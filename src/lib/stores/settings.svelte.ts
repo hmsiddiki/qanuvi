@@ -53,6 +53,8 @@ export interface Settings {
   team: import("$lib/core/decider").TeamSettings;
   /** How long "Allow for N minutes" lasts on Qanuvi's own agent's approval cards (1–240). */
   approveMinutes: number;
+  /** How Qanuvi looks (15h): the editor's font size (px) and the size of the whole interface (%). */
+  appearance: { editorFontSize: number; uiScale: number };
 }
 
 export type ModelProviderKind = "ollama" | "openai" | "openrouter";
@@ -126,6 +128,7 @@ const DEFAULTS: Settings = {
   remoteAccess: { enabled: false, relay: "", name: "" },
   brain: { providers: DEFAULT_MODEL_PROVIDERS, models: [], local: true, omniAssist: true },
   approveMinutes: 10,
+  appearance: { editorFontSize: 13, uiScale: 100 },
   team: DEFAULT_TEAM,
 };
 
@@ -175,6 +178,12 @@ export function parseSettings(json: string | null): Settings {
     typeof raw.approveMinutes === "number" && Number.isFinite(raw.approveMinutes)
       ? Math.min(240, Math.max(1, Math.round(raw.approveMinutes)))
       : 10;
+  {
+    const ap = raw.appearance && typeof raw.appearance === "object" ? (raw.appearance as Record<string, unknown>) : {};
+    const n = (v: unknown, d: number, lo: number, hi: number) =>
+      typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d;
+    s.appearance = { editorFontSize: n(ap.editorFontSize, 13, 10, 24), uiScale: n(ap.uiScale, 100, 80, 150) };
+  }
   if (Array.isArray(raw.masters))
     for (const m of raw.masters as Record<string, unknown>[]) {
       const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");

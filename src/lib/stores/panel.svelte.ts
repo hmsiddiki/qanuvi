@@ -72,6 +72,8 @@ export function moveSection(list: SectionState[], from: SectionId, to: SectionId
 class PanelStore {
   view = $state<PanelView>("workspace");
   sections = $state<SectionState[]>(DEFAULT.map((d) => ({ ...d })));
+  /** The Explorer's sections menu (show or hide sections), opened from the sidebar's switch row. */
+  menuOpen = $state(false);
   /** Goes up to ask the Search view to take focus. */
   focusSearch = $state(0);
 

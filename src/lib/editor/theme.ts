@@ -25,7 +25,7 @@ const c = {
 
 export const qanuviTheme = EditorView.theme(
   {
-    "&": { color: c.text, backgroundColor: c.bg, height: "100%", fontSize: "13px" },
+    "&": { color: c.text, backgroundColor: c.bg, height: "100%", fontSize: "var(--qx-editor-font-size, 13px)" },
     ".cm-scroller": { fontFamily: "var(--qx-font-mono)", lineHeight: "1.6" },
     ".cm-content": { caretColor: c.cursor, padding: "8px 0" },
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: c.cursor, borderLeftWidth: "2px" },

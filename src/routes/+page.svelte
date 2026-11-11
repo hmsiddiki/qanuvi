@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import SettingsView from "$lib/components/SettingsView.svelte";
   import { startWatch } from "$lib/stores/watch.svelte";
   import { knowledge } from "$lib/stores/knowledge.svelte";
@@ -166,6 +167,15 @@
     }
   }
 
+  // Appearance: the editor's font size and the size of the whole interface (the window's zoom).
+  $effect(() => {
+    const a = settings.value.appearance;
+    document.documentElement.style.setProperty("--qx-editor-font-size", `${a.editorFontSize}px`);
+    getCurrentWebview()
+      .setZoom(a.uiScale / 100)
+      .catch(() => {});
+  });
+
   let title = $derived(agent.selected?.title ?? (projects.current ? projects.current.name : "Qanuvi"));
 
   let s = $derived(layout.state);
@@ -197,7 +207,7 @@
         {/if}
       {/if}
 
-      <div class="panes" class:no-sidebar={!s.sidebarVisible}>
+      <div class="panes" class:no-sidebar={!s.sidebarVisible} class:agent-right={s.agentSide === "right"}>
         {#if ui.settings}<SettingsView />{/if}
         {#if showAgent}
           <div class="agent" class:fill={agentOnly} style:width={agentOnly ? undefined : `${s.agentWidth}px`}>
@@ -208,6 +218,7 @@
           <Splitter
             axis="x"
             size={s.agentWidth}
+            direction={s.agentSide === "right" ? -1 : 1}
             label="Resize agent pane"
             onresize={(size) => layout.setAgentWidth(size)}
           />
@@ -263,6 +274,11 @@
     display: flex;
     gap: var(--qx-space-1);
     padding: 0 var(--qx-space-2) var(--qx-space-2) var(--qx-space-1);
+  }
+
+  /* The conversation on the editor's right (the VS Code-like layout). */
+  .panes.agent-right {
+    flex-direction: row-reverse;
   }
 
   .panes.no-sidebar {

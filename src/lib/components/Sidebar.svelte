@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import ProjectPanel from "./ProjectPanel.svelte";
   import { panel, type PanelView } from "$lib/stores/panel.svelte";
   import LayoutGrid from "@lucide/svelte/icons/layout-grid";
@@ -138,6 +139,16 @@
         onclick={() => pickMode(m.id)}><m.icon size={15} /></button
       >
     {/each}
+    {#if panel.view === "explorer" && !collapsed}
+      <button
+        type="button"
+        class="sections-button"
+        class:on={panel.menuOpen}
+        title="Show or hide sections"
+        aria-label="Sections"
+        onclick={() => (panel.menuOpen = !panel.menuOpen)}><Ellipsis size={15} /></button
+      >
+    {/if}
   </div>
 
   {#if panel.view !== "workspace" && !collapsed}
@@ -620,6 +631,11 @@
 
   .modes button:hover {
     color: var(--qx-text);
+  }
+
+  .modes .sections-button {
+    flex: none;
+    width: 28px;
   }
 
   .modes button.on {

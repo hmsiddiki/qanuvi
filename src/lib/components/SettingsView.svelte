@@ -19,6 +19,10 @@
   import MastersView from "./MastersView.svelte";
   import MemoryView from "./MemoryView.svelte";
   import AccountView from "./AccountView.svelte";
+  import LayoutSettings from "./LayoutSettings.svelte";
+  import AppearanceSettings from "./AppearanceSettings.svelte";
+  import LayoutPanelLeft from "@lucide/svelte/icons/layout-panel-left";
+  import Palette from "@lucide/svelte/icons/palette";
 
   const TABS: { id: SettingsTab; label: string; icon: typeof Bot; words: string }[] = [
     {
@@ -52,6 +56,13 @@
       words: "memory entries preferences facts memory disk sync passphrase",
     },
     { id: "account", label: "Account", icon: UserRound, words: "sign in qanuvi account email" },
+    {
+      id: "layout",
+      label: "Layout",
+      icon: LayoutPanelLeft,
+      words: "layouts presets vs code coding side screen review sidebar conversation left right save",
+    },
+    { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale" },
   ];
 
   let query = $state("");
@@ -139,6 +150,10 @@
         <MemoryView />
       {:else if tab === "account"}
         <AccountView />
+      {:else if tab === "layout"}
+        <LayoutSettings />
+      {:else if tab === "appearance"}
+        <AppearanceSettings />
       {/if}
     </div>
   </section>

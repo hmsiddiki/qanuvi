@@ -7,7 +7,10 @@ import {
   parseSavedLayouts,
   MAX_NAMED_LAYOUTS,
   type LayoutState,
+  DEFAULT_LAYOUT_NAME,
+  type SidebarMode,
 } from "./layout";
+import { panel } from "$lib/stores/panel.svelte";
 
 const STORAGE_KEY = "qanuvi.layout.v1";
 
@@ -15,7 +18,7 @@ const STORAGE_KEY = "qanuvi.layout.v1";
 class LayoutStore {
   state = $state<LayoutState>(parseSavedLayouts(null).current);
   named = $state<Record<string, LayoutState>>({});
-  active = $state("Coding");
+  active = $state(DEFAULT_LAYOUT_NAME);
 
   #saveTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -88,7 +91,19 @@ class LayoutStore {
     if (!layout) return;
     this.state = { ...layout };
     this.active = name;
+    panel.show(layout.sidebarMode);
     this.saveNow();
+  }
+
+  /** Which side of the editor the conversation is on. */
+  setAgentSide(side: "left" | "right"): void {
+    this.#set({ agentSide: side });
+  }
+
+  /** What the sidebar shows when this layout is chosen (it shows it now too). */
+  setSidebarMode(mode: SidebarMode): void {
+    this.#set({ sidebarMode: mode });
+    panel.show(mode);
   }
 
   /** Saves the current layout under a name. Returns the name used, or an empty string if it could not be saved. */
@@ -96,7 +111,7 @@ class LayoutStore {
     const name = cleanLayoutName(rawName);
     if (!name) return "";
     if (!(name in this.named) && Object.keys(this.named).length >= MAX_NAMED_LAYOUTS) return "";
-    this.named = { ...this.named, [name]: { ...this.state } };
+    this.named = { ...this.named, [name]: { ...this.state, sidebarMode: panel.view } };
     this.active = name;
     this.saveNow();
     return name;
@@ -108,7 +123,7 @@ class LayoutStore {
     if (name in PRESETS) next[name] = { ...PRESETS[name] };
     else delete next[name];
     this.named = next;
-    if (!(this.active in next)) this.active = "Coding";
+    if (!(this.active in next)) this.active = DEFAULT_LAYOUT_NAME;
     this.saveNow();
   }
 

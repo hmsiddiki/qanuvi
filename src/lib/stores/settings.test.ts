@@ -51,3 +51,13 @@ describe("parseSettings", () => {
     expect(s.agents["claude-code"]).toMatchObject({ mode: "default", effort: "medium", model: "claude-sonnet-5-5" });
   });
 });
+
+describe("appearance (15h)", () => {
+  it("keeps sizes within what stays readable", () => {
+    expect(parseSettings(null).appearance).toEqual({ editorFontSize: 13, uiScale: 100 });
+    expect(parseSettings(JSON.stringify({ appearance: { editorFontSize: 99, uiScale: 10 } })).appearance).toEqual({
+      editorFontSize: 24,
+      uiScale: 80,
+    });
+  });
+});

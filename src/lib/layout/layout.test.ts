@@ -52,15 +52,23 @@ describe("cleanLayoutName", () => {
 });
 
 describe("parseSavedLayouts", () => {
-  it("starts with the presets and the Coding layout when nothing is saved", () => {
+  it("starts with the presets and the Qanuvi layout when nothing is saved", () => {
     const saved = parseSavedLayouts(null);
     expect(Object.keys(saved.named)).toEqual(Object.keys(PRESETS));
-    expect(saved.active).toBe("Coding");
-    expect(saved.current).toEqual(PRESETS.Coding);
+    expect(saved.active).toBe("Qanuvi");
+    expect(saved.current).toEqual(PRESETS.Qanuvi);
   });
 
   it("survives broken JSON", () => {
-    expect(parseSavedLayouts("{not json").active).toBe("Coding");
+    expect(parseSavedLayouts("{not json").active).toBe("Qanuvi");
+  });
+
+  it("has the VS Code-like preset: files on the left, the conversation on the right", () => {
+    expect(PRESETS["VS Code-like"]).toMatchObject({ agentSide: "right", sidebarMode: "explorer" });
+    expect(normalizeLayout({ agentSide: "middle", sidebarMode: "nowhere" })).toMatchObject({
+      agentSide: "left",
+      sidebarMode: "workspace",
+    });
   });
 
   it("keeps the user's layouts and current state, cleaned", () => {
@@ -81,7 +89,7 @@ describe("parseSavedLayouts", () => {
   it("brings back a removed preset and falls back from an unknown active name", () => {
     const saved = parseSavedLayouts(JSON.stringify({ named: {}, active: "Gone" }));
     expect(saved.named.Review).toBeDefined();
-    expect(saved.active).toBe("Coding");
+    expect(saved.active).toBe("Qanuvi");
   });
 
   it("limits the number of named layouts", () => {

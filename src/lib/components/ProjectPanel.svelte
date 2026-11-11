@@ -33,7 +33,6 @@
 
   let explorer: Explorer | undefined = $state();
   let search: SearchPanel | undefined = $state();
-  let menu = $state(false);
 
   // Search asked for (Ctrl+Shift+F): the Search view takes focus.
   $effect(() => {
@@ -204,10 +203,10 @@
     <span class="spacer"></span>
     {#if panel.view === "explorer"}
       <div class="more">
-        <button type="button" title="Sections" aria-label="Sections" onclick={() => (menu = !menu)}
+        <button type="button" title="Sections" aria-label="Sections" onclick={() => (panel.menuOpen = !panel.menuOpen)}
           ><Ellipsis size={15} /></button
         >
-        {#if menu}
+        {#if panel.menuOpen}
           <div class="menu" role="menu">
             {#each panel.sections as s (s.id)}
               <label>
@@ -469,8 +468,18 @@
     border-bottom: 0;
   }
 
-  .bar.slim > button {
+  .bar.slim > button,
+  .bar.slim .more > button {
     display: none;
+  }
+
+  .bar.slim {
+    height: 0;
+    position: relative;
+  }
+
+  .bar.slim .menu {
+    top: 2px;
   }
 
   .bar.gone {

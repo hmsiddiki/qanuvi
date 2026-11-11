@@ -585,7 +585,7 @@ runs on or off; with it off nothing is sent anywhere.
   current logo (checked by colour); Windows' icon cache for the program's path still shows the first logo. An installed
   build (new path) should be right; check after the release, and whether `ie4uinit -ClearIconCache` or a sign-out
   clears it.
-- [-] **15h. Qanuvi's own layout, with presets (owner, 2026-11-11)**: settings must not sit among the code tabs; the
+- [x] **15h. Qanuvi's own layout, with presets (owner, 2026-11-11; built 2026-11-11)**: settings must not sit among the code tabs; the
   work area holds project work only. Qanuvi keeps a look of its own (a brand), clean like VS Code but not a copy, and a
   one-click preset gives VS Code users the layout they know. Few pages (owner): one settings page with tabs, the Inbox
   as a drop-down, Plan as a work-area tab.
@@ -620,9 +620,15 @@ runs on or off; with it off nothing is sent anywhere.
     gets the room back. Only Files starts open; other sections are as tall as what they hold (up to a height
     dragged from their lower edge), so an empty one takes no room. The tree button in the work area switches the
     sidebar to Explorer and back; Ctrl+Shift+F shows Search there.
-  - [ ] Step 3: presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation
+  - [x] Step 3 (built 2026-11-11): presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation
     narrower), "VS Code-like" (icon bar on the far left, Explorer/Search/Git in a left side panel, editor centre,
     conversation on the right like a chat side bar, terminal bottom); plus Appearance and Layout tabs in Settings.
+    Built: layouts also hold the conversation's side and the sidebar's mode; presets Qanuvi (default), Coding,
+    VS Code-like, Side screen, Review, each with a line saying what it is for; Settings → Layout (pick one, the
+    conversation left or right, what the sidebar shows, save under a name, remove own layouts) and Settings →
+    Appearance (editor font size 10-24 px; interface size 80-150 %, the window's own zoom). The sections menu (...)
+    sits in the sidebar's switch row. Live: VS Code-like (files left, editor middle, conversation right), font 17 px
+    and 115 %, back to Qanuvi and the usual sizes. Later: the current plan's steps as an Explorer section.
 - [ ] **15d. Own right-click menus** (added by the owner 2026-11-10)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
