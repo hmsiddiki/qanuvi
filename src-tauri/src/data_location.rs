@@ -621,14 +621,20 @@ mod test_build_tests {
 
     #[test]
     fn a_build_in_the_source_tree_keeps_its_own_data() {
-        assert!(from_source_path(Path::new(
-            r"E:\Projects\qanuvi\src-tauri\target\release\qanuvi.exe"
-        )));
+        // Each system's own paths (a backslash separates folders on Windows only).
+        #[cfg(windows)]
+        {
+            assert!(from_source_path(Path::new(
+                r"E:\Projects\qanuvi\src-tauri\target\release\qanuvi.exe"
+            )));
+            assert!(!from_source_path(Path::new(r"D:\qanuvi\qanuvi.exe")));
+            assert!(!from_source_path(Path::new(r"C:\target\qanuvi.exe")));
+        }
         assert!(from_source_path(Path::new(
             "/home/u/qanuvi/src-tauri/target/debug/qanuvi"
         )));
-        assert!(!from_source_path(Path::new(r"D:\qanuvi\qanuvi.exe")));
-        assert!(!from_source_path(Path::new(r"C:\target\qanuvi.exe")));
+        assert!(!from_source_path(Path::new("/opt/qanuvi/qanuvi")));
+        assert!(!from_source_path(Path::new("/target/qanuvi")));
         assert_eq!(folder_name(true), format!("{IDENTIFIER}.source"));
         assert_eq!(folder_name(false), IDENTIFIER);
     }
