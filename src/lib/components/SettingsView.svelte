@@ -22,6 +22,8 @@
   import LayoutSettings from "./LayoutSettings.svelte";
   import AppearanceSettings from "./AppearanceSettings.svelte";
   import UpdatesSettings from "./UpdatesSettings.svelte";
+  import StartupSettings from "./StartupSettings.svelte";
+  import Power from "@lucide/svelte/icons/power";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import LayoutPanelLeft from "@lucide/svelte/icons/layout-panel-left";
   import Palette from "@lucide/svelte/icons/palette";
@@ -65,6 +67,12 @@
       words: "layouts presets vs code coding side screen review sidebar conversation left right save",
     },
     { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale" },
+    {
+      id: "startup",
+      label: "Start-up",
+      icon: Power,
+      words: "start up startup headroom proxy command run at start launch",
+    },
     {
       id: "updates",
       label: "Updates",
@@ -162,6 +170,8 @@
         <LayoutSettings />
       {:else if tab === "appearance"}
         <AppearanceSettings />
+      {:else if tab === "startup"}
+        <StartupSettings />
       {:else if tab === "updates"}
         <UpdatesSettings />
       {/if}

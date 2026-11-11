@@ -37,6 +37,7 @@ pub struct AppState {
     inspector: preview::Inspector,
     remotes: crate::remote::Remotes,
     accounts: crate::account::Accounts,
+    startup: crate::startup::Startup,
 }
 
 type Res<T> = Result<T, String>;
@@ -309,6 +310,42 @@ fn secrets_names(project_id: String) -> Vec<String> {
 #[tauri::command]
 fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
     crate::secrets::set(&project_id, &name, &value)
+}
+
+/// Start with Qanuvi: starts the enabled commands that are not running yet, and answers how each one is.
+#[tauri::command]
+async fn startup_start(
+    state: State<'_, AppState>,
+    items: Vec<crate::startup::Item>,
+) -> Res<Vec<crate::startup::Status>> {
+    state.startup.start_all(&items);
+    Ok(state.startup.statuses())
+}
+
+#[tauri::command]
+fn startup_status(state: State<AppState>) -> Vec<crate::startup::Status> {
+    state.startup.statuses()
+}
+
+#[tauri::command]
+fn startup_restart(
+    state: State<AppState>,
+    item: crate::startup::Item,
+) -> Vec<crate::startup::Status> {
+    state.startup.restart(&item);
+    state.startup.statuses()
+}
+
+#[tauri::command]
+fn startup_stop(state: State<AppState>, id: String) -> Vec<crate::startup::Status> {
+    state.startup.stop(&id);
+    state.startup.statuses()
+}
+
+/// Where Headroom is installed, if it is (for the one-click setup).
+#[tauri::command]
+fn startup_headroom() -> Option<String> {
+    crate::terminal::find_on_path("headroom").map(|p| p.to_string_lossy().into_owned())
 }
 
 /// A plan's private details (the plan run puts them into each step's request).
@@ -1473,6 +1510,7 @@ pub fn run() {
                 inspector: preview::Inspector::default(),
                 remotes: crate::remote::Remotes::default(),
                 accounts: crate::account::Accounts::default(),
+                startup: crate::startup::Startup::default(),
             });
             Ok(())
         })
@@ -1498,6 +1536,8 @@ pub fn run() {
                 }
                 state.terminals.kill_all();
                 state.agents.stop_all();
+                // Only what Qanuvi started at start-up (a proxy it found already running stays).
+                state.startup.stop_all();
                 state.inspector.close();
                 state.remotes.disconnect_all();
             }
@@ -1627,6 +1667,11 @@ pub fn run() {
             secrets_set,
             secrets_remove,
             plan_private,
+            startup_start,
+            startup_status,
+            startup_restart,
+            startup_stop,
+            startup_headroom,
             plan_private_add,
             plan_private_clear,
             agent_grants,

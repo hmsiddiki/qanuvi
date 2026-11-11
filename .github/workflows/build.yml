@@ -48,12 +48,16 @@ jobs:
       - run: npm ci
 
       - name: Checks and tests
+        # A test that hangs fails within minutes with its name, instead of holding the runner for an hour.
+        timeout-minutes: 30
+        env:
+          RUST_TEST_TIME_UNIT: "60000,300000"
         run: npm run verify
 
       - name: Build the app
         run: npx tauri build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: qanuvi-${{ matrix.platform }}
           path: |

@@ -55,8 +55,20 @@ export interface Settings {
   approveMinutes: number;
   /** How Qanuvi looks (15h): the editor's font size (px) and the size of the whole interface (%). */
   appearance: { editorFontSize: number; uiScale: number };
+  /** Start with Qanuvi: commands started hidden when Qanuvi starts (a Headroom proxy, for example). */
+  startup: StartupItem[];
   /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
   updates: { autoDownload: boolean };
+}
+
+/** A command Qanuvi starts with itself (hidden), and the address that answers once it runs. */
+export interface StartupItem {
+  id: string;
+  name: string;
+  command: string;
+  /** host:port, for example 127.0.0.1:8787; empty: no check. */
+  waitFor: string;
+  enabled: boolean;
 }
 
 export type ModelProviderKind = "ollama" | "openai" | "openrouter";
@@ -132,6 +144,7 @@ const DEFAULTS: Settings = {
   approveMinutes: 10,
   appearance: { editorFontSize: 13, uiScale: 100 },
   updates: { autoDownload: false },
+  startup: [],
   team: DEFAULT_TEAM,
 };
 
@@ -191,6 +204,18 @@ export function parseSettings(json: string | null): Settings {
     const up = raw.updates && typeof raw.updates === "object" ? (raw.updates as Record<string, unknown>) : {};
     s.updates = { autoDownload: up.autoDownload === true };
   }
+  if (Array.isArray(raw.startup))
+    for (const it of raw.startup as Record<string, unknown>[]) {
+      const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+      if (!it || typeof it !== "object" || !str(it.id) || !str(it.command)) continue;
+      s.startup.push({
+        id: str(it.id),
+        name: str(it.name) || str(it.command).split(" ")[0],
+        command: str(it.command),
+        waitFor: str(it.waitFor),
+        enabled: it.enabled !== false,
+      });
+    }
   if (Array.isArray(raw.masters))
     for (const m of raw.masters as Record<string, unknown>[]) {
       const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");

@@ -8,7 +8,7 @@ export type Place = WorkView | "agents" | "servers" | "memory" | "account";
 
 /** The parts of the settings page (15h). */
 export type SettingsTab =
-  "agents" | "models" | "team" | "servers" | "memory" | "account" | "layout" | "appearance" | "updates";
+  "agents" | "models" | "team" | "servers" | "memory" | "account" | "layout" | "appearance" | "startup" | "updates";
 
 /** Views that used to be pages in the work area: they open the settings page now. */
 const SETTINGS_VIEWS: Record<string, SettingsTab> = {

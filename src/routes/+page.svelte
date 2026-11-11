@@ -1,5 +1,6 @@
 <script lang="ts">
   import { updates } from "$lib/stores/updates.svelte";
+  import { startup } from "$lib/stores/startup.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import SettingsView from "$lib/components/SettingsView.svelte";
@@ -57,6 +58,7 @@
     knowledge.check().catch(() => {});
     startWatch();
     updates.start();
+    startup.start().catch(() => {});
     const flush = () => {
       layout.saveNow();
       workspace.flush();

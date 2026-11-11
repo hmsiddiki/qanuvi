@@ -4,6 +4,7 @@
    * git branch, servers, the memory disk, agents at work and this month's agent cost. Each item opens its page.
    */
   import { updates } from "$lib/stores/updates.svelte";
+  import { startup } from "$lib/stores/startup.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
@@ -203,6 +204,23 @@
 
   <span class="spacer"></span>
 
+  <!-- Start with Qanuvi: each command's state; a click opens Settings, Start-up. -->
+  {#each startup.statuses.filter((s) => s.state !== "off") as s (s.id)}
+    <button
+      type="button"
+      class="item"
+      title="{s.name}: {s.state}{s.detail ? ` (${s.detail})` : ''}"
+      onclick={() => ui.openSettings("startup")}
+    >
+      <span
+        class="sdot"
+        class:ok={s.state === "running" || s.state === "already running"}
+        class:bad={s.state === "failed" || s.state === "stopped"}
+      ></span>
+      <span>{s.name}</span>
+    </button>
+  {/each}
+
   <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. -->
   {#if updates.state === "available"}
     <button
@@ -306,6 +324,21 @@
     height: 100%;
     background: var(--qx-accent);
     transition: width 0.3s;
+  }
+
+  .sdot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--qx-status-running);
+  }
+
+  .sdot.ok {
+    background: var(--qx-status-done);
+  }
+
+  .sdot.bad {
+    background: var(--qx-status-failed);
   }
 
   .update-btn {

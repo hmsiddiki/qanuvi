@@ -674,6 +674,14 @@ impl Agents {
             return Err("Write a message first.".into());
         }
         let base_url = check_base_url(base_url.unwrap_or(""))?;
+        // A proxy set for the agent (Headroom) must answer first; it may still be starting with Qanuvi.
+        if let Some(hp) = base_url.as_deref().and_then(crate::startup::host_port)
+            && !crate::startup::wait_answers(&hp, 20)
+        {
+            return Err(format!(
+                "The proxy at {hp} (for example Headroom) is not answering. Start it (Settings, Start-up), or clear the agent's address in Settings, Agents to go direct."
+            ));
+        }
         let effort = effort.map(str::trim).filter(|e| !e.is_empty());
         if let Some(e) = effort
             && !EFFORTS.contains(&e)
