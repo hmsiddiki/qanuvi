@@ -275,6 +275,8 @@ export const api = {
     write: (id: string, data: string) => invoke<void>("term_write", { id, data }),
     resize: (id: string, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
     kill: (id: string) => invoke<void>("term_kill", { id }),
+    /** Stops this window's terminals (before the interface reloads). */
+    killWindow: () => invoke<void>("term_kill_window"),
   },
   git: {
     status: (projectId: string) => invoke<GitStatus>("git_status", { projectId }),

@@ -3,6 +3,7 @@
    * The thin bar along the bottom of the window, as in VS Code: the account (with its popup), the current project's
    * git branch, servers, the memory disk, agents at work and this month's agent cost. Each item opens its page.
    */
+  import { updates } from "$lib/stores/updates.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
@@ -207,6 +208,18 @@
         <span>{running} working{waiting ? `, ${waiting} waiting` : ""}</span>
       </span>
     {/if}
+    {#if updates.state === "downloading"}
+      <span class="item static update" title="Downloading Qanuvi {updates.version}">
+        <span>Updating to {updates.version}</span>
+        <span class="progress"><span style:width="{updates.percent}%"></span></span>
+      </span>
+    {:else if updates.state === "ready" && !updates.later}
+      <span class="item static update ready">
+        <span>Qanuvi {updates.version} is ready</span>
+        <button type="button" class="link" onclick={() => updates.restartToUpdate()}>Restart now</button>
+        <button type="button" class="link quiet" onclick={() => (updates.later = true)}>Later</button>
+      </span>
+    {/if}
     {#if monthCost !== null}
       <button
         type="button"
@@ -256,6 +269,42 @@
 
   .item.static {
     cursor: default;
+  }
+
+  .update {
+    gap: 8px;
+  }
+
+  .update .progress {
+    width: 90px;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--qx-border);
+  }
+
+  .update .progress span {
+    display: block;
+    height: 100%;
+    background: var(--qx-accent);
+    transition: width 0.3s;
+  }
+
+  .update.ready {
+    color: var(--qx-text);
+  }
+
+  .update .link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--qx-accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .update .link.quiet {
+    color: var(--qx-text-muted);
   }
 
   .item.warn {

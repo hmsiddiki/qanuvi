@@ -21,6 +21,8 @@
   import AccountView from "./AccountView.svelte";
   import LayoutSettings from "./LayoutSettings.svelte";
   import AppearanceSettings from "./AppearanceSettings.svelte";
+  import UpdatesSettings from "./UpdatesSettings.svelte";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import LayoutPanelLeft from "@lucide/svelte/icons/layout-panel-left";
   import Palette from "@lucide/svelte/icons/palette";
 
@@ -63,6 +65,12 @@
       words: "layouts presets vs code coding side screen review sidebar conversation left right save",
     },
     { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale" },
+    {
+      id: "updates",
+      label: "Updates",
+      icon: RefreshCw,
+      words: "update version channel check restart reload window new release",
+    },
   ];
 
   let query = $state("");
@@ -154,6 +162,8 @@
         <LayoutSettings />
       {:else if tab === "appearance"}
         <AppearanceSettings />
+      {:else if tab === "updates"}
+        <UpdatesSettings />
       {/if}
     </div>
   </section>

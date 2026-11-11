@@ -3,7 +3,10 @@ name: Build
 # Builds and tests Qanuvi on Windows, Linux and macOS for every push and pull request.
 on:
   push:
+    # Plan and documentation edits do not need a build (and must not cancel one that is running).
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:
 
 concurrency:

@@ -287,6 +287,12 @@ fn term_spawn(
     Ok(id)
 }
 
+/// Stops the terminals of this window (before its interface reloads; they start again afterwards).
+#[tauri::command]
+fn term_kill_window(window: tauri::Window, state: State<AppState>) {
+    state.terminals.kill_owner(window.label());
+}
+
 #[tauri::command]
 fn term_write(state: State<AppState>, id: String, data: String) -> Res<()> {
     state.terminals.write(&id, &data)
@@ -1342,6 +1348,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             let dir = data.clone();
             paths::set_data_dir(dir.clone());
@@ -1467,6 +1475,7 @@ pub fn run() {
             term_shells,
             term_spawn,
             term_write,
+            term_kill_window,
             term_resize,
             term_kill,
             git_status,

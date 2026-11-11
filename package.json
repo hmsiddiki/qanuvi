@@ -1,6 +1,6 @@
 {
   "name": "qanuvi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A light, agent-first project handler and personal assistant",
   "type": "module",
   "scripts": {
@@ -45,6 +45,8 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "codemirror": "^6.0.2"

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { updates } from "$lib/stores/updates.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import SettingsView from "$lib/components/SettingsView.svelte";
@@ -55,6 +56,7 @@
     agent.loadInfo();
     knowledge.check().catch(() => {});
     startWatch();
+    updates.start();
     const flush = () => {
       layout.saveNow();
       workspace.flush();
@@ -158,6 +160,9 @@
       event.preventDefault();
       ui.quickOpenText = "@";
       ui.quickOpen = true;
+    } else if (k === "r" && event.shiftKey) {
+      event.preventDefault();
+      updates.reloadWindow();
     } else if (k === "f" && event.shiftKey && projects.current) {
       event.preventDefault();
       if (!layout.state.workVisible) layout.toggleWork();
