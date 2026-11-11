@@ -693,7 +693,20 @@ pub fn serve(args: &[String], setup: Setup, root: PathBuf, rx: Receiver<Value>, 
                 }))
             }
             "user" => {
-                let text = text_of(&msg["message"]["content"]);
+                let content = &msg["message"]["content"];
+                let images = content
+                    .as_array()
+                    .map_or(0, |a| a.iter().filter(|b| b["type"] == "image").count());
+                if images > 0 {
+                    agent.notice(
+                        "",
+                        &format!(
+                            "{images} attached image{} left out: Qanuvi core's models read text only. Claude Code can see images.",
+                            if images == 1 { "" } else { "s" }
+                        ),
+                    );
+                }
+                let text = text_of(content);
                 if !text.trim().is_empty() {
                     agent.turn(&text);
                 }

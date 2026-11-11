@@ -7,7 +7,7 @@
 import { withoutOverruleNote } from "$lib/core/decider";
 
 export type Item =
-  | { kind: "user"; id: string; text: string }
+  | { kind: "user"; id: string; text: string; attachments?: string[] }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
   | {
@@ -122,7 +122,13 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
   // Anything else ends the live text: the whole message (or a handover, or the end) takes its place.
   const out = items.filter((x) => !(x.kind === "text" && x.live));
   if (type === "qanuvi_user") {
-    out.push({ kind: "user", id: `u${seq}`, text: withoutOverruleNote(str(msg.text)) });
+    const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
+    out.push({
+      kind: "user",
+      id: `u${seq}`,
+      text: withoutOverruleNote(str(msg.text)),
+      ...(attachments.length ? { attachments } : {}),
+    });
   } else if (type === "qanuvi_permission") {
     const i = out.findIndex((x) => x.kind === "approval" && x.id === str(msg.request_id));
     if (i >= 0)

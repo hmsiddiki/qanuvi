@@ -132,6 +132,14 @@ export interface AgentConfigFile {
   exists: boolean;
 }
 
+/** A file or web page attached to a message: an image the agent sees, or text it reads. */
+export interface Attachment {
+  name: string;
+  kind: "image" | "text" | "page";
+  mediaType: string;
+  data: string;
+}
+
 export interface Session {
   id: string;
   project_id: string;
@@ -267,6 +275,11 @@ export const api = {
     show: (projectId: string, sha: string, path: string | null) => invoke<string>("git_show", { projectId, sha, path }),
     blame: (projectId: string, path: string, line: number) => invoke<GitBlame>("git_blame", { projectId, path, line }),
   },
+  /** Files and web pages for the next message (the composer's + menu). */
+  attachments: {
+    file: (path: string) => invoke<Attachment>("attachment_file", { path }),
+    page: (url: string) => invoke<Attachment>("attachment_page", { url }),
+  },
   /** Qanuvi's remote knowledge (24c): the signed file's text, its signature checked. */
   knowledge: {
     fetch: (url = "") => invoke<string>("knowledge_fetch", { url }),
@@ -296,6 +309,7 @@ export const api = {
       context: string | null = null,
       agent = "claude-code",
       setup: unknown = null,
+      files: Attachment[] = [],
     ) => {
       const channel = new Channel<AgentEvent>();
       channel.onmessage = onEvent;
@@ -313,6 +327,7 @@ export const api = {
         indexTools,
         browserTools,
         context,
+        files: files.length ? files : null,
         onEvent: channel,
       });
     },

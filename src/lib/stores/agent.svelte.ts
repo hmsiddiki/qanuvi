@@ -1,4 +1,4 @@
-import { api, errorText, type AgentEvent, type AgentInfo, type Grant, type Session } from "$lib/api";
+import { api, errorText, type AgentEvent, type AgentInfo, type Attachment, type Grant, type Session } from "$lib/api";
 import { reduce, reduceAll, type Item } from "$lib/agent/events";
 import { settings } from "./settings.svelte";
 import { memoryContext } from "./memory.svelte";
@@ -13,6 +13,8 @@ class AgentStore {
   info = $state<AgentInfo | null>(null);
   sessions = $state<Session[]>([]);
   selectedId = $state<string | null>(null);
+  /** Files and pages added for the next message (the composer's + menu). */
+  attachments = $state<Attachment[]>([]);
   /** Standing approvals of the selected session. */
   grants = $state<Grant[]>([]);
   items = $state<Item[]>([]);
@@ -167,7 +169,12 @@ ${text}`
     this.busy = true;
     let currentId = this.selectedId;
     // Show the message straight away; the stored copy is the same text.
-    this.items = reduce(this.items, JSON.stringify({ type: "qanuvi_user", text }), ++this.#seq);
+    const files = this.attachments;
+    this.items = reduce(
+      this.items,
+      JSON.stringify({ type: "qanuvi_user", text, ...(files.length ? { attachments: files.map((f) => f.name) } : {}) }),
+      ++this.#seq,
+    );
     try {
       // A new session gets the relevant part of the user's memory with its first message.
       const context = this.selectedId ? null : await memoryContext(projectId, text);
@@ -210,7 +217,10 @@ ${text}`
         context,
         this.providerId,
         setupFor(this.providerId),
+        files,
       );
+      // Sent with this message: the next one starts without them.
+      if (this.attachments === files) this.attachments = [];
       currentId = session.id;
       this.#upsert(session);
       this.selectedId = session.id;

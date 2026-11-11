@@ -446,6 +446,7 @@ fn agent_start(
     index_tools: Option<bool>,
     browser_tools: Option<bool>,
     context: Option<String>,
+    files: Option<Vec<agent::Attachment>>,
     agent: Option<String>,
     setup: Option<serde_json::Value>,
     on_event: Channel<agent::AgentEvent>,
@@ -468,6 +469,7 @@ fn agent_start(
         index_tools.unwrap_or(false),
         browser_tools.unwrap_or(false),
         context.as_deref(),
+        &files.unwrap_or_default(),
         agent.as_deref().unwrap_or("claude-code"),
         setup.as_deref(),
         on_event.into(),
@@ -975,6 +977,18 @@ async fn core_decide(setup: String, system: String, prompt: String) -> Res<(Stri
     .await
 }
 
+/// A file from this computer for the next message (the composer's + menu).
+#[tauri::command]
+async fn attachment_file(path: String) -> Res<agent::Attachment> {
+    blocking(move || crate::attachments::read_file(std::path::Path::new(&path))).await
+}
+
+/// A web page as text for the next message.
+#[tauri::command]
+async fn attachment_page(url: String) -> Res<agent::Attachment> {
+    blocking(move || crate::attachments::read_page(&url)).await
+}
+
 /// Qanuvi's remote knowledge file (24c), its signature checked against the built-in key; empty `url`: the default.
 #[tauri::command]
 async fn knowledge_fetch(url: String) -> Res<String> {
@@ -1356,6 +1370,8 @@ pub fn run() {
             omniroute_connections,
             core_decide,
             knowledge_fetch,
+            attachment_file,
+            attachment_page,
             data_location_info,
             data_location_move,
             data_location_cancel,

@@ -1,9 +1,9 @@
 <script lang="ts">
+  import AttachMenu from "./AttachMenu.svelte";
   import { overruleIn } from "$lib/core/decider";
   import { reviewFreeTurn } from "$lib/stores/chatReview";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import Square from "@lucide/svelte/icons/square";
-  import Plus from "@lucide/svelte/icons/plus";
   import Bot from "@lucide/svelte/icons/bot";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import CircleX from "@lucide/svelte/icons/circle-x";
@@ -191,7 +191,14 @@
     {:else}
       {#each agent.items as item (item.id)}
         {#if item.kind === "user"}
-          <div class="user">{item.text}</div>
+          <div class="user">
+            {item.text}
+            {#if item.attachments?.length}
+              <div class="chips">
+                {#each item.attachments as name (name)}<span class="chip" title={name}>📎 {name}</span>{/each}
+              </div>
+            {/if}
+          </div>
         {:else if item.kind === "text"}
           {#if item.live}
             {#if !looksLikeCall(item.text)}<div class="text live">{item.text}</div>{/if}
@@ -300,6 +307,20 @@
   {/if}
 
   <form class="composer" onsubmit={send}>
+    {#if agent.attachments.length}
+      <div class="chips pending">
+        {#each agent.attachments as f, i (i)}
+          <span class="chip" title={f.name}
+            >{f.kind === "image" ? "🖼" : f.kind === "page" ? "🌐" : "📄"}
+            {f.name}<button
+              type="button"
+              aria-label="Remove {f.name}"
+              onclick={() => (agent.attachments = agent.attachments.filter((_, j) => j !== i))}>×</button
+            ></span
+          >
+        {/each}
+      </div>
+    {/if}
     <textarea
       bind:value={agent.draft}
       bind:this={agent.input}
@@ -310,9 +331,7 @@
       onkeydown={keydown}
       oninput={input}></textarea>
     <div class="tools">
-      <button type="button" title="New session" aria-label="New session" onclick={() => agent.newSession()}>
-        <Plus size={15} />
-      </button>
+      <AttachMenu disabled={!project} />
       <CommandMenu bind:open={commandsOpen} disabled={!project} />
       <span class="spacer"></span>
       <ModePicker disabled={running} />
@@ -406,6 +425,41 @@
   .empty p {
     margin: 0;
     color: var(--qx-text-secondary);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .chips.pending {
+    margin: 0 0 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    overflow: hidden;
+    max-width: 260px;
+    padding: 2px 8px;
+    border: 1px solid var(--qx-border);
+    border-radius: 10px;
+    color: var(--qx-text-secondary);
+    font-size: 11px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .chip button {
+    padding: 0 0 0 2px;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
   }
 
   .user {

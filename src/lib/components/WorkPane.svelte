@@ -77,6 +77,18 @@
     const text = editorView?.currentText();
     if (active && text !== null && text !== undefined) await editor.save(active.key, text, true);
   }
+
+  // The tab strip, and the open tab kept in view (a newly opened one may be past the edge).
+  let tabStrip = $state<HTMLDivElement | null>(null);
+  $effect(() => {
+    const key = editor.activeKey;
+    if (!tabStrip || !key) return;
+    queueMicrotask(() =>
+      tabStrip
+        ?.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)
+        ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
+    );
+  });
 </script>
 
 <section class="work-pane" aria-label="Work">
@@ -103,9 +115,20 @@
           >
             <FolderTree size={14} />
           </IconButton>
-          <div class="file-tabs">
+          <div
+            class="file-tabs"
+            bind:this={tabStrip}
+            onwheel={(e) => {
+              if (!tabStrip || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+              tabStrip.scrollLeft += e.deltaY;
+            }}
+          >
             {#each fileTabs as tab (tab.key)}
-              <div class="tab file-tab" class:active={ui.view === "editor" && editor.activeKey === tab.key}>
+              <div
+                class="tab file-tab"
+                class:active={ui.view === "editor" && editor.activeKey === tab.key}
+                data-key={tab.key}
+              >
                 <button
                   type="button"
                   role="tab"
@@ -118,7 +141,7 @@
                   onauxclick={(e) => e.button === 1 && editor.close(tab.key)}
                 >
                   <FileCode size={13} />
-                  <span>{tab.label ?? fileName(tab.path)}</span>
+                  <span class="name">{tab.label ?? fileName(tab.path)}</span>
                 </button>
                 <button
                   type="button"
@@ -381,6 +404,27 @@
     scrollbar-width: none;
   }
 
+  .file-tabs:hover {
+    scrollbar-width: thin;
+  }
+
+  .file-tab {
+    flex: 0 1 auto;
+    min-width: 96px;
+    max-width: 240px;
+  }
+
+  .file-tab > button:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .file-tab .name {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+
   .tab {
     flex: none;
     display: flex;
@@ -417,6 +461,7 @@
   }
 
   .file-tab .close {
+    flex: none;
     width: 20px;
     height: 20px;
     padding: 0;

@@ -5,7 +5,7 @@ use crate::projects::Project;
 use crate::sink::Sink;
 use crate::store::{Db, now};
 use rusqlite::{OptionalExtension, Row, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -454,10 +454,74 @@ pub fn with_context(context: Option<&str>, prompt: &str) -> String {
     }
 }
 
-fn user_message(text: &str) -> String {
+/// A file the user attached to a message: an image the agent sees, or a text file or web page it reads.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attachment {
+    pub name: String,
+    /// "image", "text" or "page".
+    pub kind: String,
+    /// For images: image/png, image/jpeg, image/gif or image/webp.
+    #[serde(default)]
+    pub media_type: String,
+    /// Images: base64. Text files and pages: the text.
+    pub data: String,
+}
+
+/// The text of attached files and pages, as notes before the user's words (images go as images instead).
+pub fn attached_text(files: &[Attachment]) -> Option<String> {
+    let parts: Vec<String> = files
+        .iter()
+        .filter(|f| f.kind != "image")
+        .map(|f| {
+            let what = if f.kind == "page" {
+                "Web page"
+            } else {
+                "Attached file"
+            };
+            format!("{what}: {}\n```\n{}\n```", f.name, f.data.trim_end())
+        })
+        .collect();
+    (!parts.is_empty()).then(|| parts.join("\n\n"))
+}
+
+/// The notes Qanuvi adds (memory) and the text of attachments, together.
+fn context_with(context: Option<&str>, files: &[Attachment]) -> Option<String> {
+    let parts: Vec<String> = context
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .map(String::from)
+        .into_iter()
+        .chain(attached_text(files))
+        .collect();
+    (!parts.is_empty()).then(|| parts.join("\n\n"))
+}
+
+/// The user's line as stored and shown: their words and the names of what they attached.
+fn user_line(prompt: &str, files: &[Attachment]) -> String {
+    let mut v = json!({"type": "qanuvi_user", "text": prompt});
+    if !files.is_empty() {
+        v["attachments"] = json!(files.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+    }
+    v.to_string()
+}
+
+fn user_message(text: &str, files: &[Attachment]) -> String {
+    let images: Vec<Value> = files
+        .iter()
+        .filter(|f| f.kind == "image")
+        .map(|f| json!({"type": "image", "source": {"type": "base64", "media_type": f.media_type, "data": f.data}}))
+        .collect();
+    let content = if images.is_empty() {
+        json!(text)
+    } else {
+        let mut blocks = vec![json!({"type": "text", "text": text})];
+        blocks.extend(images);
+        Value::Array(blocks)
+    };
     json!({
         "type": "user",
-        "message": { "role": "user", "content": text },
+        "message": { "role": "user", "content": content },
         "parent_tool_use_id": null,
         "session_id": ""
     })
@@ -488,10 +552,13 @@ impl Agents {
         index_tools: bool,
         browser_tools: bool,
         context: Option<&str>,
+        files: &[Attachment],
         kind: &str,
         setup: Option<&str>,
         channel: Sink<AgentEvent>,
     ) -> Result<Session, String> {
+        let context = context_with(context, files);
+        let context = context.as_deref();
         let own = kind == OWN_AGENT;
         if !own && kind != "claude-code" {
             return Err(format!("Unknown agent {kind}."));
@@ -546,13 +613,9 @@ impl Agents {
                 }
                 send_line(
                     &mut running.stdin,
-                    &user_message(&with_context(context, prompt)),
+                    &user_message(&with_context(context, prompt), files),
                 )?;
-                append_event(
-                    db,
-                    id,
-                    &json!({"type": "qanuvi_user", "text": prompt}).to_string(),
-                );
+                append_event(db, id, &user_line(prompt, files));
                 drop(map);
                 set_status(db, id, "running");
                 return get(db, id);
@@ -689,12 +752,11 @@ impl Agents {
             &json!({"type": "control_request", "request_id": "qanuvi-init", "request": {"subtype": "initialize"}})
                 .to_string(),
         )?;
-        send_line(&mut stdin, &user_message(&with_context(context, prompt)))?;
-        append_event(
-            db,
-            &session.id,
-            &json!({"type": "qanuvi_user", "text": prompt}).to_string(),
-        );
+        send_line(
+            &mut stdin,
+            &user_message(&with_context(context, prompt), files),
+        )?;
+        append_event(db, &session.id, &user_line(prompt, files));
 
         let pending = Arc::new(Mutex::new(HashMap::new()));
         let channel = Arc::new(Mutex::new(channel));
@@ -1234,5 +1296,50 @@ Fix it"
             v["mcpServers"]["qanuvi"]["args"],
             json!(["--mcp", "/p", "--memory", "/d/qanuvi.db", "--scope", "p1"])
         );
+    }
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+
+    fn file(name: &str, kind: &str, data: &str) -> Attachment {
+        Attachment {
+            name: name.into(),
+            kind: kind.into(),
+            media_type: "image/png".into(),
+            data: data.into(),
+        }
+    }
+
+    #[test]
+    fn images_go_as_images_and_text_goes_before_the_words() {
+        let files = [
+            file("shot.png", "image", "QUJD"),
+            file("notes.txt", "text", "milk"),
+        ];
+        let msg: Value = serde_json::from_str(&user_message("Look", &files)).unwrap();
+        let content = &msg["message"]["content"];
+        assert_eq!(content[0]["text"], "Look");
+        assert_eq!(content[1]["type"], "image");
+        assert_eq!(content[1]["source"]["data"], "QUJD");
+        let ctx = context_with(Some("memory"), &files).unwrap();
+        assert!(ctx.starts_with("memory"));
+        assert!(
+            ctx.contains("Attached file: notes.txt")
+                && ctx.contains("milk")
+                && !ctx.contains("QUJD")
+        );
+        let line: Value = serde_json::from_str(&user_line("Look", &files)).unwrap();
+        assert_eq!(line["attachments"], json!(["shot.png", "notes.txt"]));
+    }
+
+    #[test]
+    fn without_attachments_the_message_stays_plain_text() {
+        let msg: Value = serde_json::from_str(&user_message("Hi", &[])).unwrap();
+        assert_eq!(msg["message"]["content"], "Hi");
+        assert!(context_with(None, &[]).is_none());
+        let line: Value = serde_json::from_str(&user_line("Hi", &[])).unwrap();
+        assert!(line.get("attachments").is_none());
     }
 }

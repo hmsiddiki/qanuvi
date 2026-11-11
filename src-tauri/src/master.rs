@@ -310,6 +310,13 @@ impl Master {
                     b(args, "indexTools"),
                     b(args, "browserTools"),
                     opt(args, "context").as_deref(),
+                    &args
+                        .get("files")
+                        .filter(|v| !v.is_null())
+                        .map(|v| serde_json::from_value::<Vec<agent::Attachment>>(v.clone()))
+                        .transpose()
+                        .map_err(|e| e.to_string())?
+                        .unwrap_or_default(),
                     opt(args, "agent").as_deref().unwrap_or("claude-code"),
                     args.get("setup")
                         .filter(|v| !v.is_null())
