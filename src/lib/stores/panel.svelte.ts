@@ -1,16 +1,16 @@
 /**
- * The project panel on the work area's left edge (15h): which view it shows (Explorer, Search, Git), and the Explorer's
- * sections: their order, which are open, which are hidden, and their heights. Kept on this computer.
+ * The left sidebar's modes (15h): Workspace (projects, sessions, pages), Explorer, Search and Git; and the Explorer's
+ * sections: their order, which are open, which are hidden, and their largest height. Kept on this computer.
  */
 
-export type PanelView = "explorer" | "search" | "git";
+export type PanelView = "workspace" | "explorer" | "search" | "git";
 export type SectionId = "editors" | "files" | "outline" | "timeline" | "touched";
 
 export interface SectionState {
   id: SectionId;
   open: boolean;
   hidden: boolean;
-  /** Height in pixels; the Files section takes the room that is left instead. */
+  /** Largest height in pixels (a section is only as tall as what it holds); Files takes the room that is left. */
   height: number;
 }
 
@@ -22,19 +22,19 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   touched: "Touched in this session",
 };
 
-const KEY = "qanuvi.panel.v1";
+const KEY = "qanuvi.panel.v2";
 const DEFAULT: SectionState[] = [
-  { id: "editors", open: false, hidden: false, height: 140 },
   { id: "files", open: true, hidden: false, height: 0 },
-  { id: "outline", open: false, hidden: false, height: 180 },
-  { id: "timeline", open: false, hidden: false, height: 180 },
-  { id: "touched", open: false, hidden: true, height: 160 },
+  { id: "editors", open: false, hidden: false, height: 180 },
+  { id: "outline", open: false, hidden: false, height: 240 },
+  { id: "timeline", open: false, hidden: false, height: 240 },
+  { id: "touched", open: false, hidden: true, height: 200 },
 ];
 
 /** Reads a stored panel state, keeping only known sections and adding any that are new. */
 export function parsePanel(raw: unknown): { view: PanelView; sections: SectionState[] } {
   const r = (raw && typeof raw === "object" ? raw : {}) as { view?: unknown; sections?: unknown };
-  const view: PanelView = r.view === "search" || r.view === "git" ? r.view : "explorer";
+  const view: PanelView = r.view === "explorer" || r.view === "search" || r.view === "git" ? r.view : "workspace";
   const known = new Map(DEFAULT.map((d) => [d.id, d]));
   const out: SectionState[] = [];
   for (const s of Array.isArray(r.sections) ? (r.sections as Partial<SectionState>[]) : []) {
@@ -70,7 +70,7 @@ export function moveSection(list: SectionState[], from: SectionId, to: SectionId
 }
 
 class PanelStore {
-  view = $state<PanelView>("explorer");
+  view = $state<PanelView>("workspace");
   sections = $state<SectionState[]>(DEFAULT.map((d) => ({ ...d })));
   /** Goes up to ask the Search view to take focus. */
   focusSearch = $state(0);

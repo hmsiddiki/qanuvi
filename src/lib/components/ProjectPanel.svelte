@@ -28,7 +28,8 @@
   import SearchPanel from "./SearchPanel.svelte";
   import SourceControl from "./SourceControl.svelte";
 
-  let { project }: { project: Project } = $props();
+  /** views: false inside the sidebar, whose mode switch chooses Explorer, Search or Git. */
+  let { project, views = true }: { project: Project; views?: boolean } = $props();
 
   let explorer: Explorer | undefined = $state();
   let search: SearchPanel | undefined = $state();
@@ -176,24 +177,30 @@
 </script>
 
 <div class="panel">
-  <div class="bar">
-    <button
-      type="button"
-      class:on={panel.view === "explorer"}
-      title="Explorer"
-      aria-label="Explorer"
-      onclick={() => panel.show("explorer")}><Files size={15} /></button
-    >
-    <button
-      type="button"
-      class:on={panel.view === "search"}
-      title="Search in the project"
-      aria-label="Search"
-      onclick={() => panel.show("search")}><Search size={15} /></button
-    >
-    <button type="button" class:on={panel.view === "git"} title="Git" aria-label="Git" onclick={() => panel.show("git")}
-      ><GitBranch size={15} /></button
-    >
+  <div class="bar" class:slim={!views} class:gone={!views && panel.view !== "explorer"}>
+    {#if views}
+      <button
+        type="button"
+        class:on={panel.view === "explorer"}
+        title="Explorer"
+        aria-label="Explorer"
+        onclick={() => panel.show("explorer")}><Files size={15} /></button
+      >
+      <button
+        type="button"
+        class:on={panel.view === "search"}
+        title="Search in the project"
+        aria-label="Search"
+        onclick={() => panel.show("search")}><Search size={15} /></button
+      >
+      <button
+        type="button"
+        class:on={panel.view === "git"}
+        title="Git"
+        aria-label="Git"
+        onclick={() => panel.show("git")}><GitBranch size={15} /></button
+      >
+    {/if}
     <span class="spacer"></span>
     {#if panel.view === "explorer"}
       <div class="more">
@@ -288,7 +295,7 @@
           </header>
 
           {#if s.open}
-            <div class="body" style:height={s.id === "files" ? undefined : `${s.height}px`}>
+            <div class="body" style:max-height={s.id === "files" ? undefined : `${s.height}px`}>
               {#if s.id === "editors"}
                 {#each editor.visible(project.id) as tab (tab.key)}
                   <div class="row" class:active={editor.activeKey === tab.key}>
@@ -454,6 +461,20 @@
 
   .spacer {
     flex: 1;
+  }
+
+  /* In the sidebar: only the sections menu, small. */
+  .bar.slim {
+    padding: 0 2px;
+    border-bottom: 0;
+  }
+
+  .bar.slim > button {
+    display: none;
+  }
+
+  .bar.gone {
+    display: none;
   }
 
   .more {
@@ -701,5 +722,10 @@
   /* The tree inside the Files section uses its own rows; the section header replaces its header. */
   .section :global(.explorer) {
     height: auto;
+  }
+
+  /* One scrollbar: the section's, not the tree's own. */
+  .section :global(.explorer .tree) {
+    overflow: visible;
   }
 </style>

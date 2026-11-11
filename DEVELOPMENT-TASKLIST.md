@@ -614,6 +614,12 @@ runs on or off; with it off nothing is sent anywhere.
     into the panel (Ctrl+Shift+F opens it). The Inbox is a drop-down beside its sidebar entry (Esc or a click outside
     closes it). Live: Outline of agent.rs, Timeline of notes.txt (5 agent sessions) and agent.rs (3 commits), New
     file, a change opening its diff, Search, the Inbox. Still to come: the current plan's steps as a section.
+    Changed after the owner tried it (2026-11-11): four columns were too many (sidebar, conversation, panel,
+    editor) and Files was squeezed. The panel now lives in the left sidebar behind a mode switch at its top
+    (Workspace | Explorer | Search | Git; collapsed, the icons stand in a column and open the sidebar); the editor
+    gets the room back. Only Files starts open; other sections are as tall as what they hold (up to a height
+    dragged from their lower edge), so an empty one takes no room. The tree button in the work area switches the
+    sidebar to Explorer and back; Ctrl+Shift+F shows Search there.
   - [ ] Step 3: presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation
     narrower), "VS Code-like" (icon bar on the far left, Explorer/Search/Git in a left side panel, editor centre,
     conversation on the right like a chat side bar, terminal bottom); plus Appearance and Layout tabs in Settings.

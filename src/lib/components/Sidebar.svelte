@@ -1,4 +1,10 @@
 <script lang="ts">
+  import ProjectPanel from "./ProjectPanel.svelte";
+  import { panel, type PanelView } from "$lib/stores/panel.svelte";
+  import LayoutGrid from "@lucide/svelte/icons/layout-grid";
+  import Files from "@lucide/svelte/icons/files";
+  import Search from "@lucide/svelte/icons/search";
+  import GitBranch from "@lucide/svelte/icons/git-branch";
   import InboxView from "./InboxView.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
   import House from "@lucide/svelte/icons/house";
@@ -27,6 +33,19 @@
   import { editor } from "$lib/stores/editor.svelte";
   import { terminals } from "$lib/stores/terminals.svelte";
   import { settings } from "$lib/stores/settings.svelte";
+
+  /** The sidebar's modes (15h): the workspace, or the current project's files, search and git. */
+  const MODES = [
+    { id: "workspace", label: "Workspace: projects, sessions, Inbox", icon: LayoutGrid },
+    { id: "explorer", label: "Explorer: the project's files", icon: Files },
+    { id: "search", label: "Search in the project", icon: Search },
+    { id: "git", label: "Git: changes, commits, branches", icon: GitBranch },
+  ] as const;
+
+  function pickMode(id: PanelView) {
+    if (collapsed && id !== "workspace") layout.toggleSidebarCollapsed();
+    panel.show(id);
+  }
 
   /** Where the Inbox drop-down opens: beside the Inbox entry. */
   let inboxAt = $state({ left: 260, top: 120 });
@@ -107,141 +126,170 @@
     {/if}
   </button>
 
-  <ul class="items">
-    {#each items as item (item.id)}
-      <li>
-        <button
-          type="button"
-          class="item"
-          class:current={ui.section === item.id}
-          data-nav={item.id}
-          aria-current={ui.section === item.id ? "page" : undefined}
-          title={collapsed ? item.label : undefined}
-          onclick={() => navigate(item.id)}
-        >
-          <item.icon size={16} />
-          {#if !collapsed}<span>{item.label}</span>{/if}
-          {#if item.id === "memory" && memory.waiting > 0}<span
-              class="pill"
-              title="{memory.waiting} suggested by agents">{memory.waiting}</span
-            >{/if}
-          {#if item.id === "inbox" && waiting > 0}<span class="pill" title="{waiting} waiting for you or not read yet"
-              >{waiting}</span
-            >{/if}
-        </button>
-      </li>
+  <div class="modes" class:vertical={collapsed} role="tablist" aria-label="Sidebar">
+    {#each MODES as m (m.id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={panel.view === m.id}
+        class:on={panel.view === m.id}
+        title={m.label}
+        aria-label={m.label}
+        onclick={() => pickMode(m.id)}><m.icon size={15} /></button
+      >
     {/each}
-  </ul>
+  </div>
 
-  {#if !collapsed}
-    <section class="group">
-      <header>
-        <span>Projects</span>
-        <button
-          type="button"
-          class="add"
-          title="Add a project"
-          aria-label="Add a project"
-          onclick={() => projects.addWithPicker()}
-        >
-          <Plus size={14} />
-        </button>
-      </header>
-      {#if projects.error}<p class="error">{projects.error}</p>{/if}
-      {#each projects.list as p (p.id)}
-        {@const style = kindStyle(p.kind)}
-        <div class="project" class:current={p.id === projects.currentId}>
+  {#if panel.view !== "workspace" && !collapsed}
+    <div class="project-panel">
+      {#if projects.current}
+        <ProjectPanel project={projects.current} views={false} />
+      {:else}
+        <p class="empty">Add a project to see its files.</p>
+      {/if}
+    </div>
+  {:else}
+    <ul class="items">
+      {#each items as item (item.id)}
+        <li>
           <button
             type="button"
-            class="project-main"
-            title="{p.master
-              ? `On ${masters.list.find((m) => m.id === p.master)?.name ?? 'a server'}: `
-              : ''}{p.path}  ·  {style.label}"
-            onclick={() => {
-              // A project open in another window: bring that window forward instead of editing it twice.
-              const other = windows.windowOf(p.id);
-              if (other) windows.focus(other);
-              else projects.select(p.id);
-            }}
+            class="item"
+            class:current={ui.section === item.id}
+            data-nav={item.id}
+            aria-current={ui.section === item.id ? "page" : undefined}
+            title={collapsed ? item.label : undefined}
+            onclick={() => navigate(item.id)}
           >
-            <span class="kind" style:background={style.color}>{style.label.slice(0, 1)}</span>
-            <span class="project-name">{p.name}</span>
-            {#if p.master}<span class="remote" title="On a server"><Server size={11} /></span>{/if}
-            {#if windows.windowOf(p.id)}<span class="elsewhere" title="Open in another window (click to go there)"
-                ><AppWindow size={11} /></span
+            <item.icon size={16} />
+            {#if !collapsed}<span>{item.label}</span>{/if}
+            {#if item.id === "memory" && memory.waiting > 0}<span
+                class="pill"
+                title="{memory.waiting} suggested by agents">{memory.waiting}</span
+              >{/if}
+            {#if item.id === "inbox" && waiting > 0}<span class="pill" title="{waiting} waiting for you or not read yet"
+                >{waiting}</span
               >{/if}
           </button>
-          <button
-            type="button"
-            class="mini"
-            title="Open in a new window"
-            aria-label="Open {p.name} in a new window"
-            onclick={() => windows.openProject(p.id, p.name)}
-          >
-            <AppWindow size={13} />
-          </button>
-          <button
-            type="button"
-            class="mini"
-            title="Project settings"
-            aria-label="Settings for {p.name}"
-            onclick={() => (ui.settingsFor = p.id)}
-          >
-            <Settings2 size={13} />
-          </button>
-          <button
-            type="button"
-            class="mini"
-            title="Remove from Qanuvi"
-            aria-label="Remove {p.name}"
-            onclick={() => removeProject(p.id, p.name)}
-          >
-            <X size={13} />
-          </button>
-        </div>
-      {:else}
-        <p class="empty">No projects yet. Use + to add a folder.</p>
+        </li>
       {/each}
-    </section>
+    </ul>
 
-    {#if settings.value.ai}
-      <section class="group sessions">
+    {#if !collapsed}
+      <section class="group">
         <header>
-          <span>Sessions</span>
-          {#if projects.current}
+          <span>Projects</span>
+          <button
+            type="button"
+            class="add"
+            title="Add a project"
+            aria-label="Add a project"
+            onclick={() => projects.addWithPicker()}
+          >
+            <Plus size={14} />
+          </button>
+        </header>
+        {#if projects.error}<p class="error">{projects.error}</p>{/if}
+        {#each projects.list as p (p.id)}
+          {@const style = kindStyle(p.kind)}
+          <div class="project" class:current={p.id === projects.currentId}>
             <button
               type="button"
-              class="add"
-              title="New session"
-              aria-label="New session"
-              onclick={() => agent.newSession()}
+              class="project-main"
+              title="{p.master
+                ? `On ${masters.list.find((m) => m.id === p.master)?.name ?? 'a server'}: `
+                : ''}{p.path}  ·  {style.label}"
+              onclick={() => {
+                // A project open in another window: bring that window forward instead of editing it twice.
+                const other = windows.windowOf(p.id);
+                if (other) windows.focus(other);
+                else projects.select(p.id);
+              }}
             >
-              <Plus size={14} />
-            </button>
-          {/if}
-        </header>
-        {#each agent.sessions as s (s.id)}
-          <div class="session" class:current={s.id === agent.selectedId}>
-            <button type="button" class="session-main" title="{s.title} · {s.model}" onclick={() => agent.select(s.id)}>
-              <span class="session-title">{s.title}</span>
-              <span class="dot {dot(s.status)}" title={s.status}></span>
+              <span class="kind" style:background={style.color}>{style.label.slice(0, 1)}</span>
+              <span class="project-name">{p.name}</span>
+              {#if p.master}<span class="remote" title="On a server"><Server size={11} /></span>{/if}
+              {#if windows.windowOf(p.id)}<span class="elsewhere" title="Open in another window (click to go there)"
+                  ><AppWindow size={11} /></span
+                >{/if}
             </button>
             <button
               type="button"
               class="mini"
-              title="Delete session"
-              aria-label="Delete session"
-              onclick={() => agent.remove(s.id)}
+              title="Open in a new window"
+              aria-label="Open {p.name} in a new window"
+              onclick={() => windows.openProject(p.id, p.name)}
             >
-              <X size={12} />
+              <AppWindow size={13} />
+            </button>
+            <button
+              type="button"
+              class="mini"
+              title="Project settings"
+              aria-label="Settings for {p.name}"
+              onclick={() => (ui.settingsFor = p.id)}
+            >
+              <Settings2 size={13} />
+            </button>
+            <button
+              type="button"
+              class="mini"
+              title="Remove from Qanuvi"
+              aria-label="Remove {p.name}"
+              onclick={() => removeProject(p.id, p.name)}
+            >
+              <X size={13} />
             </button>
           </div>
         {:else}
-          <p class="empty">{projects.current ? "Agent sessions appear here." : "Add a project to start."}</p>
+          <p class="empty">No projects yet. Use + to add a folder.</p>
         {/each}
       </section>
-    {:else}
-      <div class="sessions"></div>
+
+      {#if settings.value.ai}
+        <section class="group sessions">
+          <header>
+            <span>Sessions</span>
+            {#if projects.current}
+              <button
+                type="button"
+                class="add"
+                title="New session"
+                aria-label="New session"
+                onclick={() => agent.newSession()}
+              >
+                <Plus size={14} />
+              </button>
+            {/if}
+          </header>
+          {#each agent.sessions as s (s.id)}
+            <div class="session" class:current={s.id === agent.selectedId}>
+              <button
+                type="button"
+                class="session-main"
+                title="{s.title} · {s.model}"
+                onclick={() => agent.select(s.id)}
+              >
+                <span class="session-title">{s.title}</span>
+                <span class="dot {dot(s.status)}" title={s.status}></span>
+              </button>
+              <button
+                type="button"
+                class="mini"
+                title="Delete session"
+                aria-label="Delete session"
+                onclick={() => agent.remove(s.id)}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          {:else}
+            <p class="empty">{projects.current ? "Agent sessions appear here." : "Add a project to start."}</p>
+          {/each}
+        </section>
+      {:else}
+        <div class="sessions"></div>
+      {/if}
     {/if}
   {/if}
 
@@ -541,6 +589,49 @@
     border-radius: 10px;
     background: var(--qx-bg-panel);
     box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+  }
+
+  .modes {
+    display: flex;
+    gap: 2px;
+    margin: 4px 0 6px;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--qx-bg-raised);
+  }
+
+  .modes.vertical {
+    flex-direction: column;
+    background: transparent;
+  }
+
+  .modes button {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    height: 26px;
+    min-width: 28px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--qx-text-muted);
+    cursor: pointer;
+  }
+
+  .modes button:hover {
+    color: var(--qx-text);
+  }
+
+  .modes button.on {
+    background: var(--qx-bg-panel);
+    color: var(--qx-text);
+    box-shadow: 0 0 0 1px var(--qx-border);
+  }
+
+  .project-panel {
+    flex: 1;
+    min-height: 0;
+    margin: 0 -4px;
   }
 
   .bottom {

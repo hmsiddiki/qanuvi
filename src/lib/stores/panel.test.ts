@@ -4,8 +4,8 @@ import { moveSection, parsePanel } from "./panel.svelte";
 describe("the project panel's state", () => {
   it("starts with the tree open and the extra section hidden", () => {
     const p = parsePanel(null);
-    expect(p.view).toBe("explorer");
-    expect(p.sections.map((s) => s.id)).toEqual(["editors", "files", "outline", "timeline", "touched"]);
+    expect(p.view).toBe("workspace");
+    expect(p.sections.map((s) => s.id)).toEqual(["files", "editors", "outline", "timeline", "touched"]);
     expect(p.sections.find((s) => s.id === "files")?.open).toBe(true);
     expect(p.sections.find((s) => s.id === "touched")?.hidden).toBe(true);
   });
@@ -28,9 +28,9 @@ describe("the project panel's state", () => {
   it("moves a section by dragging it onto another", () => {
     const list = parsePanel(null).sections;
     expect(moveSection(list, "timeline", "editors").map((s) => s.id)).toEqual([
+      "files",
       "timeline",
       "editors",
-      "files",
       "outline",
       "touched",
     ]);

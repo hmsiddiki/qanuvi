@@ -11,7 +11,7 @@
   import X from "@lucide/svelte/icons/x";
   import Splitter from "./Splitter.svelte";
   import IconButton from "./IconButton.svelte";
-  import ProjectPanel from "./ProjectPanel.svelte";
+  import { panel } from "$lib/stores/panel.svelte";
   import CodeEditor from "./CodeEditor.svelte";
   import PreviewTab from "./PreviewTab.svelte";
   import PlanView from "./PlanView.svelte";
@@ -44,9 +44,16 @@
 
   const key = (action: Parameters<typeof shortcutLabel>[0]) => shortcutLabel(action, platform.isMac);
 
-  // Search asked for: the project panel opens.
+  /** Shows the sidebar, expanded, in this mode. */
+  function openSidebar(view: "explorer" | "search") {
+    if (!layout.state.sidebarVisible) layout.toggleSidebar();
+    if (layout.state.sidebarCollapsed) layout.toggleSidebarCollapsed();
+    panel.show(view);
+  }
+
+  // Search asked for: the sidebar shows Search.
   $effect(() => {
-    if (ui.searchWanted && !settings.value.explorerVisible) settings.set("explorerVisible", true);
+    if (ui.searchWanted) openSidebar("search");
   });
 
   // Opening a file shows the editor.
@@ -79,24 +86,16 @@
 <section class="work-pane" aria-label="Work">
   {#if !maximized}
     <div class="top">
-      {#if project && settings.value.explorerVisible}
-        <div class="explorer" style:width="{settings.value.explorerWidth}px">
-          <ProjectPanel {project} />
-        </div>
-        <Splitter
-          axis="x"
-          size={settings.value.explorerWidth}
-          label="Resize project panel"
-          onresize={(w) => settings.set("explorerWidth", w)}
-        />
-      {/if}
-
       <div class="main">
         <div class="tabs" role="tablist">
           <IconButton
-            label={settings.value.explorerVisible ? "Hide file tree" : "Show file tree"}
-            active={settings.value.explorerVisible}
-            onclick={() => settings.set("explorerVisible", !settings.value.explorerVisible)}
+            label={panel.view === "explorer" ? "Back to the workspace" : "Show the files (Explorer)"}
+            active={panel.view === "explorer" && layout.state.sidebarVisible && !layout.state.sidebarCollapsed}
+            onclick={() => {
+              if (panel.view === "explorer" && layout.state.sidebarVisible && !layout.state.sidebarCollapsed)
+                panel.show("workspace");
+              else openSidebar("explorer");
+            }}
           >
             <FolderTree size={14} />
           </IconButton>
@@ -335,12 +334,6 @@
     flex: 1;
     min-height: 0;
     display: flex;
-  }
-
-  .explorer {
-    flex: none;
-    min-width: 0;
-    border-right: 1px solid var(--qx-border);
   }
 
   .main {
