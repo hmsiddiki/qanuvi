@@ -8,7 +8,7 @@
   import Unplug from "@lucide/svelte/icons/unplug";
   import Trash2 from "@lucide/svelte/icons/trash";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { masters } from "$lib/stores/masters.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";

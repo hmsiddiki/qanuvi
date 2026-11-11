@@ -5,6 +5,7 @@
  */
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { reduceAll } from "$lib/agent/events";
+import { waitsBefore } from "$lib/plan/preflight";
 import {
   addedSteps,
   canCarry,
@@ -477,6 +478,8 @@ class RunnerStore {
     const rules = settings.value.rules[project.id] ?? {};
 
     const done: { number: string | null; title: string }[] = [];
+    // The step the run starts at is never held back: the owner just pressed Run (or resumed) there.
+    let firstStep = true;
     // Every step the run knows; one that turns up later was added while it ran (the user's guidance).
     const known = new Set(parsePlan(text).steps.map(stepKey));
     const reopened = new Set<string>();
@@ -499,6 +502,17 @@ class RunnerStore {
           continue;
         }
       }
+      // A step the owner chose to see first (risky, or a question left open in the check before the run).
+      const holdWhy = waitsBefore(stepRun.number, options.waitBefore);
+      if (holdWhy && !firstStep) {
+        this.#finish(
+          run,
+          "needs-you",
+          `Step ${stepRun.number} waits for you: ${holdWhy}. Start the run from it when you are ready.`,
+        );
+        break;
+      }
+      firstStep = false;
       stepRun.status = "running";
       const planned = steps.find((s) => s.line === stepRun.line);
       const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));

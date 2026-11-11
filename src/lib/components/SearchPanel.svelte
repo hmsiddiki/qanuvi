@@ -14,7 +14,7 @@
   import Replace from "@lucide/svelte/icons/replace";
   import ListCollapse from "@lucide/svelte/icons/list-collapse";
   import X from "@lucide/svelte/icons/x";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { api, errorText, type Project, type SearchMatch, type SearchOptions } from "$lib/api";
   import { editor } from "$lib/stores/editor.svelte";
   import IconButton from "./IconButton.svelte";

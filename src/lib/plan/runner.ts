@@ -37,6 +37,8 @@ export interface RunOptions {
   model?: string;
   /** A step that keeps failing moves to a stronger model; missing: yes. */
   strongerOnFail?: boolean;
+  /** Steps the run pauses before (risky ones the owner wants to see, or a question left open), with why (24i). */
+  waitBefore?: { step: string; why: string }[];
   /** When every step of the plan is done, its private details (logins) are deleted; missing: yes. */
   forgetPrivateWhenDone?: boolean;
   /** Steps in a row on the same model and in the same section continue one session; missing: yes. */

@@ -41,7 +41,7 @@
     ui.show("agents");
   }
   import ModePicker from "./ModePicker.svelte";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { guidanceNote, isStopOrder, looksSecret } from "$lib/plan/guidance";
   import { runner } from "$lib/stores/runner.svelte";
   import CommandMenu from "./CommandMenu.svelte";

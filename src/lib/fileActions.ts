@@ -2,7 +2,7 @@
  * What the right-click menus do with files (15d): shared by the file tree, the editor tabs, the editor and the Git
  * view. Paths are project-relative with "/".
  */
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask } from "$lib/stores/confirm.svelte";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, errorText, type Project } from "$lib/api";
 import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";

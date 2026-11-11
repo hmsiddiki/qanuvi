@@ -28,7 +28,7 @@
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import X from "@lucide/svelte/icons/x";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { projects, kindStyle } from "$lib/stores/projects.svelte";
   import { agent } from "$lib/stores/agent.svelte";

@@ -190,8 +190,15 @@ ${text}`
         this.items = reduce(this.items, event.line, ++this.#seq);
         // An approval answered by a standing one: the minutes left change.
         if (event.line.includes('"auto":true')) this.loadGrants();
-      } else if (event.kind === "error") this.errors = [...this.errors.slice(-20), event.text];
-      else if (event.kind === "exit") this.busy = false;
+      } else if (event.kind === "error") {
+        // An older Claude Code that does not list a newer model yet still uses it: a quiet note, not an error.
+        if (event.text.includes("unrecognized_model")) {
+          if (!this.items.some((i) => i.kind === "notice" && i.text.startsWith("This Claude Code does not list")))
+            this.notice(
+              "This Claude Code does not list this model yet, but it uses it. Updating Claude Code removes this note.",
+            );
+        } else this.errors = [...this.errors.slice(-20), event.text];
+      } else if (event.kind === "exit") this.busy = false;
     };
   }
 

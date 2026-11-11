@@ -6,7 +6,7 @@
    */
   import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { recommend, type FreeProvider } from "$lib/agents/guides";
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import { omni } from "$lib/stores/omniroute.svelte";

@@ -7,7 +7,7 @@
   import { onMount } from "svelte";
   import { brain } from "$lib/stores/brain.svelte";
   import { settings, type ModelProvider } from "$lib/stores/settings.svelte";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { guides } from "$lib/stores/guides.svelte";
   import { projects } from "$lib/stores/projects.svelte";

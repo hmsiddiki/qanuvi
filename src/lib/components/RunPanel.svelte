@@ -12,9 +12,20 @@
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import { costRatio, freeSavings, isFree, DECIDER, parseRanges, type PauseMode, type RunTeam } from "$lib/plan/runner";
+  import {
+    costRatio,
+    freeSavings,
+    isFree,
+    DECIDER,
+    parseRanges,
+    inRanges,
+    type PauseMode,
+    type RunTeam,
+  } from "$lib/plan/runner";
   import { freeWorks } from "$lib/core/decider";
-  import { runSettingsKey } from "$lib/plan/guidance";
+  import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
+  import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
+  import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
 
   interface Props {
     project: Project;
@@ -92,6 +103,7 @@
     carryOn: boolean;
     carryK: number;
     forgetPrivate: boolean;
+    checkFirst: boolean;
   }
   function restore(): boolean {
     try {
@@ -113,6 +125,7 @@
       if (typeof k.carryOn === "boolean") carryOn = k.carryOn;
       if (typeof k.carryK === "number") carryK = k.carryK;
       if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
+      if (typeof k.checkFirst === "boolean") checkFirst = k.checkFirst;
       return true;
     } catch {
       return false;
@@ -135,6 +148,7 @@
       carryOn,
       carryK,
       forgetPrivate,
+      checkFirst,
     };
     localStorage.setItem(KEY(), JSON.stringify(k));
   }
@@ -204,8 +218,90 @@
     }
   });
 
+  /** The check before a run (24i): what the run will need, answered once. */
+  let checkFirst = $state(true);
+  let checking = $state(false);
+  let check = $state<Preflight | null>(null);
+  let secretValues = $state<Record<string, string>>({});
+  let answers = $state<Record<number, string>>({});
+  let riskyChoice = $state<Record<number, "wait" | "go">>({});
+
+  /** The open steps the run would cover, for the check. */
+  function coveredSteps() {
+    const { ranges: r } = parseRanges(ranges.trim());
+    const all = openSteps.filter((s) => s.line >= fromLine);
+    const inR = r.length ? all.filter((s) => s.number && inRanges(s.number, r)) : all;
+    return (onlyOne ? inR.slice(0, 1) : inR).slice(0, 40);
+  }
+
+  async function runCheck() {
+    checking = true;
+    error = "";
+    try {
+      const known = {
+        secrets: await api.agent.secretNames(project.id).catch(() => [] as string[]),
+        testCommand: project.settings.test_command,
+        previewUrl: project.settings.preview_url,
+        notes: loadPlanNotes(project.id, file),
+      };
+      const steps = coveredSteps().map((s) => ({ number: s.number, title: s.title, details: s.details }));
+      const r = await planner.ask(
+        project,
+        preflightPrompt(file, steps, known),
+        settings.agent(provider.id).model || defaultPlannerModel(provider),
+        "Before the run: what it needs",
+        {
+          agentId: provider.id,
+          lean: true,
+          quiet: true,
+        },
+      );
+      const found = parsePreflight(r.text);
+      found.secrets = found.secrets.filter((s) => !known.secrets.includes(s.name));
+      check = found;
+      riskyChoice = Object.fromEntries(found.risky.map((_, i) => [i, "wait"]));
+      if (!found.secrets.length && !found.questions.length && !found.risky.length && !found.setup.length) {
+        check = null;
+        await go();
+      }
+    } catch (e) {
+      error = `The check before the run did not answer (${errorText(e)}). Start without it, or try again.`;
+    } finally {
+      checking = false;
+    }
+  }
+
+  /** Saves the answers (secrets, notes) and starts, holding at risky steps and open questions. */
+  async function startChecked() {
+    const c = check;
+    if (!c) return go();
+    for (const s of c.secrets) {
+      const v = secretValues[s.name]?.trim();
+      if (v) await api.agent.setSecret(project.id, s.name, v).catch(() => {});
+    }
+    const notes = loadPlanNotes(project.id, file);
+    const wait: { step: string; why: string }[] = [];
+    c.questions.forEach((q, i) => {
+      const a = answers[i]?.trim();
+      if (a) notes.push(`The owner's answer for step ${q.step}: ${q.question} → ${a}`);
+      else if (q.step) wait.push({ step: q.step, why: `a question was left open (${q.question})` });
+    });
+    c.risky.forEach((x, i) => {
+      if (riskyChoice[i] !== "go") wait.push({ step: x.step, why: `you asked to see it first (${x.why})` });
+    });
+    savePlanNotes(project.id, file, notes);
+    check = null;
+    await go(wait);
+  }
+
   async function start(event: SubmitEvent) {
     event.preventDefault();
+    if (checkFirst && !check) return runCheck();
+    if (check) return startChecked();
+    await go();
+  }
+
+  async function go(waitBefore: { step: string; why: string }[] = []) {
     error = "";
     if (!layout.state.agentVisible) layout.toggleAgent();
     keep();
@@ -230,6 +326,7 @@
         carryOn,
         forgetPrivateWhenDone: forgetPrivate,
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 80)) * 1000,
+        waitBefore,
       });
     } catch (e) {
       error = String(e instanceof Error ? e.message : e);
@@ -264,7 +361,7 @@
         </select>
       </label>
       <label>
-        Models
+        Model for every step
         <select value={oneModel} onchange={(e) => pickModel(e.currentTarget.value)}>
           <option value="">As the plan says (each step's own model)</option>
           {#each provider.models as m (m.id)}<option value={m.id}>{m.label} for every step</option>{/each}
@@ -393,10 +490,60 @@
       {/if}
     {/if}
     {#if mode === "default"}<p class="hint warn">In Manual mode the run waits for your approval at every edit.</p>{/if}
+    <label
+      class="check"
+      title="The agent reads the open steps once (read-only, a few cents) and lists what the run will need from you: logins, decisions, risky steps, things to set up. You answer once; then the run goes on alone."
+    >
+      <input type="checkbox" bind:checked={checkFirst} /> Check what the run needs from me first
+    </label>
+    {#if check}
+      <div class="check-list">
+        <strong>Before the run</strong>
+        {#if check.secrets.length}
+          <p class="hint">Logins and keys the steps need (saved as project secrets; no model sees them):</p>
+          {#each check.secrets as s (s.name)}
+            <label class="row-input"
+              ><code>{s.name}</code><span class="dim">{s.why}{s.steps.length ? ` (${s.steps.join(", ")})` : ""}</span>
+              <input type="password" autocomplete="off" placeholder="value" bind:value={secretValues[s.name]} /></label
+            >
+          {/each}
+        {/if}
+        {#if check.questions.length}
+          <p class="hint">
+            Decisions only you can make (kept as notes for this plan; left empty, the run waits there):
+          </p>
+          {#each check.questions as q, i (i)}
+            <label class="row-input"
+              ><span><strong>{q.step}</strong> {q.question}</span>
+              <input type="text" placeholder="your answer" bind:value={answers[i]} /></label
+            >
+          {/each}
+        {/if}
+        {#if check.risky.length}
+          <p class="hint">Risky steps (hard to undo, or they reach outside this computer):</p>
+          {#each check.risky as x, i (i)}
+            <div class="row-input">
+              <span><strong>{x.step}</strong> {x.why}</span>
+              <select bind:value={riskyChoice[i]}>
+                <option value="wait">Wait for me before it</option>
+                <option value="go">Go ahead</option>
+              </select>
+            </div>
+          {/each}
+        {/if}
+        {#if check.setup.length}
+          <p class="hint">To have running or set:</p>
+          <ul>
+            {#each check.setup as x, i (i)}<li><strong>{x.what}</strong> <span class="dim">{x.why}</span></li>{/each}
+          </ul>
+        {/if}
+      </div>
+    {/if}
     <div class="row">
       <span class="spacer"></span>
       <button type="submit" class="primary" disabled={openSteps.length === 0 || !!rangeError}
-        ><Play size={13} /> Start</button
+        >{#if checking}<LoaderCircle size={13} class="spin" /> Checking…{:else}<Play size={13} />
+          {check ? "Start the run" : checkFirst ? "Check and start" : "Start"}{/if}</button
       >
     </div>
   </form>
@@ -604,6 +751,32 @@
 
   .link:disabled {
     opacity: 0.6;
+  }
+
+  .check-list {
+    margin-top: var(--qx-space-3);
+    padding: var(--qx-space-3);
+    border: 1px solid color-mix(in srgb, var(--qx-accent) 40%, var(--qx-border));
+    border-radius: var(--qx-radius-card);
+  }
+
+  .row-input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    align-items: center;
+    gap: var(--qx-space-2);
+    margin: 4px 0;
+    color: var(--qx-text);
+  }
+
+  .row-input input {
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--qx-border);
+    border-radius: 6px;
+    background: var(--qx-bg-panel);
+    color: var(--qx-text);
+    font: inherit;
   }
 
   .x {

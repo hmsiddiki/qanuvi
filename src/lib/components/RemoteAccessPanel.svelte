@@ -1,7 +1,7 @@
 <script lang="ts">
   /** This computer's remote access (Milestone 20), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { remoteAccess } from "$lib/stores/remoteAccess.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";

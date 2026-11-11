@@ -1,5 +1,5 @@
 import type { EditorState } from "@codemirror/state";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
 import { languageFor } from "$lib/editor/languages";
 import { settings } from "./settings.svelte";

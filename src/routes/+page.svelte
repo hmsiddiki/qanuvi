@@ -34,6 +34,7 @@
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
   import { isProjectView, workspace } from "$lib/stores/workspace.svelte";
   import { projectFromUrl, windows } from "$lib/stores/windows.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
   let ready = $state(false);
 
@@ -243,6 +244,7 @@
 {/if}
 
 <ContextMenu />
+<ConfirmDialog />
 
 {#if ui.quickOpen && projects.current}
   <QuickOpen

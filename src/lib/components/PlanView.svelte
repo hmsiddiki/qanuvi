@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";

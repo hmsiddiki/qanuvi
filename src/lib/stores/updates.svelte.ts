@@ -9,7 +9,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";

@@ -15,7 +15,7 @@
   import Archive from "@lucide/svelte/icons/archive";
   import History from "@lucide/svelte/icons/clock";
   import X from "@lucide/svelte/icons/x";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import {
     api,
     errorText,

@@ -9,7 +9,7 @@
   import X from "@lucide/svelte/icons/x";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Trash from "@lucide/svelte/icons/trash";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import { api, errorText, type MemoryEntry } from "$lib/api";
   import { memory } from "$lib/stores/memory.svelte";
   import { projects } from "$lib/stores/projects.svelte";

@@ -7,7 +7,7 @@
   import { EditorState } from "@codemirror/state";
   import { EditorView } from "@codemirror/view";
   import { MergeView, unifiedMergeView } from "@codemirror/merge";
-  import { ask } from "@tauri-apps/plugin-dialog";
+  import { ask } from "$lib/stores/confirm.svelte";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Columns2 from "@lucide/svelte/icons/columns-2";
