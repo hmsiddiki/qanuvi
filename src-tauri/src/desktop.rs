@@ -975,6 +975,20 @@ async fn core_decide(setup: String, system: String, prompt: String) -> Res<(Stri
     .await
 }
 
+/// Qanuvi's remote knowledge file (24c), its signature checked against the built-in key; empty `url`: the default.
+#[tauri::command]
+async fn knowledge_fetch(url: String) -> Res<String> {
+    blocking(move || {
+        let url = if url.trim().is_empty() {
+            crate::knowledge::DEFAULT_URL.to_string()
+        } else {
+            url
+        };
+        crate::knowledge::fetch(&url, crate::knowledge::PUBLIC_KEY)
+    })
+    .await
+}
+
 /// OmniRoute's provider connections and their health.
 #[tauri::command]
 async fn omniroute_connections(
@@ -1341,6 +1355,7 @@ pub fn run() {
             omniroute_connect,
             omniroute_connections,
             core_decide,
+            knowledge_fetch,
             data_location_info,
             data_location_move,
             data_location_cancel,

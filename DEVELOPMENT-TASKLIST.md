@@ -917,7 +917,7 @@ runs on or off; with it off nothing is sent anywhere.
       up"), right answer.
     - Logo v6 (purple Q, green braces, red dot) everywhere: taskbar/app icons, title bar, favicon.
 - [x] **24 done (2026-11-11)** apart from what moved to 24b (the decider) and 24c (first-time setup).
-- [-] **24c. First-time setup from Qanuvi's own knowledge (owner, 2026-11-10; wizard and OmniRoute done 2026-11-11, remote knowledge waits for qanuvi.com)**: on first run Qanuvi
+- [-] **24c. First-time setup from Qanuvi's own knowledge (owner, 2026-11-10; wizard and OmniRoute done 2026-11-11, remote knowledge built 2026-11-11 on the owner's server, moves to qanuvi.com later)**: on first run Qanuvi
   offers to set up free AI by itself, from what it knows (like the OpenRouter and OmniRoute setups: find what is
   installed, start it, connect it, pick the best free models), with the user's yes at each outside step. That
   knowledge (guides, model lists, rankings) is later updated remotely from qanuvi.com; how is to be planned.
@@ -952,6 +952,14 @@ runs on or off; with it off nothing is sent anywhere.
       online models first and the Qanuvi agent chosen. Opened from "Set up free AI" and from the Agents page. Live on
       the owner's PC (all installed): every step ran, 11 models, window ~220 MB. Not yet tried live: the installs
       themselves (nothing missing here) and the Google sign-in.
+  - Remote knowledge built (2026-11-11): one signed JSON file (guides, free providers) published by the owner at
+    https://qlopy.top/qanuvi-updates/knowledge.json (the owner's own web server, until qanuvi.com), with an Ed25519
+    signature next to it. Qanuvi checks once a day at start (and on "Check for newer"), refuses anything not signed by
+    the built-in key or not well formed, shows what changes ("Newer knowledge from Qanuvi": version, date, note, guide
+    and provider changes) and uses it only after "Use it"; "Not now" stops the daily offer for that version; "Use the
+    built-in ones" goes back. The OmniRoute panel's free providers come from it. Publishing: qanuvi-knowledge
+    (keygen / sign), steps in docs/knowledge/README.md; the private key is kept outside the repository and the web
+    folder. Live: version 1 offered at start and kept; a file changed after signing was refused with the reason.
 - [ ] **24d. More free providers, images and video (owner, 2026-11-11, later)**: other big free sources besides
   OmniRoute and OpenRouter (free Claude/Gemini through sign-ins like Antigravity: Kiro, Amazon Q, GitHub Copilot
   Free, Gemini CLI; Kimi models where a free tier exists), and image and video generation: free tiers (Pollinations,

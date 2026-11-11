@@ -267,6 +267,10 @@ export const api = {
     show: (projectId: string, sha: string, path: string | null) => invoke<string>("git_show", { projectId, sha, path }),
     blame: (projectId: string, path: string, line: number) => invoke<GitBlame>("git_blame", { projectId, path, line }),
   },
+  /** Qanuvi's remote knowledge (24c): the signed file's text, its signature checked. */
+  knowledge: {
+    fetch: (url = "") => invoke<string>("knowledge_fetch", { url }),
+  },
   /** Qanuvi core's own models (24b). */
   core: {
     /** A short decision from the free models, asked one after another: [the model that answered, its text]. */

@@ -6,7 +6,8 @@
    */
   import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { FREE_PROVIDERS, FREE_PROVIDERS_CHECKED_ON, recommend, type FreeProvider } from "$lib/agents/guides";
+  import { recommend, type FreeProvider } from "$lib/agents/guides";
+  import { knowledge } from "$lib/stores/knowledge.svelte";
   import { omni } from "$lib/stores/omniroute.svelte";
   import { brain } from "$lib/stores/brain.svelte";
   import type { ModelProvider } from "$lib/stores/settings.svelte";
@@ -137,9 +138,11 @@
     <p class="muted small">{omni.busy.load}</p>
   {/if}
 
-  <p class="sub">Free providers worth adding <span class="muted small">(checked {FREE_PROVIDERS_CHECKED_ON})</span></p>
+  <p class="sub">
+    Free providers worth adding <span class="muted small">(checked {knowledge.freeProvidersCheckedOn})</span>
+  </p>
   <ul class="free">
-    {#each FREE_PROVIDERS as f (f.id)}
+    {#each knowledge.freeProviders as f (f.id)}
       <li>
         <div class="line">
           <strong>{f.name}</strong>

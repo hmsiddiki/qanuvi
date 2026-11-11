@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { knowledge } from "$lib/stores/knowledge.svelte";
   import { onMount } from "svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
   import Sidebar from "$lib/components/Sidebar.svelte";
@@ -48,6 +49,7 @@
     if (!projects.startWith) remoteAccess.init();
     terminals.loadShells();
     agent.loadInfo();
+    knowledge.check().catch(() => {});
     const flush = () => {
       layout.saveNow();
       workspace.flush();

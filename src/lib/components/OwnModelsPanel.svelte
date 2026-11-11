@@ -1,5 +1,6 @@
 <script lang="ts">
   /** Qanuvi's own agent (Milestone 24): the models its brain may use, and where they come from. */
+  import { knowledge } from "$lib/stores/knowledge.svelte";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import X from "@lucide/svelte/icons/x";
@@ -171,6 +172,30 @@
       >{/if}
   </p>
   {#if guides.updateError}<p class="error">{guides.updateError}</p>{/if}
+  {#if knowledge.offer}
+    <div class="proposal">
+      <strong
+        >Newer knowledge from Qanuvi (version {knowledge.offer.pack.version}, {knowledge.offer.pack.published})</strong
+      >
+      {#if knowledge.offer.pack.note}<div class="muted small">{knowledge.offer.pack.note}</div>{/if}
+      {#each knowledge.offer.summary as line (line)}<div class="muted small">{line}</div>{/each}
+      <div class="row">
+        <button type="button" class="btn" onclick={() => knowledge.keep()}>Use it</button>
+        <button type="button" class="btn" onclick={() => knowledge.later()}>Not now</button>
+      </div>
+    </div>
+  {/if}
+  <p class="muted small">
+    Qanuvi's own knowledge (guides, free providers):
+    {knowledge.kept ? `version ${knowledge.kept.version} from ${knowledge.kept.published}` : "as shipped"}.
+    <button type="button" class="link" disabled={knowledge.checking} onclick={() => knowledge.check(true)}
+      >{knowledge.checking ? "Checking…" : "Check for newer"}</button
+    >
+    {#if knowledge.kept}<button type="button" class="link" onclick={() => knowledge.reset()}
+        >Use the built-in ones</button
+      >{/if}
+    {#if knowledge.error}<span class="error">{knowledge.error}</span>{/if}
+  </p>
   {#if guides.proposal}
     <div class="proposal">
       <strong>Updated guides are ready</strong>

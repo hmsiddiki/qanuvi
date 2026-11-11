@@ -12,6 +12,7 @@ pub mod data_location;
 pub mod files;
 pub mod git;
 pub mod index;
+pub mod knowledge;
 pub mod llm;
 pub mod local_agent;
 pub mod local_servers;

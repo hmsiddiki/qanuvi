@@ -126,6 +126,13 @@ class GuidesStore {
     this.proposal = null;
   }
 
+  /** Keeps the given guides in place of the current ones for the same providers (24c: Qanuvi's remote knowledge). */
+  keepGuides(list: Guide[]): void {
+    const next = this.all.map((g) => list.find((p) => p.provider === g.provider) ?? g);
+    this.kept = next;
+    localStorage.setItem(KEY, JSON.stringify(next));
+  }
+
   discard(): void {
     this.proposal = null;
   }

@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "version": 1,
+  "published": "2026-11-11",
+  "note": "First published knowledge: the free providers worth adding to OmniRoute.",
+  "freeProviders": [
+    {
+      "id": "antigravity",
+      "name": "Antigravity (Google sign-in)",
+      "how": "sign-in",
+      "url": "https://antigravity.google",
+      "note": "Free Claude Sonnet/Opus and Gemini through a Google account; the strongest free models. Sign-ins expire and need renewing."
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "how": "key",
+      "url": "https://openrouter.ai/keys",
+      "note": "Many :free models; 50 requests a day (1,000 after buying $10 once).",
+      "reuse": "openrouter"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini (Google AI Studio)",
+      "how": "key",
+      "url": "https://aistudio.google.com/apikey",
+      "note": "Free Gemini Flash with a daily limit; a key from AI Studio."
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "how": "key",
+      "url": "https://console.groq.com/keys",
+      "note": "Very fast open models (Llama, Qwen, Kimi) with free limits per minute and day."
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "how": "key",
+      "url": "https://cloud.cerebras.ai",
+      "note": "Fast open models (Qwen coder, Llama) on a free tier."
+    },
+    {
+      "id": "nvidia",
+      "name": "NVIDIA NIM",
+      "how": "key",
+      "url": "https://build.nvidia.com",
+      "note": "Free credits for many open models, including large coding ones."
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral",
+      "how": "key",
+      "url": "https://console.mistral.ai/api-keys",
+      "note": "Free experiment plan including Codestral and Devstral (coding models)."
+    }
+  ],
+  "freeProvidersCheckedOn": "2026-11-11"
+}
