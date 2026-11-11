@@ -10,8 +10,7 @@ The order of work for Qanuvi. How the parts fit: [docs/ARCHITECTURE.md](docs/ARC
 2. **Spending fewer tokens, built in beside it:** the right model for each step, small work packets, only what a
    model needs.
 
-**Name:** the app is called **Qanuvi** (folder
-`E:Projectsqanuvi`, identifier `dev.qanuvi.desktop`). The owner will provide the logo; until then a "Q" mark is used.
+**Name:** the app is called **Qanuvi** (folder `E:\Projects\qanuvi`, identifier `dev.qanuvi.desktop`). The owner will provide the logo; until then a "Q" mark is used.
 
 **A code editor first (owner, 2026-11-10):** Qanuvi must work fully as a standard code editor with no AI agent at all,
 paid or free, like VS Code. Editing, files, search, terminals, preview, task lists and git never depend on an agent.

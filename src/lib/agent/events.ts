@@ -121,11 +121,9 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
   }
   // Anything else ends the live text: the whole message (or a handover, or the end) takes its place.
   const out = items.filter((x) => !(x.kind === "text" && x.live));
-
-  // "qanuvi_*": sessions saved before the app was renamed.
-  if (type === "qanuvi_user" || type === "qanuvi_user") {
+  if (type === "qanuvi_user") {
     out.push({ kind: "user", id: `u${seq}`, text: withoutOverruleNote(str(msg.text)) });
-  } else if (type === "qanuvi_permission" || type === "qanuvi_permission") {
+  } else if (type === "qanuvi_permission") {
     const i = out.findIndex((x) => x.kind === "approval" && x.id === str(msg.request_id));
     if (i >= 0)
       out[i] = {
