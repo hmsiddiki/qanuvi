@@ -41,15 +41,80 @@ pub struct Defaults {
     pub webview: Option<PathBuf>,
 }
 
+/// Whether this Qanuvi runs from a build in the source tree (`target/debug` or `target/release`): such a test build
+/// keeps its own data, so trying a change never touches the installed copy's projects, sessions and settings.
+/// QANUVI_SHARED_DATA=1 turns this off.
+pub fn from_source() -> bool {
+    if std::env::var_os("QANUVI_SHARED_DATA").is_some() {
+        return false;
+    }
+    std::env::current_exe().is_ok_and(|exe| from_source_path(&exe))
+}
+
+/// The rule behind `from_source`: the program sits in a `target/debug` or `target/release` folder.
+pub fn from_source_path(exe: &Path) -> bool {
+    let parts: Vec<String> = exe
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+        .collect();
+    parts
+        .windows(2)
+        .any(|w| w[0] == "target" && (w[1] == "debug" || w[1] == "release"))
+}
+
+/// The name of the data folders: the identifier, with `.source` for a test build.
+pub fn folder_name(source: bool) -> String {
+    if source {
+        format!("{IDENTIFIER}.source")
+    } else {
+        IDENTIFIER.to_string()
+    }
+}
+
+/// A test build's first start: its folders begin as a copy of the installed copy's data (from wherever that data
+/// lives), so it has the projects and settings to try things on. Answers a note for the user, or None when there was
+/// nothing to do. A copy that fails leaves an empty start, which works too.
+pub fn seed_from_installed(test: &Defaults, installed: &Defaults) -> Option<String> {
+    if test.base.exists() || !installed.base.exists() {
+        return None;
+    }
+    let from = read(&installed.base)
+        .dir
+        .unwrap_or_else(|| installed.base.clone());
+    let data = copy_checked(&from, &test.base);
+    let web = match (installed.webview_for(&from), &test.webview) {
+        (Some(a), Some(b)) => copy_checked(&a, b),
+        _ => Ok(()),
+    };
+    // The installed copy's pointer (a custom data folder) is not this build's: this build stays in its own folder.
+    let _ = std::fs::remove_file(test.base.join(POINTER));
+    Some(match data.and(web) {
+        Ok(()) => format!(
+            "This test build keeps its own data, started as a copy of {}.",
+            from.display()
+        ),
+        Err(e) => format!(
+            "This test build keeps its own data; copying the installed copy's data failed ({e})."
+        ),
+    })
+}
+
 impl Defaults {
     pub fn real() -> Self {
+        Self::named(&folder_name(from_source()))
+    }
+
+    /// The installed copy's folders (also when this is a test build).
+    pub fn installed() -> Self {
+        Self::named(IDENTIFIER)
+    }
+
+    fn named(name: &str) -> Self {
         let env = |k: &str| std::env::var_os(k).map(PathBuf::from).unwrap_or_default();
         let base = if cfg!(windows) {
-            env("APPDATA").join(IDENTIFIER)
+            env("APPDATA").join(name)
         } else if cfg!(target_os = "macos") {
-            env("HOME")
-                .join("Library/Application Support")
-                .join(IDENTIFIER)
+            env("HOME").join("Library/Application Support").join(name)
         } else {
             let xdg = env("XDG_DATA_HOME");
             let root = if xdg.as_os_str().is_empty() {
@@ -57,9 +122,9 @@ impl Defaults {
             } else {
                 xdg
             };
-            root.join(IDENTIFIER)
+            root.join(name)
         };
-        let webview = cfg!(windows).then(|| env("LOCALAPPDATA").join(IDENTIFIER));
+        let webview = cfg!(windows).then(|| env("LOCALAPPDATA").join(name));
         Defaults { base, webview }
     }
 
@@ -547,5 +612,53 @@ mod tests {
             std::fs::read(local.join("EBWebView/settings")).unwrap(),
             b"window storage"
         );
+    }
+}
+
+#[cfg(test)]
+mod test_build_tests {
+    use super::*;
+
+    #[test]
+    fn a_build_in_the_source_tree_keeps_its_own_data() {
+        assert!(from_source_path(Path::new(
+            r"E:\Projects\qanuvi\src-tauri\target\release\qanuvi.exe"
+        )));
+        assert!(from_source_path(Path::new(
+            "/home/u/qanuvi/src-tauri/target/debug/qanuvi"
+        )));
+        assert!(!from_source_path(Path::new(r"D:\qanuvi\qanuvi.exe")));
+        assert!(!from_source_path(Path::new(r"C:\target\qanuvi.exe")));
+        assert_eq!(folder_name(true), format!("{IDENTIFIER}.source"));
+        assert_eq!(folder_name(false), IDENTIFIER);
+    }
+
+    #[test]
+    fn the_first_start_copies_the_installed_data_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let installed = Defaults {
+            base: dir.path().join("inst"),
+            webview: Some(dir.path().join("inst-web")),
+        };
+        let test = Defaults {
+            base: dir.path().join("test"),
+            webview: Some(dir.path().join("test-web")),
+        };
+        std::fs::create_dir_all(&installed.base).unwrap();
+        std::fs::write(installed.base.join("qanuvi.db"), b"db").unwrap();
+        std::fs::create_dir_all(installed.webview.as_ref().unwrap()).unwrap();
+        std::fs::write(
+            installed.webview.as_ref().unwrap().join("Local State"),
+            b"x",
+        )
+        .unwrap();
+        let note = seed_from_installed(&test, &installed).unwrap();
+        assert!(note.contains("own data"));
+        assert_eq!(std::fs::read(test.base.join("qanuvi.db")).unwrap(), b"db");
+        assert!(test.webview.as_ref().unwrap().join("Local State").exists());
+        // Never again: the test build's data is its own from now on.
+        std::fs::write(installed.base.join("qanuvi.db"), b"newer").unwrap();
+        assert!(seed_from_installed(&test, &installed).is_none());
+        assert_eq!(std::fs::read(test.base.join("qanuvi.db")).unwrap(), b"db");
     }
 }

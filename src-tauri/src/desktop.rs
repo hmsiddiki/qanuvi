@@ -951,6 +951,12 @@ struct DataLocationInfo {
     note: Option<String>,
 }
 
+/// Whether this is a test build from the source tree (it keeps its own data; the title bar says so).
+#[tauri::command]
+fn data_test_build() -> bool {
+    crate::data_location::from_source()
+}
+
 #[tauri::command]
 fn data_location_info() -> DataLocationInfo {
     let d = crate::data_location::Defaults::real();
@@ -1337,6 +1343,14 @@ pub fn run() {
         crate::data_location::wait_for_exit(pid, std::time::Duration::from_secs(30));
     }
     let defaults = crate::data_location::Defaults::real();
+    if crate::data_location::from_source()
+        && let Some(note) = crate::data_location::seed_from_installed(
+            &defaults,
+            &crate::data_location::Defaults::installed(),
+        )
+    {
+        eprintln!("{note}");
+    }
     let data = crate::data_location::resolve(&defaults);
     if data != defaults.base
         && let Some(web) = defaults.webview_for(&data)
@@ -1424,6 +1438,7 @@ pub fn run() {
             attachment_file,
             attachment_page,
             data_location_info,
+            data_test_build,
             data_location_move,
             data_location_cancel,
             data_location_remove_old,

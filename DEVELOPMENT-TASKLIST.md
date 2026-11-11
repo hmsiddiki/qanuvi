@@ -78,6 +78,19 @@ runs on or off; with it off nothing is sent anywhere.
   - Validate: the app builds and opens on Windows (owner's PC) and Linux (owner's Zorin laptop); the macOS build passes
     in the automatic builds; memory and idle CPU recorded on each.
 
+- [x] **1c. A test build keeps its own data (owner, 2026-11-11)**: Qanuvi started from the source tree
+  (target/debug or target/release) uses dev.qanuvi.desktop.source for its data and window storage, filled once from a
+  copy of the installed copy's data; the title bar says "test build". The installed Qanuvi's data is never touched
+  by trying a change (QANUVI_SHARED_DATA=1 turns this off). Live: installed copy and test build open side by side.
+- [ ] **1d. Automatic backups and restore (owner, 2026-11-11)**: the owner lost his sessions, memory and settings
+  when the uninstaller's "Delete the application data" box was ticked (it deletes for good). Done: the box now says
+  "Also delete my Qanuvi data (sessions, memory, settings, model list). This cannot be undone." To do: a daily backup
+  of the database (a consistent copy while Qanuvi runs), brain.json and the window's settings into a folder the user
+  chooses (another drive is best), the last 7 kept; Settings → Backups: folder, last backup, back up now, restore a
+  backup (applied at the next start, the current data kept beside it).
+- [ ] **1e. Task Manager lists WebView2 apart from Qanuvi (owner, 2026-11-11, later)**: the WebView2 processes are
+  Qanuvi's children (checked), but Task Manager shows them under "WebView2 Manager". Try giving the window and its
+  processes Qanuvi's app id so Windows groups them; cosmetic.
 - [ ] **1b. Updates: update channels, signed updates and a smooth update popup** (added 2026-11-10; moved by the owner on 2026-11-10 to after the app shell is usable, so it is built after Milestone 8; moved later again by the owner on 2026-11-10 while other milestones go first; originally planned right after
   Milestone 1 because the app will be updated very often during development)
   - Tauri updater plugin: the app checks an update address for a small manifest (`latest.json`: version, notes, date,

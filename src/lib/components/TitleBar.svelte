@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import Search from "@lucide/svelte/icons/search";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
@@ -40,6 +41,12 @@
   const key = (action: Parameters<typeof shortcutLabel>[0]) => shortcutLabel(action, platform.isMac);
   // Left part lines up with the sidebar; on macOS it leaves room for the system window buttons.
   let leftWidth = $derived(Math.max(sidebarScreenWidth(layout.state), platform.isMac ? 150 : 120));
+
+  // A build from the source tree (it keeps its own data): marked, so it is never mistaken for the installed Qanuvi.
+  let testBuild = $state(false);
+  invoke<boolean>("data_test_build")
+    .then((v) => (testBuild = v))
+    .catch(() => {});
 </script>
 
 <header class="titlebar" class:mac={platform.isMac} data-tauri-drag-region>
@@ -55,7 +62,13 @@
     {/if}
   </div>
 
-  <div class="title" data-tauri-drag-region>{title}</div>
+  <div class="title" data-tauri-drag-region>
+    {title}
+    {#if testBuild}<span
+        class="test-build"
+        title="A build from the source tree: it keeps its own data, apart from the installed Qanuvi">test build</span
+      >{/if}
+  </div>
 
   <div class="right" data-tauri-drag-region>
     <LayoutMenu />
@@ -117,6 +130,18 @@
 </header>
 
 <style>
+  .test-build {
+    margin-left: 8px;
+    padding: 1px 7px;
+    border: 1px solid var(--qx-accent);
+    border-radius: 9px;
+    color: var(--qx-accent);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    vertical-align: 1px;
+  }
+
   .titlebar {
     height: 40px;
     flex: none;

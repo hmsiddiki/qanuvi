@@ -40,7 +40,10 @@
         "installMode": "currentUser",
         "displayLanguageSelector": false,
         "startMenuFolder": "Qanuvi",
-        "uninstallerHeaderImage": "icons/installer-header.bmp"
+        "uninstallerHeaderImage": "icons/installer-header.bmp",
+        "customLanguageFiles": {
+          "English": "installer/English.nsh"
+        }
       }
     },
     "publisher": "Inner IT",
