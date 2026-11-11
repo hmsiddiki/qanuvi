@@ -23,6 +23,11 @@ export interface OmniCatalogEntry {
   website: string;
 }
 
+/** A connection's name for people: OmniRoute leaves some unnamed, then its provider says what it is. */
+export function connectionName(c: OmniConnection): string {
+  return c.name.trim() || c.provider || c.id;
+}
+
 const endpoint = (p: ModelProvider) => ({ id: p.id, kind: p.kind, url: p.url });
 
 class OmniStore {

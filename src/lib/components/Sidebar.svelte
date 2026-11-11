@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inbox } from "$lib/stores/inbox.svelte";
   import House from "@lucide/svelte/icons/house";
   import Inbox from "@lucide/svelte/icons/inbox";
   import FolderKanban from "@lucide/svelte/icons/folder-kanban";
@@ -38,7 +39,7 @@
   ];
 
   let collapsed = $derived(layout.state.sidebarCollapsed);
-  let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting").length);
+  let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting").length + inbox.unread);
 
   function navigate(id: string) {
     ui.section = id;
@@ -54,6 +55,10 @@
     if (id === "servers") {
       if (!layout.state.workVisible) layout.toggleWork();
       ui.show("servers");
+    }
+    if (id === "inbox") {
+      if (!layout.state.workVisible) layout.toggleWork();
+      ui.show("inbox");
     }
     if (id === "projects") projects.addWithPicker();
   }
@@ -109,7 +114,8 @@
               class="pill"
               title="{memory.waiting} suggested by agents">{memory.waiting}</span
             >{/if}
-          {#if item.id === "inbox" && waiting > 0}<span class="pill" title="{waiting} waiting for you">{waiting}</span
+          {#if item.id === "inbox" && waiting > 0}<span class="pill" title="{waiting} waiting for you or not read yet"
+              >{waiting}</span
             >{/if}
         </button>
       </li>

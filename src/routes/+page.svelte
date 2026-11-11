@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { startWatch } from "$lib/stores/watch.svelte";
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import { onMount } from "svelte";
   import TitleBar from "$lib/components/TitleBar.svelte";
@@ -50,6 +51,7 @@
     terminals.loadShells();
     agent.loadInfo();
     knowledge.check().catch(() => {});
+    startWatch();
     const flush = () => {
       layout.saveNow();
       workspace.flush();

@@ -1,5 +1,6 @@
 /** What the work pane shows and which overlays are open. */
-export type WorkView = "editor" | "preview" | "plan" | "search" | "diff" | "agents" | "servers" | "memory" | "account";
+export type WorkView =
+  "editor" | "preview" | "plan" | "search" | "diff" | "agents" | "servers" | "memory" | "account" | "inbox";
 
 class UiStore {
   view = $state<WorkView>("editor");

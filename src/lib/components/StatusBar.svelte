@@ -3,6 +3,8 @@
    * The thin bar along the bottom of the window, as in VS Code: the account (with its popup), the current project's
    * git branch, servers, the memory disk, agents at work and this month's agent cost. Each item opens its page.
    */
+  import { connectionName, omni } from "$lib/stores/omniroute.svelte";
+  import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
@@ -172,6 +174,27 @@
     </span>
     <button type="button" class="item stop" title="End every remote connection now" onclick={() => remoteAccess.stop()}>
       Stop
+    </button>
+  {/if}
+
+  {#if omni.problems.length}
+    {@const first = omni.problems[0]}
+    <button
+      type="button"
+      class="item warn"
+      title={omni.problems
+        .map((c) => `${connectionName(c)}: ${c.state}${c.problem ? ` (${c.problem})` : ""}`)
+        .join("\n")}
+      onclick={() => show("agents")}
+    >
+      <KeyRound size={12} />
+      <span
+        >{first.state === "needs sign-in"
+          ? `${connectionName(first)}: sign in again`
+          : `${connectionName(first)}: not working`}{omni.problems.length > 1
+          ? ` (+${omni.problems.length - 1})`
+          : ""}</span
+      >
     </button>
   {/if}
 

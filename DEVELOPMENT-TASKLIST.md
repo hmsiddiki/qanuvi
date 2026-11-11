@@ -570,9 +570,18 @@ runs on or off; with it off nothing is sent anywhere.
 - [ ] **15e2. Terminal list like VS Code (cosmetic, owner 2026-11-11, later)**: instead of the shell drop-down and tabs
   on top of the terminal panel, a slim list of terminals on the right side of the panel (icon + name, warning mark,
   current one highlighted), with + and the panel buttons above it.
-- [ ] **15f. Notices in the status bar (owner, 2026-11-11, later)**: when a sign-in needs renewing (OmniRoute
+- [x] **15f. Notices in the status bar (owner, 2026-11-11; built 2026-11-11)**: when a sign-in needs renewing (OmniRoute
   connections such as Antigravity or Kiro, OpenRouter key problems), a notice in the bottom bar that opens the renew
   screen.
+  - Built: a watch at start and every 30 minutes (when Qanuvi runs OmniRoute) reads OmniRoute's connections; a sign-in
+    to renew or a connection that stopped working shows in the status bar ("kiro: sign in again (+1)", opens the
+    Agents page with the OmniRoute panel) and in the Inbox; it leaves both by itself once solved. Unnamed connections
+    go by their provider. Live: kiro and kimi-coding showed. Not yet: OpenRouter key problems (the key check runs
+    only from the panel today).
+- [x] **Inbox (24f, 15f; built 2026-11-11)**: the Inbox page (sidebar → Inbox): sessions waiting for approval, then
+  what happened — plan run reports (finished / needs you / stopped, with the summary of done, skipped and blocked
+  steps and "Open the plan"), sign-ins to renew, newer knowledge from Qanuvi. Kept on this computer (last 100); the
+  sidebar's number counts waiting sessions and unread items. Live: a one-step run's report and two sign-ins listed.
 - [ ] **15g. Task Manager shows an old icon (owner, 2026-11-11, check later)**: the program and its window carry the
   current logo (checked by colour); Windows' icon cache for the program's path still shows the first logo. An installed
   build (new path) should be right; check after the release, and whether `ie4uinit -ClearIconCache` or a sign-out
@@ -978,7 +987,7 @@ runs on or off; with it off nothing is sent anywhere.
 - [x] **Release for self-development (owner, 2026-11-11)**: after 24b, a release build (installer) the owner uses to
   develop the rest of Qanuvi with Qanuvi itself. Built 2026-11-11: Qanuvi_0.1.0_x64-setup.exe (NSIS only, 5.6 MB;
   `npx tauri build`, output in src-tauri/target/release/bundle/nsis). Code on github.com/hmsiddiki/qanuvi.
-- [-] **24f. Plan runs that finish by themselves (owner, 2026-11-11; run part built and tested 2026-11-11)**: Qanuvi becomes an assistant with its own
+- [x] **24f. Plan runs that finish by themselves (owner, 2026-11-11; built and tested 2026-11-11; the task queue is later)**: Qanuvi becomes an assistant with its own
   task runner that keeps working on what the owner gives it, even when the owner is away. Today a run goes from the
   chosen step to the end without pausing, but the whole run stops at the first blocked step, at the budget, or when a
   step fails on every model (after the planner's rewrite).
@@ -1007,7 +1016,7 @@ runs on or off; with it off nothing is sent anywhere.
     Sonnet; "3 done · 1 skipped · 1 blocked", $0.08 with the decider's $0.05. "After every step" with range 1-2:
     paused after step 1 ("Run again to go on").
   - Fixed while testing: the note for the paid agent (24e) showed in the user's message after a reload.
-  - Still to do: the report in the Inbox (today the Inbox only counts waiting sessions; it needs its own page).
+  - The report also goes to the Inbox (see "Inbox" above).
 - [x] **24b. The decider (owner's design 2026-11-10, revised 2026-11-11; built and tested 2026-11-11)**: one model takes the
   decisions (what kind of job, which model does it, when to hand over, whether the result is good enough), the others
   do the work.

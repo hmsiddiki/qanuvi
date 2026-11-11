@@ -1,4 +1,6 @@
 <script lang="ts">
+  import InboxView from "./InboxView.svelte";
+  import InboxIcon from "@lucide/svelte/icons/inbox";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
@@ -165,6 +167,11 @@
               <UserRound size={13} />
               <span>Account</span>
             </button>
+          {:else if ui.view === "inbox"}
+            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
+              <InboxIcon size={13} />
+              <span>Inbox</span>
+            </button>
           {/if}
         </div>
 
@@ -178,6 +185,8 @@
             <MemoryView />
           {:else if ui.view === "account"}
             <AccountView />
+          {:else if ui.view === "inbox"}
+            <InboxView />
           {:else if !project}
             <div class="placeholder">
               <FileCode size={22} />

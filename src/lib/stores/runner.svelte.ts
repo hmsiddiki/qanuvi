@@ -53,6 +53,8 @@ interface Turn {
 }
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
+import { inbox } from "./inbox.svelte";
+import { projects } from "./projects.svelte";
 import { memoryContext } from "./memory.svelte";
 
 const FINISHED = ["idle", "failed", "ended", "stopped"];
@@ -503,6 +505,17 @@ class RunnerStore {
     run.status = status;
     run.message = message;
     run.endedAt = Date.now();
+    if (message !== "Stopped by you.") {
+      const done = run.steps.filter((s) => s.status === "done").length;
+      const name = run.file.split("/").pop() ?? run.file;
+      const project = projects.list.find((p) => p.id === run.projectId)?.name ?? "";
+      inbox.add({
+        kind: "run",
+        title: `${project ? `${project}: ` : ""}${name} ${status === "done" ? "finished" : status === "needs-you" ? "needs you" : "stopped"} · ${done}/${run.steps.length} steps done`,
+        text: [message, status === "done" ? "" : runSummary(run)].filter(Boolean).join("\n"),
+        open: { label: "Open the plan", view: "plan", projectId: run.projectId },
+      });
+    }
   }
 
   /**

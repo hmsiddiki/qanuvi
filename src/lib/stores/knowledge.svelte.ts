@@ -6,6 +6,7 @@ import { api, errorText } from "$lib/api";
 import { FREE_PROVIDERS, FREE_PROVIDERS_CHECKED_ON, changes, type FreeProvider } from "$lib/agents/guides";
 import { parseKnowledge, type KnowledgePack } from "$lib/agents/knowledge";
 import { guides } from "./guides.svelte";
+import { inbox } from "./inbox.svelte";
 
 const KEPT = "qanuvi.knowledge.v1";
 const CHECKED = "qanuvi.knowledge.checked";
@@ -73,6 +74,13 @@ class KnowledgeStore {
         );
       }
       this.offer = { pack, summary };
+      inbox.add({
+        kind: "knowledge",
+        key: `knowledge:${pack.version}`,
+        title: `Newer knowledge from Qanuvi (version ${pack.version}, ${pack.published})`,
+        text: [pack.note, ...summary].filter(Boolean).join("\n"),
+        open: { label: "Look at it", view: "agents" },
+      });
     } catch (e) {
       this.error = errorText(e);
     } finally {
@@ -94,6 +102,7 @@ class KnowledgeStore {
         : (this.kept?.freeProvidersCheckedOn ?? ""),
     };
     localStorage.setItem(KEPT, JSON.stringify(this.kept));
+    inbox.resolve(`knowledge:${o.pack.version}`);
     this.offer = null;
   }
 
