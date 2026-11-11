@@ -179,3 +179,24 @@ describe("needs and skipped lines (24f)", () => {
     expect(setStepSkipped(twice, 2, null, "Second")).toBe(text);
   });
 });
+
+import { clearStaleSkips } from "./tasklist";
+
+describe("clearStaleSkips", () => {
+  it("removes skip lines whose needed steps are done, and keeps the rest", () => {
+    const text = [
+      "- [x] **1. One**",
+      "- [ ] **2. Two**",
+      "  - Needs: 1",
+      "  - Skipped: needs step 1, which is not done",
+      "- [ ] **3. Three**",
+      "  - Needs: 2",
+      "  - Skipped: needs step 2, which is not done",
+      "",
+    ].join("\n");
+    const out = clearStaleSkips(text);
+    expect(out).not.toContain("needs step 1");
+    expect(out).toContain("needs step 2");
+    expect(clearStaleSkips(out)).toBe(out);
+  });
+});

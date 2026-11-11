@@ -42,7 +42,7 @@ import {
   unmetNeed,
   runSummary,
 } from "$lib/plan/runner";
-import { parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
+import { clearStaleSkips, parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
 import { budgetState, chooseModel, jobType, learn, monthStart, type ModelStats } from "$lib/plan/routing";
 import {
   assignPrompt,
@@ -276,6 +276,16 @@ class RunnerStore {
     const pause = options.pause ?? "decisions";
     const steps = stepsToRun(parsePlan(text).steps, options.fromLine, options.onlyOne, ranges);
     // What is done already, to check each step's "- Needs:" line (24f).
+    // Skip lines from earlier runs whose needed steps are done now go first (they would say the wrong thing).
+    const cleared = clearStaleSkips(text);
+    if (cleared !== text) {
+      const now = await api.files.read(project.id, file).catch(() => null);
+      if (now?.text === text) {
+        await api.files.write(project.id, file, cleared, now.hash).catch(() => {});
+        text = cleared;
+        this.changed++;
+      }
+    }
     const doneNumbers = new Set(
       parsePlan(text)
         .steps.filter((s) => s.status === "x" && s.number)

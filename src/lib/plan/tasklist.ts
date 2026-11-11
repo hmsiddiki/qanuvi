@@ -219,3 +219,20 @@ export function findTaskLists(paths: string[]): string[] {
     .filter((p) => re.test(p) && !NOT_PLANS.test(p))
     .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
 }
+
+/**
+ * Removes "- Skipped:" lines that no longer hold: the step's needs (in this plan) are all done now. A run does this
+ * before it starts, so the plan never says a step waits for one that is finished.
+ */
+export function clearStaleSkips(text: string): string {
+  const plan = parsePlan(text);
+  const done = new Set(plan.steps.filter((s) => s.status === "x" && s.number).map((s) => s.number!));
+  let out = text;
+  // From the bottom up: removing a line moves the ones below it.
+  for (const s of [...plan.steps].reverse()) {
+    if (s.status === "x" || !s.needs?.length) continue;
+    if (!s.details.some((d) => /^- Skipped:/i.test(d.trim()))) continue;
+    if (s.needs.every((n) => !n.includes("#") && done.has(n.trim()))) out = setStepSkipped(out, s.line, null, s.title);
+  }
+  return out;
+}
