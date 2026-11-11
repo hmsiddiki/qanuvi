@@ -1,10 +1,7 @@
 <script lang="ts">
-  import InboxView from "./InboxView.svelte";
-  import InboxIcon from "@lucide/svelte/icons/inbox";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
-  import Search from "@lucide/svelte/icons/search";
   import FileCode from "@lucide/svelte/icons/file-code";
   import FolderTree from "@lucide/svelte/icons/folder-tree";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
@@ -14,17 +11,12 @@
   import X from "@lucide/svelte/icons/x";
   import Splitter from "./Splitter.svelte";
   import IconButton from "./IconButton.svelte";
-  import Explorer from "./Explorer.svelte";
+  import ProjectPanel from "./ProjectPanel.svelte";
   import CodeEditor from "./CodeEditor.svelte";
-  import SearchPanel from "./SearchPanel.svelte";
   import PreviewTab from "./PreviewTab.svelte";
   import PlanView from "./PlanView.svelte";
   import SourceControl from "./SourceControl.svelte";
-  import UserRound from "@lucide/svelte/icons/user-round";
-  import Brain from "@lucide/svelte/icons/brain";
-  import Server from "@lucide/svelte/icons/server";
   import TerminalView from "./TerminalView.svelte";
-  import Bot from "@lucide/svelte/icons/bot";
   import { layout } from "$lib/layout/layout.svelte";
   import { platform } from "$lib/platform.svelte";
   import { shortcutLabel } from "$lib/shortcuts";
@@ -43,26 +35,23 @@
   let termTabs = $derived(terminals.forProject(project?.id ?? null));
   let activeTerm = $derived(terminals.active(project?.id ?? null));
   let cursor = $state({ line: 1, column: 1 });
-  let searchPanel: SearchPanel | undefined = $state();
   let editorView: CodeEditor | undefined = $state();
 
   const fixed: { id: WorkView; label: string; icon: typeof Globe }[] = [
     { id: "preview", label: "Preview", icon: Globe },
     { id: "plan", label: "Plan", icon: ListChecks },
-    { id: "search", label: "Search", icon: Search },
-    { id: "diff", label: "Git", icon: GitBranch },
   ];
 
   const key = (action: Parameters<typeof shortcutLabel>[0]) => shortcutLabel(action, platform.isMac);
 
+  // Search asked for: the project panel opens.
+  $effect(() => {
+    if (ui.searchWanted && !settings.value.explorerVisible) settings.set("explorerVisible", true);
+  });
+
   // Opening a file shows the editor.
   $effect(() => {
     if (editor.activeKey) ui.view = "editor";
-  });
-
-  $effect(() => {
-    void ui.focusSearch;
-    if (ui.focusSearch && searchPanel) searchPanel.focus();
   });
 
   function fileName(path: string) {
@@ -92,12 +81,12 @@
     <div class="top">
       {#if project && settings.value.explorerVisible}
         <div class="explorer" style:width="{settings.value.explorerWidth}px">
-          <Explorer {project} />
+          <ProjectPanel {project} />
         </div>
         <Splitter
           axis="x"
           size={settings.value.explorerWidth}
-          label="Resize file tree"
+          label="Resize project panel"
           onresize={(w) => settings.set("explorerWidth", w)}
         />
       {/if}
@@ -166,19 +155,28 @@
               <span>{f.label}</span>
             </button>
           {/each}
-          {#if ui.view === "inbox"}
-            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
-              <InboxIcon size={13} />
-              <span>Inbox</span>
-            </button>
+          {#if ui.view === "diff"}
+            <div class="tab file-tab active">
+              <button type="button" role="tab" aria-selected="true" title="Git changes">
+                <GitBranch size={13} />
+                <span class="name">Changes</span>
+              </button>
+              <button
+                type="button"
+                class="close"
+                aria-label="Close changes"
+                title="Close"
+                onclick={() => ui.show("editor")}
+              >
+                <span class="dot"></span>
+                <X size={12} />
+              </button>
+            </div>
           {/if}
         </div>
 
         <div class="content" role="tabpanel">
-          <!-- Pages of the whole app come first: they need no project. -->
-          {#if ui.view === "inbox"}
-            <InboxView />
-          {:else if !project}
+          {#if !project}
             <div class="placeholder">
               <FileCode size={22} />
               <h3>No project</h3>
@@ -238,10 +236,8 @@
             <PreviewTab {project} />
           {:else if ui.view === "plan"}
             <PlanView {project} />
-          {:else if ui.view === "search"}
-            <SearchPanel bind:this={searchPanel} {project} />
           {:else if ui.view === "diff"}
-            <SourceControl {project} refreshToken={agent.turnsEnded} />
+            <SourceControl {project} part="main" refreshToken={agent.turnsEnded} />
           {/if}
         </div>
       </div>

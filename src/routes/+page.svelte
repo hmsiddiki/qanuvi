@@ -160,7 +160,6 @@
       event.preventDefault();
       if (!layout.state.workVisible) layout.toggleWork();
       ui.show("search");
-      ui.focusSearch++;
     } else if (k === "w" && !event.shiftKey && ui.view === "editor" && editor.activeKey) {
       event.preventDefault();
       editor.close(editor.activeKey);

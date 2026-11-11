@@ -149,6 +149,17 @@ async fn files_read(
 }
 
 #[tauri::command]
+async fn files_create(
+    state: State<'_, AppState>,
+    project_id: String,
+    path: String,
+    folder: bool,
+) -> Res<()> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::create(&root, &path, folder)).await
+}
+
+#[tauri::command]
 async fn files_write(
     state: State<'_, AppState>,
     project_id: String,
@@ -424,6 +435,16 @@ fn agent_info() -> agent::AgentInfo {
 #[tauri::command]
 fn agent_sessions(state: State<AppState>, project_id: String) -> Res<Vec<agent::Session>> {
     agent::list_sessions(&state.db, &project_id)
+}
+
+/// The agent sessions of a project that changed a file (the project panel's Timeline).
+#[tauri::command]
+fn agent_file_history(
+    state: State<AppState>,
+    project_id: String,
+    path: String,
+) -> Res<Vec<agent::FileTouch>> {
+    agent::file_history(&state.db, &project_id, &path)
 }
 
 #[tauri::command]
@@ -1414,6 +1435,7 @@ pub fn run() {
             files_list_all,
             files_read,
             files_write,
+            files_create,
             files_search,
             index_find,
             checks_run,
@@ -1443,6 +1465,7 @@ pub fn run() {
             agent_info,
             agent_sessions,
             agent_session_events,
+            agent_file_history,
             agent_start,
             agent_respond,
             runs_save,

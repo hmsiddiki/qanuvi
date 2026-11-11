@@ -132,6 +132,16 @@ export interface AgentConfigFile {
   exists: boolean;
 }
 
+/** An agent session that changed a file. */
+export interface FileTouch {
+  sessionId: string;
+  title: string;
+  agent: string;
+  model: string;
+  updatedAt: number;
+  edits: number;
+}
+
 /** A file or web page attached to a message: an image the agent sees, or text it reads. */
 export interface Attachment {
   name: string;
@@ -238,6 +248,9 @@ export const api = {
     read: (projectId: string, path: string) => invoke<FileContent>("files_read", { projectId, path }),
     write: (projectId: string, path: string, text: string, expectedHash: string | null) =>
       invoke<string>("files_write", { projectId, path, text, expectedHash }),
+    /** A new empty file or folder (never replaces one that is there). */
+    create: (projectId: string, path: string, folder: boolean) =>
+      invoke<void>("files_create", { projectId, path, folder }),
     search: (projectId: string, query: string, regex: boolean, caseSensitive: boolean) =>
       invoke<SearchResult>("files_search", { projectId, query, regex, caseSensitive }),
   },
@@ -294,6 +307,8 @@ export const api = {
     info: () => invoke<AgentInfo>("agent_info"),
     sessions: (projectId: string) => invoke<Session[]>("agent_sessions", { projectId }),
     events: (sessionId: string) => invoke<string[]>("agent_session_events", { sessionId }),
+    /** The sessions that changed a file, newest first (the project panel's Timeline). */
+    fileHistory: (projectId: string, path: string) => invoke<FileTouch[]>("agent_file_history", { projectId, path }),
     start: (
       projectId: string,
       sessionId: string | null,

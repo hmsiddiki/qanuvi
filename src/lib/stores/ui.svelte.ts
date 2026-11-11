@@ -1,3 +1,5 @@
+import { panel } from "./panel.svelte";
+
 /** What the work pane shows and which overlays are open. */
 export type WorkView = "editor" | "preview" | "plan" | "search" | "diff" | "inbox";
 
@@ -24,8 +26,6 @@ class UiStore {
   pickFile = $state<((path: string) => void) | null>(null);
   /** Project whose settings dialog is open. */
   settingsFor = $state<string | null>(null);
-  /** Goes up to ask the search panel to take focus. */
-  focusSearch = $state(0);
   section = $state("home");
 
   /** The settings page, open at this part; null: closed. */
@@ -38,9 +38,25 @@ class UiStore {
       this.openSettings(tab);
       return;
     }
+    if (view === "inbox") {
+      this.inboxOpen = true;
+      return;
+    }
     this.settings = null;
+    if (view === "search") {
+      // Search lives in the project panel now.
+      panel.show("search");
+      panel.focusSearch++;
+      this.searchWanted++;
+      return;
+    }
     this.view = view as WorkView;
   }
+
+  /** The Inbox drop-down from the sidebar. */
+  inboxOpen = $state(false);
+  /** Goes up when search was asked for: the work area shows the project panel. */
+  searchWanted = $state(0);
 
   openSettings(tab: SettingsTab = "agents"): void {
     this.settings = tab;

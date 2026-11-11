@@ -16,9 +16,11 @@
 
   interface Props {
     project: Project;
+    /** In the project panel: the panel's section header has the buttons. */
+    headless?: boolean;
   }
 
-  let { project }: Props = $props();
+  let { project, headless = false }: Props = $props();
 
   const children = new SvelteMap<string, Entry[]>();
   const expanded = new SvelteSet<string>();
@@ -69,12 +71,12 @@
     if (!children.has(entry.path)) await load(entry.path);
   }
 
-  async function refresh() {
+  export async function refresh() {
     const open = ["", ...expanded];
     await Promise.all([...open.map((p) => load(p)), loadGit()]);
   }
 
-  function collapseAll() {
+  export function collapseAll() {
     expanded.clear();
   }
 
@@ -106,11 +108,13 @@
 </script>
 
 <div class="explorer">
-  <header>
-    <span class="title" title={project.path}>{project.name}</span>
-    <IconButton label="Refresh" onclick={refresh}><RefreshCw size={13} /></IconButton>
-    <IconButton label="Collapse folders" onclick={collapseAll}><ChevronsDownUp size={13} /></IconButton>
-  </header>
+  {#if !headless}
+    <header>
+      <span class="title" title={project.path}>{project.name}</span>
+      <IconButton label="Refresh" onclick={refresh}><RefreshCw size={13} /></IconButton>
+      <IconButton label="Collapse folders" onclick={collapseAll}><ChevronsDownUp size={13} /></IconButton>
+    </header>
+  {/if}
   {#if error}<p class="error">{error}</p>{/if}
   <div class="tree" role="tree" aria-label="Files">
     {#each flat as { entry, depth, ignored } (entry.path)}

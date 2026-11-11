@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InboxView from "./InboxView.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
   import House from "@lucide/svelte/icons/house";
   import Inbox from "@lucide/svelte/icons/inbox";
@@ -27,6 +28,9 @@
   import { terminals } from "$lib/stores/terminals.svelte";
   import { settings } from "$lib/stores/settings.svelte";
 
+  /** Where the Inbox drop-down opens: beside the Inbox entry. */
+  let inboxAt = $state({ left: 260, top: 120 });
+
   const items = [
     { id: "home", label: "Home", icon: House },
     { id: "inbox", label: "Inbox", icon: Inbox },
@@ -46,8 +50,10 @@
     if (id === "plans") ui.show("plan");
     if (id === "agents" || id === "memory" || id === "servers") ui.openSettings(id);
     if (id === "inbox") {
-      if (!layout.state.workVisible) layout.toggleWork();
-      ui.show("inbox");
+      const el = document.querySelector<HTMLElement>('[data-nav="inbox"]');
+      const r = el?.getBoundingClientRect();
+      if (r) inboxAt = { left: r.right + 8, top: r.top };
+      ui.inboxOpen = !ui.inboxOpen;
     }
     if (id === "projects") projects.addWithPicker();
   }
@@ -77,6 +83,21 @@
             : "muted";
 </script>
 
+<svelte:window
+  onkeydown={(e) => e.key === "Escape" && ui.inboxOpen && (ui.inboxOpen = false)}
+  onpointerdown={(e) => {
+    if (!ui.inboxOpen) return;
+    const t = e.target as HTMLElement;
+    if (!t.closest(".inbox-pop") && !t.closest('[data-nav="inbox"]')) ui.inboxOpen = false;
+  }}
+/>
+
+{#if ui.inboxOpen}
+  <div class="inbox-pop" style:left="{inboxAt.left}px" style:top="{inboxAt.top}px" role="dialog" aria-label="Inbox">
+    <InboxView />
+  </div>
+{/if}
+
 <nav class="sidebar" class:collapsed aria-label="Main">
   <button type="button" class="workspace" title="Workspace">
     <span class="avatar" aria-hidden="true">Q</span>
@@ -93,6 +114,7 @@
           type="button"
           class="item"
           class:current={ui.section === item.id}
+          data-nav={item.id}
           aria-current={ui.section === item.id ? "page" : undefined}
           title={collapsed ? item.label : undefined}
           onclick={() => navigate(item.id)}
@@ -507,6 +529,18 @@
 
   .error {
     color: var(--qx-status-failed);
+  }
+
+  .inbox-pop {
+    position: fixed;
+    z-index: 50;
+    overflow-y: auto;
+    width: 420px;
+    max-height: min(560px, calc(100vh - 140px));
+    border: 1px solid var(--qx-border);
+    border-radius: 10px;
+    background: var(--qx-bg-panel);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
   }
 
   .bottom {

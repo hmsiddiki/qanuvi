@@ -598,13 +598,22 @@ runs on or off; with it off nothing is sent anywhere.
     and by the sidebar's Agents, Memory and Servers and every former link to those pages (status bar, Inbox, agent
     pane), at the right tab. Opening a configuration file from it closes it and shows the file as an editor tab. Live:
     every tab, search ("omniroute" -> Models and providers), Esc, the config file and the sidebar entries checked.
-  - [ ] Step 2: the work area's tabs are files, Preview and Plan; the project panel on its left edge (owner: like VS
+  - [x] Step 2 (built 2026-11-11): the work area's tabs are files, Preview and Plan; the project panel on its left edge (owner: like VS
     Code's side panel, where nothing is there to be ignored in a coding app), opened and closed with one button,
     resizable, with an icon row switching Explorer, Search and Git. The Explorer has collapsible sections that can be
     resized, reordered by dragging and hidden: Open editors; Files (tree with new file / new folder / refresh /
     collapse all); Outline (symbols of the current file, from the code index); Timeline (the file's commits and
     saves, plus Qanuvi's entries for changes an agent made: which session and model, opening that session); as
     options, "Touched in this session" and the current plan's steps. The Inbox becomes a drop-down from the sidebar.
+    Built: the panel (Explorer / Search / Git icons; a "..." menu shows or hides sections); sections open and close,
+    drag into another order, resize from their lower edge; Files has New file / New folder (files_create: never
+    replaces, stays inside the project) / Refresh / Collapse; Outline from the code index; Timeline: agent changes
+    (agent_file_history: sessions whose tool calls changed the file, any path form, reads left out; opens the
+    session) and commits (open the history in the work area); "Touched in this session" (hidden at first). The Git
+    view is split: its list in the panel, the diff and history in the work area under a "Changes" tab. Search moved
+    into the panel (Ctrl+Shift+F opens it). The Inbox is a drop-down beside its sidebar entry (Esc or a click outside
+    closes it). Live: Outline of agent.rs, Timeline of notes.txt (5 agent sessions) and agent.rs (3 commits), New
+    file, a change opening its diff, Search, the Inbox. Still to come: the current plan's steps as a section.
   - [ ] Step 3: presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation
     narrower), "VS Code-like" (icon bar on the far left, Explorer/Search/Git in a left side panel, editor centre,
     conversation on the right like a chat side bar, terminal bottom); plus Appearance and Layout tabs in Settings.

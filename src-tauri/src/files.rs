@@ -216,6 +216,29 @@ pub fn write_file(
     write_path(&path, rel, text, expected_hash)
 }
 
+/// Makes a new empty file or a folder inside the project (the project panel's New file / New folder). Something
+/// already there with that name is never replaced.
+pub fn create(root: &Path, rel: &str, folder: bool) -> Result<(), String> {
+    let rel = rel.trim().trim_matches('/');
+    if rel.is_empty() {
+        return Err("Give a name.".into());
+    }
+    let path = resolve(root, rel)?;
+    if path.exists() {
+        return Err(format!("{rel} exists already."));
+    }
+    if folder {
+        std::fs::create_dir(&path).map_err(|e| format!("{rel}: {e}"))
+    } else {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map(|_| ())
+            .map_err(|e| format!("{rel}: {e}"))
+    }
+}
+
 /// Saves to a path that was already checked by the caller (see `write_file` for the rules).
 pub fn write_path(
     path: &Path,
@@ -511,5 +534,26 @@ mod tests {
                 .matches
                 .is_empty()
         );
+    }
+}
+
+#[cfg(test)]
+mod create_tests {
+    use super::*;
+
+    #[test]
+    fn makes_files_and_folders_inside_the_project_only() {
+        let dir = tempfile::tempdir().unwrap();
+        create(dir.path(), "src", true).unwrap();
+        create(dir.path(), "src/new.ts", false).unwrap();
+        assert!(dir.path().join("src/new.ts").is_file());
+        assert!(
+            create(dir.path(), "src/new.ts", false)
+                .unwrap_err()
+                .contains("exists")
+        );
+        assert!(create(dir.path(), "../outside.txt", false).is_err());
+        assert!(create(dir.path(), "missing/x.txt", false).is_err());
+        assert!(create(dir.path(), "  ", false).is_err());
     }
 }

@@ -322,6 +322,112 @@ pub fn list_sessions(db: &Db, project_id: &str) -> Result<Vec<Session>, String> 
         .map_err(|e| e.to_string())
 }
 
+/// An agent session that changed a file (the project panel's Timeline, 15h).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTouch {
+    pub session_id: String,
+    pub title: String,
+    pub agent: String,
+    pub model: String,
+    pub updated_at: i64,
+    /// How many of the session's tool calls changed the file.
+    pub edits: u32,
+}
+
+/// Tools that only look at a file (they are not changes).
+fn reads_only(tool: &str) -> bool {
+    let t = tool.to_ascii_lowercase();
+    [
+        "read", "grep", "glob", "search", "outline", "find", "list", "ls",
+    ]
+    .iter()
+    .any(|r| {
+        t == *r
+            || t.starts_with(&format!("{r}_"))
+            || t.ends_with(&format!("_{r}"))
+            || t.contains("__read")
+    })
+}
+
+/// Whether a path an agent used (absolute or relative, either slash) names the project file `rel`.
+fn same_file(used: &str, rel: &str) -> bool {
+    let used = used.replace('\\', "/");
+    let rel = rel.trim_start_matches("./").replace('\\', "/");
+    !rel.is_empty() && (used == rel || used.ends_with(&format!("/{rel}")))
+}
+
+/// The tool calls in one stored line that changed `rel`.
+fn edits_in(line: &str, rel: &str) -> u32 {
+    let Ok(v) = serde_json::from_str::<Value>(line) else {
+        return 0;
+    };
+    let Some(blocks) = v["message"]["content"].as_array() else {
+        return 0;
+    };
+    blocks
+        .iter()
+        .filter(|b| b["type"] == "tool_use" && !reads_only(b["name"].as_str().unwrap_or("")))
+        .filter(|b| {
+            ["file_path", "path", "notebook_path"]
+                .iter()
+                .any(|k| b["input"][*k].as_str().is_some_and(|p| same_file(p, rel)))
+        })
+        .count() as u32
+}
+
+/// The agent sessions of a project that changed a file, newest first.
+pub fn file_history(db: &Db, project_id: &str, rel: &str) -> Result<Vec<FileTouch>, String> {
+    let name = rel.rsplit('/').next().unwrap_or(rel);
+    if name.is_empty() {
+        return Ok(vec![]);
+    }
+    let conn = db.conn();
+    let mut stmt = conn
+        .prepare(
+            "SELECT s.id, s.title, s.agent, s.model, s.updated_at, e.line
+             FROM sessions s JOIN session_events e ON e.session_id = s.id
+             WHERE s.project_id = ?1 AND e.line LIKE '%tool_use%' AND e.line LIKE ?2
+             ORDER BY s.updated_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![project_id, format!("%{name}%")], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, i64>(4)?,
+                r.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out: Vec<FileTouch> = Vec::new();
+    for row in rows {
+        let (id, title, agent, model, updated_at, line) = row.map_err(|e| e.to_string())?;
+        let n = edits_in(&line, rel);
+        if n == 0 {
+            continue;
+        }
+        match out.iter_mut().find(|t| t.session_id == id) {
+            Some(t) => t.edits += n,
+            None => out.push(FileTouch {
+                session_id: id,
+                title,
+                agent,
+                model,
+                updated_at,
+                edits: n,
+            }),
+        }
+        if out.len() >= 50 {
+            break;
+        }
+    }
+    Ok(out)
+}
+
 pub fn session_events(db: &Db, session_id: &str) -> Result<Vec<String>, String> {
     let conn = db.conn();
     let mut stmt = conn
@@ -1341,5 +1447,38 @@ mod attachment_tests {
         assert!(context_with(None, &[]).is_none());
         let line: Value = serde_json::from_str(&user_line("Hi", &[])).unwrap();
         assert!(line.get("attachments").is_none());
+    }
+}
+
+#[cfg(test)]
+mod file_history_tests {
+    use super::*;
+
+    #[test]
+    fn changes_are_found_by_any_path_form_and_reads_are_not() {
+        let edit = |name: &str, path: &str| {
+            json!({"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": name, "input": {"file_path": path}}
+            ]}})
+            .to_string()
+        };
+        assert_eq!(
+            edits_in(
+                &edit("Edit", "E:\\Projects\\shop\\src\\cart.ts"),
+                "src/cart.ts"
+            ),
+            1
+        );
+        assert_eq!(edits_in(&edit("Write", "src/cart.ts"), "src/cart.ts"), 1);
+        assert_eq!(edits_in(&edit("Read", "src/cart.ts"), "src/cart.ts"), 0);
+        assert_eq!(edits_in(&edit("Edit", "src/mycart.ts"), "src/cart.ts"), 0);
+        assert_eq!(
+            edits_in(
+                &edit("mcp__qanuvi__read_lines", "src/cart.ts"),
+                "src/cart.ts"
+            ),
+            0
+        );
+        assert_eq!(edits_in("not json", "src/cart.ts"), 0);
     }
 }

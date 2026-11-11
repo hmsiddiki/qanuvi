@@ -167,6 +167,11 @@ impl Master {
                 Ok(json!({"files": list, "truncated": truncated}))
             }
             "files_read" => to(files::read_file(&self.root(args)?, &s(args, "path"))),
+            "files_create" => to(files::create(
+                &self.root(args)?,
+                &s(args, "path"),
+                b(args, "folder"),
+            )),
             "files_write" => to(files::write_file(
                 &self.root(args)?,
                 &s(args, "path"),
@@ -289,6 +294,11 @@ impl Master {
             // Agent sessions: they keep running when the connection ends; their output is stored.
             "agent_info" => to(Ok(agent::info())),
             "agent_sessions" => to(agent::list_sessions(db, &s(args, "projectId"))),
+            "agent_file_history" => to(agent::file_history(
+                db,
+                &s(args, "projectId"),
+                &s(args, "path"),
+            )),
             "agent_session_events" => to(agent::session_events(db, &s(args, "sessionId"))),
             "agent_start" => {
                 let project = projects::get(db, &s(args, "projectId"))?;

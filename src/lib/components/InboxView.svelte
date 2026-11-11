@@ -14,6 +14,7 @@
 
   function open(item: InboxItem) {
     inbox.markRead(item.id);
+    ui.inboxOpen = false;
     if (!item.open) return;
     if (item.open.projectId && projects.current?.id !== item.open.projectId) projects.select(item.open.projectId);
     if (!layout.state.workVisible) layout.toggleWork();
@@ -21,6 +22,7 @@
   }
 
   function openSession(id: string) {
+    ui.inboxOpen = false;
     if (!layout.state.agentVisible) layout.toggleAgent();
     agent.select(id);
   }
@@ -74,8 +76,7 @@
 
 <style>
   .inbox {
-    padding: var(--qx-space-4, 16px) var(--qx-space-5, 20px);
-    max-width: 760px;
+    padding: 12px 14px;
     font-size: 12.5px;
   }
 
