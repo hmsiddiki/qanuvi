@@ -581,7 +581,7 @@ runs on or off; with it off nothing is sent anywhere.
   what happened — plan run reports (finished / needs you / stopped, with the summary of done, skipped and blocked
   steps and "Open the plan"), sign-ins to renew, newer knowledge from Qanuvi. Kept on this computer (last 100); the
   sidebar's number counts waiting sessions and unread items. Live: a one-step run's report and two sign-ins listed.
-- [ ] **15g. Task Manager shows an old icon (owner, 2026-11-11, check later)**: the program and its window carry the
+- [x] **15g. Task Manager shows an old icon (owner, 2026-11-11; checked by the owner 2026-11-11: the installed build shows the current logo)**: the program and its window carry the
   current logo (checked by colour); Windows' icon cache for the program's path still shows the first logo. An installed
   build (new path) should be right; check after the release, and whether `ie4uinit -ClearIconCache` or a sign-out
   clears it.
