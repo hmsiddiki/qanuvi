@@ -204,3 +204,57 @@ export function savePlanNotes(projectId: string, file: string, notes: string[]):
     // Notes are a help; the run goes on without them.
   }
 }
+
+/** The folder of a plan's step logs, and one step's log. */
+export function logDir(planFile: string): string {
+  const stem = planFile
+    .replace(/\\/g, "/")
+    .replace(/\.md$/i, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "_");
+  return `.qanuvi/plan-logs/${stem}`;
+}
+export function logPath(planFile: string, step: { number: string | null; title: string }): string {
+  const name = (step.number ?? step.title.slice(0, 40)).replace(/[^A-Za-z0-9._-]+/g, "_");
+  return `${logDir(planFile)}/${name}.md`;
+}
+
+/** One attempt in a step's log. */
+export function attemptEntry(a: {
+  when: Date;
+  model: string;
+  outcome: string;
+  costUsd: number;
+  seconds: number;
+  testsPassed?: boolean | null;
+  note?: string;
+  failure?: string;
+  answer?: string;
+}): string {
+  const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n) + " …" : t);
+  const lines = [
+    "",
+    `## Attempt ${a.when.toISOString().slice(0, 16).replace("T", " ")} · ${a.model} · ${a.outcome === "open" ? "turn ended" : a.outcome} · $${a.costUsd.toFixed(2)} · ${Math.round(a.seconds)} s`,
+  ];
+  if (a.testsPassed !== undefined && a.testsPassed !== null)
+    lines.push(a.testsPassed ? "Tests: passed." : "Tests: failed.");
+  if (a.note) lines.push(`Note: ${a.note}`);
+  if (a.failure) lines.push("Failure:", "```", cut(a.failure, 1500), "```");
+  if (a.answer) lines.push("The agent's last answer:", "", cut(a.answer.trim(), 1500));
+  return lines.join("\n") + "\n";
+}
+
+/** A step's result in its log. */
+export function resultEntry(status: string, reason?: string): string {
+  return `
+**Result: ${status}**${reason ? ` — ${reason}` : ""}
+`;
+}
+
+/** What a step is told about the logs. */
+export function logsBlock(planFile: string, own: string, ownExists: boolean): string {
+  return [
+    "",
+    `Every step of this plan has a log in ${logDir(planFile)}/ (its attempts, failures and results). Read the log of a step you depend on or that failed, when it helps.`,
+    ...(ownExists ? [`This step was tried before: read its log ${own} first and do not repeat what failed.`] : []),
+  ].join("\n");
+}

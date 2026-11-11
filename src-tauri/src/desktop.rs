@@ -129,6 +129,18 @@ struct FileList {
     truncated: bool,
 }
 
+/// Adds to a plan step's log (under .qanuvi/plan-logs).
+#[tauri::command]
+async fn files_log_append(
+    state: State<'_, AppState>,
+    project_id: String,
+    path: String,
+    text: String,
+) -> Res<()> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::log_append(&root, &path, &text)).await
+}
+
 /// Every Markdown file in the project, ignore rules or not: where the Plan view finds task lists.
 #[tauri::command]
 async fn files_markdown(state: State<'_, AppState>, project_id: String) -> Res<Vec<String>> {
@@ -1562,6 +1574,7 @@ pub fn run() {
             files_list_dir,
             files_list_all,
             files_markdown,
+            files_log_append,
             files_replace,
             files_read,
             files_write,

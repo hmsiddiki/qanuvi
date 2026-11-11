@@ -261,6 +261,9 @@ export const api = {
     listAll: (projectId: string) => invoke<{ files: string[]; truncated: boolean }>("files_list_all", { projectId }),
     /** Every Markdown file, ignore rules or not (task lists can sit in any folder). */
     markdown: (projectId: string) => invoke<string[]>("files_markdown", { projectId }),
+    /** Adds to a plan step's log (under .qanuvi/plan-logs). */
+    logAppend: (projectId: string, path: string, text: string) =>
+      invoke<void>("files_log_append", { projectId, path, text }),
     read: (projectId: string, path: string) => invoke<FileContent>("files_read", { projectId, path }),
     write: (projectId: string, path: string, text: string, expectedHash: string | null) =>
       invoke<string>("files_write", { projectId, path, text, expectedHash }),

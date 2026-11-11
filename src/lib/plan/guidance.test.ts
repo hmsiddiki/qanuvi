@@ -99,3 +99,35 @@ describe("a plan's private details", () => {
     expect(b).toContain("never write them into files");
   });
 });
+
+import { attemptEntry, logPath, logsBlock, resultEntry } from "./guidance";
+
+describe("step logs", () => {
+  it("has one file per step under the plan's folder", () => {
+    expect(logPath("content/plugins/qcommerce/PLAN-D.md", { number: "82b", title: "x" })).toBe(
+      ".qanuvi/plan-logs/content_plugins_qcommerce_PLAN-D/82b.md",
+    );
+    expect(logPath("PLAN.md", { number: null, title: "Add greet test" })).toBe(
+      ".qanuvi/plan-logs/PLAN/Add_greet_test.md",
+    );
+  });
+
+  it("records attempts and results, and tells a retried step to read its log", () => {
+    const e = attemptEntry({
+      when: new Date("2026-11-12T10:00:00Z"),
+      model: "claude-opus-5-5",
+      outcome: "open",
+      costUsd: 2.19,
+      seconds: 349,
+      testsPassed: false,
+      failure: "Expected 1200, got 1250",
+      answer: "The cart cache was not cleared.",
+    });
+    expect(e).toContain("claude-opus-5-5 · turn ended · $2.19");
+    expect(e).toContain("Tests: failed.");
+    expect(e).toContain("Expected 1200, got 1250");
+    expect(resultEntry("blocked", "no database login")).toContain("**Result: blocked** — no database login");
+    expect(logsBlock("PLAN.md", ".qanuvi/plan-logs/PLAN/2.md", true)).toContain("tried before");
+    expect(logsBlock("PLAN.md", ".qanuvi/plan-logs/PLAN/2.md", false)).not.toContain("tried before");
+  });
+});

@@ -16,6 +16,10 @@ import {
   notesBlock,
   notesIn,
   privateBlock,
+  attemptEntry,
+  logPath,
+  logsBlock,
+  resultEntry,
   loadPlanNotes,
   savePlanNotes,
   stepKey,
@@ -127,6 +131,44 @@ class RunnerStore {
     if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
     // Stop always works, also when the turn's own end never arrives (a lost event, an agent that hangs).
     this.#endTurn?.();
+  }
+
+  /** Adds an attempt to the step's log: model, outcome, cost, tests, the failure and the agent's last answer. */
+  async #logAttempt(project: Project, file: string, step: StepRun, a: Attempt): Promise<void> {
+    const path = logPath(file, step);
+    if (!step.attempts.length) {
+      const head = await api.files.read(project.id, path).catch(() => null);
+      if (!head)
+        await api.files
+          .logAppend(
+            project.id,
+            path,
+            `# Step ${step.number ? step.number + ". " : ""}${step.title}\n\nPlan: ${file}\n`,
+          )
+          .catch(() => {});
+    }
+    const lines = a.sessionId ? await api.agent.events(a.sessionId).catch(() => [] as string[]) : [];
+    const texts = reduceAll(lines)
+      .filter((i) => i.kind === "text")
+      .map((i) => (i as { text: string }).text);
+    const entry = attemptEntry({
+      when: new Date(),
+      model: a.model,
+      outcome: a.outcome,
+      costUsd: a.costUsd,
+      seconds: a.seconds,
+      testsPassed: a.testsPassed,
+      note: a.note,
+      failure: a.failure,
+      answer: texts[texts.length - 1] ?? "",
+    });
+    await api.files.logAppend(project.id, path, entry).catch(() => {});
+  }
+
+  /** Adds the step's result (done, blocked, skipped with why) to its log. */
+  async #logResult(project: Project, file: string, step: StepRun): Promise<void> {
+    if (step.status === "waiting" || step.status === "running") return;
+    await api.files.logAppend(project.id, logPath(file, step), resultEntry(step.status, step.reason)).catch(() => {});
   }
 
   /** Something the owner said during the run: every later step gets it. */
@@ -409,6 +451,7 @@ class RunnerStore {
           stepRun.status = "skipped";
           stepRun.reason = unmet;
           await this.#noteSkipped(project, file, stepRun, unmet);
+          await this.#logResult(project, file, stepRun);
           await this.#save(run);
           continue;
         }
@@ -500,7 +543,13 @@ class RunnerStore {
         const testCommand = options.packets ? project.settings.test_command.trim() : "";
         // The plan's private details (read each step: one given during the last step counts at once).
         const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
-        let prompt = stepPrompt(file, fresh, done) + notesBlock(run.notes ?? []) + privateBlock(privateDetails);
+        const ownLog = logPath(file, fresh);
+        const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
+        let prompt =
+          stepPrompt(file, fresh, done) +
+          notesBlock(run.notes ?? []) +
+          privateBlock(privateDetails) +
+          logsBlock(file, ownLog, ownLogExists);
         // The reviewer turned down a free model's work: the next model hears why.
         const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
         if (rejected)
@@ -525,6 +574,7 @@ class RunnerStore {
           resume,
         );
         await this.#settleCarry(attempt, section, options, carryOn);
+        await this.#logAttempt(project, file, stepRun, attempt);
         const after = await api.files.read(project.id, file).catch(() => null);
         if (attempt.outcome === "open" && after) {
           const outcome = stepOutcome(after.text, stepRun);
@@ -594,6 +644,7 @@ class RunnerStore {
           break;
         }
       }
+      await this.#logResult(project, file, stepRun);
       // Steps added while this one ran (the user asked for them mid-step) come next.
       await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
       await this.#collectNotes(run, stepRun);

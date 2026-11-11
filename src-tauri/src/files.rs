@@ -284,6 +284,38 @@ pub fn write_file(
     write_path(&path, rel, text, expected_hash)
 }
 
+/// Where plan runs keep a log per step (attempts, failures, results): any model in any later session can read them.
+pub const PLAN_LOGS: &str = ".qanuvi/plan-logs/";
+
+/// Adds to a step's log (made with its folders when new). Only under .qanuvi/plan-logs; .qanuvi gets a .gitignore so
+/// the logs never go into the project's history.
+pub fn log_append(root: &Path, rel: &str, text: &str) -> Result<(), String> {
+    let rel = rel.replace('\\', "/");
+    if !rel.starts_with(PLAN_LOGS) || rel.contains("..") || !rel.ends_with(".md") {
+        return Err("A step log lives under .qanuvi/plan-logs and ends in .md.".into());
+    }
+    // The folders first (only plain names are allowed above), then the usual check that it stays in the project.
+    if let Some(dir) = Path::new(&rel).parent() {
+        std::fs::create_dir_all(root.join(dir)).map_err(|e| e.to_string())?;
+    }
+    let path = resolve(root, &rel)?;
+    let ignore = root.join(".qanuvi").join(".gitignore");
+    if !ignore.exists() {
+        let _ = std::fs::write(
+            &ignore,
+            "# Qanuvi's own files (plan logs): not part of the project.\n*\n",
+        );
+    }
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("{rel}: {e}"))?;
+    f.write_all(text.as_bytes())
+        .map_err(|e| format!("{rel}: {e}"))
+}
+
 /// Makes a new empty file or a folder inside the project (the project panel's New file / New folder). Something
 /// already there with that name is never replaced.
 pub fn create(root: &Path, rel: &str, folder: bool) -> Result<(), String> {
@@ -990,5 +1022,25 @@ mod rename_tests {
             std::fs::read_to_string(p.join("src/notes.md")).unwrap(),
             "$1 $"
         );
+    }
+
+    #[test]
+    fn step_logs_append_under_their_folder_and_stay_out_of_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        log_append(p, ".qanuvi/plan-logs/PLAN-D/82b.md", "one\n").unwrap();
+        log_append(p, ".qanuvi/plan-logs/PLAN-D/82b.md", "two\n").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(p.join(".qanuvi/plan-logs/PLAN-D/82b.md")).unwrap(),
+            "one\ntwo\n"
+        );
+        assert!(
+            std::fs::read_to_string(p.join(".qanuvi/.gitignore"))
+                .unwrap()
+                .contains('*')
+        );
+        assert!(log_append(p, "src/x.md", "no").is_err());
+        assert!(log_append(p, ".qanuvi/plan-logs/../../x.md", "no").is_err());
+        assert!(log_append(p, ".qanuvi/plan-logs/a.txt", "no").is_err());
     }
 }
