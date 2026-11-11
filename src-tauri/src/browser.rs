@@ -489,7 +489,12 @@ impl Browser {
     /// Runs Qanuvi's page helper (page.js) in the page.
     pub fn page(&mut self, mode: &str, arg: Value, max: usize) -> Result<Value, String> {
         let js = PAGE_JS.trim().trim_end_matches(';');
-        let expr = format!("({js})({}, {}, {max})", json!(mode), arg);
+        // Between two pages (or on a slow machine) the document may not exist yet: wait for it, up to 5 s.
+        let expr = format!(
+            "(async () => {{ for (let i = 0; i < 100 && (!document.documentElement || document.readyState === 'loading'); i++) await new Promise((r) => setTimeout(r, 50)); return ({js})({}, {}, {max}); }})()",
+            json!(mode),
+            arg
+        );
         self.eval(&expr)
     }
 
