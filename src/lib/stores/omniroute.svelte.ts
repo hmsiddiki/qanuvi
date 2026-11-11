@@ -30,16 +30,49 @@ export function connectionName(c: OmniConnection): string {
 
 const endpoint = (p: ModelProvider) => ({ id: p.id, kind: p.kind, url: p.url });
 
+/** Connections the user does not want warnings about (kept in OmniRoute, only quiet in Qanuvi). */
+const MUTED_KEY = "qanuvi.omni.muted";
+function loadMuted(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(MUTED_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 class OmniStore {
   connections = $state<OmniConnection[] | null>(null);
   catalog = $state<OmniCatalogEntry[]>([]);
   busy = $state<Record<string, string>>({});
   error = $state("");
   note = $state("");
+  muted = $state<string[]>(typeof localStorage === "undefined" ? [] : loadMuted());
 
-  /** Connections that need the user: a sign-in to renew, or a key that stopped working. */
+  /** Connections that need the user: a sign-in to renew, or a key that stopped working (not the muted ones). */
   get problems(): OmniConnection[] {
-    return (this.connections ?? []).filter((c) => c.state === "needs sign-in" || c.state === "error");
+    return (this.connections ?? []).filter(
+      (c) => (c.state === "needs sign-in" || c.state === "error") && !this.muted.includes(c.id),
+    );
+  }
+
+  /** No more warnings about this connection (or warnings again); it stays in OmniRoute either way. */
+  setMuted(c: OmniConnection, on: boolean): void {
+    this.muted = on ? [...new Set([...this.muted, c.id])] : this.muted.filter((id) => id !== c.id);
+    localStorage.setItem(MUTED_KEY, JSON.stringify(this.muted));
+  }
+
+  /** Removes the connection from OmniRoute itself. */
+  async remove(p: ModelProvider, c: OmniConnection): Promise<boolean> {
+    const ok = await this.#do(c.id, "Removing…", () =>
+      invoke("omniroute_remove", { endpoint: endpoint(p), id: c.id }).then(() => true),
+    );
+    if (ok) {
+      this.note = `${connectionName(c)} is removed from OmniRoute.`;
+      if (this.muted.includes(c.id)) this.setMuted(c, false);
+      await this.load(p);
+    }
+    return !!ok;
   }
 
   async #do<T>(key: string, label: string, f: () => Promise<T>): Promise<T | null> {

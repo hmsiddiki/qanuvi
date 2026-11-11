@@ -245,6 +245,8 @@ export const api = {
   files: {
     listDir: (projectId: string, path: string) => invoke<Entry[]>("files_list_dir", { projectId, path }),
     listAll: (projectId: string) => invoke<{ files: string[]; truncated: boolean }>("files_list_all", { projectId }),
+    /** Every Markdown file, ignore rules or not (task lists can sit in any folder). */
+    markdown: (projectId: string) => invoke<string[]>("files_markdown", { projectId }),
     read: (projectId: string, path: string) => invoke<FileContent>("files_read", { projectId, path }),
     write: (projectId: string, path: string, text: string, expectedHash: string | null) =>
       invoke<string>("files_write", { projectId, path, text, expectedHash }),

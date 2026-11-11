@@ -111,6 +111,73 @@ fn walker(dir: &Path) -> WalkBuilder {
     b
 }
 
+/// Folders never looked into for nested repositories (big and never a project of their own).
+const SKIP_FOR_REPOS: &[&str] = &["node_modules", "vendor", "target", ".git", "dist", "build"];
+
+/// Git repositories inside the project that the project's own ignore rules leave out (for example a plugin with its
+/// own repository in a folder the parent ignores). Their files belong to the user's work too, so they are walked with
+/// their own rules, as VS Code finds nested repositories.
+fn hidden_repos(root: &Path) -> Vec<PathBuf> {
+    let mut seen_dirs = std::collections::HashSet::new();
+    for e in walker(root).build().flatten() {
+        if e.file_type().is_some_and(|t| t.is_dir()) {
+            seen_dirs.insert(e.path().to_path_buf());
+        }
+    }
+    let mut repos = Vec::new();
+    let mut b = WalkBuilder::new(root);
+    b.standard_filters(false)
+        .max_depth(Some(6))
+        .filter_entry(|e| {
+            !SKIP_FOR_REPOS.iter().any(|s| e.file_name() == *s) || e.file_name() == ".git"
+        });
+    for e in b.build().flatten() {
+        if e.file_name() == ".git"
+            && let Some(repo) = e.path().parent()
+            && repo != root
+            && !seen_dirs.contains(repo)
+            && !repos.iter().any(|r: &PathBuf| repo.starts_with(r))
+        {
+            repos.push(repo.to_path_buf());
+        }
+    }
+    repos
+}
+
+/// Every Markdown file in the project, ignore rules or not (a plan is a plan in any folder, a plugin's too), leaving
+/// out only bulky folders. The Plan view picks the task lists among them.
+pub fn markdown_files(root: &Path) -> Result<Vec<String>, String> {
+    const MAX: usize = 20_000;
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut b = WalkBuilder::new(&root_c);
+    b.standard_filters(false)
+        .max_depth(Some(10))
+        .filter_entry(|e| !SKIP_FOR_REPOS.iter().any(|s| e.file_name() == *s));
+    let mut out = Vec::new();
+    for e in b.build().flatten() {
+        if e.file_type().is_some_and(|t| t.is_file())
+            && e.path()
+                .extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case("md"))
+        {
+            out.push(rel_string(&root_c, e.path()));
+            if out.len() >= MAX {
+                break;
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+/// Every file Qanuvi works with: the project's own (by its ignore rules), then those of hidden nested repositories.
+fn walk_files(root: &Path) -> impl Iterator<Item = ignore::DirEntry> {
+    std::iter::once(root.to_path_buf())
+        .chain(hidden_repos(root))
+        .flat_map(|dir| walker(&dir).build().flatten())
+        .filter(|e| e.file_type().is_some_and(|t| t.is_file()))
+}
+
 /// The entries of one folder: folders first, then files, by name. Ignored entries are listed too (greyed in the tree,
 /// as in VS Code), except the `.git` folder.
 pub fn list_dir(root: &Path, rel: &str) -> Result<Vec<Entry>, String> {
@@ -154,13 +221,11 @@ pub fn list_dir(root: &Path, rel: &str) -> Result<Vec<Entry>, String> {
 pub fn list_files(root: &Path) -> Result<(Vec<String>, bool), String> {
     let root_c = root.canonicalize().map_err(|e| e.to_string())?;
     let mut files = Vec::new();
-    for entry in walker(&root_c).build().flatten() {
-        if entry.file_type().is_some_and(|t| t.is_file()) {
-            if files.len() >= MAX_LISTED_FILES {
-                return Ok((files, true));
-            }
-            files.push(rel_string(&root_c, entry.path()));
+    for entry in walk_files(&root_c) {
+        if files.len() >= MAX_LISTED_FILES {
+            return Ok((files, true));
         }
+        files.push(rel_string(&root_c, entry.path()));
     }
     files.sort();
     Ok((files, false))
@@ -360,10 +425,7 @@ pub fn search(
     let root_c = root.canonicalize().map_err(|e| e.to_string())?;
     let mut matches = Vec::new();
     let mut files_searched = 0;
-    for entry in walker(&root_c).build().flatten() {
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
+    for entry in walk_files(&root_c) {
         if entry.metadata().map(|m| m.len()).unwrap_or(0) > MAX_SEARCH_BYTES {
             continue;
         }
@@ -636,5 +698,58 @@ mod rename_tests {
         );
         assert!(folder_in(dir.path(), Some("b.txt")).is_err());
         assert_eq!(folder_in(dir.path(), None).unwrap(), dir.path());
+    }
+
+    #[test]
+    fn a_nested_repository_the_parent_ignores_is_listed_and_searched_with_its_own_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::write(p.join(".gitignore"), "/plugins/*\n").unwrap();
+        std::fs::write(p.join("index.php"), "core").unwrap();
+        let plugin = p.join("plugins/shop");
+        std::fs::create_dir_all(plugin.join(".git")).unwrap();
+        std::fs::create_dir_all(plugin.join("cache")).unwrap();
+        std::fs::write(plugin.join(".gitignore"), "cache/\n").unwrap();
+        std::fs::write(plugin.join("PLAN-D.md"), "- [ ] **1. Step** amirul").unwrap();
+        std::fs::write(plugin.join("cache/x.md"), "amirul").unwrap();
+        std::fs::create_dir_all(p.join("plugins/other")).unwrap();
+        std::fs::write(p.join("plugins/other/notes.md"), "amirul").unwrap();
+
+        let (files, _) = list_files(p).unwrap();
+        assert!(
+            files.contains(&"plugins/shop/PLAN-D.md".to_string()),
+            "{files:?}"
+        );
+        assert!(files.contains(&"plugins/shop/.gitignore".to_string()));
+        assert!(
+            !files.iter().any(|f| f.contains("cache/")),
+            "the repository's own rules apply"
+        );
+        assert!(
+            !files.iter().any(|f| f.contains("plugins/other")),
+            "an ignored folder that is no repository stays out"
+        );
+        assert!(files.contains(&"index.php".to_string()));
+
+        let found = search(p, "amirul", false, false, 50).unwrap();
+        let paths: Vec<_> = found.matches.iter().map(|m| m.path.as_str()).collect();
+        assert_eq!(paths, ["plugins/shop/PLAN-D.md"]);
+    }
+
+    #[test]
+    fn markdown_files_are_found_in_ignored_folders_with_or_without_a_repository() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::write(p.join(".gitignore"), "/plugins/*\n").unwrap();
+        std::fs::create_dir_all(p.join("plugins/shop")).unwrap();
+        std::fs::write(p.join("plugins/shop/PLAN-D.md"), "x").unwrap();
+        std::fs::create_dir_all(p.join("node_modules/lib")).unwrap();
+        std::fs::write(p.join("node_modules/lib/TODO.md"), "x").unwrap();
+        std::fs::write(p.join("README.md"), "x").unwrap();
+        std::fs::write(p.join("index.php"), "x").unwrap();
+        assert_eq!(
+            markdown_files(p).unwrap(),
+            ["README.md", "plugins/shop/PLAN-D.md"]
+        );
     }
 }

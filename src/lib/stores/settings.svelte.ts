@@ -55,6 +55,8 @@ export interface Settings {
   approveMinutes: number;
   /** How Qanuvi looks (15h): the editor's font size (px) and the size of the whole interface (%). */
   appearance: { editorFontSize: number; uiScale: number };
+  /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
+  updates: { autoDownload: boolean };
 }
 
 export type ModelProviderKind = "ollama" | "openai" | "openrouter";
@@ -129,6 +131,7 @@ const DEFAULTS: Settings = {
   brain: { providers: DEFAULT_MODEL_PROVIDERS, models: [], local: true, omniAssist: true },
   approveMinutes: 10,
   appearance: { editorFontSize: 13, uiScale: 100 },
+  updates: { autoDownload: false },
   team: DEFAULT_TEAM,
 };
 
@@ -183,6 +186,10 @@ export function parseSettings(json: string | null): Settings {
     const n = (v: unknown, d: number, lo: number, hi: number) =>
       typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d;
     s.appearance = { editorFontSize: n(ap.editorFontSize, 13, 10, 24), uiScale: n(ap.uiScale, 100, 80, 150) };
+  }
+  {
+    const up = raw.updates && typeof raw.updates === "object" ? (raw.updates as Record<string, unknown>) : {};
+    s.updates = { autoDownload: up.autoDownload === true };
   }
   if (Array.isArray(raw.masters))
     for (const m of raw.masters as Record<string, unknown>[]) {

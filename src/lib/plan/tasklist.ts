@@ -209,10 +209,13 @@ export function nextStatus(status: StepStatus): StepStatus {
   return STATUS_ORDER[(STATUS_ORDER.indexOf(status) + 1) % STATUS_ORDER.length];
 }
 
+/** Folders whose files are copies or someone else's code, never the user's plans. */
+const NOT_PLANS = /(^|\/)(node_modules|vendor|backups?|\.history)\//i;
+
 /** Files in a project that look like task lists, the most likely first. */
 export function findTaskLists(paths: string[]): string[] {
   const re = /(^|\/)[^/]*(task[-_ ]?list|todo|plan|roadmap)[^/]*\.md$/i;
   return paths
-    .filter((p) => re.test(p) && !p.includes("node_modules/"))
+    .filter((p) => re.test(p) && !NOT_PLANS.test(p))
     .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
 }

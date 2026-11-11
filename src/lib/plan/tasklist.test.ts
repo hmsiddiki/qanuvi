@@ -138,8 +138,17 @@ describe("findTaskLists", () => {
         "node_modules/x/TODO.md",
         "notes/todo-list.md",
         "QLOPY-CORE-UPGRADE-PLAN.md",
+        "content/plugins/shop/PLAN-D.md",
+        "uploads/updates/backups/2026/content/plugins/shop/DEVELOPMENT-TASKLIST.md",
+        "vendor/lib/TODO.md",
       ]),
-    ).toEqual(["DEVELOPMENT-TASKLIST.md", "QLOPY-CORE-UPGRADE-PLAN.md", "docs/ROADMAP.md", "notes/todo-list.md"]);
+    ).toEqual([
+      "DEVELOPMENT-TASKLIST.md",
+      "QLOPY-CORE-UPGRADE-PLAN.md",
+      "docs/ROADMAP.md",
+      "notes/todo-list.md",
+      "content/plugins/shop/PLAN-D.md",
+    ]);
   });
 });
 

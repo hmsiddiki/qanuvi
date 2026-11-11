@@ -129,6 +129,13 @@ struct FileList {
     truncated: bool,
 }
 
+/// Every Markdown file in the project, ignore rules or not: where the Plan view finds task lists.
+#[tauri::command]
+async fn files_markdown(state: State<'_, AppState>, project_id: String) -> Res<Vec<String>> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::markdown_files(&root)).await
+}
+
 #[tauri::command]
 async fn files_list_all(state: State<'_, AppState>, project_id: String) -> Res<FileList> {
     let root = project_root(&state, &project_id)?;
@@ -1101,6 +1108,12 @@ async fn omniroute_test(endpoint: crate::llm::Endpoint, id: String) -> Res<()> {
     blocking(move || crate::omniroute::test(&endpoint, &id)).await
 }
 
+/// Removes a connection from OmniRoute (asked for and confirmed in the window).
+#[tauri::command]
+async fn omniroute_remove(endpoint: crate::llm::Endpoint, id: String) -> Res<()> {
+    blocking(move || crate::omniroute::remove(&endpoint, &id)).await
+}
+
 /// Renews a sign-in ("panel": open OmniRoute's own page for this provider instead).
 #[tauri::command]
 async fn omniroute_sign_in(endpoint: crate::llm::Endpoint, provider: String) -> Res<()> {
@@ -1435,6 +1448,7 @@ pub fn run() {
             local_server_start,
             omniroute_connect,
             omniroute_connections,
+            omniroute_remove,
             core_decide,
             knowledge_fetch,
             attachment_file,
@@ -1480,6 +1494,7 @@ pub fn run() {
             projects_redetect,
             files_list_dir,
             files_list_all,
+            files_markdown,
             files_read,
             files_write,
             files_create,

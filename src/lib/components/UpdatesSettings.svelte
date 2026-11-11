@@ -2,6 +2,7 @@
   /** Settings → Updates (1b): the version, the update channel, a manual check, reload and restart. */
   import { updates } from "$lib/stores/updates.svelte";
   import { ago } from "$lib/stores/git.svelte";
+  import { settings } from "$lib/stores/settings.svelte";
 
   const status = $derived.by(() => {
     switch (updates.state) {
@@ -9,14 +10,16 @@
         return "Looking for a newer version…";
       case "none":
         return "Qanuvi is up to date.";
+      case "available":
+        return `Qanuvi ${updates.version} is available.`;
       case "downloading":
         return `Downloading ${updates.version}… ${updates.percent}%`;
       case "ready":
-        return `${updates.version} is ready. Restart to use it.`;
+        return `${updates.version} is ready. Restart to use it, or it installs when you close Qanuvi.`;
       case "error":
         return `The update check failed: ${updates.error}`;
       default:
-        return "Qanuvi checks by itself at start and every few hours.";
+        return "Qanuvi looks for a newer version at start, every hour and when you come back to it.";
     }
   });
 </script>
@@ -24,7 +27,7 @@
 <h2>Updates</h2>
 <p class="intro">
   New versions come from the <strong>dev</strong> channel, signed by the Qanuvi team; a version with a wrong signature is
-  refused. They download in the background (the progress shows in the status bar) and install when you restart.
+  refused. A newer version shows as a button in the status bar: click it to download, then restart (or close Qanuvi) to install.
 </p>
 
 <div class="card">
@@ -39,12 +42,14 @@
   {#if updates.state === "downloading"}
     <div class="bar"><span style:width="{updates.percent}%"></span></div>
   {/if}
-  {#if updates.notes && (updates.state === "ready" || updates.state === "downloading")}
+  {#if updates.notes && ["available", "ready", "downloading"].includes(updates.state)}
     <pre class="notes">{updates.notes}</pre>
   {/if}
   <div class="actions">
     {#if updates.state === "ready"}
-      <button type="button" class="btn primary" onclick={() => updates.restartToUpdate()}>Restart now</button>
+      <button type="button" class="btn primary" onclick={() => updates.restartToUpdate()}>Restart to update</button>
+    {:else if updates.state === "available"}
+      <button type="button" class="btn primary" onclick={() => updates.download()}>Download {updates.version}</button>
     {:else}
       <button
         type="button"
@@ -55,6 +60,18 @@
     {/if}
   </div>
 </div>
+
+<label class="auto">
+  <input
+    type="checkbox"
+    checked={settings.value.updates.autoDownload}
+    onchange={(e) => settings.set("updates", { autoDownload: e.currentTarget.checked })}
+  />
+  <span>
+    <strong>Download updates by themselves</strong>
+    <span class="muted">Off: a new version waits for your click in the status bar before it downloads.</span>
+  </span>
+</label>
 
 <h3>Reload and restart</h3>
 <div class="card">
@@ -77,6 +94,20 @@
 </div>
 
 <style>
+  .auto {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin: 12px 0 4px;
+    cursor: pointer;
+  }
+
+  .auto > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   h2 {
     margin: 18px 20px 4px;
     font-size: 16px;

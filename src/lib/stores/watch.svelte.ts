@@ -22,7 +22,7 @@ export async function lookOnce(): Promise<void> {
   if (!omni.connections) return;
   for (const c of omni.connections) {
     const key = `sign-in:${c.id}`;
-    if (c.state === "needs sign-in" || c.state === "error")
+    if ((c.state === "needs sign-in" || c.state === "error") && !omni.muted.includes(c.id))
       inbox.add({
         kind: "sign-in",
         key,

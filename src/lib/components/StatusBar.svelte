@@ -8,6 +8,8 @@
   import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
   import GitBranch from "@lucide/svelte/icons/git-branch";
+  import ArrowDownToLine from "@lucide/svelte/icons/arrow-down-to-line";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import Server from "@lucide/svelte/icons/server";
@@ -201,23 +203,39 @@
 
   <span class="spacer"></span>
 
+  <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. -->
+  {#if updates.state === "available"}
+    <button
+      type="button"
+      class="item update-btn"
+      title={`Qanuvi ${updates.version} is available${updates.notes ? `: ${updates.notes}` : ""}. Click to download it.`}
+      onclick={() => updates.download()}
+    >
+      <ArrowDownToLine size={12} />
+      <span>Update to {updates.version}</span>
+    </button>
+  {:else if updates.state === "downloading"}
+    <span class="item static update" title="Downloading Qanuvi {updates.version}">
+      <span>Downloading {updates.version}</span>
+      <span class="progress"><span style:width="{updates.percent}%"></span></span>
+    </span>
+  {:else if updates.state === "ready"}
+    <button
+      type="button"
+      class="item update-btn"
+      title="Qanuvi {updates.version} is downloaded. Restart to use it (it also installs when you close Qanuvi)."
+      onclick={() => updates.restartToUpdate()}
+    >
+      <RotateCw size={12} />
+      <span>Restart to update</span>
+    </button>
+  {/if}
+
   {#if settings.value.ai}
     {#if running || waiting}
       <span class="item static" title="{running} working, {waiting} waiting for you">
         <LoaderCircle size={12} class="spin" />
         <span>{running} working{waiting ? `, ${waiting} waiting` : ""}</span>
-      </span>
-    {/if}
-    {#if updates.state === "downloading"}
-      <span class="item static update" title="Downloading Qanuvi {updates.version}">
-        <span>Updating to {updates.version}</span>
-        <span class="progress"><span style:width="{updates.percent}%"></span></span>
-      </span>
-    {:else if updates.state === "ready" && !updates.later}
-      <span class="item static update ready">
-        <span>Qanuvi {updates.version} is ready</span>
-        <button type="button" class="link" onclick={() => updates.restartToUpdate()}>Restart now</button>
-        <button type="button" class="link quiet" onclick={() => (updates.later = true)}>Later</button>
       </span>
     {/if}
     {#if monthCost !== null}
@@ -290,21 +308,18 @@
     transition: width 0.3s;
   }
 
-  .update.ready {
-    color: var(--qx-text);
+  .update-btn {
+    gap: 5px;
+    margin: 0 4px;
+    padding: 0 8px;
+    border-radius: 3px;
+    background: var(--qx-accent);
+    color: #fff;
+    font-weight: 600;
   }
 
-  .update .link {
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--qx-accent);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .update .link.quiet {
-    color: var(--qx-text-muted);
+  .update-btn:hover {
+    filter: brightness(1.12);
   }
 
   .item.warn {

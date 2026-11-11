@@ -94,6 +94,18 @@ runs on or off; with it off nothing is sent anywhere.
   the message joins the task and the agent reads it before its next step (Claude Code takes it mid-turn, Qanuvi's own
   agent adds it to the conversation before each step). It shows "Added while it worked". Live: Claude Code followed a
   change of plan sent during its second step.
+- [x] **15l. Plans and files in ignored folders (owner, 2026-11-12)**: a plan in content/plugins/qcommerce was not
+  shown because the project's .gitignore leaves out content/plugins/*. The Plan view now looks at every Markdown file,
+  ignore rules or not (not node_modules, vendor, build output or backup folders). Search and quick open also take in a
+  git repository nested in an ignored folder, with that repository's own rules. Live on amirularham: PLAN-D.md and the
+  qcommerce task list show; "amirul" finds 11 matches in 0.3 s.
+- [x] **15m. OmniRoute connections: remove, or no warnings (owner, 2026-11-12)**: each connection has Remove (through
+  OmniRoute's own command, after a confirmation) and, while it has a problem, Don't warn / Warn again (kept in Qanuvi,
+  the connection stays in OmniRoute). Warnings stay on by default.
+- [x] **1b2. Updates wait for a click (owner, 2026-11-12)**: a newer version shows as a slim "Update to x" button in
+  the status bar (also with AI off); a click downloads it (progress in the same place), then "Restart to update". Not
+  restarted, it installs quietly when Qanuvi closes. Checks at start, every hour and when the window comes back after
+  15 minutes. Settings → Updates: "Download updates by themselves" (off by default).
 - [ ] **15k. Search like VS Code (owner, 2026-11-12, next release)**: the search panel found 0 results for a word that
   is in the project. To do: results grouped per file with the line and the match highlighted, case, whole word and
   regex toggles, files to include and exclude, gitignore respected, results while typing, replace and replace all,

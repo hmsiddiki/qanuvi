@@ -6,6 +6,7 @@
    */
   import { onMount } from "svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { ask } from "@tauri-apps/plugin-dialog";
   import { recommend, type FreeProvider } from "$lib/agents/guides";
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import { omni } from "$lib/stores/omniroute.svelte";
@@ -82,6 +83,16 @@
     if (!ok) omni.error = `${c.provider}: ${brain.probes[m.id]?.text}`;
   }
 
+  /** Removes a connection from OmniRoute, after the user confirms it. */
+  async function remove(c: (typeof omni.connections & object)[number]) {
+    const name = c.name && c.name !== c.provider ? `${c.provider} (${c.name})` : c.provider;
+    const yes = await ask(
+      `Remove the ${name} connection from OmniRoute? Its models stop being used. To use it again later, connect it again.`,
+      { title: "Remove from OmniRoute", kind: "warning", okLabel: "Remove", cancelLabel: "Keep" },
+    );
+    if (yes) await omni.remove(provider, c);
+  }
+
   async function signIn(id: string) {
     if ((await omni.signIn(provider, id)) === "panel") openUrl(`${base()}/dashboard/providers`);
   }
@@ -128,6 +139,29 @@
               >
             {/if}
             <button type="button" class="btn small" onclick={() => test(c)}>Test</button>
+            {#if c.state === "needs sign-in" || c.state === "error"}
+              {#if omni.muted.includes(c.id)}
+                <button
+                  type="button"
+                  class="btn small"
+                  title="Show this connection's problems in the status bar and Inbox again"
+                  onclick={() => omni.setMuted(c, false)}>Warn again</button
+                >
+              {:else}
+                <button
+                  type="button"
+                  class="btn small"
+                  title="Keep it in OmniRoute, but stop the status bar and Inbox warnings about it"
+                  onclick={() => omni.setMuted(c, true)}>Don't warn</button
+                >
+              {/if}
+            {/if}
+            <button
+              type="button"
+              class="btn small danger"
+              title="Remove this connection from OmniRoute"
+              onclick={() => remove(c)}>Remove</button
+            >
           {/if}
         </li>
       {:else}
@@ -381,6 +415,11 @@
     border-color: var(--qx-accent);
     background: var(--qx-accent);
     color: #fff;
+  }
+
+  .btn.danger:hover {
+    border-color: #e5534b;
+    color: #e5534b;
   }
 
   .btn:disabled {

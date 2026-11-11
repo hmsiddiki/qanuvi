@@ -89,8 +89,8 @@
 
   async function discover() {
     try {
-      const all = await api.files.listAll(project.id);
-      candidates = findTaskLists(all.files);
+      // Any folder counts, also one the project's .gitignore leaves out (a plugin's own plan, for example).
+      candidates = findTaskLists(await api.files.markdown(project.id));
       const saved = localStorage.getItem(FILE_KEY(project.id));
       file = saved && candidates.includes(saved) ? saved : (candidates[0] ?? "");
     } catch (e) {

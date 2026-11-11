@@ -1,19 +1,25 @@
 /**
- * Updates (1b): Qanuvi looks for a newer version at its update address (signed; a wrong signature is refused),
- * downloads it in the background with its progress in the status bar, then offers "Restart now". Restarting installs it
- * quietly and opens Qanuvi again. Also: reload the window, restart Qanuvi.
+ * Updates (1b): Qanuvi looks for a newer version at its update address (signed; a wrong signature is refused). A
+ * slim "Update to x" button shows in the status bar; clicking it downloads (the button shows the progress), then it
+ * becomes "Restart to update". Not restarted, the update installs quietly when Qanuvi closes, so the next start is the
+ * new version. With "Download updates by themselves" on, the download starts without the click. Also: reload the
+ * window, restart Qanuvi.
  */
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { api, errorText } from "$lib/api";
 import { agent } from "./agent.svelte";
+import { settings } from "./settings.svelte";
 
-const EVERY = 4 * 60 * 60 * 1000;
+/** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
+const EVERY = 60 * 60 * 1000;
+const ON_RETURN = 15 * 60 * 1000;
 
 class UpdatesStore {
-  state = $state<"idle" | "checking" | "none" | "downloading" | "ready" | "error">("idle");
+  state = $state<"idle" | "checking" | "none" | "available" | "downloading" | "ready" | "error">("idle");
   current = $state("");
   version = $state("");
   notes = $state("");
@@ -21,8 +27,6 @@ class UpdatesStore {
   total = $state(0);
   error = $state("");
   checkedAt = $state<number | null>(null);
-  /** "Later": the ready notice stays hidden until the next start (the update still installs on Restart). */
-  later = $state(false);
   #update: Update | null = null;
   #timer: ReturnType<typeof setInterval> | null = null;
 
@@ -38,11 +42,21 @@ class UpdatesStore {
     if (this.#timer || import.meta.env.DEV) return;
     setTimeout(() => this.check().catch(() => {}), 15_000);
     this.#timer = setInterval(() => this.check().catch(() => {}), EVERY);
+    // Back at the window after a while: a quick look, so a new release shows within minutes.
+    window.addEventListener("focus", () => {
+      if (!this.checkedAt || Date.now() - this.checkedAt > ON_RETURN) this.check().catch(() => {});
+    });
+    // A downloaded update not restarted for installs quietly when Qanuvi closes; the next start is the new version.
+    getCurrentWindow()
+      .onCloseRequested(async () => {
+        if (this.state === "ready" && this.#update) await this.#update.install().catch(() => {});
+      })
+      .catch(() => {});
   }
 
-  /** Looks for a newer version; one that is found downloads at once. */
+  /** Looks for a newer version; one that is found waits for a click (or downloads at once, when set so). */
   async check(): Promise<void> {
-    if (this.state === "checking" || this.state === "downloading" || this.state === "ready") return;
+    if (["checking", "downloading", "ready"].includes(this.state)) return;
     this.state = "checking";
     this.error = "";
     try {
@@ -55,9 +69,22 @@ class UpdatesStore {
       this.#update = update;
       this.version = update.version;
       this.notes = update.body ?? "";
-      this.got = 0;
-      this.total = 0;
-      this.state = "downloading";
+      this.state = "available";
+      if (settings.value.updates.autoDownload) await this.download();
+    } catch (e) {
+      this.state = "error";
+      this.error = errorText(e);
+    }
+  }
+
+  /** Downloads the version that was found; the status bar button shows the progress, then "Restart to update". */
+  async download(): Promise<void> {
+    const update = this.#update;
+    if (!update || this.state !== "available") return;
+    this.got = 0;
+    this.total = 0;
+    this.state = "downloading";
+    try {
       await update.download((e) => {
         if (e.event === "Started") this.total = e.data.contentLength ?? 0;
         else if (e.event === "Progress") this.got += e.data.chunkLength;

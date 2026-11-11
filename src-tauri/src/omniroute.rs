@@ -270,6 +270,18 @@ pub fn test(ep: &Endpoint, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Removes one connection from OmniRoute (the user asked, and confirmed it in the window).
+pub fn remove(ep: &Endpoint, id: &str) -> Result<(), String> {
+    valid_id(id)?;
+    run(
+        ep,
+        &["providers", "remove", id, "--yes", "--json"],
+        None,
+        Duration::from_secs(60),
+    )
+    .map(|_| ())
+}
+
 /// Renews a sign-in. Antigravity: OmniRoute opens Google's sign-in page and catches the answer itself; the user only
 /// signs in. Other sign-ins go through OmniRoute's own page (the caller opens it).
 pub fn sign_in(ep: &Endpoint, provider: &str) -> Result<(), String> {
