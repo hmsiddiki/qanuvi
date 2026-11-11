@@ -5,7 +5,7 @@
  */
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { providerById, type AgentProvider } from "$lib/agents/providers";
-import { setupFor } from "./brain.svelte";
+import { freeDecide, setupFor } from "./brain.svelte";
 import {
   FREE_MODEL,
   isFree,
@@ -29,13 +29,13 @@ import {
   parseAssignment,
   parseReview,
   reviewPrompt,
-  stepDiff,
   type Assignment,
   type DecisionRecord,
 } from "$lib/core/decider";
 import { setStepStatus } from "$lib/plan/tasklist";
 import { extractSteps, labelRange, lastNumber, renumber, replaceStep, replanPrompt } from "$lib/plan/planner";
 import { defaultPlannerModel, planner } from "./planner.svelte";
+import { changesSince, snapshotChanges } from "./changes";
 import { failureSummary, fixPrompt, locationBlock, mentions, packetPrompt, type Location } from "$lib/plan/packet";
 
 /** Fix rounds in the same session when the test run Qanuvi does fails. */
@@ -154,27 +154,33 @@ class RunnerStore {
       }));
       const priority = team.mode === "priority" ? team.priority : "save";
       let answer = "";
+      let deciderBy = provider.id;
       try {
-        answer = (
-          await planner.ask(
-            project,
-            assignPrompt(briefs, priority),
-            defaultPlannerModel(provider),
-            "Decider: who does each step",
-            {
-              agentId: provider.id,
-              lean: true,
-            },
-          )
-        ).text;
+        const model = defaultPlannerModel(provider);
+        const r = await planner.ask(project, assignPrompt(briefs, priority), model, "Decider: who does each step", {
+          agentId: provider.id,
+          lean: true,
+        });
+        answer = r.text;
+        (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
       } catch {
-        // No answer: Qanuvi core's rules decide (parseAssignment falls back).
+        // The paid agent cannot answer now (limit, sign-in, offline): the free models take the seat (24e).
+        try {
+          const f = await freeDecide(
+            "You plan work for coding agents. Answer with JSON only.",
+            assignPrompt(briefs, priority),
+          );
+          answer = f.text;
+          deciderBy = `${f.by} (free, ${provider.name} could not answer)`;
+        } catch {
+          // No answer: Qanuvi core's rules decide (parseAssignment falls back).
+        }
       }
       for (const a of parseAssignment(answer, briefs, priority)) {
         assignment.set(a.number, a);
         this.#decide(run, {
           kind: "assign",
-          by: answer ? provider.id : "Qanuvi core",
+          by: answer ? deciderBy : "Qanuvi core",
           subject: `Step ${a.number}`,
           decision: a.worker,
           why: a.why,
@@ -356,14 +362,7 @@ class RunnerStore {
    * changes are not committed yet, so a diff against the commit would show them too).
    */
   async #snapshot(project: Project): Promise<Map<string, string>> {
-    const out = new Map<string, string>();
-    const st = await api.git.status(project.id).catch(() => null);
-    if (!st?.is_repo) return out;
-    for (const c of st.changes.slice(0, 40)) {
-      const f = await api.files.read(project.id, c.path).catch(() => null);
-      out.set(c.path, f && !f.binary && !f.too_large ? f.text : "");
-    }
-    return out;
+    return snapshotChanges(project.id);
   }
 
   /** The decider's look at what a free model changed for a step (diff since the step started, tests). */
@@ -375,28 +374,34 @@ class RunnerStore {
     before: Map<string, string>,
     testsPassed: boolean | null | undefined,
   ): Promise<{ ok: boolean; why: string }> {
-    const after = await this.#snapshot(project);
-    const parts: string[] = [];
-    for (const [path, text] of after) {
-      if (path.endsWith(this.run?.file ?? "")) continue;
-      const was = before.get(path);
-      if (was === text) continue;
-      // A file that was clean before the step: its diff against the commit is this step's change.
-      const own = was === undefined ? null : stepDiff(path, was, text);
-      parts.push(own ?? (await api.git.diff(project.id, path).catch(() => "")));
-    }
+    const file = this.run?.file ?? "";
+    const parts = await changesSince(project.id, before, (path) => !!file && path.endsWith(file));
     const tests = testsPassed === true ? "passed" : testsPassed === false ? "failed" : "";
     try {
-      const { text } = await planner.ask(
+      // A short look at one step's diff: the agent's own default model, not the planner's bigger one.
+      const model = settings.agent(provider.id).model || defaultPlannerModel(provider);
+      const { text, costUsd } = await planner.ask(
         project,
         reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests),
-        defaultPlannerModel(provider),
+        model,
         `Decider: review step ${stepRun.number ?? stepRun.title}`,
         { agentId: provider.id, lean: true },
       );
+      if (this.run) (this.run.deciderCalls ??= []).push({ model, costUsd });
       return parseReview(text);
     } catch (e) {
-      // The reviewer could not answer: tests decide when there are any, else the step stays accepted with a note.
+      // The paid agent cannot answer now: the free models review instead (24e).
+      try {
+        const f = await freeDecide(
+          "You review code changes. Answer with JSON only.",
+          reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests),
+        );
+        const r = parseReview(f.text);
+        return { ok: r.ok, why: `${r.why} (reviewed by ${f.by}: ${provider.name} could not answer)` };
+      } catch {
+        // Nobody could review.
+      }
+      // Tests decide when there are any, else the step stays accepted with a note.
       return testsPassed === false
         ? { ok: false, why: "tests failed and the review did not answer" }
         : { ok: true, why: `not reviewed (${errorText(e)})` };

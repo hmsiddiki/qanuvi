@@ -2,8 +2,9 @@
  * Qanuvi's own agent (Milestone 24): finding models at the user's providers, keeping their keys (in the credential
  * store, through the app), choosing which models the brain may use, and what it has learned about them.
  */
+import { deciderSeat } from "$lib/core/decider";
 import { invoke } from "@tauri-apps/api/core";
-import { errorText } from "$lib/api";
+import { api, errorText } from "$lib/api";
 import { settings, type ModelProvider, type OwnModel } from "./settings.svelte";
 
 export interface ModelInfo {
@@ -35,6 +36,23 @@ export interface ModelRecord {
 }
 
 /** What Qanuvi's agent gets for a session: the providers its models need (keys are added by the app) and the models. */
+/**
+ * A short decision from Qanuvi core's free models, online ones first, one after another (24b/24e): the decider seat
+ * when there is no paid agent, or while the paid one cannot answer. Returns the model that answered and its text;
+ * throws when none did.
+ */
+export async function freeDecide(system: string, prompt: string): Promise<{ by: string; text: string }> {
+  const setup = ownSetup();
+  const seat = deciderSeat(
+    null,
+    setup.models.map((m) => ({ id: m.id, local: !!m.local })),
+  );
+  if (seat.kind !== "free") throw new Error("no free models are set up");
+  const ordered = { ...setup, models: seat.models.map((id) => setup.models.find((m) => m.id === id)!) };
+  const [by, text] = await api.core.decide(JSON.stringify(ordered), system, prompt);
+  return { by, text };
+}
+
 export function ownSetup() {
   const all = settings.value.brain;
   // Online only: models on this computer are left out, so Ollama is never asked, loaded or started.

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { overruleIn } from "$lib/core/decider";
+  import { reviewFreeTurn } from "$lib/stores/chatReview";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import Square from "@lucide/svelte/icons/square";
   import Plus from "@lucide/svelte/icons/plus";
@@ -62,6 +64,30 @@
       const pid = projects.current.id;
       untrack(() => agent.handToPaid(pid));
     }
+  });
+
+  // Paid agent on top (24e): a free chat turn that ended well and changed files is reviewed by the paid agent.
+  $effect(() => {
+    const last = agent.items[agent.items.length - 1];
+    if (!last || last.kind !== "result" || !agent.freeTurn || !projects.current) return;
+    const p = projects.current;
+    untrack(() => {
+      if (last.ok) reviewFreeTurn(p);
+      else agent.freeTurn = null;
+    });
+  });
+
+  // Free decides, paid works, with the paid agent on top (24e): its answer can overrule the free pick.
+  $effect(() => {
+    const last = agent.items[agent.items.length - 1];
+    if (!last || last.kind !== "result" || !agent.freePicked || !projects.current) return;
+    const answer = [...agent.items].reverse().find((i) => i.kind === "text");
+    const why = answer && answer.kind === "text" ? overruleIn(answer.text) : null;
+    const pid = projects.current.id;
+    untrack(() => {
+      if (why) agent.overrule(pid, why);
+      else agent.freePicked = null;
+    });
   });
 
   function openAgentSettings() {

@@ -11,7 +11,7 @@
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import { freeSavings, isFree } from "$lib/plan/runner";
+  import { freeSavings, isFree, DECIDER } from "$lib/plan/runner";
 
   interface Props {
     project: Project;
@@ -40,6 +40,7 @@
   let freeFirst = $state(true);
   /** A model's name in the run's lines: the free agent's attempts read as Qanuvi core. */
   function label(model: string) {
+    if (model.startsWith(DECIDER)) return `Decider (${modelLabel(provider, model.slice(DECIDER.length))})`;
     return isFree(model) ? "Qanuvi core (free)" : modelLabel(provider, model);
   }
   let error = $state("");
@@ -78,6 +79,7 @@
   let run = $derived(runner.run && runner.run.projectId === project.id && runner.run.file === file ? runner.run : null);
   let totals = $derived(runner.totals);
   let saved = $derived(run ? freeSavings(run, runner.paidPerStep) : { steps: 0, estimateUsd: 0 });
+  let deciderUsd = $derived((run?.deciderCalls ?? []).reduce((t, c) => t + c.costUsd, 0));
   let current = $derived(run?.steps.find((s) => s.status === "running") ?? null);
   let currentAttempt = $derived(current ? current.attempts.length + 1 : 0);
 </script>
@@ -205,7 +207,7 @@
         {#if saved.steps}
           <span class="saved"
             >Free models finished {saved.steps} step{saved.steps === 1 ? "" : "s"}{saved.estimateUsd !== null
-              ? `: about ${formatCost(saved.estimateUsd)} saved, going by what paid steps of the same kind cost before`
+              ? `: about ${formatCost(saved.estimateUsd)} saved, going by what paid steps of the same kind cost before${deciderUsd ? `; the decider's checks cost ${formatCost(deciderUsd)}` : ""}`
               : " (what they saved shows once a paid step of the same kind has been measured)"}</span
           >
         {/if}

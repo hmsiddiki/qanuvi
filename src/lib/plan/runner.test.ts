@@ -171,3 +171,17 @@ describe("free models first", () => {
     expect(freeSavings({ steps: [run.steps[0]] }, {}).estimateUsd).toBeNull();
   });
 });
+
+describe("runTotals with the decider", () => {
+  it("counts the decider's calls in the cost, as their own line", () => {
+    const totals = runTotals({
+      steps: [],
+      deciderCalls: [
+        { model: "claude-sonnet-5-5", costUsd: 0.01 },
+        { model: "claude-sonnet-5-5", costUsd: 0.02 },
+      ],
+    });
+    expect(totals.costUsd).toBeCloseTo(0.03);
+    expect(totals.byModel.get("decider:claude-sonnet-5-5")).toMatchObject({ attempts: 2 });
+  });
+});

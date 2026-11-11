@@ -3,9 +3,10 @@ import { reduce, reduceAll, type Item } from "$lib/agent/events";
 import { settings } from "./settings.svelte";
 import { memoryContext } from "./memory.svelte";
 import { modelLabel, paidAgent, providerById, type AgentProvider } from "$lib/agents/providers";
-import { chatModelPrompt, deciderSeat, parseChatModel } from "$lib/core/decider";
+import { chatModelPrompt, deciderSeat, overruleNote, parseChatModel, strongerModel } from "$lib/core/decider";
 import { itemsToMarkdown } from "$lib/agent/events";
-import { ownSetup, setupFor } from "./brain.svelte";
+import { freeDecide, ownSetup, setupFor } from "./brain.svelte";
+import { snapshotChanges } from "./changes";
 
 /** Agent sessions of the current project and the conversation of the selected one. */
 class AgentStore {
@@ -171,11 +172,33 @@ ${text}`
       // A new session gets the relevant part of the user's memory with its first message.
       const context = this.selectedId ? null : await memoryContext(projectId, text);
       // Free decides, paid works: a free model picks the paid agent's model for this message.
-      const model = this.providerId !== "qanuvi" && this.model === "auto" ? await this.#freePick(text) : this.model;
+      let model = this.model;
+      let sent = text;
+      // Paid agent on top (24e): what a free model changes in chat is reviewed by the paid one.
+      this.freeTurn = null;
+      if (this.providerId === "qanuvi" && this.model === "auto" && this.info?.available && paidAgent()) {
+        const mode = settings.value.team.mode;
+        if (mode === "paid-decides" || mode === "priority")
+          this.freeTurn = { projectId, request: text, before: await snapshotChanges(projectId) };
+      }
+      this.freePicked = null;
+      if (this.#forceModel) {
+        // The paid agent overruled the free pick: this message goes to the model it asked for.
+        model = this.#forceModel;
+        this.#forceModel = null;
+      } else if (this.providerId !== "qanuvi" && this.model === "auto") {
+        const pick = await this.#freePick(text);
+        model = pick.model;
+        // The paid agent sits on top (24e): it sees the pick and can overrule it.
+        if (pick.model !== providerById(this.providerId).models[0]?.id) {
+          sent = text + overruleNote(modelLabel(providerById(this.providerId), pick.model), pick.why);
+          this.freePicked = { text, model: pick.model };
+        }
+      }
       const session = await api.agent.start(
         projectId,
         this.selectedId,
-        text,
+        sent,
         model,
         this.mode,
         settings.agent(this.providerId).baseUrl,
@@ -203,16 +226,11 @@ ${text}`
    * Free decides, paid works (24b): Qanuvi core's free models, online ones first, pick the paid agent's model for a
    * message. The pick and its reason show in the conversation; when no free model answers, the agent's default is used.
    */
-  async #freePick(text: string): Promise<string> {
+  async #freePick(text: string): Promise<{ model: string; why: string }> {
     const provider = providerById(this.providerId);
     const fallback = provider.defaultModel;
-    const setup = ownSetup();
-    const seat = deciderSeat(
-      null,
-      setup.models.map((m) => ({ id: m.id, local: !!m.local })),
-    );
-    if (seat.kind !== "free") return fallback;
-    const ordered = { ...setup, models: seat.models.map((id) => setup.models.find((m) => m.id === id)!) };
+    const def = { model: fallback, why: "" };
+    if (!ownSetup().models.length) return def;
     const note = (t: string, model: string) =>
       (this.items = reduce(
         this.items,
@@ -220,8 +238,7 @@ ${text}`
         ++this.#seq,
       ));
     try {
-      const [by, answer] = await api.core.decide(
-        JSON.stringify(ordered),
+      const { by, text: answer } = await freeDecide(
         "You choose models for a coding assistant. Answer with JSON only.",
         chatModelPrompt(text, provider.models),
       );
@@ -231,14 +248,54 @@ ${text}`
         `Free decides: ${by} picked ${modelLabel(provider, model)}${pick?.why ? ` (${pick.why})` : " (its answer could not be used; the default)"}.`,
         model,
       );
-      return model;
+      return { model, why: pick?.why ?? "" };
     } catch (e) {
       note(
         `Free decides: no free model answered (${errorText(e)}); ${modelLabel(provider, fallback)} works on it.`,
         fallback,
       );
-      return fallback;
+      return def;
     }
+  }
+
+  /** A free chat turn the paid agent reviews when it ends: the request and the changed files before it. */
+  freeTurn: { projectId: string; request: string; before: Map<string, string> } | null = null;
+
+  /** Adds a line from Qanuvi core to the conversation. */
+  notice(text: string, model = ""): void {
+    this.items = reduce(
+      this.items,
+      JSON.stringify({ type: "system", subtype: "qanuvi_route", text, model }),
+      ++this.#seq,
+    );
+  }
+
+  /** The message whose model a free model picked (the paid agent may overrule it), until the next message. */
+  freePicked = $state<{ text: string; model: string } | null>(null);
+  #forceModel: string | null = null;
+
+  /**
+   * The paid agent answered that the free pick is too weak (24e): the same message goes again, in the same session,
+   * to one model up. Once per message.
+   */
+  async overrule(projectId: string, why: string): Promise<boolean> {
+    const picked = this.freePicked;
+    if (!picked) return false;
+    this.freePicked = null;
+    const provider = providerById(this.providerId);
+    const model = strongerModel(provider.models, picked.model);
+    this.items = reduce(
+      this.items,
+      JSON.stringify({
+        type: "system",
+        subtype: "qanuvi_route",
+        text: `${provider.name} overruled the free pick (${why}); ${modelLabel(provider, model)} works on it.`,
+        model,
+      }),
+      ++this.#seq,
+    );
+    this.#forceModel = model;
+    return this.send(projectId, picked.text);
   }
 
   /**

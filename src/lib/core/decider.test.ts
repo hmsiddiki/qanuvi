@@ -10,6 +10,9 @@ import {
   parseTeam,
   reviewPrompt,
   stepDiff,
+  overruleIn,
+  overruleNote,
+  strongerModel,
   type StepBrief,
 } from "./decider";
 
@@ -95,5 +98,25 @@ describe("stepDiff", () => {
     expect(stepDiff("a", "x\ny", "x\ny")).toBe("");
     const big = "l\n".repeat(3000);
     expect(stepDiff("a", big, big + "x")).toBeNull();
+  });
+});
+
+describe("the paid agent overrules a free pick", () => {
+  it("tells the paid agent the pick and how to overrule it", () => {
+    const n = overruleNote("Haiku 5.5", "a short question");
+    expect(n).toContain("Haiku 5.5");
+    expect(n).toContain("NEEDS_STRONGER_MODEL");
+  });
+
+  it("reads an overrule only when the answer starts with it", () => {
+    expect(overruleIn("NEEDS_STRONGER_MODEL: the refactor spans many files")).toBe("the refactor spans many files");
+    expect(overruleIn("  NEEDS_STRONGER_MODEL")).toBe("no reason given");
+    expect(overruleIn("The file holds prices. NEEDS_STRONGER_MODEL is not needed.")).toBeNull();
+  });
+
+  it("goes one model up, strongest first", () => {
+    const models = [{ id: "fable" }, { id: "opus" }, { id: "sonnet" }, { id: "haiku" }];
+    expect(strongerModel(models, "haiku")).toBe("sonnet");
+    expect(strongerModel(models, "fable")).toBe("fable");
   });
 });

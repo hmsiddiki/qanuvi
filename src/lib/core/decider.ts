@@ -219,3 +219,31 @@ export function stepDiff(path: string, before: string, after: string): string | 
   }
   return out.length ? `--- ${path} (before this step)\n+++ ${path} (after)\n${out.join("\n")}` : "";
 }
+
+/** The word the paid agent answers with when the free pick is too weak for the message (24e). */
+export const NEEDS_STRONGER = "NEEDS_STRONGER_MODEL";
+
+/**
+ * Free decides, paid works, with the paid agent on top (24e): the note added to the message, so the paid agent sees
+ * the free model's pick and can overrule it before doing the work.
+ */
+export function overruleNote(model: string, why: string): string {
+  return [
+    "",
+    "",
+    `(Qanuvi: a free model chose ${model} for this message${why ? ` because: ${why}` : ""}. If this message needs a`,
+    `stronger model to be done well, answer only "${NEEDS_STRONGER}: <the reason>" and do nothing else.)`,
+  ].join("\n");
+}
+
+/** The paid agent's overrule, if its answer is one: the reason, else null. */
+export function overruleIn(answer: string): string | null {
+  const m = answer.trim().match(new RegExp(`^${NEEDS_STRONGER}\\s*:?\\s*(.*)`, "s"));
+  return m ? m[1].trim() || "no reason given" : null;
+}
+
+/** One model up in a list ordered strongest first; the strongest stays itself. */
+export function strongerModel(models: { id: string }[], current: string): string {
+  const i = models.findIndex((m) => m.id === current);
+  return i > 0 ? models[i - 1].id : (models[0]?.id ?? current);
+}

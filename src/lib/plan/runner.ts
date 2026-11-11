@@ -82,7 +82,12 @@ export interface PlanRun {
   endedAt: number | null;
   /** What the decider decided in this run, with its reasons (24b). */
   decisions?: import("$lib/core/decider").DecisionRecord[];
+  /** The decider's own calls (assignment, reviews): they count in the run's cost (24e). */
+  deciderCalls?: { model: string; costUsd: number }[];
 }
+
+/** The run lines' key for the decider's calls on a model. */
+export const DECIDER = "decider:";
 
 /** The steps a run covers: open steps (not done, not blocked) from the chosen one on. */
 export function stepsToRun(steps: Step[], fromLine: number, onlyOne: boolean): Step[] {
@@ -151,7 +156,7 @@ export function stepPrompt(file: string, step: Step, done: { number: string | nu
 }
 
 /** Totals for a run, per model and overall. */
-export function runTotals(run: Pick<PlanRun, "steps">) {
+export function runTotals(run: Pick<PlanRun, "steps"> & Pick<Partial<PlanRun>, "deciderCalls">) {
   const byModel = new Map<string, { attempts: number; costUsd: number; inputTokens: number; outputTokens: number }>();
   let costUsd = 0;
   let inputTokens = 0;
@@ -170,6 +175,14 @@ export function runTotals(run: Pick<PlanRun, "steps">) {
       m.outputTokens += a.outputTokens;
       byModel.set(a.model, m);
     }
+  for (const c of run.deciderCalls ?? []) {
+    costUsd += c.costUsd;
+    const key = DECIDER + c.model;
+    const m = byModel.get(key) ?? { attempts: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+    m.attempts++;
+    m.costUsd += c.costUsd;
+    byModel.set(key, m);
+  }
   return { costUsd, inputTokens, outputTokens, seconds, byModel };
 }
 

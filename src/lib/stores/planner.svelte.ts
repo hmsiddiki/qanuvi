@@ -38,7 +38,7 @@ class PlannerStore {
     prompt: string,
     model: string,
     title: string,
-    opts: { agentId?: string; lean?: boolean } = {},
+    opts: { agentId?: string; lean?: boolean; quiet?: boolean } = {},
   ): Promise<{ text: string; costUsd: number }> {
     const provider = providerById(opts.agentId ?? settings.value.agent);
     const s = settings.agent(provider.id);
@@ -47,7 +47,7 @@ class PlannerStore {
       let text = "";
       let cost = 0;
       let settled = false;
-      const show = agent.handler(() => id);
+      const show = opts.quiet ? () => {} : agent.handler(() => id);
       const done = (err?: string) => {
         if (settled) return;
         settled = true;
@@ -77,7 +77,7 @@ class PlannerStore {
           done(text ? undefined : "The planner did not finish.");
         }
       };
-      agent.watch(null);
+      if (!opts.quiet) agent.watch(null);
       // The planner gets the relevant part of the user's memory too.
       memoryContext(project.id, prompt)
         .then((context) =>
@@ -102,7 +102,7 @@ class PlannerStore {
           id = session.id;
           agent.track(session);
           agent.rename(session.id, title);
-          agent.watch(session.id);
+          if (!opts.quiet) agent.watch(session.id);
         })
         .catch((e) => done(errorText(e)));
     });

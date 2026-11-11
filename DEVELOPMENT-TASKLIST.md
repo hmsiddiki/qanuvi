@@ -1042,7 +1042,7 @@ runs on or off; with it off nothing is sent anywhere.
       accepted first try after the fix; 4/4 done, $0.03; Qanuvi + WebView at most 250 MB, free RAM never under 4.5 GB.
     - Not tested live: the automatic hand-over (the free models did not fail any request in the tests).
   - Moved to 24e: plan runs always go to the paid agent when one is installed.
-- [ ] **24e. Paid agent on top, in every mode (owner, 2026-11-11)**: when a paid agent is active (installed, signed
+- [x] **24e. Paid agent on top, in every mode (owner, 2026-11-11; built and tested 2026-11-11)**: when a paid agent is active (installed, signed
   in, not at its limit) it is always the top layer: the decider and the overall monitor that keeps everything on track.
   Free models may work and even take a first pass at deciding, but the paid agent checks and can overrule.
   - Plan runs: always the paid agent as decider, whichever agent is chosen for new sessions (today a run with the
@@ -1060,8 +1060,17 @@ runs on or off; with it off nothing is sent anywhere.
   - [x] Plan runs and plan writing use the paid agent whenever it is active (agent.runProviderId), whichever agent new
     sessions use (2026-11-11). Live: Qanuvi agent set for new sessions, run of step 1 on free-test: Claude Code
     assigned it, a free model did it, Claude Code reviewed and accepted it.
-  - [ ] The run's cost line leaves out the decider's own calls (assignment, reviews): the live review cost $0.04 on
-    Opus 5.5 while the run showed $0. Count them, and consider a cheaper model for short reviews.
-  - [ ] Free decides, paid works: the paid agent sees and can overrule the free pick.
-  - [ ] Free chat with a paid agent present: the paid agent reviews changes.
-  - [ ] Paid agent not active: free models hold the top seat and hand it back; the pane says so.
+  - [x] The decider's own calls count in the run's cost, as their own line ("Decider (Sonnet 5.5)"), and the
+    savings line says what the checks cost. Reviews use the agent's own default model (Sonnet for the owner), not the
+    planner's bigger one; the one assignment per plan stays on the planner model.
+  - [x] Free decides, paid works: the message to the paid agent carries the free pick and its reason; the paid agent
+    can answer "NEEDS_STRONGER_MODEL: why", and the same message goes again, in the same session, one model up, with
+    a line saying so (not when the pick is already the strongest). Live: two questions, Haiku picked, answered, no
+    false overrule. The overrule itself is covered by tests, not triggered live.
+  - [x] Free chat (Qanuvi agent on Auto, mode "Paid decides" or "Priority") with a paid agent present: the changed
+    files are noted before the turn; when it ends well and changed something, the paid agent reviews only that turn's
+    change (quietly: the pane keeps the conversation). Accepted: a line with the reason and cost. Not accepted: the
+    paid agent takes the request over. Live (git-test): a free model added a line, Claude Code accepted it ($0.047).
+  - [x] Paid agent cannot answer (limit, sign-in, offline): the assignment and the reviews go to the free models, one
+    after another, and the decisions say who decided and why; the next decision tries the paid agent first again.
+  - Fixed while testing: a quiet decider call took over the agent pane (the planner selected its session).
