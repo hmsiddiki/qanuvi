@@ -440,6 +440,8 @@ mod tests {
         assert!(resolve(dir.path(), "../outside.txt").is_err());
         assert!(resolve(dir.path(), "src/../../outside.txt").is_err());
         assert!(resolve(dir.path(), "/etc/passwd").is_err());
+        // A drive path is only "outside" on Windows; elsewhere the same text is an ordinary (odd) file name.
+        #[cfg(windows)]
         assert!(resolve(dir.path(), r"C:\Windows\win.ini").is_err());
         assert!(resolve(dir.path(), "src/main.php").is_ok());
         assert!(

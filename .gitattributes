@@ -1,0 +1,13 @@
+# Every text file is stored and checked out with LF line endings on every system (the format check expects them).
+* text=auto eol=lf
+
+# Binary files are never touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.webp binary
+*.exe binary
+*.dll binary
