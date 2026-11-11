@@ -45,6 +45,20 @@ export interface SearchMatch {
   line: number;
   column: number;
   text: string;
+  /** Where the matches are in `text` (characters, [start, end)). */
+  spans: [number, number][];
+  /** How many matches the line has. */
+  count: number;
+}
+
+/** How to search (15k). */
+export interface SearchOptions {
+  regex: boolean;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  /** Comma-separated globs, for example "src/**, *.php"; empty: every file. */
+  include: string;
+  exclude: string;
 }
 
 export interface SearchResult {
@@ -259,6 +273,24 @@ export const api = {
     trash: (projectId: string, path: string) => invoke<void>("files_trash", { projectId, path }),
     search: (projectId: string, query: string, regex: boolean, caseSensitive: boolean) =>
       invoke<SearchResult>("files_search", { projectId, query, regex, caseSensitive }),
+    /** Search with every option: whole words, files to include and leave out. */
+    find: (projectId: string, query: string, options: SearchOptions) =>
+      invoke<SearchResult>("files_search", {
+        projectId,
+        query,
+        regex: options.regex,
+        caseSensitive: options.caseSensitive,
+        options,
+      }),
+    /** Replaces the matches in the project's files (only in `paths` when given). */
+    replace: (projectId: string, query: string, options: SearchOptions, replacement: string, paths?: string[]) =>
+      invoke<{ files: number; replacements: number }>("files_replace", {
+        projectId,
+        query,
+        options,
+        replacement,
+        paths: paths ?? null,
+      }),
   },
   term: {
     shells: () => invoke<Shell[]>("term_shells"),
@@ -367,6 +399,14 @@ export const api = {
     grants: (sessionId: string) => invoke<Grant[]>("agent_grants", { sessionId }),
     forgetGrants: (sessionId: string) => invoke<void>("agent_forget_grants", { sessionId }),
     stop: (sessionId: string) => invoke<void>("agent_stop", { sessionId }),
+    /** A project's secrets: only their names come back. */
+    secretNames: (projectId: string) => invoke<string[]>("secrets_names", { projectId }),
+    setSecret: (projectId: string, name: string, value: string) =>
+      invoke<void>("secrets_set", { projectId, name, value }),
+    removeSecret: (projectId: string, name: string) => invoke<void>("secrets_remove", { projectId, name }),
+    /** Changes a running session's model or mode now. */
+    configure: (sessionId: string, change: { model?: string; mode?: string }) =>
+      invoke<void>("agent_configure", { sessionId, model: change.model ?? null, mode: change.mode ?? null }),
     rename: (sessionId: string, title: string) => invoke<void>("agent_rename", { sessionId, title }),
     remove: (sessionId: string) => invoke<void>("agent_delete", { sessionId }),
   },

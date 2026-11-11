@@ -134,6 +134,34 @@ ${text}`
     }
   }
 
+  /** The session of the plan step running now (set by the runner): its pickers show and change that step. */
+  planSessionId = $state<string | null>(null);
+  /** The runner hears picker changes on its step here (the mode for the rest of the run, the step's model). */
+  onPlanChange: ((change: { model?: string; mode?: string }) => void) | null = null;
+
+  /** Whether the pickers now act on a running plan step. */
+  get onPlanStep(): boolean {
+    return !!this.planSessionId && this.planSessionId === this.selectedId;
+  }
+
+  /** The model picker: on a running plan step it changes that step now (and the plan's Model line). */
+  pickModel(id: string): void {
+    this.model = id;
+    if (this.onPlanStep && this.planSessionId) {
+      api.agent.configure(this.planSessionId, { model: id }).catch((e) => (this.error = errorText(e)));
+      this.onPlanChange?.({ model: id });
+    }
+  }
+
+  /** The mode picker: on a running plan step it changes it now and for the rest of the run. */
+  pickMode(id: string): void {
+    this.mode = id;
+    if (this.onPlanStep && this.planSessionId) {
+      api.agent.configure(this.planSessionId, { mode: id }).catch((e) => (this.error = errorText(e)));
+      this.onPlanChange?.({ mode: id });
+    }
+  }
+
   #upsert(session: Session): void {
     const i = this.sessions.findIndex((s) => s.id === session.id);
     if (i >= 0) this.sessions[i] = session;
@@ -146,6 +174,11 @@ ${text}`
       const id = sessionId();
       if (event.kind === "session") {
         this.#upsert(event.session);
+        // A plan step shows the model and mode the plan gave it.
+        if (event.session.id === this.planSessionId && event.session.id === this.selectedId) {
+          this.model = event.session.model;
+          this.mode = event.session.mode;
+        }
         if (["idle", "ended", "failed", "stopped"].includes(event.session.status)) {
           this.busy = false;
           this.turnsEnded++;
@@ -162,7 +195,8 @@ ${text}`
     };
   }
 
-  async send(projectId: string, prompt: string): Promise<boolean> {
+  /** `note`: words Qanuvi adds for the agent after the user's (not shown as theirs). */
+  async send(projectId: string, prompt: string, note = ""): Promise<boolean> {
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
@@ -187,7 +221,7 @@ ${text}`
       const context = this.selectedId ? null : await memoryContext(projectId, text);
       // Free decides, paid works: a free model picks the paid agent's model for this message.
       let model = this.model;
-      let sent = text;
+      let sent = text + note;
       // Paid agent on top (24e): what a free model changes in chat is reviewed by the paid one.
       if (!during) this.freeTurn = null;
       if (!during && this.providerId === "qanuvi" && this.model === "auto" && this.info?.available && paidAgent()) {
@@ -217,7 +251,8 @@ ${text}`
         this.selectedId,
         sent,
         model,
-        this.mode,
+        // A message while it works keeps the running session's mode (a plan run's Auto stays Auto).
+        during ? this.selected?.mode || this.mode : this.mode,
         settings.agent(this.providerId).baseUrl,
         this.effort,
         this.handler(() => currentId),

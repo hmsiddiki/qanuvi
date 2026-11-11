@@ -41,6 +41,9 @@
     ui.show("agents");
   }
   import ModePicker from "./ModePicker.svelte";
+  import { ask } from "@tauri-apps/plugin-dialog";
+  import { guidanceNote, isStopOrder, looksSecret } from "$lib/plan/guidance";
+  import { runner } from "$lib/stores/runner.svelte";
   import CommandMenu from "./CommandMenu.svelte";
 
   let commandsOpen = $state(false);
@@ -115,7 +118,34 @@
     if (!project || !agent.draft.trim()) return;
     const text = agent.draft;
     agent.draft = "";
-    if (!(await agent.send(project.id, text))) agent.draft = text;
+    // The step a plan run is working on now: the user is watching and guides it.
+    const step =
+      runner.sessionId && runner.sessionId === session?.id
+        ? runner.run?.steps.find((s) => s.status === "running")
+        : null;
+    if (step && isStopOrder(text)) {
+      runner.stop();
+      agent.notice("You said stop: the plan run stops here. Run it again to go on.");
+      return;
+    }
+    if (step && looksSecret(text)) {
+      const asSecret = await ask(
+        "This looks like a login or password. As a project secret it reaches every step and model as an environment variable, without the models seeing it. Save it as a secret instead of sending it?",
+        {
+          title: "A password in the chat",
+          kind: "warning",
+          okLabel: "Open project secrets",
+          cancelLabel: "Send anyway",
+        },
+      );
+      if (asSecret) {
+        agent.draft = text;
+        ui.settingsFor = project.id;
+        return;
+      }
+    } else if (step) runner.addNote(text);
+    const note = step && runner.run ? guidanceNote(step.number ?? step.title, runner.run.file) : "";
+    if (!(await agent.send(project.id, text, note))) agent.draft = text;
   }
 
   function keydown(event: KeyboardEvent) {
@@ -389,7 +419,7 @@
       <AttachMenu disabled={!project} />
       <CommandMenu bind:open={commandsOpen} disabled={!project} />
       <span class="spacer"></span>
-      <ModePicker disabled={running} />
+      <ModePicker disabled={running && !agent.onPlanStep} />
       {#if running}
         <button type="button" class="stop" title="Stop" aria-label="Stop" onclick={() => agent.stop()}>
           <Square size={12} />

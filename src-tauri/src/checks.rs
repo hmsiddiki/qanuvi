@@ -88,6 +88,16 @@ fn keep_tail(bytes: &[u8]) -> String {
 }
 
 pub fn run(dir: &Path, command: &str, timeout: Duration) -> Result<CheckResult, String> {
+    run_with_env(dir, command, timeout, &[])
+}
+
+/// Runs the command with extra environment variables (the project's secrets).
+pub fn run_with_env(
+    dir: &Path,
+    command: &str,
+    timeout: Duration,
+    env: &[(String, String)],
+) -> Result<CheckResult, String> {
     let command = command.trim();
     if command.is_empty() {
         return Err("This project has no test command. Set one in the project's settings.".into());
@@ -95,6 +105,7 @@ pub fn run(dir: &Path, command: &str, timeout: Duration) -> Result<CheckResult, 
     let started = Instant::now();
     let mut child = shell(command)
         .current_dir(dir)
+        .envs(env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

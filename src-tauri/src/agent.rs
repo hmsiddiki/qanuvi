@@ -692,10 +692,18 @@ impl Agents {
         if let Some(id) = session_id {
             let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(running) = map.get_mut(id) {
-                *running.channel.lock().unwrap_or_else(|e| e.into_inner()) = channel;
+                // A message while the agent is working joins the task (both agents take it in mid-turn).
+                let during =
+                    get(db, id).is_ok_and(|s| s.status == "running" || s.status == "waiting");
+                // The events keep going to whoever runs the turn (a plan run waits for its step to finish there);
+                // a message added mid-task only joins it. Between turns the new sender takes over.
+                if !during {
+                    *running.channel.lock().unwrap_or_else(|e| e.into_inner()) = channel;
+                }
                 // The user chose another model or permission mode for this session: the running agent hears it first
-                // (otherwise it keeps the ones it was started with).
-                if let Ok(s) = get(db, id) {
+                // (otherwise it keeps the ones it was started with). Never from a message sent while it works: that
+                // only adds to the task, and must not switch, say, a plan run's Auto to the chat box's Manual.
+                if !during && let Ok(s) = get(db, id) {
                     if s.model != model {
                         send_line(
                             &mut running.stdin,
@@ -717,9 +725,6 @@ impl Agents {
                         params![id, model, mode],
                     );
                 }
-                // A message while the agent is working joins the task (both agents take it in mid-turn).
-                let during =
-                    get(db, id).is_ok_and(|s| s.status == "running" || s.status == "waiting");
                 send_line(
                     &mut running.stdin,
                     &user_message(&with_context(context, prompt), files),
@@ -781,6 +786,9 @@ impl Agents {
 
         let mut cmd = Command::new(&program);
         cmd.current_dir(&project.path);
+        // The project's secrets (a test database login...) as environment variables: every step and model has them,
+        // and none of them sees the values in its text.
+        cmd.envs(crate::secrets::env(&project.id));
         if let Some(raw) = &own_setup {
             cmd.args([
                 "--agent",
@@ -1142,6 +1150,43 @@ impl Agents {
     }
 
     /// Stops a session's agent process.
+    /// Changes a running session's model or permission mode now (the user changed the picker while it works).
+    pub fn configure(
+        &self,
+        db: &Db,
+        id: &str,
+        model: Option<&str>,
+        mode: Option<&str>,
+    ) -> Result<(), String> {
+        let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        let running = map.get_mut(id).ok_or("The session is not running.")?;
+        if let Some(m) = model {
+            send_line(
+                &mut running.stdin,
+                &json!({"type": "control_request", "request_id": format!("qanuvi-model-{}", crate::llm::short_id()),
+                    "request": {"subtype": "set_model", "model": m}})
+                .to_string(),
+            )?;
+            let _ = db.conn().execute(
+                "UPDATE sessions SET model = ?2 WHERE id = ?1",
+                params![id, m],
+            );
+        }
+        if let Some(m) = mode {
+            send_line(
+                &mut running.stdin,
+                &json!({"type": "control_request", "request_id": format!("qanuvi-mode-{}", crate::llm::short_id()),
+                    "request": {"subtype": "set_permission_mode", "mode": m}})
+                .to_string(),
+            )?;
+            let _ = db.conn().execute(
+                "UPDATE sessions SET mode = ?2 WHERE id = ?1",
+                params![id, m],
+            );
+        }
+        Ok(())
+    }
+
     pub fn stop(&self, session_id: &str) {
         let running = self
             .map

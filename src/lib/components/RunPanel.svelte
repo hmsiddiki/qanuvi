@@ -5,13 +5,16 @@
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import X from "@lucide/svelte/icons/x";
   import type { Project } from "$lib/api";
-  import type { Plan } from "$lib/plan/tasklist";
-  import { modelLabel, providerById } from "$lib/agents/providers";
+  import { setStepModel, type Plan } from "$lib/plan/tasklist";
+  import { modelLabel, providerById, PROVIDERS } from "$lib/agents/providers";
+  import { api, errorText } from "$lib/api";
   import { formatCost, formatTokens } from "$lib/agent/events";
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import { freeSavings, isFree, DECIDER, parseRanges, type PauseMode } from "$lib/plan/runner";
+  import { costRatio, freeSavings, isFree, DECIDER, parseRanges, type PauseMode, type RunTeam } from "$lib/plan/runner";
+  import { freeWorks } from "$lib/core/decider";
+  import { runSettingsKey } from "$lib/plan/guidance";
 
   interface Props {
     project: Project;
@@ -20,11 +23,25 @@
     /** The setup form is shown (the user pressed Run). */
     setup: boolean;
     onclose: () => void;
+    /** The plan file was changed here (the steps' models written in). */
+    onchanged?: () => void;
   }
 
-  let { project, file, plan, setup, onclose }: Props = $props();
+  let { project, file, plan, setup, onclose, onchanged }: Props = $props();
 
-  let provider = $derived(providerById(agent.runProviderId));
+  /** The agent for this run: any that works on this computer (Claude Code needs its command; Qanuvi's own, models). */
+  let usable = $derived(
+    PROVIDERS.filter((p) => (p.id === "qanuvi" ? settings.value.brain.models.length > 0 : !!agent.info?.available)),
+  );
+  let providerId = $state("");
+  let provider = $derived(providerById(providerId || agent.runProviderId));
+  /** One model for every step ("" = as the plan says), and whether a failing step may move to a stronger one. */
+  let oneModel = $state("");
+  let strongerOnFail = $state(true);
+  let team = $state<RunTeam>("settings");
+  /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
+  let carryOn = $state(true);
+  let carryK = $state(80);
   let openSteps = $derived(plan.steps.filter((s) => s.status !== "x" && s.status !== "!"));
   let fromLine = $state(-1);
   let onlyOne = $state(false);
@@ -41,7 +58,116 @@
   let replan = $state(true);
   /** Free models can go first when the run's agent is a paid one and Qanuvi core has models. */
   let canFree = $derived(provider.id !== "qanuvi" && settings.value.brain.models.length > 0);
-  let freeFirst = $state(true);
+  /** What "Use Team settings" means right now, in a few words. */
+  let teamNow = $derived(
+    !canFree
+      ? "only this agent (no free models set up)"
+      : freeWorks(settings.value.team, true, true)
+        ? "the paid agent decides; free models do simple steps"
+        : "only the paid agent works",
+  );
+  /** The steps the run would cover, with the model each would use by the plan. */
+  let stepModels = $derived(
+    openSteps.map((s) => s.model?.trim() || settings.agent(provider.id).model).filter((m) => !!m),
+  );
+  let ratio = $derived(oneModel ? costRatio(provider.models, stepModels, oneModel) : null);
+
+  /** Run settings are kept per plan file, so each plan keeps its own way of running. */
+  const KEY = () => runSettingsKey(project.id, file);
+  interface Kept {
+    providerId: string;
+    oneModel: string;
+    strongerOnFail: boolean;
+    team: RunTeam;
+    budget: number;
+    perModel: number;
+    pause: PauseMode;
+    mode: string;
+    lean: boolean;
+    indexTools: boolean;
+    packets: boolean;
+    replan: boolean;
+    carryOn: boolean;
+    carryK: number;
+  }
+  function restore(): boolean {
+    try {
+      const k = JSON.parse(localStorage.getItem(KEY()) ?? "null") as Partial<Kept> | null;
+      if (!k) return false;
+      if (k.providerId && usable.some((p) => p.id === k.providerId)) providerId = k.providerId;
+      const p = providerById(providerId || agent.runProviderId);
+      oneModel = k.oneModel && p.models.some((m) => m.id === k.oneModel) ? k.oneModel : "";
+      strongerOnFail = k.strongerOnFail ?? !oneModel;
+      if (k.team === "settings" || k.team === "paid" || k.team === "free") team = k.team;
+      if (typeof k.budget === "number") budget = k.budget;
+      if (typeof k.perModel === "number") perModel = k.perModel;
+      if (k.pause) pause = k.pause;
+      if (k.mode && p.modes.some((m) => m.id === k.mode)) mode = k.mode;
+      if (typeof k.lean === "boolean") lean = k.lean;
+      if (typeof k.indexTools === "boolean") indexTools = k.indexTools;
+      if (typeof k.packets === "boolean") packets = k.packets;
+      if (typeof k.replan === "boolean") replan = k.replan;
+      if (typeof k.carryOn === "boolean") carryOn = k.carryOn;
+      if (typeof k.carryK === "number") carryK = k.carryK;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function keep(): void {
+    const k: Kept = {
+      providerId,
+      oneModel,
+      strongerOnFail,
+      team,
+      budget,
+      perModel,
+      pause,
+      mode,
+      lean,
+      indexTools,
+      packets,
+      replan,
+      carryOn,
+      carryK,
+    };
+    localStorage.setItem(KEY(), JSON.stringify(k));
+  }
+
+  /** Another agent: its own models and modes. */
+  function pickAgent(id: string) {
+    providerId = id;
+    const p = providerById(id);
+    if (oneModel && !p.models.some((m) => m.id === oneModel)) oneModel = "";
+    mode = p.modes.some((m) => m.id === "auto") ? "auto" : settings.agent(p.id).mode;
+  }
+
+  /** One model chosen: a failing step stops for you instead of quietly moving to another model (can be turned on). */
+  function pickModel(id: string) {
+    oneModel = id;
+    strongerOnFail = !id;
+  }
+
+  /** Writes the chosen model into every open step's Model line, so the plan keeps it. */
+  let writing = $state(false);
+  async function writeIntoPlan() {
+    if (!oneModel) return;
+    writing = true;
+    error = "";
+    try {
+      const now = await api.files.read(project.id, file);
+      let text = now.text;
+      // From the bottom up: a Model line added to a step moves the lines below it.
+      for (const s of [...openSteps].sort((a, b) => b.line - a.line))
+        text = setStepModel(text, s.line, oneModel, s.title);
+      await api.files.write(project.id, file, text, now.hash);
+      onchanged?.();
+    } catch (e) {
+      error = errorText(e);
+    } finally {
+      writing = false;
+    }
+  }
   /** A model's name in the run's lines: the free agent's attempts read as Qanuvi core. */
   function label(model: string) {
     if (model.startsWith(DECIDER)) return `Decider (${modelLabel(provider, model.slice(DECIDER.length))})`;
@@ -54,6 +180,8 @@
       fromLine = openSteps[0]?.line ?? -1;
       // Unattended work needs a mode that does not stop at every edit; the user can still choose Manual.
       mode = provider.modes.some((m) => m.id === "auto") ? "auto" : settings.agent(provider.id).mode;
+      // This plan's own settings from its last run.
+      restore();
     }
   });
 
@@ -61,6 +189,7 @@
     event.preventDefault();
     error = "";
     if (!layout.state.agentVisible) layout.toggleAgent();
+    keep();
     onclose();
     try {
       await runner.start(project, file, {
@@ -75,7 +204,12 @@
         indexTools,
         packets,
         replan,
-        freeFirst: canFree && freeFirst,
+        providerId: provider.id,
+        model: oneModel,
+        strongerOnFail,
+        team,
+        carryOn,
+        carryLimit: Math.max(20, Math.min(400, Number(carryK) || 80)) * 1000,
       });
     } catch (e) {
       error = String(e instanceof Error ? e.message : e);
@@ -97,10 +231,43 @@
       <button type="button" class="x" aria-label="Close" onclick={onclose}><X size={14} /></button>
     </div>
     <p class="hint">
-      Each step runs in a fresh {provider.name} session on its own model (the step's model, else
-      {modelLabel(provider, settings.agent(provider.id).model)}). A step counts as done when the agent marks it done in
-      the file.
+      Each step runs in a fresh {provider.name} session{oneModel
+        ? ` on ${modelLabel(provider, oneModel)}`
+        : ` on its own model (the step's model, else ${modelLabel(provider, settings.agent(provider.id).model)})`}. A
+      step counts as done when the agent marks it done in the file. These settings are kept for this plan.
     </p>
+    <div class="grid">
+      <label>
+        Agent
+        <select value={provider.id} onchange={(e) => pickAgent(e.currentTarget.value)}>
+          {#each usable.length ? usable : [provider] as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+        </select>
+      </label>
+      <label>
+        Models
+        <select value={oneModel} onchange={(e) => pickModel(e.currentTarget.value)}>
+          <option value="">As the plan says (each step's own model)</option>
+          {#each provider.models as m (m.id)}<option value={m.id}>{m.label} for every step</option>{/each}
+        </select>
+      </label>
+    </div>
+    {#if oneModel}
+      <p class="hint">
+        {#if ratio !== null}
+          {modelLabel(provider, oneModel)} on all {stepModels.length} open steps costs about
+          {ratio >= 1.05
+            ? `${ratio.toFixed(1)}× as much as`
+            : ratio <= 0.95
+              ? `${ratio.toFixed(2)}× of`
+              : "the same as"}
+          the plan's own models.
+        {/if}
+        Only for this run; the plan file is not changed.
+        <button type="button" class="link" disabled={writing} onclick={writeIntoPlan}
+          >{writing ? "Writing…" : "Write it into the plan"}</button
+        >
+      </p>
+    {/if}
     <div class="grid">
       <label>
         Start at
@@ -121,7 +288,7 @@
         <input type="number" min="0" step="0.01" bind:value={budget} />
       </label>
       <label>
-        Failed tries before a stronger model
+        {strongerOnFail ? "Failed tries before a stronger model" : "Failed tries before it stops for you"}
         <select bind:value={perModel}>
           <option value={1}>1</option>
           <option value={2}>2</option>
@@ -176,14 +343,28 @@
     >
       <input type="checkbox" bind:checked={replan} /> Back to the planner when a step fails on every model
     </label>
+    <label
+      class="check"
+      title="The next step keeps the session (it knows the work so far) while it uses the same model and is in the same section. Past the size below it starts a new one, with the run's notes; that keeps each step's cost down."
+    >
+      <input type="checkbox" bind:checked={carryOn} /> Continue the session across steps, up to
+      <input type="number" class="small" min="20" max="400" step="10" bind:value={carryK} disabled={!carryOn} />k tokens
+    </label>
+    <label class="check" title="After the failed tries above, the step goes to the next stronger model.">
+      <input type="checkbox" bind:checked={strongerOnFail} /> A step that keeps failing moves to a stronger model
+    </label>
     {#if canFree}
-      <label
-        class="check"
-        title="Each step first goes to Qanuvi's own agent, which uses your free and local models; if it does not finish the step, the paid agent takes over as usual. Money and security steps go straight to the paid agent."
-      >
-        <input type="checkbox" bind:checked={freeFirst} /> Free models first: the paid agent only when they do not finish
-        a step
+      <label class="team">
+        Who works
+        <select bind:value={team}>
+          <option value="settings">Use Team settings: {teamNow}</option>
+          <option value="paid">{provider.name} only</option>
+          <option value="free">Free models first, {provider.name} when they do not finish a step</option>
+        </select>
       </label>
+      {#if team !== "paid"}
+        <p class="hint">Money and security steps, and steps that name their own model, always go to {provider.name}.</p>
+      {/if}
     {/if}
     {#if mode === "default"}<p class="hint warn">In Manual mode the run waits for your approval at every edit.</p>{/if}
     <div class="row">
@@ -219,7 +400,10 @@
             : run.status === "needs-you"
               ? "Run paused: it needs you"
               : "Run stopped"}
-          · {run.steps.filter((s) => s.status === "done").length}/{run.steps.length} steps done
+          · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
+            {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
+            {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}
+          · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
           {#if run.message}<span class="dim"> · {run.message}</span>{/if}
         </span>
       {/if}
@@ -239,6 +423,20 @@
           >
         {/if}
       </div>
+    {/if}
+    {#if run.notes?.length}
+      <details class="decisions" open>
+        <summary>Notes every later step gets ({run.notes.length})</summary>
+        <ul>
+          {#each run.notes as n, i (i)}
+            <li>
+              {n}
+              <button type="button" class="link" title="Remove this note" onclick={() => runner.removeNote(i)}>×</button
+              >
+            </li>
+          {/each}
+        </ul>
+      </details>
     {/if}
     {#if run.decisions?.length}
       <details class="decisions">
@@ -353,6 +551,26 @@
   button {
     font: inherit;
     cursor: pointer;
+  }
+
+  input.small {
+    width: 64px;
+    height: 24px;
+  }
+
+  label.team {
+    margin-top: var(--qx-space-3);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--qx-accent);
+  }
+
+  .link:disabled {
+    opacity: 0.6;
   }
 
   .x {

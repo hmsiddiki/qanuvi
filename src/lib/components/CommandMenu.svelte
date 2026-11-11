@@ -105,7 +105,7 @@
           role="menuitemradio"
           aria-checked={agent.model === m.id}
           onclick={() => {
-            agent.model = m.id;
+            agent.pickModel(m.id);
             close();
           }}
         >

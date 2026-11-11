@@ -4,6 +4,19 @@
  * model fails, a step is blocked, the budget is reached or the user presses Stop.
  */
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
+import { reduceAll } from "$lib/agent/events";
+import {
+  addedSteps,
+  canCarry,
+  contextSize,
+  needingCount,
+  keepRunSetting,
+  reopenedSteps,
+  looksSecret,
+  notesBlock,
+  notesIn,
+  stepKey,
+} from "$lib/plan/guidance";
 import { providerById, type AgentProvider } from "$lib/agents/providers";
 import { freeDecide, setupFor } from "./brain.svelte";
 import {
@@ -11,6 +24,8 @@ import {
   isFree,
   nextModel,
   nextModelFreeFirst,
+  freeFirstFor,
+  ladder,
   paidPerStep,
   runTotals,
   stepOutcome,
@@ -24,7 +39,7 @@ import {
   unmetNeed,
   runSummary,
 } from "$lib/plan/runner";
-import { parsePlan, type Step } from "$lib/plan/tasklist";
+import { parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
 import { budgetState, chooseModel, jobType, learn, monthStart, type ModelStats } from "$lib/plan/routing";
 import {
   assignPrompt,
@@ -107,11 +122,135 @@ class RunnerStore {
   stop(): void {
     this.#stopRequested = true;
     if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
+    // Stop always works, also when the turn's own end never arrives (a lost event, an agent that hangs).
+    this.#endTurn?.();
+  }
+
+  /** Something the owner said during the run: every later step gets it. */
+  addNote(text: string): void {
+    const run = this.run;
+    const note = text.replace(/\s+/g, " ").trim().slice(0, 400);
+    if (!run || !note || looksSecret(note)) return;
+    run.notes = [...(run.notes ?? []), note];
+    void this.#save(run);
+  }
+
+  removeNote(index: number): void {
+    const run = this.run;
+    if (!run?.notes) return;
+    run.notes = run.notes.filter((_, i) => i !== index);
+    void this.#save(run);
+  }
+
+  /** Notes the step's agent left for later steps ("Note for the next steps: ..."). */
+  async #collectNotes(run: PlanRun, step: StepRun): Promise<void> {
+    const last = step.attempts[step.attempts.length - 1];
+    if (!last?.sessionId) return;
+    const lines = await api.agent.events(last.sessionId).catch(() => [] as string[]);
+    const texts = reduceAll(lines)
+      .filter((i) => i.kind === "text")
+      .map((i) => (i as { text: string }).text);
+    const found = notesIn(texts.slice(-3).join("\n")).filter((n) => !(run.notes ?? []).includes(n));
+    if (found.length) {
+      run.notes = [...(run.notes ?? []), ...found];
+      await this.#save(run);
+    }
+  }
+
+  /** Puts steps added to the plan while a step ran right after it in the run, in the plan's order. */
+  async #takeAdded(
+    project: Project,
+    file: string,
+    run: PlanRun,
+    after: StepRun,
+    steps: Step[],
+    known: Set<string>,
+    reopened: Set<string>,
+  ) {
+    const now = await api.files.read(project.id, file).catch(() => null);
+    if (!now) return;
+    const all = parsePlan(now.text).steps;
+    const inRun = new Set(run.steps.map(stepKey));
+    // Earlier steps the owner sent the run back to come first, then steps added while this one ran.
+    const back = reopenedSteps(run.steps, all, reopened);
+    for (const s of back) reopened.add(stepKey(s));
+    const added = [...back, ...addedSteps(all, known).filter((s) => !inRun.has(stepKey(s)))];
+    for (const s of all) known.add(stepKey(s));
+    if (!added.length) return;
+    steps.push(...added);
+    run.steps.splice(
+      run.steps.indexOf(after) + 1,
+      0,
+      ...added.map((s) => ({
+        line: s.line,
+        number: s.number,
+        title: s.title,
+        attempts: [],
+        status: "waiting" as const,
+      })),
+    );
+    this.changed++;
+    await this.#save(run);
+  }
+
+  /** The session the next step may continue (same model and section, still small). */
+  #carry: { sessionId: string; model: string; section: string; tokens: number; steps: number; base: Base } | null =
+    null;
+  #lastIdle = false;
+  #lastTotals: Base = { cost: 0, input: 0, output: 0, ms: 0 };
+
+  /** After an attempt: keep its session for the next step, or close it. */
+  async #settleCarry(attempt: Attempt, section: string, options: RunOptions, continued: boolean): Promise<void> {
+    const id = attempt.sessionId;
+    if (!id || !this.#lastIdle || options.carryOn === false || attempt.outcome !== "open") {
+      if (id && this.#lastIdle) await api.agent.stop(id).catch(() => {});
+      this.#carry = null;
+      return;
+    }
+    const lines = await api.agent.events(id).catch(() => [] as string[]);
+    this.#carry = {
+      sessionId: id,
+      model: attempt.model,
+      section,
+      tokens: contextSize(lines),
+      steps: (continued && this.#carry ? this.#carry.steps : 0) + 1,
+      base: this.#lastTotals,
+    };
+  }
+
+  /** Closes the carried session (the run ends, or the next step may not continue it). */
+  async #dropCarry(): Promise<void> {
+    if (this.#carry) await api.agent.stop(this.#carry.sessionId).catch(() => {});
+    this.#carry = null;
+  }
+
+  /** A model the user picked for the step running now. */
+  #liveModel: string | null = null;
+
+  /** Writes the user's model choice into the step's Model line. */
+  async #writeStepModel(project: Project, file: string, step: StepRun, model: string): Promise<void> {
+    try {
+      const now = await api.files.read(project.id, file);
+      const found = parsePlan(now.text).steps.find((x) => x.number === step.number && x.title === step.title);
+      if (!found) return;
+      await api.files.write(project.id, file, setStepModel(now.text, found.line, model, found.title), now.hash);
+      this.changed++;
+    } catch {
+      // The choice still holds for this run; only the file keeps its old line.
+    }
+  }
+
+  /** Ends the turn the run is waiting for, as stopped. */
+  #endTurn: (() => void) | null = null;
+
+  /** The session of the step running now (a message sent there is guidance for the step). */
+  get sessionId(): string | null {
+    return this.running ? this.#sessionId : null;
   }
 
   async start(project: Project, file: string, options: RunOptions): Promise<void> {
     if (this.running) return;
-    const provider = providerById(agent.runProviderId);
+    const provider = providerById(options.providerId || agent.runProviderId);
     const agentSettings = settings.agent(provider.id);
     let text: string;
     try {
@@ -145,6 +284,23 @@ class RunnerStore {
     };
     // Keep a reference to this run: the rest of the run works on it, whatever else is shown meanwhile.
     const run = this.run;
+    // The user watching a step can change its mode (for the rest of the run, kept for this plan) and its model (this
+    // step, written into its Model line) from the chat pickers.
+    let live = null as { step: StepRun; model: string; from: number } | null;
+    agent.onPlanChange = (change) => {
+      const current = run.steps.find((x) => x.status === "running");
+      if (change.mode) {
+        run.options.mode = change.mode;
+        keepRunSetting(project.id, file, { mode: change.mode });
+        void this.#save(run);
+      }
+      if (change.model && current) {
+        // Counted from the next attempt, so a step can still fail over and never retries for ever.
+        live = { step: current, model: change.model, from: current.attempts.length + 1 };
+        this.#liveModel = change.model;
+        void this.#writeStepModel(project, file, current, change.model);
+      }
+    };
     await this.#save(run);
 
     // What earlier runs (in every project) showed, and what this month has cost so far.
@@ -152,11 +308,14 @@ class RunnerStore {
     this.paidPerStep = paidPerStep(stats);
     // Free models first only makes sense on a paid agent, with free models set up.
     const team = settings.value.team;
-    const freeFirst =
-      !!options.freeFirst &&
-      provider.id !== "qanuvi" &&
-      settings.value.brain.models.length > 0 &&
-      freeWorks(team, true, true);
+    // The run's own Team choice (Team settings, paid only, or free first) decides; older runs set freeFirst.
+    const canFree = provider.id !== "qanuvi" && settings.value.brain.models.length > 0;
+    const freeFirst = options.team
+      ? freeFirstFor(options.team, freeWorks(team, true, true), canFree)
+      : !!options.freeFirst && canFree && freeWorks(team, true, true);
+    // One model for every step (the user's choice for this run) wins over the steps' own Model lines.
+    const oneModel = options.model?.trim() || "";
+    const models = ladder(provider.models, options.strongerOnFail);
     // The decider (the paid agent) says once, for the whole plan, which steps free models do (24b).
     const assignment = new Map<string, Assignment>();
     if (freeFirst && steps.length) {
@@ -210,6 +369,9 @@ class RunnerStore {
     const rules = settings.value.rules[project.id] ?? {};
 
     const done: { number: string | null; title: string }[] = [];
+    // Every step the run knows; one that turns up later was added while it ran (the user's guidance).
+    const known = new Set(parsePlan(text).steps.map(stepKey));
+    const reopened = new Set<string>();
     for (const stepRun of run.steps) {
       if (run.status !== "running") break;
       // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
@@ -231,7 +393,7 @@ class RunnerStore {
       const planned = steps.find((s) => s.line === stepRun.line);
       const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
       const choice = chooseModel({
-        stepModel: planned?.model ?? null,
+        stepModel: oneModel || (planned?.model ?? null),
         type,
         rules,
         stats,
@@ -239,6 +401,7 @@ class RunnerStore {
         defaultModel: agentSettings.model,
         budget: budget(),
       });
+      if (oneModel) choice.reason = "one model for the whole run (your choice)";
       stepRun.jobType = type;
       const first = choice.model;
       // Free first, except money and security work and steps that name their model.
@@ -270,9 +433,12 @@ class RunnerStore {
           stepRun.status = "waiting";
           break;
         }
-        const model = free
-          ? nextModelFreeFirst(provider.models, stepRun.attempts, FREE_MODEL, first, options.attemptsPerModel)
-          : nextModel(provider.models, stepRun.attempts, first, options.attemptsPerModel);
+        const chosen = live && live.step === stepRun ? live : null;
+        const model = chosen
+          ? nextModel(models, stepRun.attempts.slice(chosen.from), chosen.model, options.attemptsPerModel)
+          : free
+            ? nextModelFreeFirst(models, stepRun.attempts, FREE_MODEL, first, options.attemptsPerModel)
+            : nextModel(models, stepRun.attempts, first, options.attemptsPerModel);
         if (model === null && options.replan && !stepRun.replacedBy) {
           // Back to the planner, once: rewrite the step into smaller ones and carry on with those.
           const added = await this.#replan(project, file, run, stepRun, provider);
@@ -308,13 +474,18 @@ class RunnerStore {
         this.currentModel = model;
         const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
         const testCommand = options.packets ? project.settings.test_command.trim() : "";
-        let prompt = stepPrompt(file, fresh, done);
+        let prompt = stepPrompt(file, fresh, done) + notesBlock(run.notes ?? []);
         // The reviewer turned down a free model's work: the next model hears why.
         const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
         if (rejected)
           prompt += `\n\nA free model already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
         const before = isFree(model) ? await this.#snapshot(project) : null;
         if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh), testCommand);
+        // Same model, same section, still small: the step continues the last step's session (it knows the work).
+        const section = fresh.section ?? "";
+        const carryOn = canCarry(this.#carry, model, section, options.carryLimit ?? 80_000);
+        if (!carryOn) await this.#dropCarry();
+        const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
         const attempt = await this.#attempt(
           project,
           prompt,
@@ -325,7 +496,9 @@ class RunnerStore {
           options.lean,
           options.indexTools,
           testCommand,
+          resume,
         );
+        await this.#settleCarry(attempt, section, options, carryOn);
         const after = await api.files.read(project.id, file).catch(() => null);
         if (attempt.outcome === "open" && after) {
           const outcome = stepOutcome(after.text, stepRun);
@@ -395,8 +568,25 @@ class RunnerStore {
           break;
         }
       }
+      // Steps added while this one ran (the user asked for them mid-step) come next.
+      await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
+      await this.#collectNotes(run, stepRun);
+      if (run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed") && stepRun.number) {
+        const now = await api.files.read(project.id, file).catch(() => null);
+        const waiting = new Set(run.steps.filter((x) => x.status === "waiting" && x.number).map((x) => x.number!));
+        const held = now ? needingCount(stepRun.number, parsePlan(now.text).steps, waiting) : 0;
+        if (held >= 3 && held * 2 >= waiting.size)
+          this.#finish(
+            run,
+            "needs-you",
+            `Step ${stepRun.number} is ${stepRun.status === "blocked" ? "blocked" : "not finished"} (${stepRun.reason ?? "it needs you"}). ${held} of the ${waiting.size} steps left need it, so the run stops here instead of skipping them. Sort it out (a missing login goes into Project settings, Secrets), then press Run.`,
+          );
+      }
     }
     if (run.status === "running") this.#finish(run, "done", runSummary(run));
+    await this.#dropCarry();
+    agent.onPlanChange = null;
+    agent.planSessionId = null;
     await this.#save(run);
   }
 
@@ -634,8 +824,10 @@ class RunnerStore {
       const finish = (outcome: Turn["outcome"], note = "") => {
         if (settled) return;
         settled = true;
+        this.#endTurn = null;
         resolve({ sessionId: id, last, outcome, note });
       };
+      this.#endTurn = () => finish("stopped");
       const onEvent = (event: AgentEvent) => {
         show(event);
         if (event.kind === "session") {
@@ -675,6 +867,9 @@ class RunnerStore {
         .then((session) => {
           id = session.id;
           this.#sessionId = session.id;
+          agent.planSessionId = session.id;
+          agent.model = session.model;
+          agent.mode = session.mode;
           agent.track(session);
           if (!sessionId) agent.rename(session.id, title);
           agent.watch(session.id);
@@ -698,8 +893,9 @@ class RunnerStore {
     lean: boolean,
     indexTools: boolean,
     testCommand: string,
+    resume: { sessionId: string; base: Base } | null = null,
   ): Promise<Attempt> {
-    let turn = await this.#turn(project, null, prompt, model, mode, s, title, lean, indexTools);
+    let turn = await this.#turn(project, resume?.sessionId ?? null, prompt, model, mode, s, title, lean, indexTools);
     let testRuns = 0;
     let testsPassed: boolean | null = null;
     let failure = "";
@@ -722,20 +918,36 @@ class RunnerStore {
           : failureSummary(check.output);
         failure = summary;
         const follow = fixPrompt(testCommand, summary, round + 1, MAX_FIX_ROUNDS);
-        turn = await this.#turn(project, turn.sessionId, follow, model, mode, s, title, lean, indexTools);
+        // A model or mode the user picked meanwhile stays (it is not switched back for the fix round).
+        turn = await this.#turn(
+          project,
+          turn.sessionId,
+          follow,
+          this.#liveModel ?? model,
+          this.run?.options.mode ?? mode,
+          s,
+          title,
+          lean,
+          indexTools,
+        );
       }
     }
     this.#sessionId = null;
+    this.#liveModel = null;
+    agent.planSessionId = null;
     const last = turn.last as Session | null;
-    if (turn.sessionId && last?.status === "idle") api.agent.stop(turn.sessionId).catch(() => {});
+    // The session stays open: the runner decides whether the next step continues it (#settleCarry).
+    this.#lastIdle = !!turn.sessionId && last?.status === "idle";
+    this.#lastTotals = totalsOf(last);
+    const base = resume?.base ?? { cost: 0, input: 0, output: 0, ms: 0 };
     return {
       model,
       sessionId: turn.sessionId ?? "",
       outcome: turn.outcome === "stopped" ? "stopped" : turn.outcome === "error" ? "error" : "open",
-      costUsd: last?.cost_usd ?? 0,
-      inputTokens: last?.input_tokens ?? 0,
-      outputTokens: last?.output_tokens ?? 0,
-      seconds: (last?.duration_ms ?? 0) / 1000,
+      costUsd: Math.max(0, (last?.cost_usd ?? 0) - base.cost),
+      inputTokens: Math.max(0, (last?.input_tokens ?? 0) - base.input),
+      outputTokens: Math.max(0, (last?.output_tokens ?? 0) - base.output),
+      seconds: Math.max(0, (last?.duration_ms ?? 0) - base.ms) / 1000,
       note: turn.note || (testsPassed === false ? "Tests failed." : ""),
       testRuns,
       testsPassed,
@@ -745,5 +957,21 @@ class RunnerStore {
 }
 
 export const runner = new RunnerStore();
+
+/** A session's running totals, to count each step's own share when steps continue one session. */
+interface Base {
+  cost: number;
+  input: number;
+  output: number;
+  ms: number;
+}
+function totalsOf(s: Session | null): Base {
+  return {
+    cost: s?.cost_usd ?? 0,
+    input: s?.input_tokens ?? 0,
+    output: s?.output_tokens ?? 0,
+    ms: s?.duration_ms ?? 0,
+  };
+}
 
 export type { StepRun };

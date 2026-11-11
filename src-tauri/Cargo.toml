@@ -46,6 +46,7 @@ tauri-plugin-opener = { version = "2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
+globset = "0.4"
 ignore = "0.4.34"
 regex = "1.13.1"
 portable-pty = "0.9.0"

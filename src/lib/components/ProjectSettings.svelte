@@ -2,6 +2,7 @@
   import { projects, kindStyle } from "$lib/stores/projects.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { terminals } from "$lib/stores/terminals.svelte";
+  import { api, errorText } from "$lib/api";
 
   interface Props {
     projectId: string;
@@ -16,6 +17,39 @@
   let test = $state("");
   let preview = $state("");
   let error = $state("");
+
+  /** Secrets: names shown, values never (they go to the credential store and to the agents' environment). */
+  let secretNames = $state<string[]>([]);
+  let secretName = $state("");
+  let secretValue = $state("");
+  let secretError = $state("");
+  $effect(() => {
+    if (!projectId) return;
+    api.agent
+      .secretNames(projectId)
+      .then((n) => (secretNames = n))
+      .catch(() => (secretNames = []));
+  });
+  async function addSecret() {
+    secretError = "";
+    try {
+      await api.agent.setSecret(projectId, secretName.trim(), secretValue);
+      secretNames = await api.agent.secretNames(projectId);
+      secretName = "";
+      secretValue = "";
+    } catch (e) {
+      secretError = errorText(e);
+    }
+  }
+  async function removeSecret(name: string) {
+    secretError = "";
+    try {
+      await api.agent.removeSecret(projectId, name);
+      secretNames = await api.agent.secretNames(projectId);
+    } catch (e) {
+      secretError = errorText(e);
+    }
+  }
 
   $effect(() => {
     if (!project) return;
@@ -63,6 +97,24 @@
         /></label
       >
 
+      <h3>Secrets</h3>
+      <p class="note">
+        Logins and passwords this project's work needs, for example a test database's. They are kept in Windows'
+        credential store and given to every agent and the test command as environment variables; no model sees them.
+      </p>
+      {#each secretNames as n (n)}
+        <div class="secret">
+          <code>{n}</code><span class="dots">••••••</span>
+          <button type="button" class="link" onclick={() => removeSecret(n)}>Remove</button>
+        </div>
+      {/each}
+      <div class="secret add">
+        <input bind:value={secretName} placeholder="NAME, for example DB_PASSWORD" spellcheck="false" />
+        <input bind:value={secretValue} type="password" placeholder="value" autocomplete="off" />
+        <button type="button" disabled={!secretName.trim() || !secretValue} onclick={addSecret}>Add</button>
+      </div>
+      {#if secretError}<p class="error">{secretError}</p>{/if}
+
       <h3>For all projects</h3>
       <label class="check">
         <input
@@ -109,6 +161,29 @@
     border: 1px solid var(--qx-border);
     border-radius: var(--qx-radius-panel);
     box-shadow: 0 18px 48px rgb(0 0 0 / 50%);
+  }
+
+  .note {
+    margin: 0 0 var(--qx-space-2);
+    color: var(--qx-text-muted);
+    font-size: 11.5px;
+  }
+
+  .secret {
+    display: flex;
+    align-items: center;
+    gap: var(--qx-space-2);
+    margin-bottom: 4px;
+  }
+
+  .secret .dots {
+    flex: 1;
+    color: var(--qx-text-muted);
+  }
+
+  .secret.add input {
+    flex: 1;
+    min-width: 0;
   }
 
   h2 {

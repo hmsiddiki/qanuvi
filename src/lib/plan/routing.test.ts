@@ -5,7 +5,7 @@ import { budgetState, chooseModel, jobType, learn, learnedModel, monthStart } fr
 const models = CLAUDE_CODE.models; // fable, opus, sonnet, haiku
 const H = "claude-haiku-5-5";
 const S = "claude-sonnet-5-5";
-const F = "claude-fable-5-1";
+const F = "claude-fable-5-2";
 
 describe("jobType", () => {
   it("sorts steps by the kind of work", () => {

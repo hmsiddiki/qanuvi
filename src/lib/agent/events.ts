@@ -5,6 +5,7 @@
  */
 
 import { withoutOverruleNote } from "$lib/core/decider";
+import { withoutGuidance } from "$lib/plan/guidance";
 
 export type Item =
   | { kind: "user"; id: string; text: string; attachments?: string[]; during?: boolean }
@@ -126,7 +127,7 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
     out.push({
       kind: "user",
       id: `u${seq}`,
-      text: withoutOverruleNote(str(msg.text)),
+      text: withoutGuidance(withoutOverruleNote(str(msg.text))),
       ...(attachments.length ? { attachments } : {}),
       ...(msg.during === true ? { during: true } : {}),
     });

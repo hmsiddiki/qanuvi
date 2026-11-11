@@ -106,10 +106,38 @@ runs on or off; with it off nothing is sent anywhere.
   the status bar (also with AI off); a click downloads it (progress in the same place), then "Restart to update". Not
   restarted, it installs quietly when Qanuvi closes. Checks at start, every hour and when the window comes back after
   15 minutes. Settings → Updates: "Download updates by themselves" (off by default).
-- [ ] **15k. Search like VS Code (owner, 2026-11-12, next release)**: the search panel found 0 results for a word that
+- [x] **24h. Plan runs that finish by themselves (owner, 2026-11-12)**: the owner's aim is an assistant that
+  completes a whole project unattended, waiting only on risky or complicated steps. Done in 0.1.5:
+  - Run dialog: agent picker; one model for every step (cost against the plan's own models, "Write it into the
+    plan"); a failing step moves to a stronger model (on/off); who works (Team settings, paid only, free first); the
+    settings kept per plan; Fable 5.2 replaces Fable 5.1.
+  - Messages during a step are guidance: followed now, "do not" overrides the step, a small extra is done and noted, a
+    big one becomes a new step (82a-1) that runs next, "go back to 82b" reopens it and the run does it next, a plain
+    "stop" stops the run. They no longer take over the run's events or change its mode (the 82a/82b stalls).
+  - Run notes: what the owner says and what steps leave ("Note for the next steps:") reach every later step.
+  - Project secrets (Project settings): in the credential store, given to agents and the test command as
+    environment variables; a password typed into a running step is offered as a secret instead.
+  - Steps in a row on one model and section continue one session (up to 80k tokens of context and 6 steps; each step
+    counts its own cost); a new session gets the notes.
+  - A blocked step that most remaining steps need stops the run and says what is missing, instead of skipping them.
+  - Pickers on a running plan step show and change it now (mode for the rest of the run, model into the step's line).
+  - Stop always works; the running step's dot turns; "This run: n of m · Plan: a of b done"; marking a step done by
+    hand asks first.
+  Live (scratch plan, Haiku): a mid-step message was followed and kept as a note, step 2 continued step 1's session,
+  the mode stayed Auto, the run finished both steps; a project secret reached the test command.
+- [ ] **24i. Before a run (next)**: the paid agent reads the plan once and lists what it will need (logins, decisions,
+  risky steps) so the owner answers once up front and the run then goes unattended; risky steps are marked to wait.
+- [ ] **1f. Qanuvi's own resource use (next)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
+  WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
+- [ ] **24j. Plan housekeeping (next)**: move finished sections to an archive file next to the plan, and add another
+  plan's steps into the current one, both with a preview and the owner's confirmation.
+- [x] **15k. Search like VS Code (owner, 2026-11-12)**: the search panel found 0 results for a word that
   is in the project. To do: results grouped per file with the line and the match highlighted, case, whole word and
   regex toggles, files to include and exclude, gitignore respected, results while typing, replace and replace all,
   click to open at the line; fast on large projects (search in Rust, streamed).
+  Done: results while typing, grouped per file with every match marked and a count; match case, whole word and
+  regular expression; files to include and leave out (globs like "src/**, *.php", "vendor"); replace in one file or
+  all (with a confirmation; open files are read again); click opens at the line and column. Search runs in Rust.
 - [x] **24g. Qanuvi introduces itself to every model (owner, 2026-11-12)**: an agent asked for "a Qanuvi
   plan" had to dig through Qanuvi's source to learn what one is. To do: every session starts with a short brief from
   Qanuvi core: what Qanuvi is, the plan and task list format (sections, steps, needs, model per step) with an example,

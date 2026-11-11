@@ -31,6 +31,18 @@ export interface RunOptions {
   freeFirst?: boolean;
   /** Which steps by number, for example "2-6, 10-15"; empty: all open steps from `fromLine` (24f). */
   ranges?: string;
+  /** The agent the run uses; missing: the one Qanuvi picks (a paid agent on top, else the chosen one). */
+  providerId?: string;
+  /** One model for every step, whatever the steps' own Model lines say; empty or missing: as the plan says. */
+  model?: string;
+  /** A step that keeps failing moves to a stronger model; missing: yes. */
+  strongerOnFail?: boolean;
+  /** Steps in a row on the same model and in the same section continue one session; missing: yes. */
+  carryOn?: boolean;
+  /** Past this many tokens of context the next step starts a new session (with the run's notes). */
+  carryLimit?: number;
+  /** Who works: the Team settings, the paid agent only, or free models first (then the paid agent). */
+  team?: RunTeam;
   /** When the run stops for the user (24f); missing: "decisions", as before. */
   pause?: PauseMode;
 }
@@ -96,8 +108,40 @@ export interface PlanRun {
   endedAt: number | null;
   /** What the decider decided in this run, with its reasons (24b). */
   decisions?: import("$lib/core/decider").DecisionRecord[];
+  /** What the owner said during the run and what steps left for later ones: every later step gets them. */
+  notes?: string[];
   /** The decider's own calls (assignment, reviews): they count in the run's cost (24e). */
   deciderCalls?: { model: string; costUsd: number }[];
+}
+
+export type RunTeam = "settings" | "paid" | "free";
+
+/** The models a step may move up to after failures: the agent's list, or none when the run stays on one model. */
+export function ladder(models: AgentModel[], strongerOnFail: boolean | undefined): AgentModel[] {
+  return strongerOnFail === false ? [] : models;
+}
+
+/** Whether free models go first in a run, by the run's own Team choice. */
+export function freeFirstFor(team: RunTeam | undefined, teamAllows: boolean, canFree: boolean): boolean {
+  if (!canFree || team === "paid") return false;
+  return team === "free" ? true : teamAllows;
+}
+
+/**
+ * Roughly how much one model on every step costs against the plan's own models (by output price; tokens per step
+ * taken as alike). Null when a price is unknown.
+ */
+export function costRatio(models: AgentModel[], stepModels: string[], one: string): number | null {
+  const out = (id: string) => models.find((m) => m.id === id)?.price?.[1];
+  const target = out(one);
+  if (target === undefined || stepModels.length === 0) return null;
+  let own = 0;
+  for (const id of stepModels) {
+    const p = out(id);
+    if (p === undefined) return null;
+    own += p;
+  }
+  return own > 0 ? (target * stepModels.length) / own : null;
 }
 
 /** The run lines' key for the decider's calls on a model. */

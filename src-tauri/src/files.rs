@@ -5,7 +5,6 @@ use ignore::WalkBuilder;
 use regex::RegexBuilder;
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
-use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 /// Files bigger than this are not opened in the editor.
@@ -45,6 +44,10 @@ pub struct SearchMatch {
     pub column: usize,
     /// The line, cut to 300 characters around the match.
     pub text: String,
+    /// Where the matches are in `text`, in characters: [start, end).
+    pub spans: Vec<[usize; 2]>,
+    /// How many matches the line has.
+    pub count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -385,15 +388,125 @@ pub fn write_path(
     Ok(fingerprint(text.as_bytes()))
 }
 
-fn excerpt(line: &str, byte_start: usize) -> (String, usize) {
-    let column = line[..byte_start].chars().count() + 1;
-    let chars: Vec<char> = line.chars().collect();
-    if chars.len() <= 300 {
-        return (line.trim_end().to_string(), column);
+/// How to search (15k): the query's kind, and which files take part.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SearchOptions {
+    pub regex: bool,
+    pub case_sensitive: bool,
+    /// Only whole words match ("cart" not in "carton").
+    pub whole_word: bool,
+    /// Files to include, comma-separated globs ("src/**, *.php"); empty: all.
+    pub include: String,
+    /// Files to leave out, comma-separated globs ("vendor, *.min.js").
+    pub exclude: String,
+}
+
+/// Comma-separated globs as people write them: "*.php" and "vendor" match at any depth, a folder matches what is in it.
+fn glob_set(list: &str) -> Result<Option<globset::GlobSet>, String> {
+    let mut b = globset::GlobSetBuilder::new();
+    let mut any = false;
+    for raw in list.split(',') {
+        let p = raw.trim().trim_start_matches("./").replace('\\', "/");
+        if p.is_empty() {
+            continue;
+        }
+        let p = p.trim_end_matches('/');
+        let base = if let Some(rooted) = p.strip_prefix('/') {
+            rooted.to_string()
+        } else if p.starts_with("**/") {
+            p.to_string()
+        } else {
+            format!("**/{p}")
+        };
+        for g in [base.clone(), format!("{base}/**")] {
+            b.add(
+                globset::GlobBuilder::new(&g)
+                    .literal_separator(true)
+                    .case_insensitive(cfg!(windows))
+                    .build()
+                    .map_err(|e| format!("The pattern {p} is not valid: {e}"))?,
+            );
+        }
+        any = true;
     }
-    let start = (column - 1).saturating_sub(100);
-    let text: String = chars.iter().skip(start).take(300).collect();
-    (text, column)
+    if !any {
+        return Ok(None);
+    }
+    b.build().map(Some).map_err(|e| e.to_string())
+}
+
+/// The compiled search: the pattern and the file filters.
+struct Searcher {
+    re: regex::Regex,
+    include: Option<globset::GlobSet>,
+    exclude: Option<globset::GlobSet>,
+}
+
+impl Searcher {
+    fn new(query: &str, o: &SearchOptions) -> Result<Self, String> {
+        let mut pattern = if o.regex {
+            query.to_string()
+        } else {
+            regex::escape(query)
+        };
+        if o.whole_word {
+            pattern = format!(r"\b(?:{pattern})\b");
+        }
+        let re = RegexBuilder::new(&pattern)
+            .case_insensitive(!o.case_sensitive)
+            .size_limit(1 << 20)
+            .build()
+            .map_err(|e| format!("The search pattern is not valid: {e}"))?;
+        Ok(Searcher {
+            re,
+            include: glob_set(&o.include)?,
+            exclude: glob_set(&o.exclude)?,
+        })
+    }
+
+    fn wants(&self, rel: &str) -> bool {
+        self.include.as_ref().is_none_or(|g| g.is_match(rel))
+            && !self.exclude.as_ref().is_some_and(|g| g.is_match(rel))
+    }
+}
+
+/// A file's text, when it is a searchable text file.
+fn text_of(path: &Path) -> Option<String> {
+    if std::fs::metadata(path).map(|m| m.len()).unwrap_or(u64::MAX) > MAX_SEARCH_BYTES {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    if looks_binary(&bytes) {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// One line's result: the text around the matches (at most 300 characters) and where each match is in it.
+fn line_hit(line: &str, found: &[(usize, usize)]) -> (String, usize, Vec<[usize; 2]>) {
+    let col = |b: usize| line[..b].chars().count();
+    let column = col(found[0].0) + 1;
+    let total = line.chars().count();
+    let from = if total <= 300 {
+        0
+    } else {
+        (column - 1).saturating_sub(100)
+    };
+    let text: String = line.chars().skip(from).take(300).collect();
+    let shown = text.chars().count();
+    let spans = found
+        .iter()
+        .map(|&(a, b)| [col(a).saturating_sub(from), col(b).saturating_sub(from)])
+        .filter(|[a, _]| *a < shown)
+        .map(|[a, b]| [a, b.min(shown)])
+        .collect();
+    let text = if from == 0 {
+        text.trim_end().to_string()
+    } else {
+        text
+    };
+    (text, column, spans)
 }
 
 /// Searches every non-ignored text file. `regex` treats the query as a regular expression; otherwise it is plain
@@ -405,65 +518,124 @@ pub fn search(
     case_sensitive: bool,
     limit: usize,
 ) -> Result<SearchResult, String> {
-    if query.is_empty() {
-        return Ok(SearchResult {
-            matches: vec![],
-            files_searched: 0,
-            truncated: false,
-        });
-    }
-    let pattern = if regex {
-        query.to_string()
-    } else {
-        regex::escape(query)
+    let o = SearchOptions {
+        regex,
+        case_sensitive,
+        ..Default::default()
     };
-    let re = RegexBuilder::new(&pattern)
-        .case_insensitive(!case_sensitive)
-        .size_limit(1 << 20)
-        .build()
-        .map_err(|e| format!("The search pattern is not valid: {e}"))?;
+    search_with(root, query, &o, limit)
+}
+
+/// Searches with all options: whole words, files to include and leave out. Each matching line comes once, with
+/// every match in it marked.
+pub fn search_with(
+    root: &Path,
+    query: &str,
+    o: &SearchOptions,
+    limit: usize,
+) -> Result<SearchResult, String> {
+    let mut result = SearchResult {
+        matches: vec![],
+        files_searched: 0,
+        truncated: false,
+    };
+    if query.is_empty() {
+        return Ok(result);
+    }
+    let s = Searcher::new(query, o)?;
     let root_c = root.canonicalize().map_err(|e| e.to_string())?;
-    let mut matches = Vec::new();
-    let mut files_searched = 0;
     for entry in walk_files(&root_c) {
-        if entry.metadata().map(|m| m.len()).unwrap_or(0) > MAX_SEARCH_BYTES {
-            continue;
-        }
-        let mut bytes = Vec::new();
-        if std::fs::File::open(entry.path())
-            .and_then(|mut f| f.read_to_end(&mut bytes))
-            .is_err()
-            || looks_binary(&bytes)
-        {
-            continue;
-        }
-        files_searched += 1;
-        let text = String::from_utf8_lossy(&bytes);
         let rel = rel_string(&root_c, entry.path());
+        if !s.wants(&rel) {
+            continue;
+        }
+        let Some(text) = text_of(entry.path()) else {
+            continue;
+        };
+        result.files_searched += 1;
         for (i, line) in text.lines().enumerate() {
-            if let Some(m) = re.find(line) {
-                let (text, column) = excerpt(line, m.start());
-                matches.push(SearchMatch {
-                    path: rel.clone(),
-                    line: i + 1,
-                    column,
-                    text,
-                });
-                if matches.len() >= limit {
-                    return Ok(SearchResult {
-                        matches,
-                        files_searched,
-                        truncated: true,
-                    });
-                }
+            let found: Vec<(usize, usize)> =
+                s.re.find_iter(line)
+                    .filter(|m| m.end() > m.start())
+                    .map(|m| (m.start(), m.end()))
+                    .collect();
+            if found.is_empty() {
+                continue;
+            }
+            let (text, column, spans) = line_hit(line, &found);
+            result.matches.push(SearchMatch {
+                path: rel.clone(),
+                line: i + 1,
+                column,
+                text,
+                spans,
+                count: found.len(),
+            });
+            if result.matches.len() >= limit {
+                result.truncated = true;
+                return Ok(result);
             }
         }
     }
-    Ok(SearchResult {
-        matches,
-        files_searched,
-        truncated: false,
-    })
+    Ok(result)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReplaceResult {
+    pub files: usize,
+    pub replacements: usize,
+}
+
+/// Replaces every match in the files searched with the same options (only in `paths` when given). A regular
+/// expression's replacement may use $1 and ${name}; plain text is used as it is. Files keep their line endings.
+pub fn replace_with(
+    root: &Path,
+    query: &str,
+    o: &SearchOptions,
+    replacement: &str,
+    paths: Option<&[String]>,
+) -> Result<ReplaceResult, String> {
+    let mut done = ReplaceResult {
+        files: 0,
+        replacements: 0,
+    };
+    if query.is_empty() {
+        return Ok(done);
+    }
+    let s = Searcher::new(query, o)?;
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    for entry in walk_files(&root_c) {
+        let rel = rel_string(&root_c, entry.path());
+        if !s.wants(&rel) || paths.is_some_and(|p| !p.iter().any(|x| x == &rel)) {
+            continue;
+        }
+        // Only files that are valid UTF-8, so nothing else in them changes.
+        let Ok(bytes) = std::fs::read(entry.path()) else {
+            continue;
+        };
+        if bytes.len() as u64 > MAX_SEARCH_BYTES || looks_binary(&bytes) {
+            continue;
+        }
+        let Ok(text) = String::from_utf8(bytes) else {
+            continue;
+        };
+        let n =
+            s.re.find_iter(&text)
+                .filter(|m| m.end() > m.start())
+                .count();
+        if n == 0 {
+            continue;
+        }
+        let next = if o.regex {
+            s.re.replace_all(&text, replacement)
+        } else {
+            s.re.replace_all(&text, regex::NoExpand(replacement))
+        };
+        std::fs::write(entry.path(), next.as_bytes()).map_err(|e| format!("{rel}: {e}"))?;
+        done.files += 1;
+        done.replacements += n;
+    }
+    Ok(done)
 }
 
 #[cfg(test)]
@@ -750,6 +922,73 @@ mod rename_tests {
         assert_eq!(
             markdown_files(p).unwrap(),
             ["README.md", "plugins/shop/PLAN-D.md"]
+        );
+    }
+
+    #[test]
+    fn whole_words_include_exclude_spans_and_replace() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::create_dir_all(p.join("src")).unwrap();
+        std::fs::create_dir_all(p.join("vendor/lib")).unwrap();
+        std::fs::write(p.join("src/cart.php"), "cart carton cart\r\nno\r\n").unwrap();
+        std::fs::write(p.join("src/notes.md"), "cart").unwrap();
+        std::fs::write(p.join("vendor/lib/x.php"), "cart").unwrap();
+        let o = |w: bool, inc: &str, exc: &str| SearchOptions {
+            whole_word: w,
+            include: inc.into(),
+            exclude: exc.into(),
+            ..Default::default()
+        };
+
+        let r = search_with(p, "cart", &o(true, "*.php", "vendor"), 50).unwrap();
+        assert_eq!(r.matches.len(), 1, "{:?}", r.matches);
+        let m = &r.matches[0];
+        assert_eq!((m.path.as_str(), m.line, m.count), ("src/cart.php", 1, 2));
+        assert_eq!(m.spans, vec![[0, 4], [12, 16]]);
+        assert_eq!(
+            search_with(p, "cart", &o(false, "", ""), 50)
+                .unwrap()
+                .matches
+                .len(),
+            3
+        );
+        assert_eq!(
+            search_with(p, "cart", &o(false, "src/**", "*.md"), 50)
+                .unwrap()
+                .matches
+                .len(),
+            1
+        );
+        assert!(search_with(p, "x", &o(false, "[", ""), 50).is_err());
+
+        let done = replace_with(p, "cart", &o(true, "", "vendor"), "basket", None).unwrap();
+        assert_eq!((done.files, done.replacements), (2, 3));
+        assert_eq!(
+            std::fs::read_to_string(p.join("src/cart.php")).unwrap(),
+            "basket carton basket\r\nno\r\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(p.join("vendor/lib/x.php")).unwrap(),
+            "cart"
+        );
+
+        let re = SearchOptions {
+            regex: true,
+            ..Default::default()
+        };
+        let only = vec!["src/notes.md".to_string()];
+        let done = replace_with(p, "(bask)et", &re, "$1-it $$", Some(&only)).unwrap();
+        assert_eq!(done.files, 1);
+        assert_eq!(
+            std::fs::read_to_string(p.join("src/notes.md")).unwrap(),
+            "bask-it $"
+        );
+        let plain = SearchOptions::default();
+        replace_with(p, "bask-it", &plain, "$1", Some(&only)).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(p.join("src/notes.md")).unwrap(),
+            "$1 $"
         );
     }
 }

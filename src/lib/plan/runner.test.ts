@@ -3,6 +3,9 @@ import { CLAUDE_CODE } from "$lib/agents/providers";
 import { parsePlan } from "./tasklist";
 import {
   FREE_MODEL,
+  costRatio,
+  freeFirstFor,
+  ladder,
   freeSavings,
   nextModel,
   nextModelFreeFirst,
@@ -60,8 +63,8 @@ describe("nextModel", () => {
     expect(nextModel(models, [h, h], "claude-haiku-5-5", 2)).toBe("claude-sonnet-5-5");
     const s = fail("claude-sonnet-5-5");
     expect(nextModel(models, [h, h, s, s], "claude-haiku-5-5", 2)).toBe("claude-opus-5-5");
-    const f = fail("claude-fable-5-1");
-    expect(nextModel(models, [f], "claude-fable-5-1", 1)).toBeNull();
+    const f = fail("claude-fable-5-2");
+    expect(nextModel(models, [f], "claude-fable-5-2", 1)).toBeNull();
   });
 
   it("asks the user when a model outside the list fails", () => {
@@ -237,5 +240,32 @@ describe("runs that finish by themselves (24f)", () => {
         steps: [s("1", "done"), s("2", "blocked", "needs a key"), s("3", "skipped", "needs step 2, which is not done")],
       }),
     ).toBe("1 done · 1 skipped: step 3 (needs step 2, which is not done) · 1 blocked: step 2 (needs a key)");
+  });
+});
+
+describe("run settings: one model, Team per run", () => {
+  const models = CLAUDE_CODE.models;
+  it("compares one model on every step with the plan's own models", () => {
+    // Sonnet ($10 out) on every step, against Opus ($20) and Haiku ($0.50): (10 * 2) / 20.5.
+    expect(costRatio(models, ["claude-opus-5-5", "claude-haiku-5-5"], "claude-sonnet-5-5")).toBeCloseTo(0.976, 2);
+    expect(costRatio(models, ["claude-sonnet-5-5"], "claude-fable-5-2")).toBe(4);
+    expect(costRatio(models, ["unknown"], "claude-fable-5-2")).toBeNull();
+    expect(costRatio(models, [], "claude-fable-5-2")).toBeNull();
+  });
+
+  it("stays on one model when moving up is off", () => {
+    const fail = (model: string) => ({ model, outcome: "open" as const });
+    expect(nextModel(ladder(models, false), [fail("claude-sonnet-5-5")], "claude-sonnet-5-5", 1)).toBeNull();
+    expect(nextModel(ladder(models, true), [fail("claude-sonnet-5-5")], "claude-sonnet-5-5", 1)).toBe(
+      "claude-opus-5-5",
+    );
+  });
+
+  it("lets the run's own Team choice decide whether free models go first", () => {
+    expect(freeFirstFor("paid", true, true)).toBe(false);
+    expect(freeFirstFor("free", false, true)).toBe(true);
+    expect(freeFirstFor("settings", true, true)).toBe(true);
+    expect(freeFirstFor("settings", false, true)).toBe(false);
+    expect(freeFirstFor("free", true, false)).toBe(false);
   });
 });

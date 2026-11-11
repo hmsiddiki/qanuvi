@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ask } from "@tauri-apps/plugin-dialog";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
@@ -96,6 +97,20 @@
     } catch (e) {
       error = errorText(e);
     }
+  }
+
+  /** The status dot: next status. Marking a step done by hand asks first (a stray click must not skip work). */
+  async function cycleStatus(step: Step) {
+    const next = nextStatus(step.status);
+    if (
+      next === "x" &&
+      !(await ask(
+        `Mark step ${step.number ? step.number + ". " : ""}${step.title} as done? A plan run then skips it.`,
+        { title: "Mark as done", kind: "warning", okLabel: "Mark done", cancelLabel: "Cancel" },
+      ))
+    )
+      return;
+    apply((t) => setStepStatus(t, step.line, next, step.title));
   }
 
   async function load() {
@@ -227,7 +242,7 @@
         {/if}
       </div>
     {:else if plan}
-      <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} />
+      <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} onchanged={load} />
       {#each plan.sections.filter((s) => s.steps.length) as section (section.line)}
         {@const total = section.steps.length}
         {@const finished = done(section.steps)}
@@ -250,9 +265,14 @@
                       : step.status === 'x'
                         ? 'done'
                         : 'blocked'}"
+                  class:working={runner.running &&
+                    runner.run?.file === file &&
+                    runner.run.steps.some(
+                      (r) => r.status === "running" && r.number === step.number && r.title === step.title,
+                    )}
                   title="{STATUS_LABELS[step.status]} (click to change)"
                   aria-label="Status: {STATUS_LABELS[step.status]}"
-                  onclick={() => apply((t) => setStepStatus(t, step.line, nextStatus(step.status), step.title))}
+                  onclick={() => cycleStatus(step)}
                 ></button>
                 <button
                   type="button"
@@ -502,6 +522,20 @@
     border-radius: 50%;
     background: transparent;
     cursor: pointer;
+  }
+
+  /* The step a run is working on now: a ring that turns. */
+  .status.working {
+    border-color: color-mix(in srgb, var(--qx-status-running) 30%, transparent);
+    border-top-color: var(--qx-status-running);
+    background: transparent;
+    animation: qx-step-spin 0.9s linear infinite;
+  }
+
+  @keyframes qx-step-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .status.sdoing {

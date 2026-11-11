@@ -31,6 +31,7 @@ pub mod relay;
 pub mod relay_client;
 pub mod relay_server;
 pub mod runs;
+pub mod secrets;
 pub mod sink;
 pub mod store;
 pub mod terminal;

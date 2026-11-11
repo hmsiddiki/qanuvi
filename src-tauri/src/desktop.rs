@@ -204,9 +204,30 @@ async fn files_search(
     query: String,
     regex: bool,
     case_sensitive: bool,
+    options: Option<files::SearchOptions>,
 ) -> Res<files::SearchResult> {
     let root = project_root(&state, &project_id)?;
-    blocking(move || files::search(&root, &query, regex, case_sensitive, 2000)).await
+    let o = options.unwrap_or(files::SearchOptions {
+        regex,
+        case_sensitive,
+        ..Default::default()
+    });
+    blocking(move || files::search_with(&root, &query, &o, 5000)).await
+}
+
+/// Replaces the matches of a search in the project's files (only in `paths` when given).
+#[tauri::command]
+async fn files_replace(
+    state: State<'_, AppState>,
+    project_id: String,
+    query: String,
+    options: files::SearchOptions,
+    replacement: String,
+    paths: Option<Vec<String>>,
+) -> Res<files::ReplaceResult> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::replace_with(&root, &query, &options, &replacement, paths.as_deref()))
+        .await
 }
 
 #[derive(Serialize)]
@@ -263,7 +284,24 @@ async fn checks_run(
 ) -> Res<checks::CheckResult> {
     let root = project_root(&state, &project_id)?;
     let timeout = std::time::Duration::from_secs(timeout_secs.clamp(5, 1800));
-    blocking(move || checks::run(&root, &command, timeout)).await
+    let env = crate::secrets::env(&project_id);
+    blocking(move || checks::run_with_env(&root, &command, timeout, &env)).await
+}
+
+/// The names of a project's secrets (never the values).
+#[tauri::command]
+fn secrets_names(project_id: String) -> Vec<String> {
+    crate::secrets::names(&project_id)
+}
+
+#[tauri::command]
+fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
+    crate::secrets::set(&project_id, &name, &value)
+}
+
+#[tauri::command]
+fn secrets_remove(project_id: String, name: String) -> Res<()> {
+    crate::secrets::remove(&project_id, &name)
 }
 
 // Terminals -------------------------------------------------------------------------------------------------------
@@ -1331,6 +1369,19 @@ fn agent_forget_grants(state: State<AppState>, session_id: String) {
     state.agents.forget_grants(&session_id);
 }
 
+/// A running session's model or mode, changed now from the picker.
+#[tauri::command]
+fn agent_configure(
+    state: State<AppState>,
+    session_id: String,
+    model: Option<String>,
+    mode: Option<String>,
+) -> Res<()> {
+    state
+        .agents
+        .configure(&state.db, &session_id, model.as_deref(), mode.as_deref())
+}
+
 #[tauri::command]
 fn agent_stop(state: State<AppState>, session_id: String) -> Res<()> {
     agent::mark_stopped(&state.db, &session_id);
@@ -1495,6 +1546,7 @@ pub fn run() {
             files_list_dir,
             files_list_all,
             files_markdown,
+            files_replace,
             files_read,
             files_write,
             files_create,
@@ -1541,6 +1593,10 @@ pub fn run() {
             agent_config_read,
             agent_config_write,
             agent_stop,
+            agent_configure,
+            secrets_names,
+            secrets_set,
+            secrets_remove,
             agent_grants,
             agent_forget_grants,
             agent_rename,

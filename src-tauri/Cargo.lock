@@ -3389,6 +3389,7 @@ dependencies = [
  "chacha20poly1305",
  "ed25519-dalek",
  "getrandom 0.4.3",
+ "globset",
  "hkdf 0.13.0",
  "ignore",
  "keyring",

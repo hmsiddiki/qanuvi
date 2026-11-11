@@ -13,7 +13,12 @@ import { own } from "./ownModels.svelte";
 export interface AgentModel {
   id: string;
   label: string;
+  /** API price in US dollars per million tokens, [input, output], when known (for cost comparisons). */
+  price?: [number, number];
 }
+
+/** Models no longer offered, so older sessions and plans still show their names. */
+const RETIRED_LABELS: Record<string, string> = { "claude-fable-5-1": "Fable 5.1" };
 
 export interface AgentMode {
   id: string;
@@ -52,10 +57,10 @@ export const CLAUDE_CODE: AgentProvider = {
   badge: "C",
   color: "#d97757",
   models: [
-    { id: "claude-fable-5-1", label: "Fable 5.1" },
-    { id: "claude-opus-5-5", label: "Opus 5.5" },
-    { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
-    { id: "claude-haiku-5-5", label: "Haiku 5.5" },
+    { id: "claude-fable-5-2", label: "Fable 5.2", price: [8, 40] },
+    { id: "claude-opus-5-5", label: "Opus 5.5", price: [4, 20] },
+    { id: "claude-sonnet-5-5", label: "Sonnet 5.5", price: [2, 10] },
+    { id: "claude-haiku-5-5", label: "Haiku 5.5", price: [0.1, 0.5] },
   ],
   defaultModel: "claude-sonnet-5-5",
   modes: [
@@ -149,6 +154,7 @@ export function modelLabel(provider: AgentProvider, id: string): string {
   return (
     provider.models.find((m) => m.id === id)?.label ??
     PROVIDERS.flatMap((p) => p.models).find((m) => m.id === id)?.label ??
+    RETIRED_LABELS[id] ??
     id
   );
 }

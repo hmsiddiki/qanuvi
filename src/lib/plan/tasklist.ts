@@ -60,7 +60,7 @@ const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 const MODEL_RE = /^\s+- Model:\s*(\S+)\s*$/i;
 const NEEDS_RE = /^- Needs:\s*(.+)$/i;
 const SKIPPED_RE = /^\s+- Skipped:/i;
-const TITLE_RE = /^\*\*(?:(\d+[a-z]?)\.\s+)?(.+?)\*\*\s*(.*)$/;
+const TITLE_RE = /^\*\*(?:(\d+[a-z]?(?:-\d+)?)\.\s+)?(.+?)\*\*\s*(.*)$/;
 
 export function splitLines(text: string): { lines: string[]; eol: "\n" | "\r\n" } {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";

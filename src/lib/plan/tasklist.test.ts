@@ -112,8 +112,8 @@ describe("editing", () => {
     const second = setStepModel(SAMPLE, 4, "claude-sonnet-5-5");
     expect(second.split("\n")[5]).toBe("  - Model: claude-sonnet-5-5");
 
-    const changed = setStepModel(SAMPLE, 8, "claude-fable-5-1");
-    expect(changed.split("\n")[11]).toBe("  - Model: claude-fable-5-1");
+    const changed = setStepModel(SAMPLE, 8, "claude-fable-5-2");
+    expect(changed.split("\n")[11]).toBe("  - Model: claude-fable-5-2");
     const removed = setStepModel(SAMPLE, 8, null);
     expect(removed.split("\n")).toHaveLength(SAMPLE.split("\n").length - 1);
     expect(parsePlan(removed).steps[1].model).toBeNull();

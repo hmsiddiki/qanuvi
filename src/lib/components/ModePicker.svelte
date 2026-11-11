@@ -15,7 +15,7 @@
   let current = $derived(modes.find((m) => m.id === agent.mode) ?? modes[0]);
 
   function choose(id: string) {
-    agent.mode = id;
+    agent.pickMode(id);
     open = false;
   }
 </script>
