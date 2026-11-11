@@ -265,11 +265,18 @@
                       : step.status === 'x'
                         ? 'done'
                         : 'blocked'}"
-                  class:working={runner.running &&
+                  class:working={(runner.running &&
                     runner.run?.file === file &&
                     runner.run.steps.some(
                       (r) => r.status === "running" && r.number === step.number && r.title === step.title,
-                    )}
+                    )) ||
+                    (!!step.number &&
+                      agent.sessions.some(
+                        (x) =>
+                          x.project_id === project.id &&
+                          ["running", "waiting"].includes(x.status) &&
+                          x.title.startsWith(`Step ${step.number}:`),
+                      ))}
                   title="{STATUS_LABELS[step.status]} (click to change)"
                   aria-label="Status: {STATUS_LABELS[step.status]}"
                   onclick={() => cycleStatus(step)}

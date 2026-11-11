@@ -123,6 +123,15 @@
       runner.sessionId && runner.sessionId === session?.id
         ? runner.run?.steps.find((s) => s.status === "running")
         : null;
+    // A step the last run stopped at: writing in its session resumes the run from it (not a plain chat message).
+    if (!step && session && !running && /^Step [^:\s]+:/.test(session.title) && !isStopOrder(text)) {
+      if (looksSecret(text) && runner.run) await runner.addPrivate(project.id, runner.run.file, text);
+      else runner.addNote(text);
+      if (await runner.resumeFrom(project, session.id, text)) {
+        agent.notice("The plan run goes on from this step, in this session, with your message first.");
+        return;
+      }
+    }
     if (step && isStopOrder(text)) {
       runner.stop();
       agent.notice("You said stop: the plan run stops here. Run it again to go on.");

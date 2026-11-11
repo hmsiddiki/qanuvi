@@ -171,6 +171,48 @@ class RunnerStore {
     await api.files.logAppend(project.id, logPath(file, step), resultEntry(step.status, step.reason)).catch(() => {});
   }
 
+  /** The owner's message that resumed the run (it goes first in the step's request). */
+  #resumeText = "";
+
+  /**
+   * The owner wrote in the session of a step the last run stopped at (blocked, failed or stopped): the run goes on from
+   * that step, in the same session, with the owner's words first, then carries on with the next steps as it was set.
+   * Answers false when there is no such run, and the message goes to the chat as usual.
+   */
+  async resumeFrom(project: Project, sessionId: string, text: string): Promise<boolean> {
+    const last = this.run;
+    if (!last || this.running || last.projectId !== project.id) return false;
+    const session = agent.sessions.find((x) => x.id === sessionId);
+    const number = session?.title.match(/^Step ([^:\s]+):/)?.[1];
+    if (!number) return false;
+    const now = await api.files.read(project.id, last.file).catch(() => null);
+    const step = now ? parsePlan(now.text).steps.find((x) => x.number === number) : undefined;
+    if (!step || step.status === "x") return false;
+    this.#carry = {
+      sessionId,
+      model: session?.model ?? "",
+      section: step.section ?? "",
+      tokens: 0,
+      steps: 0,
+      base: totalsOf(session ?? null),
+    };
+    this.#resumeText = text;
+    // A blocked step is open again: the owner is unblocking it.
+    if (step.status === "!" && now)
+      await api.files
+        .write(project.id, last.file, setStepStatus(now.text, step.line, " ", step.title), now.hash)
+        .catch(() => {});
+    void this.start(project, last.file, {
+      ...last.options,
+      fromLine: step.line,
+      onlyOne: false,
+      ranges: "",
+      // The session keeps its model for this step; later steps go back to their own.
+      model: last.options.model,
+    });
+    return true;
+  }
+
   /** Something the owner said during the run: every later step gets it. */
   addNote(text: string): void {
     const run = this.run;
@@ -446,6 +488,7 @@ class RunnerStore {
         const nowStep = now
           ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
           : undefined;
+        if (now) for (const x of parsePlan(now.text).steps) if (x.status === "x" && x.number) doneNumbers.add(x.number);
         const unmet = unmetNeed(nowStep?.needs, doneNumbers, await this.#otherPlans(project, nowStep?.needs));
         if (unmet) {
           stepRun.status = "skipped";
@@ -538,6 +581,14 @@ class RunnerStore {
           stepRun.status = "skipped";
           break;
         }
+        // Done by hand (or by an agent in the chat) since the run started: it counts as done, nobody runs it again.
+        if (fresh.status === "x" && !stepRun.attempts.length) {
+          stepRun.status = "done";
+          stepRun.reason = "marked done outside the run";
+          done.push({ number: stepRun.number, title: stepRun.title });
+          if (stepRun.number) doneNumbers.add(stepRun.number);
+          break;
+        }
         this.currentModel = model;
         const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
         const testCommand = options.packets ? project.settings.test_command.trim() : "";
@@ -545,7 +596,12 @@ class RunnerStore {
         const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
         const ownLog = logPath(file, fresh);
         const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
+        const resumedWith = this.#resumeText;
+        this.#resumeText = "";
         let prompt =
+          (resumedWith
+            ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
+            : "") +
           stepPrompt(file, fresh, done) +
           notesBlock(run.notes ?? []) +
           privateBlock(privateDetails) +
@@ -558,7 +614,8 @@ class RunnerStore {
         if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh), testCommand);
         // Same model, same section, still small: the step continues the last step's session (it knows the work).
         const section = fresh.section ?? "";
-        const carryOn = canCarry(this.#carry, model, section, options.carryLimit ?? 80_000);
+        const carryOn =
+          (!!resumedWith && !!this.#carry) || canCarry(this.#carry, model, section, options.carryLimit ?? 80_000);
         if (!carryOn) await this.#dropCarry();
         const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
         const attempt = await this.#attempt(
