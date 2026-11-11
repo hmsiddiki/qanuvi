@@ -171,3 +171,36 @@ export function needingCount(
   }
   return n;
 }
+
+/** The plan's private details for a step's request, with the rule for them. */
+export function privateBlock(details: string[]): string {
+  if (!details.length) return "";
+  return [
+    "",
+    "Private details the owner gave earlier in this plan (logins, passwords). Use them where the work needs them; " +
+      "never write them into files, notes, commits, plans or your answers:",
+    ...details.map((d) => `- ${d}`),
+  ].join("\n");
+}
+
+/** Where a plan's notes are kept: the owner's instructions belong to the plan, for every run of it. */
+function planNotesKey(projectId: string, file: string): string {
+  return `qanuvi.plannotes.${projectId}.${file}`;
+}
+
+export function loadPlanNotes(projectId: string, file: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(planNotesKey(projectId, file)) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePlanNotes(projectId: string, file: string, notes: string[]): void {
+  try {
+    localStorage.setItem(planNotesKey(projectId, file), JSON.stringify(notes.slice(-60)));
+  } catch {
+    // Notes are a help; the run goes on without them.
+  }
+}

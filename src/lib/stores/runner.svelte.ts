@@ -15,6 +15,9 @@ import {
   looksSecret,
   notesBlock,
   notesIn,
+  privateBlock,
+  loadPlanNotes,
+  savePlanNotes,
   stepKey,
 } from "$lib/plan/guidance";
 import { providerById, type AgentProvider } from "$lib/agents/providers";
@@ -132,13 +135,21 @@ class RunnerStore {
     const note = text.replace(/\s+/g, " ").trim().slice(0, 400);
     if (!run || !note || looksSecret(note)) return;
     run.notes = [...(run.notes ?? []), note];
+    savePlanNotes(run.projectId, run.file, run.notes);
     void this.#save(run);
+  }
+
+  /** A login or password given during the run: kept for this plan (credential store), for every later step. */
+  async addPrivate(projectId: string, file: string, text: string): Promise<void> {
+    await api.agent.planPrivateAdd(projectId, file, text).catch(() => {});
+    this.changed++;
   }
 
   removeNote(index: number): void {
     const run = this.run;
     if (!run?.notes) return;
     run.notes = run.notes.filter((_, i) => i !== index);
+    savePlanNotes(run.projectId, run.file, run.notes);
     void this.#save(run);
   }
 
@@ -153,6 +164,7 @@ class RunnerStore {
     const found = notesIn(texts.slice(-3).join("\n")).filter((n) => !(run.notes ?? []).includes(n));
     if (found.length) {
       run.notes = [...(run.notes ?? []), ...found];
+      savePlanNotes(run.projectId, run.file, run.notes);
       await this.#save(run);
     }
   }
@@ -284,6 +296,8 @@ class RunnerStore {
     };
     // Keep a reference to this run: the rest of the run works on it, whatever else is shown meanwhile.
     const run = this.run;
+    // The plan's notes from earlier runs: the owner's instructions hold for every run of this plan.
+    run.notes = loadPlanNotes(project.id, file);
     // The user watching a step can change its mode (for the rest of the run, kept for this plan) and its model (this
     // step, written into its Model line) from the chat pickers.
     let live = null as { step: StepRun; model: string; from: number } | null;
@@ -474,7 +488,9 @@ class RunnerStore {
         this.currentModel = model;
         const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
         const testCommand = options.packets ? project.settings.test_command.trim() : "";
-        let prompt = stepPrompt(file, fresh, done) + notesBlock(run.notes ?? []);
+        // The plan's private details (read each step: one given during the last step counts at once).
+        const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
+        let prompt = stepPrompt(file, fresh, done) + notesBlock(run.notes ?? []) + privateBlock(privateDetails);
         // The reviewer turned down a free model's work: the next model hears why.
         const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
         if (rejected)
@@ -585,6 +601,12 @@ class RunnerStore {
     }
     if (run.status === "running") this.#finish(run, "done", runSummary(run));
     await this.#dropCarry();
+    // The whole plan is done: its private details are deleted, unless the owner chose to keep them.
+    if (options.forgetPrivateWhenDone !== false) {
+      const end = await api.files.read(project.id, file).catch(() => null);
+      if (end && parsePlan(end.text).steps.every((x) => x.status === "x"))
+        await api.agent.planPrivateClear(project.id, file).catch(() => {});
+    }
     agent.onPlanChange = null;
     agent.planSessionId = null;
     await this.#save(run);

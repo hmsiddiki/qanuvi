@@ -37,6 +37,8 @@ export interface RunOptions {
   model?: string;
   /** A step that keeps failing moves to a stronger model; missing: yes. */
   strongerOnFail?: boolean;
+  /** When every step of the plan is done, its private details (logins) are deleted; missing: yes. */
+  forgetPrivateWhenDone?: boolean;
   /** Steps in a row on the same model and in the same section continue one session; missing: yes. */
   carryOn?: boolean;
   /** Past this many tokens of context the next step starts a new session (with the run's notes). */

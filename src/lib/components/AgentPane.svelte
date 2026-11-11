@@ -130,12 +130,12 @@
     }
     if (step && looksSecret(text)) {
       const asSecret = await ask(
-        "This looks like a login or password. As a project secret it reaches every step and model as an environment variable, without the models seeing it. Save it as a secret instead of sending it?",
+        "This looks like a login or password. It will be kept for this plan, so every later step and run of it has it (in Windows' credential store, never in files). Better still: a project secret reaches every step and the tests as an environment variable, without any model seeing it.",
         {
           title: "A password in the chat",
           kind: "warning",
           okLabel: "Open project secrets",
-          cancelLabel: "Send anyway",
+          cancelLabel: "Use it for this plan",
         },
       );
       if (asSecret) {
@@ -143,6 +143,7 @@
         ui.settingsFor = project.id;
         return;
       }
+      if (runner.run) await runner.addPrivate(project.id, runner.run.file, text);
     } else if (step) runner.addNote(text);
     const note = step && runner.run ? guidanceNote(step.number ?? step.title, runner.run.file) : "";
     if (!(await agent.send(project.id, text, note))) agent.draft = text;

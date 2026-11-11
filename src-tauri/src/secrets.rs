@@ -73,6 +73,46 @@ pub fn env(project_id: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Private details the owner gave during a plan's run (a login typed into a step): kept for that plan, in the
+/// credential store, so every later step and run of the plan has them; never in files or Qanuvi's database.
+fn plan_entry(project_id: &str, file: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new("Qanuvi", &format!("plan:{project_id}:{file}")).map_err(|e| e.to_string())
+}
+
+pub fn plan_private(project_id: &str, file: &str) -> Vec<String> {
+    plan_entry(project_id, file)
+        .and_then(|e| e.get_password().map_err(|e| e.to_string()))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+pub fn plan_private_add(project_id: &str, file: &str, text: &str) -> Result<(), String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(());
+    }
+    let mut all = plan_private(project_id, file);
+    if !all.iter().any(|t| t == text) {
+        all.push(text.chars().take(500).collect());
+    }
+    // The credential store holds a few kilobytes: the newest details win.
+    while serde_json::to_string(&all).map(|s| s.len()).unwrap_or(0) > 2000 && all.len() > 1 {
+        all.remove(0);
+    }
+    let t = serde_json::to_string(&all).map_err(|e| e.to_string())?;
+    plan_entry(project_id, file)?
+        .set_password(&t)
+        .map_err(|e| e.to_string())
+}
+
+pub fn plan_private_clear(project_id: &str, file: &str) -> Result<(), String> {
+    match plan_entry(project_id, file)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

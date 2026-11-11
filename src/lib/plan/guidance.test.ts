@@ -88,3 +88,14 @@ describe("continuing a session across steps", () => {
     expect(needingCount("82b", steps, new Set(["82c", "82d", "82e", "83a"]))).toBe(2);
   });
 });
+
+import { privateBlock } from "./guidance";
+
+describe("a plan's private details", () => {
+  it("reach later steps with the rule to keep them out of everything written", () => {
+    expect(privateBlock([])).toBe("");
+    const b = privateBlock(["db login: root / example1"]);
+    expect(b).toContain("- db login: root / example1");
+    expect(b).toContain("never write them into files");
+  });
+});

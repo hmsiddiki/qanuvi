@@ -42,6 +42,8 @@
   /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
   let carryOn = $state(true);
   let carryK = $state(80);
+  /** The plan's private details are deleted once every step is done. */
+  let forgetPrivate = $state(true);
   let openSteps = $derived(plan.steps.filter((s) => s.status !== "x" && s.status !== "!"));
   let fromLine = $state(-1);
   let onlyOne = $state(false);
@@ -89,6 +91,7 @@
     replan: boolean;
     carryOn: boolean;
     carryK: number;
+    forgetPrivate: boolean;
   }
   function restore(): boolean {
     try {
@@ -109,6 +112,7 @@
       if (typeof k.replan === "boolean") replan = k.replan;
       if (typeof k.carryOn === "boolean") carryOn = k.carryOn;
       if (typeof k.carryK === "number") carryK = k.carryK;
+      if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
       return true;
     } catch {
       return false;
@@ -130,6 +134,7 @@
       replan,
       carryOn,
       carryK,
+      forgetPrivate,
     };
     localStorage.setItem(KEY(), JSON.stringify(k));
   }
@@ -175,6 +180,20 @@
   }
   let error = $state("");
 
+  /** Private details kept for this plan (only how many shows here). */
+  let privateCount = $state(0);
+  $effect(() => {
+    void runner.changed;
+    api.agent
+      .planPrivate(project.id, file)
+      .then((d) => (privateCount = d.length))
+      .catch(() => (privateCount = 0));
+  });
+  async function forgetPrivateNow() {
+    await api.agent.planPrivateClear(project.id, file).catch(() => {});
+    privateCount = 0;
+  }
+
   $effect(() => {
     if (setup) {
       fromLine = openSteps[0]?.line ?? -1;
@@ -209,6 +228,7 @@
         strongerOnFail,
         team,
         carryOn,
+        forgetPrivateWhenDone: forgetPrivate,
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 80)) * 1000,
       });
     } catch (e) {
@@ -350,6 +370,12 @@
       <input type="checkbox" bind:checked={carryOn} /> Continue the session across steps, up to
       <input type="number" class="small" min="20" max="400" step="10" bind:value={carryK} disabled={!carryOn} />k tokens
     </label>
+    <label
+      class="check"
+      title="Logins and passwords given while this plan ran are kept for it in Windows' credential store. With this on they are deleted once every step of the plan is done."
+    >
+      <input type="checkbox" bind:checked={forgetPrivate} /> Forget the plan's private details (logins) when the plan is finished
+    </label>
     <label class="check" title="After the failed tries above, the step goes to the next stronger model.">
       <input type="checkbox" bind:checked={strongerOnFail} /> A step that keeps failing moves to a stronger model
     </label>
@@ -424,9 +450,16 @@
         {/if}
       </div>
     {/if}
+    {#if privateCount}
+      <p class="dim private">
+        {privateCount} private detail{privateCount === 1 ? "" : "s"} (logins) kept for this plan in Windows' credential store;
+        every step gets {privateCount === 1 ? "it" : "them"}.
+        <button type="button" class="link" onclick={forgetPrivateNow}>Forget</button>
+      </p>
+    {/if}
     {#if run.notes?.length}
       <details class="decisions" open>
-        <summary>Notes every later step gets ({run.notes.length})</summary>
+        <summary>Notes kept for this plan: every step and run gets them ({run.notes.length})</summary>
         <ul>
           {#each run.notes as n, i (i)}
             <li>

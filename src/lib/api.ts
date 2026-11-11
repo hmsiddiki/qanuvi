@@ -404,6 +404,11 @@ export const api = {
     setSecret: (projectId: string, name: string, value: string) =>
       invoke<void>("secrets_set", { projectId, name, value }),
     removeSecret: (projectId: string, name: string) => invoke<void>("secrets_remove", { projectId, name }),
+    /** Private details given during a plan's run, kept for that plan in the credential store. */
+    planPrivate: (projectId: string, file: string) => invoke<string[]>("plan_private", { projectId, file }),
+    planPrivateAdd: (projectId: string, file: string, text: string) =>
+      invoke<void>("plan_private_add", { projectId, file, text }),
+    planPrivateClear: (projectId: string, file: string) => invoke<void>("plan_private_clear", { projectId, file }),
     /** Changes a running session's model or mode now. */
     configure: (sessionId: string, change: { model?: string; mode?: string }) =>
       invoke<void>("agent_configure", { sessionId, model: change.model ?? null, mode: change.mode ?? null }),

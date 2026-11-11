@@ -299,6 +299,22 @@ fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
     crate::secrets::set(&project_id, &name, &value)
 }
 
+/// A plan's private details (the plan run puts them into each step's request).
+#[tauri::command]
+fn plan_private(project_id: String, file: String) -> Vec<String> {
+    crate::secrets::plan_private(&project_id, &file)
+}
+
+#[tauri::command]
+fn plan_private_add(project_id: String, file: String, text: String) -> Res<()> {
+    crate::secrets::plan_private_add(&project_id, &file, &text)
+}
+
+#[tauri::command]
+fn plan_private_clear(project_id: String, file: String) -> Res<()> {
+    crate::secrets::plan_private_clear(&project_id, &file)
+}
+
 #[tauri::command]
 fn secrets_remove(project_id: String, name: String) -> Res<()> {
     crate::secrets::remove(&project_id, &name)
@@ -1597,6 +1613,9 @@ pub fn run() {
             secrets_names,
             secrets_set,
             secrets_remove,
+            plan_private,
+            plan_private_add,
+            plan_private_clear,
             agent_grants,
             agent_forget_grants,
             agent_rename,
