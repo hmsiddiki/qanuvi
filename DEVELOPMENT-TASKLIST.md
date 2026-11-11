@@ -98,11 +98,16 @@ runs on or off; with it off nothing is sent anywhere.
   is in the project. To do: results grouped per file with the line and the match highlighted, case, whole word and
   regex toggles, files to include and exclude, gitignore respected, results while typing, replace and replace all,
   click to open at the line; fast on large projects (search in Rust, streamed).
-- [ ] **24g. Qanuvi introduces itself to every model (owner, 2026-11-12, next release)**: an agent asked for "a Qanuvi
+- [x] **24g. Qanuvi introduces itself to every model (owner, 2026-11-12)**: an agent asked for "a Qanuvi
   plan" had to dig through Qanuvi's source to learn what one is. To do: every session starts with a short brief from
   Qanuvi core: what Qanuvi is, the plan and task list format (sections, steps, needs, model per step) with an example,
   where plans live and how the runner runs them, the Inbox, memory, and what the agent may ask Qanuvi to do. Kept
   short (cached), one copy for all agents, updated with the app (and by signed remote knowledge, 24c).
+  Done: src-tauri/src/brief.rs (the plan format the parser reads, statuses, Needs, Model, where plans live); Claude
+  Code gets it with --append-system-prompt (not in lean plan-step sessions), Qanuvi's own agent in its system
+  prompt. Live: a fresh session asked only to make a plan wrote PLAN.md in the right format without reading any of
+  Qanuvi's code, for $0.11 (the same kind of request cost $3.86 before). Still to add: the Inbox, memory and runner
+  commands, and updates by remote knowledge.
 - [ ] **1e. Task Manager lists WebView2 apart from Qanuvi (owner, 2026-11-11, later)**: the WebView2 processes are
   Qanuvi's children (checked), but Task Manager shows them under "WebView2 Manager". Try giving the window and its
   processes Qanuvi's app id so Windows groups them; cosmetic.

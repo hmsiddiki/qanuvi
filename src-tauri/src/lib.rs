@@ -6,6 +6,7 @@ pub mod agent_config;
 pub mod agent_tools;
 pub mod attachments;
 pub mod brain;
+pub mod brief;
 pub mod browser;
 pub mod browser_mcp;
 pub mod checks;

@@ -828,6 +828,11 @@ impl Agents {
             if lean {
                 cmd.args(["--strict-mcp-config", "--tools", LEAN_TOOLS]);
             }
+            // Qanuvi introduces itself (24g): what it is and its plan format, so "make a plan" needs no search.
+            if let Some(brief) = crate::brief::for_session(lean) {
+                cmd.arg("--append-system-prompt")
+                    .arg(crate::brief::as_arg(brief, &program));
+            }
             // Qanuvi's own tools: the code index (read-only) and the test browser (its own empty profile, nothing of the
             // user's), so they need no approval.
             if index_tools || browser_tools {

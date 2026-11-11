@@ -132,6 +132,13 @@ fn system_prompt(root: &Path, mode: &str, model: &str) -> String {
         root.display(),
         std::env::consts::OS
     );
+    // What Qanuvi is and how its plans work (24g), so no model has to search for it.
+    p.push_str(
+        "
+
+",
+    );
+    p.push_str(crate::brief::BRIEF);
     // The project's own instructions, kept short.
     if let Ok(rules) = std::fs::read_to_string(root.join("AGENTS.md")) {
         let rules: String = rules.chars().take(4000).collect();
