@@ -1,6 +1,6 @@
 [package]
 name = "qanuvi"
-version = "0.1.3"
+version = "0.1.4"
 description = "A light, agent-first project handler and personal assistant"
 authors = ["Inner IT"]
 edition = "2024"
