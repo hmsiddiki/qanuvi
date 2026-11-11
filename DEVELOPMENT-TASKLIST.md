@@ -970,7 +970,7 @@ runs on or off; with it off nothing is sent anywhere.
 - [x] **Release for self-development (owner, 2026-11-11)**: after 24b, a release build (installer) the owner uses to
   develop the rest of Qanuvi with Qanuvi itself. Built 2026-11-11: Qanuvi_0.1.0_x64-setup.exe (NSIS only, 5.6 MB;
   `npx tauri build`, output in src-tauri/target/release/bundle/nsis). Code on github.com/hmsiddiki/qanuvi.
-- [ ] **24f. Plan runs that finish by themselves (owner, 2026-11-11)**: Qanuvi becomes an assistant with its own
+- [-] **24f. Plan runs that finish by themselves (owner, 2026-11-11; run part built and tested 2026-11-11)**: Qanuvi becomes an assistant with its own
   task runner that keeps working on what the owner gives it, even when the owner is away. Today a run goes from the
   chosen step to the end without pausing, but the whole run stops at the first blocked step, at the budget, or when a
   step fails on every model (after the planner's rewrite).
@@ -986,6 +986,20 @@ runs on or off; with it off nothing is sent anywhere.
     and blocked steps are easy to run again once their reason is gone.
   - Later: a task queue for the assistant (tasks the owner assigns, run one after another, also on a remote machine
     through the masters), with the paid agent on top as the monitor (24e).
+  - Built (2026-11-11):
+    - Run panel: "Steps" (ranges such as 2-6, 10-15; unreadable ranges are named and Start waits) and "Stop for me"
+      (Never, the default / Only where a decision or my input is needed, as before / After every step).
+    - "- Needs: 3, 5" or "- Needs: OTHER-PLAN.md#4" under a step; a step whose needs are not done is skipped, "-
+      Skipped: why" is written under it (removed when a later run finishes it), and the run carries on.
+    - With "Never": a blocked step (with the agent's own "Blocked:" reason) or one no model could finish is left with
+      its reason and the run goes on; steps that need it skip themselves.
+    - The end of the run reports what was done, skipped, blocked and failed, with why, in the run panel.
+  - Live (free-test, 5 steps, "Never"): 1 and 2 by free models (reviews accepted), 3 blocked by the free model (it
+    would not invent the shop's name, as told), 4 skipped ("needs step 3, which is not done", written under it), 5 by
+    Sonnet; "3 done · 1 skipped · 1 blocked", $0.08 with the decider's $0.05. "After every step" with range 1-2:
+    paused after step 1 ("Run again to go on").
+  - Fixed while testing: the note for the paid agent (24e) showed in the user's message after a reload.
+  - Still to do: the report in the Inbox (today the Inbox only counts waiting sessions; it needs its own page).
 - [x] **24b. The decider (owner's design 2026-11-10, revised 2026-11-11; built and tested 2026-11-11)**: one model takes the
   decisions (what kind of job, which model does it, when to hand over, whether the result is good enough), the others
   do the work.

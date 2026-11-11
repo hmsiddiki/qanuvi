@@ -6,6 +6,8 @@
  *     on the next line)
  *     - detail
  *     - Model: claude-opus-5-5
+ *     - Needs: 10, 11, docs/OTHER-PLAN.md#4
+ *     - Skipped: (written by a plan run: why it skipped the step)
  *
  * Edits change only the lines they must; everything else in the file stays exactly as it was, line endings included.
  */
@@ -33,6 +35,8 @@ export interface Step {
   /** Detail lines under the step, without their leading indentation. */
   details: string[];
   model: string | null;
+  /** What the step needs done first (its "- Needs:" line): step numbers, or "file#number" in another plan. */
+  needs?: string[];
   /** First line after the step and its details. */
   end: number;
   section: string;
@@ -54,6 +58,8 @@ export interface Plan {
 const STEP_RE = /^( ?)- \[([ xX!-])\] (.*)$/;
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 const MODEL_RE = /^\s+- Model:\s*(\S+)\s*$/i;
+const NEEDS_RE = /^- Needs:\s*(.+)$/i;
+const SKIPPED_RE = /^\s+- Skipped:/i;
 const TITLE_RE = /^\*\*(?:(\d+[a-z]?)\.\s+)?(.+?)\*\*\s*(.*)$/;
 
 export function splitLines(text: string): { lines: string[]; eol: "\n" | "\r\n" } {
@@ -111,7 +117,14 @@ export function parsePlan(text: string): Plan {
       end = j + 1;
     }
 
-    const step: Step = { line: i, status, number, title, note, details, model, end, section: section.title };
+    const needsLine = details.map((d) => NEEDS_RE.exec(d.trim())).find((m) => m);
+    const needs = needsLine
+      ? needsLine[1]
+          .split(/[,\s]+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+    const step: Step = { line: i, status, number, title, note, details, model, needs, end, section: section.title };
     steps.push(step);
     section.steps.push(step);
     i = end - 1;
@@ -169,6 +182,25 @@ export function setStepModel(text: string, line: number, model: string | null, e
     let at = line + 1;
     while (at < lines.length && lines[at].trim() && indentOf(lines[at]) >= 2 && !isListItem(lines[at].trim())) at++;
     lines.splice(at, 0, `  - Model: ${value}`);
+  }
+  return join(lines, plan.eol);
+}
+
+/**
+ * Sets, changes or (with null) removes the step's "- Skipped:" line: why a plan run skipped it (24f). A later run
+ * that finishes the step removes it.
+ */
+export function setStepSkipped(text: string, line: number, reason: string | null, expectTitle?: string): string {
+  const value = reason?.replace(/\s+/g, " ").trim() || null;
+  const { plan, step, lines } = stepAt(text, line, expectTitle);
+  const existing = lines.findIndex((l, i) => i > line && i < step.end && SKIPPED_RE.test(l));
+  if (existing >= 0) {
+    if (value) lines[existing] = `  - Skipped: ${value}`;
+    else lines.splice(existing, 1);
+  } else if (value) {
+    let at = line + 1;
+    while (at < lines.length && lines[at].trim() && indentOf(lines[at]) >= 2) at++;
+    lines.splice(at, 0, `  - Skipped: ${value}`);
   }
   return join(lines, plan.eol);
 }

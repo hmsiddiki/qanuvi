@@ -20,6 +20,9 @@ import {
   type PlanRun,
   type RunOptions,
   type StepRun,
+  parseRanges,
+  unmetNeed,
+  runSummary,
 } from "$lib/plan/runner";
 import { parsePlan, type Step } from "$lib/plan/tasklist";
 import { budgetState, chooseModel, jobType, learn, monthStart, type ModelStats } from "$lib/plan/routing";
@@ -32,7 +35,7 @@ import {
   type Assignment,
   type DecisionRecord,
 } from "$lib/core/decider";
-import { setStepStatus } from "$lib/plan/tasklist";
+import { setStepSkipped, setStepStatus } from "$lib/plan/tasklist";
 import { extractSteps, labelRange, lastNumber, renumber, replaceStep, replanPrompt } from "$lib/plan/planner";
 import { defaultPlannerModel, planner } from "./planner.svelte";
 import { changesSince, snapshotChanges } from "./changes";
@@ -115,7 +118,16 @@ class RunnerStore {
       this.run = null;
       throw new Error(errorText(e));
     }
-    const steps = stepsToRun(parsePlan(text).steps, options.fromLine, options.onlyOne);
+    const { ranges, error: rangeError } = parseRanges(options.ranges);
+    if (rangeError) throw new Error(rangeError);
+    const pause = options.pause ?? "decisions";
+    const steps = stepsToRun(parsePlan(text).steps, options.fromLine, options.onlyOne, ranges);
+    // What is done already, to check each step's "- Needs:" line (24f).
+    const doneNumbers = new Set(
+      parsePlan(text)
+        .steps.filter((s) => s.status === "x" && s.number)
+        .map((s) => s.number!),
+    );
     this.#stopRequested = false;
     this.run = {
       id: crypto.randomUUID(),
@@ -198,6 +210,21 @@ class RunnerStore {
     const done: { number: string | null; title: string }[] = [];
     for (const stepRun of run.steps) {
       if (run.status !== "running") break;
+      // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
+      {
+        const now = await api.files.read(project.id, file).catch(() => null);
+        const nowStep = now
+          ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
+          : undefined;
+        const unmet = unmetNeed(nowStep?.needs, doneNumbers, await this.#otherPlans(project, nowStep?.needs));
+        if (unmet) {
+          stepRun.status = "skipped";
+          stepRun.reason = unmet;
+          await this.#noteSkipped(project, file, stepRun, unmet);
+          await this.#save(run);
+          continue;
+        }
+      }
       stepRun.status = "running";
       const planned = steps.find((s) => s.line === stepRun.line);
       const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
@@ -254,6 +281,12 @@ class RunnerStore {
         }
         if (model === null) {
           stepRun.status = "failed";
+          stepRun.reason = "not finished even by the strongest model";
+          if (pause === "never") {
+            // Runs to the end: this step is left with its reason; steps that need it skip themselves.
+            await this.#noteSkipped(project, file, stepRun, stepRun.reason);
+            break;
+          }
           this.#finish(
             run,
             "needs-you",
@@ -335,10 +368,22 @@ class RunnerStore {
         if (attempt.outcome === "done") {
           stepRun.status = "done";
           done.push({ number: stepRun.number, title: stepRun.title });
+          if (stepRun.number) doneNumbers.add(stepRun.number);
+          // An earlier run's "Skipped:" line no longer applies.
+          await this.#noteSkipped(project, file, stepRun, null);
+          if (pause === "step" && run.steps.some((s) => s.status === "waiting"))
+            this.#finish(
+              run,
+              "stopped",
+              `Paused after step ${stepRun.number ?? stepRun.title}, as chosen. Run again to go on.`,
+            );
           break;
         }
         if (attempt.outcome === "blocked") {
           stepRun.status = "blocked";
+          stepRun.reason = attempt.note || (await this.#blockedReason(project, file, stepRun)) || "it needs you";
+          // Runs to the end: the agent marked it blocked with its reason; the run carries on.
+          if (pause === "never") break;
           this.#finish(run, "needs-you", `Step ${stepRun.number ?? stepRun.title} is blocked and needs you.`);
           break;
         }
@@ -349,8 +394,54 @@ class RunnerStore {
         }
       }
     }
-    if (run.status === "running") this.#finish(run, "done", "");
+    if (run.status === "running") this.#finish(run, "done", runSummary(run));
     await this.#save(run);
+  }
+
+  /** The "Blocked: ..." line the agent wrote under a step it marked blocked, without the label. */
+  async #blockedReason(project: Project, file: string, stepRun: StepRun): Promise<string> {
+    const now = await api.files.read(project.id, file).catch(() => null);
+    const step = now
+      ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
+      : undefined;
+    const line = step?.details.map((d) => d.trim()).find((d) => /^- Blocked:/i.test(d));
+    return line ? line.replace(/^- Blocked:\s*/i, "").slice(0, 300) : "";
+  }
+
+  /** Writes (or with null removes) the step's "- Skipped:" line with the reason (24f). */
+  async #noteSkipped(project: Project, file: string, stepRun: StepRun, reason: string | null): Promise<void> {
+    const now = await api.files.read(project.id, file).catch(() => null);
+    if (!now) return;
+    const step = parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title);
+    if (!step) return;
+    try {
+      const next = setStepSkipped(now.text, step.line, reason, step.title);
+      if (next !== now.text) await api.files.write(project.id, file, next, now.hash);
+    } catch {
+      // The list changed meanwhile: the reason stays in the run's record.
+    }
+  }
+
+  /** The finished step numbers of other plans that a step's needs name ("file#number"), by file. */
+  async #otherPlans(project: Project, needs: string[] | undefined): Promise<Map<string, Set<string>>> {
+    const out = new Map<string, Set<string>>();
+    for (const need of needs ?? []) {
+      const hash = need.lastIndexOf("#");
+      if (hash <= 0) continue;
+      const other = need.slice(0, hash);
+      if (out.has(other)) continue;
+      const f = await api.files.read(project.id, other).catch(() => null);
+      if (f)
+        out.set(
+          other,
+          new Set(
+            parsePlan(f.text)
+              .steps.filter((s) => s.status === "x" && s.number)
+              .map((s) => s.number!),
+          ),
+        );
+    }
+    return out;
   }
 
   #decide(run: PlanRun, d: Omit<DecisionRecord, "at">): void {

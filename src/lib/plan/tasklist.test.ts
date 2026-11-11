@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { findTaskLists, nextStatus, parsePlan, setStepModel, setStepStatus, setStepTitle } from "./tasklist";
+import {
+  findTaskLists,
+  nextStatus,
+  parsePlan,
+  setStepModel,
+  setStepStatus,
+  setStepTitle,
+  setStepSkipped,
+} from "./tasklist";
 
 const SAMPLE = [
   "# Work map",
@@ -132,5 +140,33 @@ describe("findTaskLists", () => {
         "QLOPY-CORE-UPGRADE-PLAN.md",
       ]),
     ).toEqual(["DEVELOPMENT-TASKLIST.md", "QLOPY-CORE-UPGRADE-PLAN.md", "docs/ROADMAP.md", "notes/todo-list.md"]);
+  });
+});
+
+describe("needs and skipped lines (24f)", () => {
+  const text = [
+    "## Steps",
+    "- [ ] **1. First**",
+    "- [ ] **2. Second**",
+    "  - do it",
+    "  - Needs: 1, docs/OTHER.md#4",
+    "- [ ] **3. Third**",
+    "",
+  ].join("\n");
+
+  it("reads what a step needs", () => {
+    const steps = parsePlan(text).steps;
+    expect(steps[1].needs).toEqual(["1", "docs/OTHER.md#4"]);
+    expect(steps[0].needs).toEqual([]);
+  });
+
+  it("writes, replaces and removes the skipped line, leaving the rest", () => {
+    const once = setStepSkipped(text, 2, "needs step 1, which is not done", "Second");
+    expect(once).toContain(
+      "  - Needs: 1, docs/OTHER.md#4\n  - Skipped: needs step 1, which is not done\n- [ ] **3. Third**",
+    );
+    const twice = setStepSkipped(once, 2, "blocked", "Second");
+    expect(twice.match(/Skipped:/g)).toHaveLength(1);
+    expect(setStepSkipped(twice, 2, null, "Second")).toBe(text);
   });
 });

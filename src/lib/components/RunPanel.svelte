@@ -11,7 +11,7 @@
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import { freeSavings, isFree, DECIDER } from "$lib/plan/runner";
+  import { freeSavings, isFree, DECIDER, parseRanges, type PauseMode } from "$lib/plan/runner";
 
   interface Props {
     project: Project;
@@ -28,6 +28,10 @@
   let openSteps = $derived(plan.steps.filter((s) => s.status !== "x" && s.status !== "!"));
   let fromLine = $state(-1);
   let onlyOne = $state(false);
+  /** Which steps by number ("2-6, 10-15"); empty: from the start step to the end (24f). */
+  let ranges = $state("");
+  let rangeError = $derived(parseRanges(ranges).error);
+  let pause = $state<PauseMode>("never");
   let mode = $state("");
   let budget = $state(1);
   let perModel = $state(2);
@@ -62,6 +66,8 @@
       await runner.start(project, file, {
         fromLine: Math.max(0, fromLine),
         onlyOne,
+        ranges: ranges.trim(),
+        pause,
         mode,
         budgetUsd: Math.max(0, Number(budget) || 0),
         attemptsPerModel: Math.min(3, Math.max(1, Math.round(perModel))),
@@ -123,6 +129,25 @@
         </select>
       </label>
     </div>
+    <div class="grid">
+      <label title="Step numbers, for example 2-6, 10-15. Empty: from the start step to the end.">
+        Steps (empty = from the start step on)
+        <input type="text" placeholder="for example 2-6, 10-15" bind:value={ranges} disabled={onlyOne} />
+      </label>
+      <label>
+        Stop for me
+        <select bind:value={pause}>
+          <option value="never">Never: run to the end, skip what cannot be done (with why)</option>
+          <option value="decisions">Only where a decision or my input is needed</option>
+          <option value="step">After every step</option>
+        </select>
+      </label>
+    </div>
+    {#if rangeError}<p class="hint warn">{rangeError}</p>{/if}
+    <p class="hint">
+      A step can say what it needs first ("- Needs: 3, 5" or "- Needs: OTHER-PLAN.md#4"). When that is not done, the run
+      skips it, writes why under it ("- Skipped: ..."), and carries on.
+    </p>
     <label class="check"><input type="checkbox" bind:checked={onlyOne} /> Only this one step</label>
     <label
       class="check"
@@ -163,7 +188,9 @@
     {#if mode === "default"}<p class="hint warn">In Manual mode the run waits for your approval at every edit.</p>{/if}
     <div class="row">
       <span class="spacer"></span>
-      <button type="submit" class="primary" disabled={openSteps.length === 0}><Play size={13} /> Start</button>
+      <button type="submit" class="primary" disabled={openSteps.length === 0 || !!rangeError}
+        ><Play size={13} /> Start</button
+      >
     </div>
   </form>
 {/if}

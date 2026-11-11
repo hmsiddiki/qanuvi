@@ -227,6 +227,8 @@ export const NEEDS_STRONGER = "NEEDS_STRONGER_MODEL";
  * Free decides, paid works, with the paid agent on top (24e): the note added to the message, so the paid agent sees
  * the free model's pick and can overrule it before doing the work.
  */
+export const OVERRULE_MARK = "\n\n(Qanuvi: a free model chose";
+
 export function overruleNote(model: string, why: string): string {
   return [
     "",
@@ -234,6 +236,12 @@ export function overruleNote(model: string, why: string): string {
     `(Qanuvi: a free model chose ${model} for this message${why ? ` because: ${why}` : ""}. If this message needs a`,
     `stronger model to be done well, answer only "${NEEDS_STRONGER}: <the reason>" and do nothing else.)`,
   ].join("\n");
+}
+
+/** What the user wrote, without the note Qanuvi added for the paid agent. */
+export function withoutOverruleNote(text: string): string {
+  const i = text.indexOf(OVERRULE_MARK);
+  return i >= 0 ? text.slice(0, i) : text;
 }
 
 /** The paid agent's overrule, if its answer is one: the reason, else null. */

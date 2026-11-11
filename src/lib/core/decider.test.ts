@@ -12,6 +12,7 @@ import {
   stepDiff,
   overruleIn,
   overruleNote,
+  withoutOverruleNote,
   strongerModel,
   type StepBrief,
 } from "./decider";
@@ -118,5 +119,12 @@ describe("the paid agent overrules a free pick", () => {
     const models = [{ id: "fable" }, { id: "opus" }, { id: "sonnet" }, { id: "haiku" }];
     expect(strongerModel(models, "haiku")).toBe("sonnet");
     expect(strongerModel(models, "fable")).toBe("fable");
+  });
+});
+
+describe("the note for the paid agent stays out of sight", () => {
+  it("is cut from what the user wrote", () => {
+    expect(withoutOverruleNote("Is it sorted?" + overruleNote("Haiku 5.5", "short"))).toBe("Is it sorted?");
+    expect(withoutOverruleNote("Plain text")).toBe("Plain text");
   });
 });

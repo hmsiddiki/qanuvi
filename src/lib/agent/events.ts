@@ -4,6 +4,8 @@
  * result line with time, tokens and cost.
  */
 
+import { withoutOverruleNote } from "$lib/core/decider";
+
 export type Item =
   | { kind: "user"; id: string; text: string }
   /** live: text still being written (replaced by the whole message when it arrives). */
@@ -122,7 +124,7 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
 
   // "qanuvi_*": sessions saved before the app was renamed.
   if (type === "qanuvi_user" || type === "qanuvi_user") {
-    out.push({ kind: "user", id: `u${seq}`, text: str(msg.text) });
+    out.push({ kind: "user", id: `u${seq}`, text: withoutOverruleNote(str(msg.text)) });
   } else if (type === "qanuvi_permission" || type === "qanuvi_permission") {
     const i = out.findIndex((x) => x.kind === "approval" && x.id === str(msg.request_id));
     if (i >= 0)

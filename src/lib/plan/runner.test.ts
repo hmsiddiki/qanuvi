@@ -12,6 +12,10 @@ import {
   stepOutcome,
   stepPrompt,
   stepsToRun,
+  parseRanges,
+  unmetNeed,
+  runSummary,
+  type StepRun,
 } from "./runner";
 
 const PLAN = [
@@ -183,5 +187,55 @@ describe("runTotals with the decider", () => {
     });
     expect(totals.costUsd).toBeCloseTo(0.03);
     expect(totals.byModel.get("decider:claude-sonnet-5-5")).toMatchObject({ attempts: 2 });
+  });
+});
+
+describe("runs that finish by themselves (24f)", () => {
+  it("reads ranges and says what it could not read", () => {
+    expect(parseRanges("2-6, 10-15, 20")).toEqual({
+      ranges: [
+        [2, 6],
+        [10, 15],
+        [20, 20],
+      ],
+      error: "",
+    });
+    expect(parseRanges("6-2").ranges).toEqual([[2, 6]]);
+    expect(parseRanges("2-6, x").error).toContain("x");
+    expect(parseRanges("").ranges).toEqual([]);
+  });
+
+  it("runs only the steps in the ranges", () => {
+    const plan = parsePlan(
+      [
+        "- [ ] **1. A**",
+        "- [ ] **2. B**",
+        "- [x] **3. C**",
+        "- [ ] **4. D**",
+        "- [ ] **10b. E**",
+        "- [ ] **F**",
+        "",
+      ].join("\n"),
+    );
+    const picked = stepsToRun(plan.steps, 0, false, parseRanges("2-4, 10").ranges).map((s) => s.number);
+    expect(picked).toEqual(["2", "4", "10b"]);
+  });
+
+  it("finds the first need that is not done", () => {
+    const done = new Set(["1", "2"]);
+    expect(unmetNeed(["1", "2"], done)).toBeNull();
+    expect(unmetNeed(["1", "3"], done)).toBe("needs step 3, which is not done");
+    expect(unmetNeed(["docs/B.md#4"], done)).toContain("could not be read");
+    expect(unmetNeed(["docs/B.md#4"], done, new Map([["docs/B.md", new Set(["4"])]]))).toBeNull();
+  });
+
+  it("reports what was done and what was left, with why", () => {
+    const s = (number: string, status: StepRun["status"], reason?: string) =>
+      ({ line: 0, number, title: number, attempts: [], status, reason }) as StepRun;
+    expect(
+      runSummary({
+        steps: [s("1", "done"), s("2", "blocked", "needs a key"), s("3", "skipped", "needs step 2, which is not done")],
+      }),
+    ).toBe("1 done · 1 skipped: step 3 (needs step 2, which is not done) · 1 blocked: step 2 (needs a key)");
   });
 });

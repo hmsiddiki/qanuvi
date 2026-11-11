@@ -29,7 +29,19 @@ export interface RunOptions {
    * local models Qanuvi core picks; the paid agent takes over only when that attempt does not finish the step.
    */
   freeFirst?: boolean;
+  /** Which steps by number, for example "2-6, 10-15"; empty: all open steps from `fromLine` (24f). */
+  ranges?: string;
+  /** When the run stops for the user (24f); missing: "decisions", as before. */
+  pause?: PauseMode;
 }
+
+/**
+ * When a run stops for the user (24f):
+ * - "never": runs to the end; a blocked step, or one no model could finish, is skipped with its reason.
+ * - "decisions": stops at a blocked step or one no model could finish.
+ * - "step": stops after every step too.
+ */
+export type PauseMode = "never" | "decisions" | "step";
 
 /** The "model" of an attempt on Qanuvi's own agent (Qanuvi core picks among the free and local models). */
 export const FREE_MODEL = "qanuvi:auto";
@@ -67,6 +79,8 @@ export interface StepRun {
   choice?: string;
   /** The planner rewrote this step into the steps named here. */
   replacedBy?: string;
+  /** Why the run skipped, or could not finish, the step (24f). */
+  reason?: string;
 }
 
 export interface PlanRun {
@@ -90,9 +104,75 @@ export interface PlanRun {
 export const DECIDER = "decider:";
 
 /** The steps a run covers: open steps (not done, not blocked) from the chosen one on. */
-export function stepsToRun(steps: Step[], fromLine: number, onlyOne: boolean): Step[] {
-  const from = steps.filter((s) => s.line >= fromLine && s.status !== "x" && s.status !== "!");
+export function stepsToRun(steps: Step[], fromLine: number, onlyOne: boolean, ranges: [number, number][] = []): Step[] {
+  const open = steps.filter((s) => s.status !== "x" && s.status !== "!");
+  if (ranges.length && !onlyOne) return open.filter((s) => inRanges(s.number, ranges));
+  const from = open.filter((s) => s.line >= fromLine);
   return onlyOne ? from.filter((s) => s.line === fromLine).slice(0, 1) : from;
+}
+
+/** Reads step ranges such as "2-6, 10-15, 20". Unreadable parts are reported, not guessed. */
+export function parseRanges(text: string | undefined): { ranges: [number, number][]; error: string } {
+  const ranges: [number, number][] = [];
+  const bad: string[] = [];
+  for (const part of (text ?? "")
+    .split(/[,;]+/)
+    .map((p) => p.trim())
+    .filter(Boolean)) {
+    const m = /^(\d+)\s*(?:-|–|to)\s*(\d+)$/i.exec(part) ?? /^(\d+)$/.exec(part);
+    if (!m) {
+      bad.push(part);
+      continue;
+    }
+    const a = Number(m[1]);
+    const b = Number(m[2] ?? m[1]);
+    ranges.push([Math.min(a, b), Math.max(a, b)]);
+  }
+  return { ranges, error: bad.length ? `Not a step range: ${bad.join(", ")}` : "" };
+}
+
+/** Whether a step number (such as "12" or "12b") falls in the ranges. Steps without a number never do. */
+export function inRanges(number: string | null, ranges: [number, number][]): boolean {
+  const n = number ? parseInt(number, 10) : NaN;
+  return !Number.isNaN(n) && ranges.some(([a, b]) => n >= a && n <= b);
+}
+
+/**
+ * The first thing a step needs that is not done, as a reason to skip it; null when all is done (24f). `done` holds
+ * this plan's finished step numbers; `others` the finished numbers of other plans by file (missing: not read).
+ */
+export function unmetNeed(
+  needs: string[] | undefined,
+  done: Set<string>,
+  others: Map<string, Set<string>> = new Map(),
+): string | null {
+  for (const need of needs ?? []) {
+    const hash = need.lastIndexOf("#");
+    if (hash > 0) {
+      const file = need.slice(0, hash);
+      const num = need.slice(hash + 1);
+      const there = others.get(file);
+      if (!there) return `needs step ${num} of ${file}, which could not be read`;
+      if (!there.has(num)) return `needs step ${num} of ${file}, which is not done`;
+    } else if (!done.has(need)) return `needs step ${need}, which is not done`;
+  }
+  return null;
+}
+
+/** The end-of-run report (24f): what was done, and what was skipped or left, with why. */
+export function runSummary(run: Pick<PlanRun, "steps">): string {
+  const done = run.steps.filter((s) => s.status === "done").length;
+  const left = run.steps.filter((s) => s.status === "skipped" || s.status === "blocked" || s.status === "failed");
+  const name = (s: StepRun) => (s.number ? `step ${s.number}` : s.title);
+  const parts = [`${done} done`];
+  for (const kind of ["skipped", "blocked", "failed"] as const) {
+    const these = left.filter((s) => s.status === kind);
+    if (these.length)
+      parts.push(
+        `${these.length} ${kind}: ${these.map((s) => `${name(s)}${s.reason ? ` (${s.reason})` : ""}`).join("; ")}`,
+      );
+  }
+  return parts.join(" · ");
 }
 
 /** The model a step starts on: its own "- Model:" line, else the agent's default. */
