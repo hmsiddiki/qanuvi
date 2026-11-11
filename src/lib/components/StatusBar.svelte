@@ -21,7 +21,7 @@
   import { memoryDisk } from "$lib/stores/memoryDisk.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings } from "$lib/stores/settings.svelte";
-  import { ui, type WorkView } from "$lib/stores/ui.svelte";
+  import { ui, type Place } from "$lib/stores/ui.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { formatCost } from "$lib/agent/events";
   import { monthStart } from "$lib/plan/routing";
@@ -32,7 +32,7 @@
   let git = $state<GitStatus | null>(null);
   let monthCost = $state<number | null>(null);
 
-  function show(view: WorkView) {
+  function show(view: Place) {
     menu = false;
     if (!layout.state.workVisible) layout.toggleWork();
     ui.show(view);

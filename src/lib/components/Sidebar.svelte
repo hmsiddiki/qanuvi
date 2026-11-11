@@ -44,18 +44,7 @@
   function navigate(id: string) {
     ui.section = id;
     if (id === "plans") ui.show("plan");
-    if (id === "agents") {
-      if (!layout.state.workVisible) layout.toggleWork();
-      ui.show("agents");
-    }
-    if (id === "memory") {
-      if (!layout.state.workVisible) layout.toggleWork();
-      ui.show("memory");
-    }
-    if (id === "servers") {
-      if (!layout.state.workVisible) layout.toggleWork();
-      ui.show("servers");
-    }
+    if (id === "agents" || id === "memory" || id === "servers") ui.openSettings(id);
     if (id === "inbox") {
       if (!layout.state.workVisible) layout.toggleWork();
       ui.show("inbox");
@@ -235,6 +224,16 @@
   {/if}
 
   <div class="bottom">
+    <button
+      type="button"
+      class="item"
+      class:current={!!ui.settings}
+      title={collapsed ? "Settings" : undefined}
+      onclick={() => (ui.settings ? ui.closeSettings() : ui.openSettings())}
+    >
+      <Settings2 size={16} />
+      {#if !collapsed}<span>Settings</span>{/if}
+    </button>
     <button
       type="button"
       class="item"

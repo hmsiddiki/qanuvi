@@ -13,6 +13,9 @@
   import OwnModelsPanel from "./OwnModelsPanel.svelte";
   import TeamPanel from "./TeamPanel.svelte";
 
+  /** In the settings page, Team and Models and providers are tabs of their own. */
+  let { team = true, ownModels = true }: { team?: boolean; ownModels?: boolean } = $props();
+
   let files = $state<Record<string, AgentConfigFile[]>>({});
   let error = $state("");
 
@@ -28,7 +31,7 @@
 
   function openConfig(p: AgentProvider, f: AgentConfigFile) {
     editor.openConfig(p.id, f.id, `${f.label} · ${p.name}`, f.scope === "user" ? null : projects.currentId);
-    ui.view = "editor";
+    ui.show("editor");
   }
 
   const available = (p: AgentProvider) =>
@@ -55,7 +58,7 @@
   </label>
   {#if error}<p class="error">{error}</p>{/if}
 
-  {#if settings.value.ai}<TeamPanel />{/if}
+  {#if settings.value.ai && team}<TeamPanel />{/if}
   {#each PROVIDERS as p (p.id)}
     {@const a = settings.agent(p.id)}
     <section class="card">
@@ -132,8 +135,13 @@
         {/if}
       </div>
 
-      {#if p.id === "qanuvi"}
+      {#if p.id === "qanuvi" && ownModels}
         <OwnModelsPanel />
+      {:else if p.id === "qanuvi"}
+        <p class="note">
+          Its models, keys and setup are in
+          <button type="button" class="link" onclick={() => ui.openSettings("models")}>Models and providers</button>.
+        </p>
       {:else}
         <label class="check">
           <input

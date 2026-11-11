@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SettingsView from "$lib/components/SettingsView.svelte";
   import { startWatch } from "$lib/stores/watch.svelte";
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import { onMount } from "svelte";
@@ -90,7 +91,7 @@
       if (projects.currentId !== id) return;
       if (w.active && editorStore.tabs.some((x) => x.key === tabKey(id, w.active!)))
         editorStore.activate(tabKey(id, w.active));
-      if (w.view) ui.view = w.view;
+      if (w.view) ui.show(w.view);
       if (terminals.forProject(id).length === 0) for (const shell of w.terminals) terminals.open(id, shell);
       workspace.restored.add(id);
     }
@@ -198,6 +199,7 @@
       {/if}
 
       <div class="panes" class:no-sidebar={!s.sidebarVisible}>
+        {#if ui.settings}<SettingsView />{/if}
         {#if showAgent}
           <div class="agent" class:fill={agentOnly} style:width={agentOnly ? undefined : `${s.agentWidth}px`}>
             <AgentPane />
@@ -256,6 +258,7 @@
   }
 
   .panes {
+    position: relative;
     flex: 1;
     min-width: 0;
     display: flex;

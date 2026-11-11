@@ -1,6 +1,19 @@
 /** What the work pane shows and which overlays are open. */
-export type WorkView =
-  "editor" | "preview" | "plan" | "search" | "diff" | "agents" | "servers" | "memory" | "account" | "inbox";
+export type WorkView = "editor" | "preview" | "plan" | "search" | "diff" | "inbox";
+
+/** Where a link can lead: a view of the work area, or a part of the settings page. */
+export type Place = WorkView | "agents" | "servers" | "memory" | "account";
+
+/** The parts of the settings page (15h). */
+export type SettingsTab = "agents" | "models" | "team" | "servers" | "memory" | "account";
+
+/** Views that used to be pages in the work area: they open the settings page now. */
+const SETTINGS_VIEWS: Record<string, SettingsTab> = {
+  agents: "agents",
+  servers: "servers",
+  memory: "memory",
+  account: "account",
+};
 
 class UiStore {
   view = $state<WorkView>("editor");
@@ -15,8 +28,26 @@ class UiStore {
   focusSearch = $state(0);
   section = $state("home");
 
-  show(view: WorkView): void {
-    this.view = view;
+  /** The settings page, open at this part; null: closed. */
+  settings = $state<SettingsTab | null>(null);
+
+  /** Shows a view of the work area; the former settings views open the settings page instead. */
+  show(view: Place): void {
+    const tab = SETTINGS_VIEWS[view];
+    if (tab) {
+      this.openSettings(tab);
+      return;
+    }
+    this.settings = null;
+    this.view = view as WorkView;
+  }
+
+  openSettings(tab: SettingsTab = "agents"): void {
+    this.settings = tab;
+  }
+
+  closeSettings(): void {
+    this.settings = null;
   }
 }
 

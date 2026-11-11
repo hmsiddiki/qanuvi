@@ -2,7 +2,7 @@
  * The Inbox (24f, 15f): what Qanuvi has to tell the user when they come back — plan run reports, sign-ins that need
  * renewing, newer knowledge to look at. Kept on this computer (the last 100), newest first.
  */
-import type { WorkView } from "./ui.svelte";
+import type { Place } from "./ui.svelte";
 
 const KEY = "qanuvi.inbox.v1";
 const MAX = 100;
@@ -15,7 +15,7 @@ export interface InboxItem {
   text: string;
   read: boolean;
   /** Where the item's button leads. */
-  open?: { label: string; view: WorkView; projectId?: string };
+  open?: { label: string; view: Place; projectId?: string };
   /** Items with the same key replace each other (the newest stays), so a lasting problem is listed once. */
   key?: string;
 }

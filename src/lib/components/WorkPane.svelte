@@ -20,14 +20,10 @@
   import PreviewTab from "./PreviewTab.svelte";
   import PlanView from "./PlanView.svelte";
   import SourceControl from "./SourceControl.svelte";
-  import MastersView from "./MastersView.svelte";
-  import MemoryView from "./MemoryView.svelte";
-  import AccountView from "./AccountView.svelte";
   import UserRound from "@lucide/svelte/icons/user-round";
   import Brain from "@lucide/svelte/icons/brain";
   import Server from "@lucide/svelte/icons/server";
   import TerminalView from "./TerminalView.svelte";
-  import AgentsView from "./AgentsView.svelte";
   import Bot from "@lucide/svelte/icons/bot";
   import { layout } from "$lib/layout/layout.svelte";
   import { platform } from "$lib/platform.svelte";
@@ -170,27 +166,7 @@
               <span>{f.label}</span>
             </button>
           {/each}
-          {#if ui.view === "agents"}
-            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
-              <Bot size={13} />
-              <span>Agents</span>
-            </button>
-          {:else if ui.view === "servers"}
-            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
-              <Server size={13} />
-              <span>Servers</span>
-            </button>
-          {:else if ui.view === "memory"}
-            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
-              <Brain size={13} />
-              <span>Memory</span>
-            </button>
-          {:else if ui.view === "account"}
-            <button type="button" role="tab" class="tab fixed active" aria-selected="true">
-              <UserRound size={13} />
-              <span>Account</span>
-            </button>
-          {:else if ui.view === "inbox"}
+          {#if ui.view === "inbox"}
             <button type="button" role="tab" class="tab fixed active" aria-selected="true">
               <InboxIcon size={13} />
               <span>Inbox</span>
@@ -200,15 +176,7 @@
 
         <div class="content" role="tabpanel">
           <!-- Pages of the whole app come first: they need no project. -->
-          {#if ui.view === "agents"}
-            <AgentsView />
-          {:else if ui.view === "servers"}
-            <MastersView />
-          {:else if ui.view === "memory"}
-            <MemoryView />
-          {:else if ui.view === "account"}
-            <AccountView />
-          {:else if ui.view === "inbox"}
+          {#if ui.view === "inbox"}
             <InboxView />
           {:else if !project}
             <div class="placeholder">

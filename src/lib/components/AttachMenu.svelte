@@ -140,7 +140,7 @@
   }
 
   .attach > button:hover:not(:disabled) {
-    color: var(--qx-text-primary);
+    color: var(--qx-text);
   }
 
   .menu {
@@ -165,7 +165,7 @@
     border: none;
     border-radius: 6px;
     background: transparent;
-    color: var(--qx-text-primary);
+    color: var(--qx-text);
     font: inherit;
     font-size: 12.5px;
     text-align: left;
@@ -182,8 +182,8 @@
     padding: 6px 8px;
     border: 1px solid var(--qx-border);
     border-radius: 6px;
-    background: var(--qx-bg);
-    color: var(--qx-text-primary);
+    background: var(--qx-bg-window);
+    color: var(--qx-text);
     font: inherit;
     font-size: 12.5px;
   }

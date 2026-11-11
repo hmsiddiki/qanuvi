@@ -585,35 +585,29 @@ runs on or off; with it off nothing is sent anywhere.
   current logo (checked by colour); Windows' icon cache for the program's path still shows the first logo. An installed
   build (new path) should be right; check after the release, and whether `ie4uinit -ClearIconCache` or a sign-out
   clears it.
-- [ ] **15h. Qanuvi's own layout, with presets (owner, 2026-11-11)**: settings must not sit among the code tabs; the
+- [-] **15h. Qanuvi's own layout, with presets (owner, 2026-11-11)**: settings must not sit among the code tabs; the
   work area holds project work only. Qanuvi keeps a look of its own (a brand), clean like VS Code but not a copy, and a
-  one-click preset gives VS Code users the layout they know.
-  - Default layout ("Qanuvi"): assistant first.
-    - Left: the labelled sidebar as now (Home, Inbox, Projects, Plans, Memory; projects and sessions), a gear at its
-      foot for Settings.
-    - Centre: the conversation (messages, approval cards, decisions, the + menu).
-    - Right: the work area; its tabs are only files and Preview.
-    - Bottom: terminal and status bar.
-  - Project panel on the work area's left edge (owner: like VS Code's side panel, where nothing is there to be ignored
-    in a coding app), opened and closed with one button, resizable. A small icon row at its top switches the view:
-    Explorer, Search, Git (Plan steps when a plan is open). The Explorer has collapsible sections that can be resized,
-    reordered by dragging and hidden:
-    - Open editors (open files, unsaved dot, close).
-    - Files: the project tree with new file / new folder / refresh / collapse all.
-    - Outline: the symbols of the current file (from Qanuvi's code index).
-    - Timeline: the current file's history: commits, saves, and Qanuvi's own entries for changes an agent made (which
-      session, which model; opens that session). This is where Qanuvi differs: the panel shows the agents' work too.
-    - Qanuvi's own sections as options: "Touched in this session" (files the current session read or changed) and the
-      current plan's steps.
-  - Settings page (decided: option A): opens over the main area; categories on the left (Agents, Models and
-    providers, Team, Servers, Account, Appearance, Layout) and a search box; x or Esc returns to where the user was.
-    The sidebar's Agents and Servers entries and the gear open it at the right category; the setup wizard runs from it.
-  - Inbox, Memory and Plans become full pages in the main area (like Home), not work-area tabs.
-  - Presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation narrower),
-    "VS Code-like" (icon bar on the far left, Explorer/Search/Git in a left side panel, editor centre, conversation on
-    the right like a chat side bar, terminal bottom). Pages (Settings, Inbox, Memory, Plans) work the same in all.
-  - Order: 1. Settings page. 2. Work area tabs = files + Preview, and the project panel (Explorer sections, Search,
-    Git). 3. Inbox, Memory, Plans as pages. 4. Presets. Each step tested in the app and committed on its own.
+  one-click preset gives VS Code users the layout they know. Few pages (owner): one settings page with tabs, the Inbox
+  as a drop-down, Plan as a work-area tab.
+  - Default layout ("Qanuvi"): the labelled sidebar (Home, Inbox, Projects, Plans; projects and sessions; Settings at
+    its foot), the conversation in the centre, the work area on the right (tabs: files, Preview, Plan), terminal and
+    status bar at the bottom.
+  - [x] Step 1, the settings page (2026-11-11): one page over the main area (the panes stay underneath, terminals keep
+    running), tabs on the left: Agents, Models and providers, Team, Servers, Memory, Account; a search box that narrows
+    the tabs by what they hold (Enter opens the first); x or Esc closes it. Opened by Settings at the sidebar's foot,
+    and by the sidebar's Agents, Memory and Servers and every former link to those pages (status bar, Inbox, agent
+    pane), at the right tab. Opening a configuration file from it closes it and shows the file as an editor tab. Live:
+    every tab, search ("omniroute" -> Models and providers), Esc, the config file and the sidebar entries checked.
+  - [ ] Step 2: the work area's tabs are files, Preview and Plan; the project panel on its left edge (owner: like VS
+    Code's side panel, where nothing is there to be ignored in a coding app), opened and closed with one button,
+    resizable, with an icon row switching Explorer, Search and Git. The Explorer has collapsible sections that can be
+    resized, reordered by dragging and hidden: Open editors; Files (tree with new file / new folder / refresh /
+    collapse all); Outline (symbols of the current file, from the code index); Timeline (the file's commits and
+    saves, plus Qanuvi's entries for changes an agent made: which session and model, opening that session); as
+    options, "Touched in this session" and the current plan's steps. The Inbox becomes a drop-down from the sidebar.
+  - [ ] Step 3: presets in the layout button (one click): "Qanuvi" (default), "Coding" (code larger, conversation
+    narrower), "VS Code-like" (icon bar on the far left, Explorer/Search/Git in a left side panel, editor centre,
+    conversation on the right like a chat side bar, terminal bottom); plus Appearance and Layout tabs in Settings.
 - [ ] **15d. Own right-click menus** (added by the owner 2026-11-10)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
