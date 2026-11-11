@@ -967,8 +967,25 @@ runs on or off; with it off nothing is sent anywhere.
     big for a home PC).
   - Small (2026-11-11): sign-in rows show the account to sign in with; "Test" on a sign-in connection tests one of its
     models (OmniRoute cannot test those and said "SKIP", which used to read as a pass).
-- [ ] **Release for self-development (owner, 2026-11-11)**: after 24b, a release build (installer) the owner uses to
-  develop the rest of Qanuvi with Qanuvi itself.
+- [x] **Release for self-development (owner, 2026-11-11)**: after 24b, a release build (installer) the owner uses to
+  develop the rest of Qanuvi with Qanuvi itself. Built 2026-11-11: Qanuvi_0.1.0_x64-setup.exe (NSIS only, 5.6 MB;
+  `npx tauri build`, output in src-tauri/target/release/bundle/nsis). Code on github.com/hmsiddiki/qanuvi.
+- [ ] **24f. Plan runs that finish by themselves (owner, 2026-11-11)**: Qanuvi becomes an assistant with its own
+  task runner that keeps working on what the owner gives it, even when the owner is away. Today a run goes from the
+  chosen step to the end without pausing, but the whole run stops at the first blocked step, at the budget, or when a
+  step fails on every model (after the planner's rewrite).
+  - How it pauses (the user picks): never (runs to the end), after every step, or only where a decision or the user's
+    input is needed.
+  - Which steps: all open ones, from a step, or ranges such as "2-6, 10-15".
+  - Dependencies: a step can say what it needs ("- Needs: 3", or a step in another plan). A step whose need is not
+    done, or that is blocked, is skipped with the reason written under it, and the run carries on with the rest
+    (configurable: stop instead).
+  - Every step finishes with its checks: the project's tests and the decider's review (24b/24e); what fails goes to
+    a stronger model, then to the paid agent, then is skipped with the reason.
+  - At the end: a report (done, skipped and why, blocked and why, cost) in the run panel and the Inbox; the skipped
+    and blocked steps are easy to run again once their reason is gone.
+  - Later: a task queue for the assistant (tasks the owner assigns, run one after another, also on a remote machine
+    through the masters), with the paid agent on top as the monitor (24e).
 - [x] **24b. The decider (owner's design 2026-11-10, revised 2026-11-11; built and tested 2026-11-11)**: one model takes the
   decisions (what kind of job, which model does it, when to hand over, whether the result is good enough), the others
   do the work.
