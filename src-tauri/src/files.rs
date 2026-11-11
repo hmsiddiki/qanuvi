@@ -1,0 +1,515 @@
+//! Reading, writing, listing and searching files inside a project. Every path is relative to the project folder and
+//! is refused if it would lead outside it.
+
+use ignore::WalkBuilder;
+use regex::RegexBuilder;
+use serde::Serialize;
+use std::hash::{Hash, Hasher};
+use std::io::Read;
+use std::path::{Component, Path, PathBuf};
+
+/// Files bigger than this are not opened in the editor.
+pub const MAX_EDIT_BYTES: u64 = 10 * 1024 * 1024;
+/// Files bigger than this are skipped by project search.
+pub const MAX_SEARCH_BYTES: u64 = 2 * 1024 * 1024;
+pub const MAX_LISTED_FILES: usize = 50_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Entry {
+    pub name: String,
+    /// Path from the project folder, always with `/`.
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    /// Left out by .gitignore and similar files (shown greyed).
+    pub ignored: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FileContent {
+    pub path: String,
+    pub text: String,
+    /// Fingerprint of the bytes on disk, used to notice changes made by someone else before saving.
+    pub hash: String,
+    pub size: u64,
+    pub binary: bool,
+    pub too_large: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SearchMatch {
+    pub path: String,
+    /// 1-based line number.
+    pub line: usize,
+    /// 1-based column of the match, in characters.
+    pub column: usize,
+    /// The line, cut to 300 characters around the match.
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SearchResult {
+    pub matches: Vec<SearchMatch>,
+    pub files_searched: usize,
+    pub truncated: bool,
+}
+
+pub fn fingerprint(bytes: &[u8]) -> String {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut h);
+    format!("{:016x}-{}", h.finish(), bytes.len())
+}
+
+fn rel_string(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// Turns a project-relative path into a real path inside the project, or refuses it.
+pub fn resolve(root: &Path, rel: &str) -> Result<PathBuf, String> {
+    let rel_path = Path::new(rel);
+    for c in rel_path.components() {
+        match c {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(format!("The path {rel} is outside the project.")),
+        }
+    }
+    let root = root
+        .canonicalize()
+        .map_err(|_| "The project folder cannot be found.".to_string())?;
+    let joined = root.join(rel_path);
+    // Follow links: a link inside the project that points outside it is refused too.
+    let check = if joined.exists() {
+        joined.canonicalize().map_err(|e| e.to_string())?
+    } else {
+        let parent = joined.parent().ok_or("Invalid path.")?;
+        let parent = parent
+            .canonicalize()
+            .map_err(|_| format!("The folder for {rel} does not exist."))?;
+        parent.join(joined.file_name().ok_or("Invalid path.")?)
+    };
+    if !check.starts_with(&root) {
+        return Err(format!("The path {rel} is outside the project."));
+    }
+    Ok(joined)
+}
+
+fn walker(dir: &Path) -> WalkBuilder {
+    let mut b = WalkBuilder::new(dir);
+    b.hidden(false)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .require_git(false)
+        .ignore(true)
+        .parents(true)
+        .filter_entry(|e| e.file_name() != ".git");
+    b
+}
+
+/// The entries of one folder: folders first, then files, by name. Ignored entries are listed too (greyed in the tree,
+/// as in VS Code), except the `.git` folder.
+pub fn list_dir(root: &Path, rel: &str) -> Result<Vec<Entry>, String> {
+    let dir = resolve(root, rel)?;
+    if !dir.is_dir() {
+        return Err(format!("{rel} is not a folder."));
+    }
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    let dir_c = dir.canonicalize().map_err(|e| e.to_string())?;
+    let kept: std::collections::HashSet<std::ffi::OsString> = walker(&dir_c)
+        .max_depth(Some(1))
+        .build()
+        .flatten()
+        .filter(|e| e.depth() == 1)
+        .map(|e| e.file_name().to_os_string())
+        .collect();
+    let mut entries: Vec<Entry> = std::fs::read_dir(&dir_c)
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .filter(|e| e.file_name() != ".git")
+        .map(|e| {
+            let meta = e.metadata().ok();
+            Entry {
+                name: e.file_name().to_string_lossy().to_string(),
+                path: rel_string(&root_c, &e.path()),
+                is_dir: e.file_type().is_ok_and(|t| t.is_dir()),
+                size: meta.map(|m| m.len()).unwrap_or(0),
+                ignored: !kept.contains(&e.file_name()),
+            }
+        })
+        .collect();
+    entries.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+/// Every file in the project that is not ignored, for "Go to file".
+pub fn list_files(root: &Path) -> Result<(Vec<String>, bool), String> {
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut files = Vec::new();
+    for entry in walker(&root_c).build().flatten() {
+        if entry.file_type().is_some_and(|t| t.is_file()) {
+            if files.len() >= MAX_LISTED_FILES {
+                return Ok((files, true));
+            }
+            files.push(rel_string(&root_c, entry.path()));
+        }
+    }
+    files.sort();
+    Ok((files, false))
+}
+
+fn looks_binary(bytes: &[u8]) -> bool {
+    bytes.iter().take(8000).any(|b| *b == 0)
+}
+
+pub fn read_file(root: &Path, rel: &str) -> Result<FileContent, String> {
+    let path = resolve(root, rel)?;
+    let meta = std::fs::metadata(&path).map_err(|_| format!("{rel} cannot be found."))?;
+    if meta.is_dir() {
+        return Err(format!("{rel} is a folder."));
+    }
+    let size = meta.len();
+    if size > MAX_EDIT_BYTES {
+        return Ok(FileContent {
+            path: rel.into(),
+            text: String::new(),
+            hash: String::new(),
+            size,
+            binary: false,
+            too_large: true,
+        });
+    }
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let binary = looks_binary(&bytes);
+    Ok(FileContent {
+        path: rel.into(),
+        text: if binary {
+            String::new()
+        } else {
+            String::from_utf8_lossy(&bytes).to_string()
+        },
+        hash: fingerprint(&bytes),
+        size,
+        binary,
+        too_large: false,
+    })
+}
+
+/// Saves a file. If `expected_hash` is given and the file on disk changed since it was read, nothing is written.
+/// The new content is written to a temporary file first and then moved into place, so a crash never leaves half a
+/// file.
+pub fn write_file(
+    root: &Path,
+    rel: &str,
+    text: &str,
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    let path = resolve(root, rel)?;
+    write_path(&path, rel, text, expected_hash)
+}
+
+/// Saves to a path that was already checked by the caller (see `write_file` for the rules).
+pub fn write_path(
+    path: &Path,
+    label: &str,
+    text: &str,
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    let rel = label;
+    if let Some(expected) = expected_hash.filter(|h| !h.is_empty())
+        && let Ok(current) = std::fs::read(path)
+        && fingerprint(&current) != expected
+    {
+        return Err(format!(
+            "{rel} was changed on disk after it was opened. Reload it or save again to overwrite."
+        ));
+    }
+    let dir = path.parent().ok_or("Invalid path.")?;
+    let tmp = dir.join(format!(
+        ".{}.qanuvi-{}.tmp",
+        path.file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default(),
+        std::process::id()
+    ));
+    std::fs::write(&tmp, text.as_bytes()).map_err(|e| e.to_string())?;
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e.to_string());
+    }
+    Ok(fingerprint(text.as_bytes()))
+}
+
+fn excerpt(line: &str, byte_start: usize) -> (String, usize) {
+    let column = line[..byte_start].chars().count() + 1;
+    let chars: Vec<char> = line.chars().collect();
+    if chars.len() <= 300 {
+        return (line.trim_end().to_string(), column);
+    }
+    let start = (column - 1).saturating_sub(100);
+    let text: String = chars.iter().skip(start).take(300).collect();
+    (text, column)
+}
+
+/// Searches every non-ignored text file. `regex` treats the query as a regular expression; otherwise it is plain
+/// text.
+pub fn search(
+    root: &Path,
+    query: &str,
+    regex: bool,
+    case_sensitive: bool,
+    limit: usize,
+) -> Result<SearchResult, String> {
+    if query.is_empty() {
+        return Ok(SearchResult {
+            matches: vec![],
+            files_searched: 0,
+            truncated: false,
+        });
+    }
+    let pattern = if regex {
+        query.to_string()
+    } else {
+        regex::escape(query)
+    };
+    let re = RegexBuilder::new(&pattern)
+        .case_insensitive(!case_sensitive)
+        .size_limit(1 << 20)
+        .build()
+        .map_err(|e| format!("The search pattern is not valid: {e}"))?;
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut matches = Vec::new();
+    let mut files_searched = 0;
+    for entry in walker(&root_c).build().flatten() {
+        if !entry.file_type().is_some_and(|t| t.is_file()) {
+            continue;
+        }
+        if entry.metadata().map(|m| m.len()).unwrap_or(0) > MAX_SEARCH_BYTES {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        if std::fs::File::open(entry.path())
+            .and_then(|mut f| f.read_to_end(&mut bytes))
+            .is_err()
+            || looks_binary(&bytes)
+        {
+            continue;
+        }
+        files_searched += 1;
+        let text = String::from_utf8_lossy(&bytes);
+        let rel = rel_string(&root_c, entry.path());
+        for (i, line) in text.lines().enumerate() {
+            if let Some(m) = re.find(line) {
+                let (text, column) = excerpt(line, m.start());
+                matches.push(SearchMatch {
+                    path: rel.clone(),
+                    line: i + 1,
+                    column,
+                    text,
+                });
+                if matches.len() >= limit {
+                    return Ok(SearchResult {
+                        matches,
+                        files_searched,
+                        truncated: true,
+                    });
+                }
+            }
+        }
+    }
+    Ok(SearchResult {
+        matches,
+        files_searched,
+        truncated: false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn project() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        fs::create_dir_all(p.join("src/inner")).unwrap();
+        fs::create_dir_all(p.join("node_modules/pkg")).unwrap();
+        fs::create_dir_all(p.join(".git")).unwrap();
+        fs::write(p.join(".gitignore"), "node_modules/\n*.log\n").unwrap();
+        fs::write(
+            p.join("src/main.php"),
+            "<?php\necho 'Hello';\n$price = 100;\n",
+        )
+        .unwrap();
+        fs::write(
+            p.join("src/inner/Cart.php"),
+            "class Cart { function price() {} }\n",
+        )
+        .unwrap();
+        fs::write(p.join("README.md"), "Price list\n").unwrap();
+        fs::write(p.join("debug.log"), "price price\n").unwrap();
+        fs::write(p.join("node_modules/pkg/index.js"), "price\n").unwrap();
+        fs::write(p.join("image.bin"), [0u8, 1, 2, 3, 0, 5]).unwrap();
+        fs::write(p.join(".git/config"), "x").unwrap();
+        dir
+    }
+
+    #[test]
+    fn refuses_paths_outside_the_project() {
+        let dir = project();
+        assert!(resolve(dir.path(), "../outside.txt").is_err());
+        assert!(resolve(dir.path(), "src/../../outside.txt").is_err());
+        assert!(resolve(dir.path(), "/etc/passwd").is_err());
+        assert!(resolve(dir.path(), r"C:\Windows\win.ini").is_err());
+        assert!(resolve(dir.path(), "src/main.php").is_ok());
+        assert!(
+            resolve(dir.path(), "src/new-file.txt").is_ok(),
+            "a new file in an existing folder is allowed"
+        );
+    }
+
+    #[test]
+    fn lists_a_folder_with_ignored_entries_marked_folders_first() {
+        let dir = project();
+        let names: Vec<(String, bool)> = list_dir(dir.path(), "")
+            .unwrap()
+            .into_iter()
+            .map(|e| (e.name, e.ignored))
+            .collect();
+        let want = [
+            ("node_modules", true),
+            ("src", false),
+            (".gitignore", false),
+            ("debug.log", true),
+            ("image.bin", false),
+            ("README.md", false),
+        ];
+        assert_eq!(
+            names,
+            want.iter()
+                .map(|(n, i)| (n.to_string(), *i))
+                .collect::<Vec<_>>(),
+            ".git is never listed"
+        );
+        let inner = list_dir(dir.path(), "src").unwrap();
+        assert_eq!(inner[0].path, "src/inner");
+        assert!(inner[0].is_dir);
+        assert_eq!(inner[1].path, "src/main.php");
+    }
+
+    #[test]
+    fn lists_all_files_for_go_to_file() {
+        let dir = project();
+        let (files, truncated) = list_files(dir.path()).unwrap();
+        assert!(!truncated);
+        assert_eq!(
+            files,
+            vec![
+                ".gitignore",
+                "README.md",
+                "image.bin",
+                "src/inner/Cart.php",
+                "src/main.php"
+            ]
+        );
+    }
+
+    #[test]
+    fn reads_text_and_recognises_binary_files() {
+        let dir = project();
+        let text = read_file(dir.path(), "src/main.php").unwrap();
+        assert!(text.text.contains("Hello"));
+        assert!(!text.binary);
+        assert_eq!(text.hash, fingerprint(text.text.as_bytes()));
+        let bin = read_file(dir.path(), "image.bin").unwrap();
+        assert!(bin.binary);
+        assert!(bin.text.is_empty());
+        assert!(read_file(dir.path(), "src").is_err());
+    }
+
+    #[test]
+    fn saves_and_refuses_to_overwrite_a_file_changed_on_disk() {
+        let dir = project();
+        let opened = read_file(dir.path(), "src/main.php").unwrap();
+        let new_hash = write_file(
+            dir.path(),
+            "src/main.php",
+            "<?php\n// edited\n",
+            Some(&opened.hash),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.path().join("src/main.php")).unwrap(),
+            "<?php\n// edited\n"
+        );
+
+        // Someone else changes the file; saving with the old fingerprint is refused.
+        fs::write(dir.path().join("src/main.php"), "changed elsewhere").unwrap();
+        let err = write_file(dir.path(), "src/main.php", "mine", Some(&new_hash)).unwrap_err();
+        assert!(err.contains("changed on disk"));
+        assert_eq!(
+            fs::read_to_string(dir.path().join("src/main.php")).unwrap(),
+            "changed elsewhere"
+        );
+
+        // Saving without a fingerprint overwrites, and no temporary file is left behind.
+        write_file(dir.path(), "src/main.php", "mine", None).unwrap();
+        let leftovers = fs::read_dir(dir.path().join("src"))
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .count();
+        assert_eq!(leftovers, 0);
+        assert!(write_file(dir.path(), "../escape.txt", "x", None).is_err());
+    }
+
+    #[test]
+    fn searches_text_files_only_and_respects_gitignore() {
+        let dir = project();
+        let result = search(dir.path(), "price", false, false, 100).unwrap();
+        let paths: Vec<&str> = result.matches.iter().map(|m| m.path.as_str()).collect();
+        assert_eq!(paths.len(), 3, "{paths:?}");
+        assert!(paths.contains(&"README.md"));
+        assert!(paths.contains(&"src/main.php"));
+        assert!(paths.contains(&"src/inner/Cart.php"));
+        let readme = result
+            .matches
+            .iter()
+            .find(|m| m.path == "README.md")
+            .unwrap();
+        assert_eq!((readme.line, readme.column), (1, 1));
+    }
+
+    #[test]
+    fn search_options_case_regex_and_limit() {
+        let dir = project();
+        assert_eq!(
+            search(dir.path(), "Price", false, true, 100)
+                .unwrap()
+                .matches
+                .len(),
+            1
+        );
+        let re = search(dir.path(), r"\$price\s*=", true, false, 100).unwrap();
+        assert_eq!(re.matches.len(), 1);
+        assert_eq!(re.matches[0].line, 3);
+        let limited = search(dir.path(), "price", false, false, 1).unwrap();
+        assert!(limited.truncated);
+        assert_eq!(limited.matches.len(), 1);
+        assert!(search(dir.path(), "(", true, false, 10).is_err());
+        assert!(
+            search(dir.path(), "", false, false, 10)
+                .unwrap()
+                .matches
+                .is_empty()
+        );
+    }
+}

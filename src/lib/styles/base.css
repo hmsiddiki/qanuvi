@@ -1,0 +1,35 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--qx-bg-window);
+  color: var(--qx-text);
+  font-family: var(--qx-font-ui);
+  font-size: var(--qx-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--qx-font-mono);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--qx-accent) 35%, transparent);
+}

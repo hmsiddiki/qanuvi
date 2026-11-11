@@ -1,0 +1,41 @@
+/* Design tokens from docs/DESIGN.md. Change values there first, then here. */
+:root {
+  /* Surfaces */
+  --qx-bg-window: #141416;
+  --qx-bg-panel: #1c1c1f;
+  --qx-bg-raised: #232327;
+  --qx-border: #2c2c31;
+
+  /* Text */
+  --qx-text: #ececef;
+  --qx-text-secondary: #9b9ba3;
+  --qx-text-muted: #6b6b73;
+
+  /* Accent and status */
+  --qx-accent: #4f8cff;
+  --qx-status-running: #4f8cff;
+  --qx-status-waiting: #e5b84b;
+  --qx-status-done: #4cc38a;
+  --qx-status-failed: #e5604b;
+
+  /* Shape */
+  --qx-radius-panel: 12px;
+  --qx-radius-card: 10px;
+  --qx-radius-input: 10px;
+  --qx-radius-button: 8px;
+
+  /* Type */
+  --qx-font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+  --qx-font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --qx-text-base: 13px;
+  --qx-text-small: 12px;
+  --qx-text-section: 11px;
+
+  /* Spacing (4 px grid) */
+  --qx-space-1: 4px;
+  --qx-space-2: 8px;
+  --qx-space-3: 12px;
+  --qx-space-4: 16px;
+  --qx-space-6: 24px;
+  --qx-space-8: 32px;
+}

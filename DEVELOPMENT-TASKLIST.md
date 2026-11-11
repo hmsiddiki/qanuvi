@@ -1,0 +1,1050 @@
+# Qanuvi work map
+
+The order of work for Qanuvi. How the parts fit: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The look:
+[docs/DESIGN.md](docs/DESIGN.md) (reference picture in `docs/design/reference-layout.png`).
+
+## Core goals
+
+1. **A great workspace:** light, fast and pleasant enough to replace a heavy editor and browser for daily work, and to
+   sit on a second screen while gaming.
+2. **Spending fewer tokens, built in beside it:** the right model for each step, small work packets, only what a
+   model needs.
+
+**Name:** the app is called **Qanuvi** (folder
+`E:Projectsqanuvi`, identifier `dev.qanuvi.desktop`). The owner will provide the logo; until then a "Q" mark is used.
+
+**A code editor first (owner, 2026-11-10):** Qanuvi must work fully as a standard code editor with no AI agent at all,
+paid or free, like VS Code. Editing, files, search, terminals, preview, task lists and git never depend on an agent.
+AI is a layer the user adds and configures: Settings (Agents) > "AI features" turns the agent pane, sessions and plan
+runs on or off; with it off nothing is sent anywhere.
+
+## Rules
+
+- One milestone at a time: build, test, check it in the running app, mark it done, then start the next. The owner
+  reviews the app after each milestone.
+- Light first: measure memory and CPU of the app at the end of every milestone and record it here. Target for the shell
+  with one project open: about 50 to 100 MB without the preview, near 0% CPU when idle. Hidden panes and tabs are
+  unloaded.
+- Spending fewer tokens is the second core goal: every agent feature must say what it sends to a model and why, and record the
+  tokens it used.
+- The look follows `docs/DESIGN.md`; changes to the design are made there first.
+- Open source from day one: no secrets, keys or personal data in the repository; nothing in the code, docs or commit
+  messages names a tool or assistant as an author.
+- Every platform from day one: one codebase for Windows, Linux and macOS (desktop) and Android and iOS (handler mode,
+  Stage 4). Nothing may be written for one platform only without the others. Each platform's installer is built on
+  that platform, so automatic builds (GitHub Actions: Windows, Linux and macOS machines) build all of them on every
+  release; development can happen on any of the owner's machines (the Windows PC or the Zorin Linux laptop).
+
+## Status legend
+
+- `[ ]` Not started
+- `[-]` In progress
+- `[x]` Completed and validated
+- `[!]` Blocked; reason underneath
+
+## Stack
+
+- Tauri 2 (Rust core, system web view), Svelte for the interface, CodeMirror 6 for the editor, xterm.js for terminals
+  with a real terminal behind it in Rust (portable-pty), SQLite for local data.
+- Later: Rust relay service (axum, WebSockets), sign-in through a Qlopy site's OAuth 2.0 + PKCE, Ollama or llama.cpp for
+  local models.
+
+## Stage 1: the app shell (first goal)
+
+- [-] **1. Project setup and an empty window** (started 2026-11-10)
+  - Owner's Windows PC set up 2026-11-10: Node 24.22, git 2.49, WebView2 157; installed with the owner's permission:
+    Visual Studio 2022 Build Tools (C++ 14.44) in `E:\DevTools\VS2022BuildTools` (Windows SDK on C:), Rust 1.99.1 in
+    `E:\DevTools\rustup` and `E:\DevTools\cargo`.
+  - Done on Windows (2026-11-10): Tauri 2 + SvelteKit (static, single-page) + TypeScript; crate `qanuvi` / `qanuvi_lib`,
+    identifier `dev.qanuvi.desktop`; Rust command `app_info` (name, version, OS, architecture) shown in the window;
+    design tokens in `src/lib/styles/tokens.css`; window 1440 x 900 (minimum 900 x 560), dark background before the page
+    loads, a content security policy instead of none. Tooling: Prettier (with Svelte), svelte-check, Vitest, rustfmt,
+    clippy with warnings as errors; `npm run verify` runs all of them plus the Rust tests; `npm run app` (development),
+    `npm run app:build` (release). Automatic builds: `.github/workflows/build.yml` (Windows, Ubuntu 22.04, macOS; checks,
+    tests, build, installers kept as artifacts). Git repository started (`main`), nothing committed yet.
+  - Validated on Windows: `npm run verify` green (2 frontend tests, 2 Rust tests, clippy clean); release build
+    `qanuvi.exe` 4.4 MB; the window opens with the dark theme and shows "Version 0.1.0 · Windows x86_64" from the Rust
+    core (screenshot checked).
+  - Measured on Windows (release build, idle, welcome screen): 7 processes (Qanuvi plus its WebView2), private memory
+    76.6 MB in total (Qanuvi 4 MB, WebView2 72.6 MB), CPU 0%.
+  - Still open: open and measure on the Zorin laptop (Linux); the macOS build in the automatic builds once the repository
+    is on GitHub; Qanuvi's own icon (the default Tauri icon is in place). `npm audit`: 5 low-severity warnings in
+    SvelteKit's server-side packages (`cookie`, `deepmerge`), not used by a static app; recheck when SvelteKit 3 is
+    adopted.
+  - Tauri 2 + Svelte + TypeScript project, Rust workspace, lint and format, a test runner for Rust and for the frontend,
+    build scripts that work on Windows, Linux and macOS.
+  - Automatic builds (GitHub Actions) for Windows, Linux and macOS on every push, set up once the repository is on
+    GitHub.
+  - Window opens with the dark theme from `docs/DESIGN.md` (colour, radius and type tokens as CSS variables).
+  - Validate: the app builds and opens on Windows (owner's PC) and Linux (owner's Zorin laptop); the macOS build passes
+    in the automatic builds; memory and idle CPU recorded on each.
+
+- [ ] **1b. Updates: update channels, signed updates and a smooth update popup** (added 2026-11-10; moved by the owner on 2026-11-10 to after the app shell is usable, so it is built after Milestone 8; moved later again by the owner on 2026-11-10 while other milestones go first; originally planned right after
+  Milestone 1 because the app will be updated very often during development)
+  - Tauri updater plugin: the app checks an update address for a small manifest (`latest.json`: version, notes, date,
+    download address and signature per platform), downloads in the background, installs on restart.
+  - Channels: `dev` (now), `beta` and `stable` (later); the channel and its address are a setting.
+  - The `dev` channel for now is a local folder served by the owner's web server:
+    `E:\Wnmp\nginx-bins\default\www\qanuvi-updates\dev\` (for example `http://localhost/qanuvi-updates/dev/latest.json`;
+    the exact address is set when the folder is created). Plain `http` is allowed only for this local channel; `beta`
+    and `stable` must use `https`.
+  - Signed updates: a key pair made with the Tauri signer; the public key is in the app, the private key stays outside
+    the repository (never committed), and an update with a wrong signature is refused.
+  - Popup for permission: "Qanuvi 0.x.y is ready", the release notes, **Update now** / **Later** / **Skip this version**;
+    an option to download automatically and only ask before restarting.
+  - Smooth: the update waits while an agent is running a step and installs between steps; layout, open projects, tabs
+    and sessions are restored after the restart; if the new version fails to start, the previous one is kept.
+  - Check on start and every few hours (a setting), and "Check for updates" in the menu.
+  - Publish script (one command): build, sign, write `latest.json`, copy the files to the channel folder.
+  - Validate: install version 0.1.0, publish 0.1.1 to the local channel, the popup appears, update and restart restore
+    the layout; a wrongly signed file is refused; "Later" and "Skip" behave; an update offered during a running step
+    waits for the step to end.
+
+- [-] **2. Layout: sidebar, agent pane, tabbed work pane, terminal panel** (built 2026-11-10, waiting for the owner's
+  review)
+  - Three panes as in the design: sidebar (left), agent pane (middle), work pane with tabs (right); the terminal panel
+    split under the editor like VS Code.
+  - Drag to resize, hide and show each pane (with shortcuts), collapse the sidebar to icons, maximise the terminal.
+  - Named layouts saved and switched ("Coding", "Side screen", "Review"); the last layout is restored on start.
+  - Validate: every pane resizes, hides and comes back; layouts survive a restart; the design matches the reference feel.
+  - Built: `src/lib/layout/layout.ts` (rules: limits, defaults, the three presets, cleaning of saved data, at most 20
+    named layouts, the window never left empty) and `layout.svelte.ts` (live state, saved to local storage a quarter
+    second after the last change); components `TitleBar` (Qanuvi's own bar on Windows with the layout menu, pane
+    toggles and window buttons; macOS keeps its window buttons over the bar; Linux keeps the system title bar),
+    `LayoutMenu` (switch, save as, remove; a removed preset goes back to its original settings), `Sidebar` (workspace,
+    Home, Inbox, Projects, Plans, Agents, Reminders, Projects and Sessions sections, collapse to icons), `AgentPane`
+    (empty state and the "Ask Qanuvi…" box), `WorkPane` (Welcome/editor, Preview and Diff tabs; terminal panel under
+    them with maximise and hide), `Splitter` (pointer drag and arrow keys) and `shortcuts.ts`: Ctrl+B sidebar, Ctrl+J
+    terminal, Ctrl+Shift+J maximise terminal, Ctrl+Alt+A agent pane, Ctrl+Alt+W work pane (Cmd on macOS). Icons from
+    Lucide, imported one by one. Window config per system: `tauri.conf.json` (no system frame), `tauri.macos.conf.json`,
+    `tauri.linux.conf.json`; window permissions in `capabilities/default.json`.
+  - Checked on Windows: `npm run verify` green (18 frontend tests: layout rules and shortcuts; 2 Rust tests; clippy and
+    svelte-check without warnings); screenshots of the full layout, Ctrl+B and Ctrl+J hiding the sidebar and terminal,
+    the layout coming back the same after closing and reopening, Ctrl+Shift+J maximising the terminal and restoring it.
+    Memory with the full layout, idle: 84.4 MB private in 7 processes, CPU 0%.
+  - Not yet checked by hand (the owner's review): dragging the splitters with the mouse, the layout menu (switch, save,
+    remove), the window buttons and dragging the window by the title bar; macOS and Linux title bars.
+
+- [x] **3. Projects** (done 2026-11-10)
+  - Add a project folder; detect its type from its files (`composer.json`, `artisan`, `pubspec.yaml`, `*.csproj`,
+    `requirements.txt` / `pyproject.toml`, `build.gradle`, `package.json`) and show it with a coloured icon.
+  - Project list in the sidebar, switching projects, remove from the list (never deletes files), per-project settings
+    (run, test and preview commands, preview address).
+  - Validate: the owner's projects (for example the qCommerce plugin and a Laravel or Flutter project) are detected
+    correctly.
+  - Built: SQLite store `src-tauri/src/store.rs` (app data folder, `qanuvi.db`, versioned migrations; tables projects,
+    sessions, session_events), `projects.rs` (detection of Qlopy, Laravel, Flutter, Android, .NET, Python, Rust, Node,
+    PHP, plain folder; all tags kept; default run/test/preview commands per type, `php tests/run.php` found for
+    qCommerce-style plugins; add, list, update, remove, look again), sidebar project list with a coloured type badge,
+    settings and remove buttons, `ProjectSettings` dialog (name, run, test, preview address, plus "tabs follow the
+    project" and terminal shell for all projects), folder picker (dialog plugin). Added beyond the plan: `qanuvi <folder>`
+    (or `qanuvi .`) opens a folder as the current project, like `code .`.
+  - Validated: 6 Rust tests (each type, tags, defaults, Flutter not also Android, add twice keeps one entry, update,
+    remove leaves files, refuses missing folders and files, Windows `\\?\` prefix removed). In the app: `qanuvi .` in
+    `E:\Projects\qanuvi` and in a test project; both listed and switchable.
+  - Not checked: the owner's Laravel, Flutter and qCommerce folders in the app (the rules are covered by the tests); the
+    folder picker by hand (it opens; choosing a folder in it was not automated).
+
+- [x] **4. File tree and code editor** (done 2026-11-10)
+  - File tree for the project (respects `.gitignore`, large folders loaded lazily), editor tabs, CodeMirror 6 with
+    highlighting for PHP, JS/TS, CSS, HTML, Markdown, Python, Dart, C#, Rust, JSON, YAML, SQL.
+  - Save, unsaved marks, search in the file, search across the project (Rust, ripgrep-style, results in a panel),
+    go to file.
+  - Setting: editor tabs follow the project (switching project swaps the open tabs) or stay open across projects.
+  - Validate: open and edit large files smoothly, project search on a large codebase, memory recorded.
+  - Built: `files.rs` (every path checked to stay inside the project, links included; folder listing and file list with
+    the `ignore` crate, so `.gitignore`, global ignores and `.git` are respected; read with binary and 10 MB checks;
+    save through a temporary file then rename, refused if the file changed on disk since it was opened; regex or plain
+    search, case option, 2 MB per file, 2,000 results). Interface: `Explorer` (lazy tree, refresh, collapse), editor
+    tabs with unsaved dot, middle-click to close, Ctrl+W, close asks before losing changes; one CodeMirror view with a
+    state per tab (text, cursor, undo kept when switching); 26 languages loaded only when first needed
+    (`editor/languages.ts`, legacy modes for Dart, C#, Kotlin, Java, C/C++, shell, PowerShell, TOML, Dockerfile, Groovy,
+    nginx); dark theme from the design tokens; status line (path, unsaved, line and column, language); "changed on
+    disk" bar with overwrite or reload; Ctrl+S, Ctrl+F (in-file search and replace), Ctrl+P go to file (fuzzy),
+    Ctrl+Shift+F project search panel; "unsaved" clears when undo returns to the saved text.
+  - Validated: 6 Rust tests (paths outside refused, listing order and ignores, file list, binary detection, save and
+    the on-disk conflict, search options and limits) and frontend tests for languages and fuzzy matching. In the app on
+    `E:\Projects\qanuvi`: tree, TypeScript highlighting and folding, Ctrl+P "tasklist" opened `tasklist.ts`, project
+    search "fuzzyScore" gave 6 results in 2 files (77 searched).
+  - Not checked: a very large file and a very large codebase (speed); the "tabs follow the project" switch by hand.
+
+- [x] **5. Terminal panel** (done 2026-11-10)
+  - Real terminals (PowerShell, cmd, Git Bash on Windows; bash or zsh elsewhere) in tabs under the editor; several per
+    project, started in the project folder; resize, clear, kill, rename.
+  - Validate: run the qCommerce test suite in it; long output stays smooth; closing a project closes its terminals.
+  - Built: `terminal.rs` (portable-pty: ConPTY on Windows; shells found on the machine: PowerShell 7, Windows
+    PowerShell, Command Prompt, Git Bash, or the login shell plus bash, zsh, fish elsewhere; output streamed over a
+    channel with characters split between reads kept whole; resize; kill one, a project's, or all when the window
+    closes). Interface: xterm.js with the Qanuvi colours, fit to the panel, tabs per project that keep running while
+    another project is shown, the tab title follows the shell, shell picker, Ctrl+C copies a selection and Ctrl+V
+    pastes. No terminal is started until asked (a shell costs memory).
+  - Validated: 3 Rust tests (split characters, invalid bytes, at least one shell). In the app: PowerShell opened in the
+    project folder and `git status --short` printed its coloured output.
+  - Not checked: the qCommerce test suite and very long output in it; rename (the title follows the shell instead);
+    clear (use the shell's own `cls`/`clear`).
+
+- [x] **6. Preview tab** (done 2026-11-10)
+  - Address bar, reload, back and forward, device sizes (desktop, tablet, phone); uses the project's preview address.
+  - Unloaded when its tab is hidden.
+  - Validate: a local site loads in each size; memory with and without the preview recorded.
+  - Built: `PreviewTab` (address bar that adds `http://` for local addresses and `https://` otherwise and refuses
+    anything that is not a web address, own back/forward history, reload, desktop / 820 px tablet / 390 px phone
+    frames, open in the browser); the frame exists only while the tab is shown; content security policy allows framing
+    `http`/`https` pages only.
+  - Validated: `url.test.ts`; `http://localhost/` (the owner's nginx) shown in the app. Memory with the preview, an
+    editor tab and a session open: 104 MB for Qanuvi and its web view (the full layout without them: 84 MB).
+  - Known limit: sites that forbid being framed (`X-Frame-Options`) stay blank; "open in the browser" is the way round.
+    Back and forward follow the address bar, not links clicked inside the page.
+  - Added after the owner's review (2026-11-10): "Fill the Qanuvi window" (the preview covers the whole app, with its
+    address bar and an Exit button) and "Full screen" (the same, and the window goes full screen); Esc or Exit returns to
+    the normal layout. Checked in the app. While the focus is inside the page, the page keeps the keyboard, so Esc
+    reaches the page instead; the Exit button always works.
+
+- [x] **7. Task list view** (done 2026-11-10)
+  - Read the project's task list (for example `DEVELOPMENT-TASKLIST.md`): sections, numbered steps, status
+    (`[ ]`, `[-]`, `[x]`, `[!]`), sub-points; shown as a plan in the sidebar and a list in the work pane.
+  - Change a step's status and edit text from the view; the file stays readable Markdown and other edits in the file
+    are kept.
+  - Per-step settings stored in the file in a simple, readable form (for example the model for a step).
+  - Validate: the qCommerce task list (Plan D) reads and writes back without changing anything else in the file.
+  - Built: `plan/tasklist.ts` (sections, steps with number, title, wrapped note, details and a `- Model: <id>` line;
+    edits change only the lines they must and keep CRLF or LF; an edit is refused if the step at that line no longer
+    has the title that was shown); `PlanView` (task lists found by name: TASKLIST, TODO, PLAN, ROADMAP; picker when
+    there are several; progress per section; All / Open / Done; click the status circle to cycle it; double-click a
+    title to rename; model per step; details; "show in the file"); saving uses the on-disk check, so a file edited
+    elsewhere is reloaded, not overwritten. "Plans" in the sidebar opens it.
+  - Validated: 13 frontend tests (parsing, continued notes, details, model line, CRLF, one-line status change, rename,
+    add/change/remove model, refusal on a changed file, file discovery). In the app: Qanuvi's own task list shown with
+    stages, counts and notes; in a test project a click changed `- [ ]` to `- [-]` on disk and nothing else.
+  - Not checked: the qCommerce task list in the app (its format is the one the tests use).
+  - Added after the owner's review (2026-11-10): "Ask the agent to write one" (empty state) and a button in the Plan
+    header open a new agent session with a ready-made request (`plan/prompts.ts`) to write or extend the task list in
+    Qanuvi's format, with a suggested model per step (strongest for money, security and hard design, a mid model for
+    normal coding, the smallest for small edits and docs); the user reads, changes and sends it. A test checks that the
+    example in the request is a step Qanuvi reads, model included.
+
+- [x] **8. Agent pane: run an agent with a chosen model** (done 2026-11-10)
+  - Start an agent session (Claude Code first) in the project folder, with the model chosen for the session; stream its
+    progress into the agent pane as quiet step lines and result cards; approval cards for what it asks; stop.
+  - Clicking a result card opens the file, diff or page in the work pane. Diff tab with accept and revert.
+  - Sessions listed in the sidebar with a status dot; tokens and time shown per session.
+  - Validate: a real small task done end to end from the app on the owner's project; VS Code not needed for it.
+  - Built: `agent.rs` runs `claude -p` with streamed JSON in and out, `--model`, `--permission-mode` (Ask before
+    changes = `default`, Allow edits = `acceptEdits`, Plan only = `plan`; never "bypass") and
+    `--permission-prompt-tool stdio`, so every permission request comes to Qanuvi and is answered allow or deny; the
+    process stays open for follow-up messages and a finished session is resumed with `--resume`; every message is kept
+    in `session_events` (with Qanuvi's own notes of the user's messages and answers) so a session reads back in full
+    after a restart; tokens (input with cache writes, cache reads, output), cost and time are added up per session from
+    each turn's result. Interface: `agent/events.ts` turns messages into the user's messages, the agent's text, step
+    lines (running, done, failed, with the first line of the result; a step on a file opens it), approval cards with the
+    command or the change shown and Approve / Refuse, a finished line with time; model and permission pickers; Stop;
+    usage line; sessions in the sidebar with status dots (running, waiting, done, failed, ended), delete; the Inbox
+    shows how many sessions wait for an answer. `git.rs` and `DiffView`: branch, changed files with status letters,
+    the diff (untracked files shown as added), accept = stage, undo = restore from the last commit after a
+    confirmation (new files are never deleted); refreshed when an agent turn ends.
+  - Message format checked against the real CLI first (one test call on Haiku, $0.004).
+  - Validated: 6 Rust tests (titles, result totals, sessions stored, renamed, listed, deleted with their events,
+    removed with their project, history order, git status and diff on a real repository) and frontend tests for the
+    message reading. In the app, on a test git project with Haiku 5.5 and "Ask before changes": the agent read
+    `notes.txt`, asked to edit it, the approval card showed the change, Approve applied it (file on disk changed),
+    finished in 42 s (including the wait) with "in 14k · cache 42k · out 429 · $0.0035"; the Diff tab then showed the
+    change; after closing and reopening Qanuvi the session read back in full.
+  - Not checked: Stop during a run; a follow-up message in the same session; Refuse from the app (the CLI side was
+    checked in the format test); the agent on the owner's real project.
+  - Added after the owner's review (2026-11-10): an **Auto** permission mode (the agent's own auto mode: routine actions
+    go ahead, risky ones are stopped; "bypass all" is still never offered), and an **agent address** setting for a
+    proxy such as Headroom, passed to each new session as `ANTHROPIC_BASE_URL` (empty: Claude Code's own setting
+    applies); both in Settings > For all projects, with the default permission mode for new sessions. Checked: Rust test
+    for the address rules and the modes; `claude -p --permission-mode auto` answered on Haiku. MCP servers added with
+    `claude mcp add` (for example in Qanuvi's terminal) are used by Qanuvi's sessions, since they run the same CLI.
+
+- [x] **8b. Agents as add-ons: Agents panel, agent config files, composer like a coding agent's** (added by the owner
+  and done 2026-11-10)
+  - Why: Qanuvi will run many agents (and agents from extensions), so nothing in Qanuvi's own interface may be written for
+    one agent; an agent describes itself and Qanuvi shows what it describes. The owner asked for a composer that feels
+    like a coding agent's (mode list with icons and descriptions, a "/" menu, the model shown under the box) and for a
+    way to see the connected agent, edit its configuration and know what other agents are coming.
+  - Built: `agents/providers.ts` (an agent describes its name, badge, models, permission modes with icon and
+    description, effort levels, whether it can use a proxy address, and how to install it; Claude Code is the first,
+    with Manual, Edit automatically, Plan and Auto, and efforts low to max); per-agent settings in `settings.svelte.ts`
+    (model, mode, effort, address; older single settings carried over); Rust `agent_config.rs` (only a fixed list of each
+    agent's files can be read or written: for Claude Code `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, the
+    project's `.claude/settings.json`, `.claude/settings.local.json`, `CLAUDE.md` and `.mcp.json`; a missing file opens
+    empty and is created on save; JSON must be valid to be saved) and `--effort` passed to sessions. Interface:
+    `AgentsView` (Agents in the sidebar or the gear under the message box: status and version, where it is installed,
+    "use for new sessions", model, mode, effort, address, configuration files that open in the editor, and "Add an
+    agent" with what is coming next); `ModePicker` (Shift+Tab cycles modes); `CommandMenu` ("/" button or typing "/" in
+    an empty message: mention a file from the project, clear the conversation, export it as Markdown to the clipboard,
+    switch model, effort slider); the agent's badge, model and effort under the message box; editor tabs for config
+    files (global ones stay visible in every project) with a save-error bar that keeps the text; the project settings
+    dialog no longer holds agent settings.
+  - Validated: Rust tests for the config file list, reading a missing file, creating on save, invalid JSON refused,
+    unknown ids refused, changes made elsewhere refused; frontend tests for agent settings and Markdown export;
+    `npm run verify` green (51 frontend, 32 Rust tests). In the app: mode list and "/" menu open fully, Agents panel shows
+    Claude Code connected (2.1.302) with its six files, `.mcp.json` opened in the editor and `{bad}` was refused with the
+    JSON error and no file written.
+  - Not checked: saving a real change to the owner's own Claude settings (left to the owner); Shift+Tab by keyboard in the
+    app; "Mention a file" picking end to end.
+
+- [x] **9. Model per step: run a task list with a different model per step** (done 2026-11-10)
+  - Run a plan from the task list step by step; each step uses its own model (the step's own setting, the user's rules,
+    a project default); switching between steps needs nobody at the screen.
+  - Each step starts with a short fresh context (the step text, a summary of earlier steps, the relevant rules) instead
+    of one ever-growing conversation.
+  - A step that fails twice on a cheaper model moves up to a stronger one; the change is recorded on the step.
+  - Tokens, cost, time and outcome recorded per step and per model; totals per plan.
+  - Validate: a three-step plan where each step uses a different model runs unattended; the switches and token counts
+    are visible; a forced failure moves a step up.
+  - Built: `plan/runner.ts` (decisions, tested: steps to run, a step's first model = its `- Model:` line or the agent's
+    default, next model after failures with models listed strongest first, a step's outcome read back from the file by
+    number and title, the step's request, totals per model); `stores/runner.svelte.ts` (the run: one fresh agent
+    session per attempt with only the step, its details, the steps already done in the run and the rules "work only on
+    this step; mark it `[x]` with a Done line when checked, or `[!]` with the reason if only the user can unblock it";
+    success is read from the task list after the turn; after the chosen number of failed tries (1 to 3, default 2) the
+    step moves one model up; the run stops when the strongest model fails, a step is blocked, the budget is reached or
+    the user presses Stop; each session is named after its step and closed when the step ends, to free memory; the
+    session shows live in the agent pane); Rust `runs.rs` and database version 2 (`plan_runs`, one JSON record per run,
+    cleaned up with its project; runs going when the app closed are marked stopped); `RunPanel` (Run button: start at a
+    step or only one step, permissions (Auto by default for unattended work, with a warning for Manual), budget, failed
+    tries before a stronger model; live banner with step, model, try and Stop; totals per model; summary when the run
+    ends) and a chip per step with the model of its last try and its cost.
+  - Validated: 8 frontend tests for the decisions and a Rust test for run records; `npm run verify` green (59 frontend,
+    33 Rust tests). Real run on a test project (Auto, 1 try per model, budget $0.15): step 1 on Haiku done ($0.0061)
+    and marked `[x]` with a Done line; Qanuvi switched to Sonnet for step 2 by itself, done ($0.10, list sorted); step 3
+    (written to be left open) failed on Haiku, moved up to Sonnet, failed again, and the run stopped at the budget
+    ("The run reached its budget of $0.15"); totals Haiku 2 tries $0.0085, Sonnet 2 tries $0.14.
+  - Found: a fresh session per step pays the agent's start-up context each time (about 17–20k tokens written to the
+    cache), so a tiny step on Sonnet still cost $0.10.
+  - Fixed the same day with **lean sessions** (Run option, on by default): `--strict-mcp-config` and
+    `--tools Read,Edit,Write,Bash,Glob,Grep`. Measured with one tiny request on Haiku: normal start-up 18,252 tokens;
+    without MCP servers 17,507; lean 8,992; the same lean start-up again read 8,195 from the cache and cost a sixth
+    (the agent keeps its cache for an hour, per model). Same three-step run as above, lean: step 1 Haiku $0.0046, step 2
+    Sonnet $0.058, step 3 Haiku $0.0007 and Sonnet $0.0125 (both mostly from the cache): about $0.076 for what cost
+    about $0.16 before (−52%); the budget then also covered a third try on Opus ($0.076). Running steps on the same model
+    one after another keeps the cache warm; Milestone 13 can use that when choosing models.
+  - Also fixed: a race where the Plan view, still loading the last run's record, replaced a run that had just started
+    (the run stopped at once); the run now keeps its own reference and an old record never replaces a running one.
+    Sessions of a run are named after their step ("Step 2: Sort the list", "(try 2)").
+  - Still to try in Stage 2: `--bare` would cut more but needs an API key instead of a subscription sign-in.
+  - Known limits: the budget is checked before each try, so a run can go over by at most one try; the run lives in the
+    window (a headless runner is Milestone 16); "the user's rules" for choosing models come with Milestone 13.
+
+- [ ] **10. Stage 1 review**
+  - Memory and CPU table for every milestone; the owner uses Qanuvi instead of VS Code for a full working day; list of
+    fixes before Stage 2.
+
+## Stage 2: the brain and token saving
+
+- [x] **11. Code index and cheap tools**: a code index (files, symbols, references) kept up to date, search and "give me
+  this file" tools the agent can call, answered by the app without reading the whole project. (done 2026-11-10)
+  - Built: Rust `index.rs` (definitions found with per-language patterns for PHP, JS/TS/Svelte/Vue, Rust, Python, Dart,
+    C#, Go, Java/Kotlin: functions, methods with their class, classes, interfaces, traits, enums, structs, types,
+    modules, constants; `.gitignore`, `node_modules` and `vendor` left out; files over 1 MB skipped; a refresh reads
+    again only files whose size or time changed, and drops deleted files); `mcp.rs`: **`qanuvi --mcp <folder>`** runs
+    Qanuvi as a read-only MCP server with no window, tools `project_map`, `find_symbol`, `outline`, `read_lines` (at
+    most 300 lines, inside the project only) and `search`, each answering in a few lines of text; sessions get it
+    through `--mcp-config` (a small config written per project under the app data folder) with
+    `--allowedTools mcp__qanuvi`, so the read-only tools never ask for approval; "Code index tools" option per agent
+    (Agents panel, on by default) and per run (Run panel). For the editor: **Go to symbol** — Ctrl+T (or `#` in Ctrl+P)
+    across the project, Ctrl+Shift+O (or `@`) in the current file; choosing one opens the file at its line.
+  - Validated: Rust tests for every language's patterns, comments and control flow skipped, classes holding their
+    methods, index refresh after edits and deletions, the MCP handshake, each tool's answer, paths outside the project
+    and bad ranges refused, the session config; `npm run verify` green (61 frontend, 43 Rust tests). By hand: the real
+    `qanuvi.exe --mcp E:\Projects\qanuvi` answered `find_symbol nextModel` with `src/lib/plan/runner.ts:70`, an outline,
+    and a map (73 source files, 542 definitions). In the app: Ctrl+T "nextmo" found `nextModel` and opened it at its
+    line; Ctrl+Shift+O listed the file's definitions.
+  - Measured (Sonnet, lean sessions, the Qanuvi code, two questions, each asked twice in both orders): a question that
+    needs finding and reading code across files cost on average $0.0605 without the tools and $0.0371 with them
+    (**−39%**, fewer turns); a question one text search answers cost about the same ($0.0273 vs $0.0281, the tool
+    descriptions cost a few hundred tokens); both together −26%. Answers were correct with exact lines.
+  - Not done: references (who calls a function) — patterns find definitions only; a language server would add them
+    (with the editor's own language support, later).
+- [x] **12. Work packets**: the app prepares the step text, relevant files and lines, rules and test command for the
+  model; the app runs tests itself and sends back only failures; measured against a plain agent run on the same step
+  (tokens before and after). (done 2026-11-10)
+  - Built: Rust `checks.rs` (runs the project's test command in its folder through the system shell, with `CI=1` and no
+    colours, a time limit (default 10 minutes) that stops the whole process tree (`taskkill /T` on Windows, a process
+    group elsewhere), stdout and stderr kept (the last 256 KB), never waiting more than 2 s for output a leftover
+    program keeps open); `plan/packet.ts` (what a step mentions: file paths and code names; **where** that code is,
+    from the index, one line per definition plus outlines of mentioned files and which files are new; the failure
+    summary: failure lines with a little context and the end of the log, without passing lines, zero counters,
+    colours or the test runner's own stack frames, at most 3,000 characters; the fix message); the run: "Work packets"
+    option (Run panel, on by default) adds the locations and the rule "Qanuvi runs the test command when you finish;
+    do not run the whole suite" to each step; after the agent's turn Qanuvi runs the tests, and on failure sends only
+    the summary as a follow-up in the same session, at most 2 fix rounds; a step counts as done only when it is marked
+    done **and** the tests pass; tries record how often the tests ran and whether they passed; the banner shows
+    "running the tests".
+  - Validated: Rust tests for the check runner (pass, fail with both streams, time limit stopping a child program in
+    under a second, long output cut to its end); frontend tests for mentions, locations, the failure summary (noise
+    removed), and the prompts; `npm run verify` green (69 frontend, 46 Rust tests).
+  - Measured on a small Node project with a real test suite (`node --test`), three steps on Sonnet, lean sessions and
+    index tools on, one run each: **A** no packets (the agent runs the tests) $0.1778; **B** packets with the code
+    pasted in $0.1852 (+4%); **C** packets with locations only $0.1633 (−8%). All runs finished with 11/11 tests.
+  - Found: pasting code does not pay off with Claude Code, because its Edit tool needs the file read in the session
+    anyway, so the code is paid for twice; packets therefore give locations only. On a project this small the gain is
+    within run-to-run variation; it should grow with bigger files (locations instead of searching) and big or
+    failing test suites (a 1,000-character failure summary instead of the whole log).
+  - Fix rounds checked for real: a step 4 plus a hidden failing test it did not mention; the agent marked it done,
+    Qanuvi's full run caught the failure and sent ~1,000 characters (the failing test, `'12.5%' !== '12.5 %'`, file and
+    line) instead of the log; after two rounds all 13 tests passed. The first round was lost because "work only on
+    this step" conflicted with fixing a failure the step did not cause; the fix message now says to fix such a failure
+    only when the fix is small and clearly right, otherwise mark the step blocked. Not measured again after that change.
+  - Also seen: every step ends with a `Grep` for AI attribution words, from the owner's global agent instructions; it
+    costs one tool call per step and is wanted.
+- [x] **13. Learned routing and budgets**: success rate and cost per model and job type, used to choose models; rules
+  per project; a monthly budget that prefers cheaper models or stops and asks. (done 2026-11-10)
+  - Built: `plan/routing.ts` (job type of a step from its title and details: docs, tests, interface, money and
+    security, bug fix, refactor, feature — money and security wins over the rest, plurals understood; per job type and
+    model the tries, successes and cost, learned from the latest 300 runs of every project, tries the user stopped left
+    out; the learned choice is the cheapest model by cost per success with at least 3 tries and 80% done; a step's
+    first model: its own `- Model:` line, else the project's rule for its job type, else the learned model, else the
+    default; monthly budget: from 80% used one model cheaper (never for money and security), at 100% the run stops and
+    asks); Rust `usage_since` (all sessions' cost since the start of the month) and `runs::list_all`; the run records
+    each step's job type and why it started on its model (shown in the step's chip); `RoutingSettings` in the Agents
+    panel: monthly budget with this month's spending and a meter, rules per job type for the current project, and the
+    "learned so far" table (tries, % done, cost per done step, "trusted").
+  - Validated: routing tests (job types, plurals, learning, the learned choice, budget states, choice order, cheaper
+    under a tight budget except for money and security), settings tests (budget and rules cleaned), Rust tests for the
+    month's usage and listing runs; `npm run verify` green (79 frontend, 47 Rust tests). In the app: the learned table
+    showed today's runs (for example features on Sonnet: 13 tries, 85% done, $0.07 per done step, trusted); with a
+    monthly budget of $0.50 and $1.00 spent the run stopped at once ("needs you", $0 spent); with the budget cleared
+    and the rule "docs → Haiku", a README step was recognised as docs, started on Haiku because of the rule and
+    finished for $0.0035 with the tests passing.
+  - Not checked live: the "one model cheaper" move under a tight budget (covered by tests), and a learned choice
+    taking over after enough tries (covered by tests; today's data has no job type with a cheaper trusted model yet).
+  - Not done: grouping steps by model to keep the agent's cache warm; job types from the files a step changes rather
+    than its words.
+- [x] **14. Planner and workers**: a paid planner turns a big request into a plan with a model per step; the controller
+  runs it and goes back to the planner only on failure or for judgement. (done 2026-11-10)
+  - Built: `plan/planner.ts` (the planner's request: read the project read-only and answer with 2–10 steps in one
+    \`\`\`tasklist block, each with a Validate line and a model chosen from the agent's models; reading its answer — only
+    step lines and their details, all opened; numbering after the file's last step, or 12a, 12b… for a replacement;
+    adding a new section at the end of the task list with its line endings kept; replacing a failed step: it is marked
+    `[!]` with a note naming its replacement, and the new steps follow its details; a section title from the request's
+    first sentence); `stores/planner.svelte.ts` (the planner runs as an agent session in **plan mode** (read-only),
+    lean, with the index tools, on the second strongest model by default; its final answer is taken from the result,
+    the session closed; it shows live in the agent pane); `PlannerDialog` in the Plan view (wand button): the request,
+    the planner model, "Make the plan", then a preview of the steps with their kind of work and model, a section title,
+    and Discard / Add to the file / **Add and run** (runs the new steps with Auto, lean, index tools, packets and
+    replanning). Qanuvi, not the planner, writes the file. In runs: "Back to the planner when a step fails on every
+    model" (on by default): the planner gets the step, every try with its result and the last test failures, and
+    rewrites it once into 2–5 smaller steps that are written into the file and added to the run.
+  - Validated: planner tests (reading answers, renumbering, sections with CRLF, replacing a step, prompts, titles);
+    `npm run verify` green (88 frontend, 47 Rust tests). For real on the test project: the request "add optional VAT
+    to the cart total using addVat, with tests; document it in the README" was planned by Opus in 20 s for $0.14 into
+    2 concrete steps (VAT with seven named test cases on Opus, the README on Haiku); "Add and run" wrote them as section
+    steps 6 and 7 and ran them on those models ($0.152 and $0.005), Qanuvi's test runs passed, 20 of 20 tests pass.
+    Whole request about $0.30.
+  - Not checked live: replanning a step that failed on every model (covered by tests; forcing a real failure on the
+    strongest model was not worth its cost); the planner's answer when it refuses or asks a question (the dialog shows
+    "no steps" and the answer stays readable in the agent pane).
+  - Found while testing: the dialog's buttons can be below the visible part of the Plan view when the preview is long
+    (scroll to reach them); a sticky button row would be better.
+- [x] **15. Test browser** (done 2026-11-10; short recordings left for later): a headless browser started only for checks;
+  screenshots and short recordings shown in the agent pane; pointer in the preview to send an element to the agent.
+  - Built: `browser.rs` (finds Chrome, Edge, Chromium or Brave, or `QANUVI_BROWSER`; starts it headless with a new empty
+    profile in the temp folder; a small DevTools client over a local WebSocket; notes console errors, uncaught
+    exceptions, failed requests and 4xx/5xx answers, answers alerts with OK; waits for load plus half a second of quiet
+    network), `page.js` (runs in the page: text, links and fields with numbers, find by number/selector/label text,
+    element at a point), `browser_mcp.rs` (10 tools: `browser_open`, `_read`, `_links`, `_fields`, `_click`, `_type`,
+    `_wait_for`, `_errors`, `_screenshot`, `_eval`; started as `qanuvi --mcp-browser <project> <state file>`; a click or
+    typing answers only what changed: new address, new text lines, new errors), `preview.rs` (the preview tab's
+    inspector and the agent's last page). `mcp.rs` now serves any tool set. Sessions get one MCP config with the index
+    and/or the browser (`mcp/<session>.json`, old ones removed after a week); setting "Give it Qanuvi's test browser" in
+    Agents (on by default; plan runs follow it, the planner does not get it since it plans read-only). The agent pane
+    shows screenshots under their step, and MCP tool names without their prefix. The preview tab got three buttons:
+    follow the agent (shows the page its browser is on), send this page to the agent (as text, into the message box),
+    and point at an element (a picture of the page from the inspector browser; click an element and its selector, text
+    and HTML go into the message box; scroll moves the page; Esc stops).
+  - Light: the browser runs only while a session uses it or the inspector is open (stopped after 3 idle minutes and
+    when the app closes). Measured with the light switches (no GPU process, one page process, no component extensions,
+    network service in the main process): 6 processes, 109 MB private memory (it was 11 processes and 278 MB without
+    them); 0 processes once the session ends. On Windows a job object ends the browser with its owner even when that is
+    killed (tested with a forced kill: 0 processes 2 s later). Opening a page takes under a second.
+  - Token cost: the 10 tool definitions add 337 tokens at session start (8,880 → 9,217, Haiku, lean), since the agent
+    loads MCP tool details only when it needs them; so the setting is on by default.
+  - Validated: 56 Rust tests (two drive a real browser: open, fields, type by label, click with the change answered,
+    errors, screenshot and state file, eval; the inspector shows, picks `#total > span` and reads a page) and 90
+    frontend tests (screenshot items, tool names, settings). Live: Sonnet checked a test shop page with a hidden bug
+    using only the browser tools: it filled in the coupon by number, clicked, got the `TypeError` at line 15 and the
+    missing stylesheet, and said why the total stayed 50.00: 7 turns, 15.8 s, $0.024, no screenshot (the first version,
+    with full file addresses and no "open a page first" answer, took 9 turns and $0.045). In the app: the inspector
+    showed the owner's local site and a click on its logo put the element (an `img` with alt "Amirul Arham", its
+    selector and HTML) into the message box; closing the app ended the inspector's browser.
+  - Not done: short recordings; follow-the-agent was not tried with a live session in the app (covered by the state-file
+    test); the browser's end with its owner on macOS and Linux relies on the normal shutdown only (Milestone 16 should
+    add the Linux equivalent of the job object).
+  - Agents use Qanuvi's browser instead of launching their own (added by the owner 2026-11-10): Qanuvi offers its
+    browser to agents as tools (an MCP server Qanuvi starts with each session: open address, read the page as text,
+    list links and form fields, click, type, console errors, failed requests, screenshot on request), so Playwright or
+    a separate Chrome is not started for checks.
+  - Token saving: answers are short text by default (the page's visible text and structure, errors only), and a
+    screenshot is sent only when asked for or when text cannot answer the question.
+  - The preview tab can show what the agent is looking at, and the user can hand the agent the page or an element
+    from the preview.
+  - Note: the preview tab today is a frame inside Qanuvi's own page, which cannot be read or driven for pages from
+    another address; this step uses a browser controlled from the Rust core (Chrome DevTools Protocol) instead.
+- [x] **15b. Git like VS Code** (added by the owner 2026-11-10; done 2026-11-10, comparison with VS Code on the owner's
+  own repositories still to do by the owner)
+  - Done earlier: `git/decorations.ts` (letters M, A, U, D, R and `!` for conflicts from `git status`; every folder above
+    a change gets a dot) and the file tree showing them in VS Code's colours, refreshed after each agent turn, after each
+    save and every 15 seconds while the window is shown (so terminal commands show up too).
+  - Built: `git.rs` (status with upstream and ahead/behind; a file's last-commit and staged text in working-tree form
+    with `cat-file --filters`, so line endings match the file; staged text set directly with `hash-object --path` and
+    `update-index`, which is how one change is staged or unstaged; unstage, stage all, commit (message on standard
+    input, amend, `--cleanup=strip`), fetch / pull / push (push sets the upstream the first time; git never waits for a
+    password in a terminal, the user's credential helper still works), branches (list, switch, create, a remote branch
+    gets a local one that follows it), stash (push with untracked files, pop, apply, delete), log of the project or a
+    file (following renames), what a commit changed, blame of one line). `files.rs` lists ignored entries too, marked,
+    and the tree greys them and everything under an ignored folder (`.git` stays hidden). `git/hunks.ts`: a line diff
+    (Myers, as git; nearby changes stay apart), stage / unstage / undo one change, gutter marks, conflict blocks (also
+    three-way ones) and their resolution. `git/gutter.ts`: change markers in the editor (green added, blue changed, red
+    removed) against the staged text, recomputed 400 ms after typing stops, refreshed after saves, agent turns and git
+    actions. Alt+B in the editor: who last changed the line, when and in which commit. The Diff tab became **Git**
+    (`SourceControl.svelte`, `GitDiff.svelte`): branch and ahead/behind, pull, push, fetch, stash, project history;
+    message box (Ctrl+Enter), Commit (or "Commit all", which asks to stage everything first), amend; Merge changes,
+    Staged changes and Changes with per-file stage, unstage and undo (undo is confirmed); a file's diff side by side or
+    inline (CodeMirror's merge view, unchanged parts folded) with the changes numbered and Stage change / Unstage change
+    / Undo change (confirmed) for the current one; conflicts as blocks with Accept current / incoming / both, then Mark
+    as resolved; a file's history. In a narrow pane the lists go above the diff.
+  - Validated: 58 Rust tests (a real repository: part of a file staged and unstaged, commit with an empty message
+    refused, history, a commit's change, blame, branches with a bad name refused, stash with an untracked file and back,
+    push without a remote explained) and 102 frontend tests (line diff, staging and undoing one change also with CRLF and
+    without a final line break, gutter marks, conflicts). In the app on a test repository with a local remote: the
+    conflict was listed under Merge changes, the first of two changes in a file was staged alone (git showed `MM`, only
+    that change staged), the conflict was resolved with Accept incoming and marked resolved, the commit was made with
+    Ctrl+Enter, and Push sent it to the remote (0 ahead afterwards); the gutter showed removed, changed and added lines
+    and kept them apart while typing; Alt+B showed the line's commit; `debug.log` was greyed by `.gitignore`.
+  - Found and fixed while testing: the first gutter used CodeMirror's character diff, which merged nearby changes after
+    an edit (replaced by the line diff); the file tree kept an old letter after a commit (now refreshed after every git
+    action); push said only "Done." (now says where it pushed); buttons were cut off in a narrow pane (they wrap, and the
+    view stacks).
+  - Not done: a VS Code side-by-side check on the owner's own repositories; staging from the gutter itself (it is done
+    from the Git view).
+  - File tree decorations as in VS Code: modified `M`, added `A`, untracked `U`, deleted `D`, conflict `!` with their
+    colours; a dot on folders that contain changes; ignored files and folders shown greyed.
+  - Diff in the work pane: side-by-side and inline views, change markers in the editor gutter (added, changed,
+    removed), stage and unstage per file and per change, revert a change (confirmed first).
+  - A Source Control view: changed and staged files, commit message box, commit, push, pull, fetch, branches (switch,
+    create), stash, history of a file, blame on a line; merge conflicts with accept current / incoming / both.
+  - Git from the terminal keeps working as normal (the terminal is a real shell, Milestone 5); the tree, gutter and
+    Source Control view refresh when files or the repository change, whether from the terminal, an agent or the editor.
+  - Git runs through the installed `git` program, so the user's own configuration, credentials and hooks apply.
+  - Validate: the owner's repositories (for example a Qlopy site with modified and untracked files) show the same
+    status as VS Code; commit, push and pull on a test repository; a conflict resolved from the view.
+
+- [x] **15c. Workspace per project and a second window** (added by the owner 2026-11-10; done 2026-11-10, layout and
+  scroll position per project left out)
+  - One Qanuvi window stays the normal way of working (one light app process, projects switched in the sidebar), and
+    each project remembers its whole workspace: open files with cursor and scroll position, the layout, the shown view,
+    terminals, the preview address and the agent session it was on; switching back restores all of it, also after a
+    restart.
+  - Optional **Open in a new window** for a project (from the project's menu in the sidebar, and a command), for working
+    on two projects side by side, for example on two monitors. The second window shares the app process and its data;
+    a project open in one window is shown as such in the other, so the same files are not edited in two places.
+  - Validate: switch between two projects and back, and restart: tabs, cursors, layout and terminals come back; two
+    windows on two projects work side by side; closing one leaves the other running.
+  - Built: `stores/workspace.svelte.ts` (per project in local storage: open files with line and column, the active
+    file, the shown view, terminals by shell, the agent session, the preview address; saved half a second after a
+    change and when the window closes; read back with checks: no paths with `..`, only project views, only http(s) or
+    file preview addresses). On a project's first opening in a run its files come back with their cursors (files that
+    are gone are dropped), then its view and terminals; on every opening, the agent session it was on. The editor
+    keeps each tab's cursor and can open a file at a line and column. `stores/windows.svelte.ts`: **Open in a new
+    window** (a button on each project in the sidebar) opens a window of the same app process for that project, or
+    brings forward the window that already shows it; windows tell each other which project they show (a new window
+    asks), the sidebar marks a project open in another window, and choosing it goes to that window instead of opening
+    it twice. A project window does not change which project the main window starts with, and joins the server
+    connections the app already has. Rust: terminals remember the window that opened them; closing a second window ends
+    only its terminals (the last window ends everything as before) and tells the other windows. The window capability
+    covers project windows.
+  - Validated: 108 frontend tests (saved workspaces read back safely, routing). In the app: after a restart `cart.txt`
+    came back at line 5, column 7; a VPS project opened in a new window with its file and its server terminal back;
+    the main window's project was marked in the new window; closing the project window left the app running, closing
+    the main window ended it and its SSH connection.
+  - Found and fixed while testing: a new window did not see the server projects (it now joins the app's open
+    connections) and fell back to the main window's project (a project window now waits for its own); a closed window
+    still showed as open elsewhere (the app now announces it); the marker hid the project name (now an icon).
+  - Also checked in the app: choosing in a project window a project the main window shows brought the main window
+    forward instead of opening it twice; closing the project window removed its mark from the main window's sidebar.
+
+- [ ] **15e2. Terminal list like VS Code (cosmetic, owner 2026-11-11, later)**: instead of the shell drop-down and tabs
+  on top of the terminal panel, a slim list of terminals on the right side of the panel (icon + name, warning mark,
+  current one highlighted), with + and the panel buttons above it.
+- [ ] **15f. Notices in the status bar (owner, 2026-11-11, later)**: when a sign-in needs renewing (OmniRoute
+  connections such as Antigravity or Kiro, OpenRouter key problems), a notice in the bottom bar that opens the renew
+  screen.
+- [ ] **15g. Task Manager shows an old icon (owner, 2026-11-11, check later)**: the program and its window carry the
+  current logo (checked by colour); Windows' icon cache for the program's path still shows the first logo. An installed
+  build (new path) should be right; check after the release, and whether `ie4uinit -ClearIconCache` or a sign-out
+  clears it.
+- [ ] **15d. Own right-click menus** (added by the owner 2026-11-10)
+  - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
+    belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
+    editor (cut, copy, paste, go to definition, find references, format, add to agent message, git: blame line, stage
+    change), file tree (new file or folder, rename, delete, copy path, reveal in Explorer/Finder, open in terminal,
+    git stage / discard), tabs (close, close others, close to the right, copy path, reveal), agent messages (copy,
+    quote in reply, open file), terminal (copy, paste, clear), Git view (stage, unstage, discard, open file, history),
+    sidebar projects (open in new window, settings, remove). Text fields keep cut / copy / paste / select all.
+  - The browser's own menu and its reload shortcut are turned off in release builds (kept in development for
+    inspecting the interface).
+  - Validate: a right-click in each place shows only its own actions; nothing reloads the interface.
+
+- [x] **15e. Where Qanuvi keeps its data** (added by the owner 2026-11-10; built 2026-11-11)
+  - Everything Qanuvi stores can live in a folder the user chooses, on any drive, not only the system drive (C: on
+    Windows): the database (projects, sessions, memory), the brain's records (`brain.json`), the agent's conversation
+    histories (`agent-history/`), the memory disk's working files, test-browser profiles, MCP configs, logs and
+    caches. Chosen at first start or in Settings, kept in a small pointer file in the default place.
+  - Moving it: copy to the new folder, check, switch, then offer to remove the old copy (confirmed). A server (master)
+    already takes `--data`.
+  - Validate: a fresh start with the data on another drive (for example E:) writes nothing to the old place except the
+    pointer; moving an existing setup keeps projects, sessions, memory and the brain's records.
+  - Built (data_location.rs, DataFolderPanel on the Servers page): choose a folder (or type it); a folder with other
+    things gets a "Qanuvi" folder inside; checks: not inside the current folder, empty, writable, room on the drive.
+    The move is booked and done at the next start, before the database and the window open: Qanuvi restarts itself
+    and the new instance waits for the old one to end (--after-pid); everything is copied (the window engine's caches
+    left out, files that vanish meanwhile ignored, retried while its helper processes finish), checked file by file,
+    then switched; on any failure nothing changes and the reason is shown (red). The window's own storage (settings,
+    guides, layout) moves too (WEBVIEW2_USER_DATA_FOLDER, Windows). Moving back into the default folder first clears
+    the outdated copy there (so SQLite's old side files never sit next to a newer database). The old copy is kept until
+    the user removes it (confirmed). Live on the owner's PC: moved to E:\QanuviDataTest — same 7 projects, 46 sessions,
+    3 memory entries, the window reopened as it was, nothing written to C: afterwards (10 files changed on E:); moved
+    back the same way. Two races found and fixed on the way (the old window still writing during the copy).
+  - Not moved: Ollama's models (~/.ollama) and OmniRoute's data (~/.omniroute) belong to those programs; a later option
+    can point Ollama at a folder on the same drive (OLLAMA_MODELS).
+
+- [x] **16. Headless master**: master mode running without a window on a Linux server or VPS (16 GB), controlled from
+  the desktop app. (Built 2026-11-10; tested on this PC and on the owner's VPS (Debian 12) over SSH.)
+  - Built: the core builds without Tauri (feature `desktop`; `sink.rs` replaces the window's channels for agent and
+    terminal events, `paths.rs` gives the data folder, the database handle is shared, the window's commands moved to
+    `desktop.rs`). `qanuvi-master` (4.2 MB): `serve` (background service on 127.0.0.1 behind a token in a file only its
+    user can read; agent sessions keep running without a desktop; `stop` also ends its sessions and terminals),
+    `--stdio` (what the desktop starts over SSH: starts the service when needed and passes messages through), `status`,
+    and the agent tools (`--mcp`, `--mcp-browser`). `master.rs` answers the window's own command names and arguments
+    (projects, files, search, code index, checks, terminals, git, agent sessions, runs). Desktop: `remote.rs` (SSH with
+    keys only, `BatchMode`, keep-alive; addresses and program paths checked so nothing can be slipped into the SSH
+    command; plain-words errors for refused keys, unknown hosts, a missing program, an unknown host key; "local" starts
+    the master next to the app for trying it without a server). Window: `remote.ts` routes each call to the master that
+    owns its project, agent session or terminal; a **Servers** view (add, connect, disconnect, remove, connect at
+    start-up, add a server folder as a project, setup steps including a systemd user service); server projects in the
+    sidebar with a server mark.
+  - Validated: 63 Rust tests (the master answers the window's commands; a connection answers each message, streams and
+    closes its terminals; the service refuses a wrong token and answers with the right one; SSH address and program
+    checks; error wording) and 106 frontend tests (routing). In the app with a master on this PC: connected (host,
+    system, version shown), added a folder as a project, the tree with its git letters, the editor, a terminal (`git
+    log` ran on the master) and an agent session (it used the code index served by the master program; 15 s, $0.08)
+    all worked through the master; after closing the app the service kept running, and on reopening Qanuvi connected
+    by itself, reopened the project and listed the session. Memory: service 8–24 MB, the SSH relay 8 MB.
+  - Found and fixed while testing: the gutter marked every line when the file had LF line endings and git gave the
+    staged text with CRLF (line endings are now compared as equal, as in VS Code); Tauri took the master as the main
+    program (`default-run`).
+  - Linux: built on Windows with `cargo zigbuild --release --no-default-features --bin qanuvi-master --target
+    x86_64-unknown-linux-gnu.2.36` (zig 0.13 in `E:\DevTools\zig`, installed with the owner's permission): 4.75 MB,
+    runs on Debian 12's own libraries. On the owner's VPS (Debian 12, 6 cores, 5.7 GB) over real SSH: hello in 557 ms
+    including starting the service, then 50–90 ms per call (files, git status and diff, code index, search); a bash
+    terminal on the server; the service file private (`-rw-------`), listening on 127.0.0.1 only, 20 MB of memory. From
+    the app: a server with a key file (new optional "SSH key file" per server, `-i` with `IdentitiesOnly`; `~` allowed)
+    connected, a server folder added as a project, its file with gutter marks, its terminal ("Server terminal", the
+    server's own shell), and a project window for it. Both services were stopped afterwards; `~/qanuvi-test` (4.9 MB)
+    and `~/.local/share/qanuvi` (108 KB) are left on the VPS for the owner to keep or remove.
+  - Still to do: plan runs are still driven by the window, so a run stops when the desktop disconnects (moving the
+    runner into the master is a follow-up); agent configuration files and the preview's inspector work on this PC only;
+    the monthly budget counts this PC's sessions only; agents on the VPS need `claude` installed there; an installer or
+    copy step for `qanuvi-master` from the app.
+
+## Stage 3: personal layer
+
+- [x] **17. Memory and rules** (done 2026-11-10): facts, decisions, solutions, approved examples, style and rules as
+  separate entries; given to models as relevant slices; editable by the user.
+  - Built: `memory.rs` and a `memory` table (schema 3): entries of six kinds for every project or one project, with
+    tags, an id, change times, a use count and a deleted mark instead of erasing (for merging copies in Milestone 18).
+    A slice for a request: the rules and style that apply (the project's own first), then the entries that match the
+    request best (word matching on this PC: rarer words count more, title matches double), within a size limit
+    (default 1,500 characters); nothing at all when nothing applies. It goes to the agent before the user's message
+    (`with_context`), while only the user's words are stored and shown: for a new chat session, each plan step's first
+    turn, and the planner. Qanuvi's tool server gets `memory_search` (more on demand) and `memory_suggest` (an
+    agent's suggestion, kept as "suggested" until the user approves it) when the session's project has a memory. A
+    **Memory** page: on/off and size, entries by kind with filter, new / edit / delete (confirmed), suggestions with
+    Keep / Edit / Dismiss (and a count in the sidebar), and **Try it**: exactly what an agent would get for a request,
+    with its size in tokens. The memory stays on this PC, also for a server's projects (their slices are sent from
+    here).
+  - Validated: 70 Rust tests (saving, project scope, deleted marks, suggestions waiting, slice order and budget, empty
+    slice, ranking, the context before the message, the tool server's memory tools) and 108 frontend tests. In the app:
+    a fact added for packet-test; Try it for "Fix the rounding of the cart total" gave just that fact, 235 characters
+    (about 59 tokens); a new session asked, without reading files, how money is kept and answered from the memory
+    ("integer cents, never floats, two decimals only when shown"), then suggested "Tests run with npm test" with
+    `memory_suggest`, which waited as a suggestion (Sonnet, 5.8 s, $0.084). Found and fixed: the Try it preview counted
+    as a use.
+  - Left in the owner's app from the test: the packet-test fact and the suggested entry (packet-test is a test project).
+- [-] **18. Memory disk and sync** (main part done 2026-11-10): encrypted, versioned log; local only, local plus remote, or
+  remote only (Google Drive, Dropbox, OneDrive, FTP/SFTP, WebDAV, S3-compatible, own server); copies from two machines
+  merge.
+  - Built: `memory_disk.rs`. Each machine writes only its own file (`<device>.qxm`: its whole memory with deleted
+    marks), so two machines never write the same file (which sync services handle badly); a sync reads every machine's
+    file and keeps the newest version of each entry, deletions included; use counts keep the larger number; entries
+    from files are checked like the user's own. Files are encrypted: an Argon2id key from the passphrase and
+    XChaCha20-Poly1305 (a wrong passphrase or a changed file is refused, and then nothing is written). The previous file
+    is kept as a version (`<device>-<time>.qxv`, the last 10) and can be restored (its entries come back, newer ones are
+    deleted, and the other machines follow). Where: a folder (a Google Drive, Dropbox or OneDrive folder, a USB disk, a
+    network share) or a folder on one of the Servers over SSH (`~/.qanuvi-memory` by default; files are written whole
+    through a temporary name). The passphrase is kept in the system's credential store (Windows Credential Manager,
+    macOS Keychain, Secret Service), never in a file. The Memory page has a **Memory disk** section: this computer only
+    / a folder / a folder on a server, the passphrase (twice; change, forget), Sync now, sync by itself (at start-up,
+    15 s after a change, every 10 minutes; main window only), the last sync (entries written, other computers read,
+    what came in), and earlier versions with Restore (confirmed).
+  - Validated: 76 Rust tests and 110 frontend tests: encryption (wrong passphrase, a changed byte, a new salt and nonce
+    each time), two machines through a folder (adds, changes, a deletion that reaches the other machine, newest wins,
+    only encrypted files on the disk, a wrong passphrase writes nothing), restoring a version, keeping 10 versions, odd
+    file and folder names refused, the settings. On the owner's VPS over SSH (opt-in test): two machines synced through
+    `~/qanuvi-test/memory-disk` with an add and a deletion both ways, 4 syncs in 12 s (about 3 s each, one SSH
+    connection per file step); the files there start with `QXM1` and contain none of the entries' text; the test
+    folder was removed afterwards. The credential store: a test passphrase saved, read back and deleted (opt-in test).
+    By mouse in the app: an agent suggestion approved with Keep; A folder chosen, a test passphrase saved (it went to
+    Credential Manager) and the first sync ran by itself; Sync now kept the previous file as a version; a second computer
+    (simulated by an opt-in test writing its own file) was read and its entry appeared; Restore (confirmed) took the
+    memory back to the earlier version and removed that entry; Forget removed the passphrase from Credential Manager;
+    back to "This computer only". The test folder was removed.
+  - Still to do: "remote only"; built-in Google Drive, Dropbox and OneDrive sign-in, WebDAV, S3-compatible and FTP (the
+    folder option covers the first three through their desktop apps); one SSH connection for a whole sync.
+
+## Stage 4: accounts and remote control
+
+- [-] **19. Central Qanuvi account at qanuvi.com** (decided by the owner 2026-11-10): one Qanuvi account, signed in at
+  qanuvi.com (a Qlopy site, not yet deployed) with Google, Microsoft or GitHub there; OAuth 2.0 + PKCE; devices and
+  device approval, two-factor. (Qanuvi side done 2026-11-10; waiting for qanuvi.com.)
+  - Found: Qlopy already has the server side (`includes/rest-oauth.php`): authorization code with PKCE S256 for public
+    apps, redirect addresses matched exactly (http only for localhost), short-lived JWT access tokens and one-use
+    rotating refresh tokens, revoke (RFC 7009), `GET /api/qlopy/v1/users/me`, and per-app sessions the user can end on
+    Settings > API. Google and Microsoft sign-in exist in the arhamskin and direktor themes; GitHub does not; there is
+    no two-factor sign-in yet.
+  - Built: `account.rs` (desktop): qanuvi.com and Qanuvi's app id (`qanuvi-desktop`) are built in
+    (`QANUVI_ACCOUNT_SITE` / `QANUVI_ACCOUNT_CLIENT` point it at a test copy of the site). Signing in the way apps on a
+    computer do it (RFC 8252; the owner agreed): qanuvi.com's sign-in page opens in the user's browser (Google refuses
+    sign-ins inside app windows), Qanuvi never sees a password; a one-time listener on `http://127.0.0.1:47213/callback`
+    takes the code only with the right state; the code is exchanged with the PKCE verifier; the refresh token is kept
+    in the system credential store and the access token only in memory; a new access token comes from the one-use
+    refresh token when needed (a refused one signs out); "who am I" from `users/me`; signing out revokes the sign-in at
+    qanuvi.com and forgets it here; Cancel stops waiting. In the window: the **Account** page (Sign in; while waiting a
+    "Finish signing in in your browser" popup with Cancel; when signed in, name, e-mail and Sign out), and the account in
+    the new status bar (below). At start-up the kept sign-in is checked quietly; being offline does not sign out.
+  - Validated: 83 Rust tests: the PKCE challenge against the RFC 7636 example, site address rules, the authorize
+    address, the listener refusing a forged state, Cancel; and (opt-in, real port and credential store) the whole flow
+    against a stand-in Qlopy site that checks the verifier like Qlopy does: sign in, who am I, a restart signing in again
+    from the kept sign-in with the refresh token replaced, and sign out revoking the latest token with nothing left in
+    Credential Manager. In the app: the Account page and the account popup in the status bar.
+  - qanuvi.com (Qlopy work, when the site is deployed): switch on Tokens (JWT) and OAuth apps; add the app
+    `qanuvi-desktop` with the redirect address `http://127.0.0.1:47213/callback`; make Google and Microsoft sign-in
+    (now in two themes) a part any Qlopy site can use and add GitHub; show those buttons on the sign-in page the
+    authorize step uses; devices (Qlopy's per-app sessions) and device approval, and two-factor, on the site.
+- [x] **19b. Status bar** (asked for by the owner 2026-11-10): a thin bar along the bottom of the window, as in VS Code:
+  the account (the user's initial, or a person icon; a popup with Sign in, or name, e-mail, Account and Sign out), the
+  current project's git branch with commits to pull and push and the number of changes (opens Git), servers connected
+  (opens Servers; red when one failed), the memory disk's last sync or a problem (opens Memory), agents working or
+  waiting, and this month's agent cost (opens Agents). The sidebar's top button is "My workspace" again.
+
+- [x] **20. Relay service**: masters connect out; handlers reach them from anywhere; end-to-end encryption; activity log
+  and "being controlled" indicator on the master. (Done 2026-11-10.)
+  - Built: the relay (`qanuvi-relay`, about 680 KB on Linux; `relay_server.rs`) only passes messages on over a
+    WebSocket (ws:// only for localhost, wss:// otherwise): masters connect out and register with a secret; a pairing
+    code (`SLOT-XXXX-XXXX`, 10 minutes, one try) pairs a device with SPAKE2, so a relay that sees the code's slot
+    still cannot learn the key; each connection gets its own keys per direction (HKDF from the pairing key and both
+    sides' nonces) and every frame is sealed with XChaCha20-Poly1305 and a counter (changed, replayed or reordered frames
+    are refused). On the master (`relay_client.rs`): remote access on or off with the relay address and a name,
+    reconnecting with back-off, paired devices (Remove), an activity log of commands per device, Stop all. The remote
+    session speaks the same master protocol as SSH servers, so every page works the same. In the window: Servers →
+    "This computer: remote access" (Turn on, Pair a device with the code shown, In use now with Stop all, Paired
+    devices, Show activity) and "Pair with a computer through the relay"; a paired computer is a server "through the
+    relay" (its key in the credential store, removed with it); the status bar shows "Used from <device>" with Stop.
+    This computer's remote access runs in its master service on the app's own data, so it keeps working while the
+    window is closed.
+  - Fixed while testing: a computer paired with itself listed its own projects as remote ones and Stop then emptied
+    the sidebar (projects on this computer now always stay local); the Servers page could not be opened with no
+    project open.
+  - Validated: 89 Rust tests and 111 frontend tests: the code format, SPAKE2 pairing (a wrong code fails), sealing
+    (changed, replayed and reordered frames refused), and a whole pairing and remote session through a local relay. On
+    the owner's VPS: the relay ran there (through an SSH tunnel); in the app remote access connected, a code was shown,
+    the same PC paired as "Test laptop" through the relay, a project opened through it (files, git), the status bar
+    showed "Used from Test laptop", Stop all ended it; after the fix local projects stayed local. Then the server entry
+    and the paired device were removed, remote access turned off, and the relay and its data removed from the VPS.
+  - Still to do: run the relay at `wss://relay.qanuvi.com` behind TLS; tie masters to the Qanuvi account (19) so
+    devices can be listed without codes; permissions per device (with 21).
+- [ ] **21. Handler mode**: web handler first, then the phone app (Tauri mobile): pick master and project, commands,
+  approvals, progress, diffs, screenshots, push notifications; permissions per device.
+
+## Stage 5: assistant tools and voice
+
+- [ ] **22. Email** (Gmail, Outlook, IMAP/SMTP), **push**, **SMS through the user's gateway**, **reminders** kept on the
+  relay; drafts confirmed before sending unless a standing rule allows it.
+- [ ] **23. Voice**: speech to text and text to speech in the user's language (local Whisper or a provider), from the
+  phone and the desktop.
+
+## Stage 6: local models
+
+- [x] **24. Local coder and chat models** through Ollama or llama.cpp, with a router; cheap jobs (summaries, sorting,
+  small drafts) moved to them; savings measured. Widened by the owner (2026-11-10): also free models through
+  OpenRouter or OmniRoute, mixed and chosen by Qanuvi's own brain, so a developer who cannot pay for big models still
+  gets AI coding. (Main part done 2026-11-10.)
+  - Built: **Qanuvi agent**, a second agent next to the command-line one. `qanuvi --agent` (and
+    `qanuvi-master --agent` on servers) runs in the project folder and speaks the same JSON lines, so sessions,
+    approvals, history, costs, Stop and remote servers work unchanged. `llm.rs`: Ollama's own API (context set to
+    16k; its default is too small for an agent) and any OpenAI-compatible API (OpenRouter, OmniRoute, llama.cpp's
+    server, LM Studio, vLLM); model lists (Ollama tells which models can use tools; OpenRouter's list is cut to free
+    models that can); tool calls that small models write as text are recognised. `agent_tools.rs`: Read, Write,
+    Edit, Bash, Glob, Grep with the command-line agent's names and inputs, kept inside the project folder (`..`,
+    other absolute paths and links refused), .gitignore respected, short answers (400 lines, the end of long command
+    output), commands end after 2 minutes with everything they started. Permission modes: Manual asks before edits and
+    commands, Edit automatically asks for commands, Auto asks only for risky commands (deleting, pushing, downloading,
+    ...), Plan changes nothing. `brain.rs`: the user's models in their order; "Auto" sends questions to a model on
+    this computer first and changes to the first model; a rate-limited or unreachable model rests (1-2 min, 30 min when
+    unusable) and the next one takes over within the same turn; a model that breaks two tool calls in a row hands over;
+    models that break more than a third of their calls move down for code; what it learns is kept in
+    `brain.json`. The conversation is kept inside the model's context (old tool output shortened, oldest exchanges
+    left out) and saved for resuming; the project's `AGENTS.md` is added to the instructions. Keys are kept in
+    the credential store (`QANUVI_KEY_<PROVIDER>` on servers), never in settings or the window, and never sent
+    over plain http to another machine. In the window: Agents → Qanuvi agent (models in order with what the brain
+    learned, Up/Down/Remove; per provider its address, key and Find models; add any OpenAI-compatible server); the
+    session shows when the brain hands a turn to another model.
+  - Validated: 106 Rust tests and 115 frontend tests, among them the tools (folder limits, edits with Windows line
+    ends, ignored files, commands, risky commands), the brain's order, rests and distrust, the context trimming, and a
+    whole turn against a stand-in model server (a rate-limited model skipped, Read, Edit after approval, the answer,
+    the brain's records and the saved conversation). Live on this PC (RTX 3050 Ti 4 GB, Ollama, qwen2.5-coder:3b):
+    from the command line a rename in a Python file in 10 s; in the app Find models listed the local model (tools, 16k,
+    1.9 GB) and OpenRouter's free tool-using models, the model was added, and a question in a session was answered
+    with Read and Grep in 2.7 s, 2.4k tokens in and 83 out, $0. By mouse: Refuse (the file stayed as it was) and
+    Approve (notes.txt got its new last line; 2.6k tokens in, 108 out, $0).
+  - Fixed while testing: the small model called itself another company's assistant (the instructions now name the
+    Qanuvi agent and the model it runs on, and it answers so); a tool call written as text to a tool that does not
+    exist was shown as the answer (now refused, so the model tries again); edits that cannot work (text not in the
+    file, not unique, no change) are answered at once instead of asking the user; the approval card shows what an edit
+    replaces and with what, and that a write replaces the whole file (for both agents).
+  - Free AI from the start (asked for by the owner 2026-11-10: a new user with no paid plan gets workable AI help):
+    - When no paid agent is found, the session pane offers "Set up free AI" instead of a dead end; once free models are
+      set up, new sessions use the Qanuvi agent by themselves.
+    - Step-by-step guides (`guides.ts`) for Ollama, OpenRouter and OmniRoute, researched and dated 2026-11-10:
+      pages to open, commands to copy, the key, Check key (OpenRouter: free requests left today), Find models, Use the
+      recommended ones. Facts used: OpenRouter's free models give 50 requests a day (1,000 after buying $10 once), 20 a
+      minute, some need the privacy setting for free models; OmniRoute (MIT) installs with npm, runs on port 20128, its
+      key is under Endpoints, auto/coding routes between free providers.
+    - The two local models of the plan, fitted to the machine (`machine.rs` reads memory and the graphics card): a
+      coder and a conversation-and-thinking model from a dated list of Ollama models that can use tools (from
+      qwen2.5-coder:1.5b up to qwen3-coder:30b; qwen3:1.7b up to qwen3.8:27b), fast when it fits the card, slower from
+      main memory otherwise; "Get it" downloads through Ollama with progress and adds it. On the owner's PC (15.3 GB,
+      RTX 3050 Ti 4 GB): qwen2.5-coder:3b and qwen3:4b.
+    - Free cloud models ranked by rules (must use tools and be free; coding, bigger and longer-context models first;
+      tiny ones left out; OmniRoute's auto/coding first, OpenRouter's free router last; turns finished here count).
+      Live: 14 free OpenRouter models with tools; recommended nemotron-3-ultra-550b, gemma-4-31b, then openrouter/free.
+    - Update with a paid agent: with the user's yes, Claude Code checks the pages on the web and answers with the guides
+      in the same shape; Qanuvi checks them (known providers, https pages, one-line commands, a date), shows what
+      changed and keeps them only when the user accepts; Use the built-in ones goes back.
+    - Standing approvals (both agents): an approval card also offers "for this session" and "for 10 minutes"; file
+      changes count as one kind, other tools each their own; risky commands always ask. Kept by the session manager in
+      Rust, so plan runs and remote masters follow it too; "Ask again" above the input takes them back. In the models
+      list "in use" became "Stop using", and "Remove all" empties the list.
+    - Live on OpenRouter with the owner's key (2026-11-10): key check showed 50 of 50 free requests; a two-edit change
+      went to nemotron-3-ultra-550b:free (3 tool calls, none broken, $0); the second edit was approved by "for this
+      session".
+    - The model at work is shown: the brain names its pick and the reason at the start of each turn ("A question:
+      ollama/qwen2.5-coder:3b on this computer answers it, which costs nothing."), the "Working…" line and the line
+      under the conversation name the model, handovers name the next one.
+    - Streaming: Ollama (JSON lines) and OpenAI-compatible servers (data: events, tool arguments joined from pieces,
+      usage from the last event; a server answering in one piece still works). Text shows as it is written and the
+      whole message takes its place; text that is a tool call written as JSON is not shown live. Partial text goes to
+      the window only, not into the stored session. Live: 58 pieces from qwen2.5-coder:3b; nemotron-3-ultra on
+      OpenRouter seen mid-sentence in the app.
+    - Seen: the brain sorts jobs by words only, so "Read cart.txt and write a paragraph… do not change any file" counted
+      as a change (went to the cloud model, not the local one). For 24b.
+    - Local servers found and started (local_servers.rs): when Find gets no answer from Ollama or OmniRoute, Qanuvi
+      looks for the program (PATH, then the usual install places), starts it hidden in the background (`ollama serve`,
+      `omniroute serve --daemon --no-open --port N`), waits until it answers, then lists the models; not installed:
+      it says so and opens the install steps; running but asking for a key: it says so and opens the steps. Live:
+      OmniRoute 3.8.52 (npm) found and started on the owner's PC, no window, then asked for its key.
+    - Connect Qanuvi (OmniRoute): OmniRoute's own command line (it signs in with this machine's local token) makes an
+      API key named "Qanuvi"; Qanuvi keeps it in the credential store, never shows it, then finds the models. Models
+      behind OmniRoute count as cloud models, not "this computer" (the brain sends questions to local models first);
+      image, audio and embedding models are left out. The free-model ranking knows frontier families whose names carry
+      no size (Claude Opus/Sonnet, Gemini Pro, GPT-5: first; Gemini Flash, Kimi, GLM, DeepSeek, Qwen3 coder: strong).
+      Live on the owner's PC: connected; Antigravity offers Claude Sonnet 4.6, Claude Opus 4.6 Thinking, Gemini 3.8
+      Flash and GPT-OSS 120B; Kiro and Kimi Coding sign-ins had run out.
+    - Only connected models: OmniRoute's OpenAI-style list named 342 models (most from providers not connected);
+      Qanuvi keeps the ones OmniRoute's own list marks available, plus its routes and combos (49). Then each of the
+      six best-ranked is tried with one tiny message (with one tool) before it is recommended; those that do not
+      answer are struck out with the reason. Live: auto/claude-opus and auto/claude-sonnet failed (500 from a provider
+      behind them); Claude Sonnet 4.6 (6.7 s), Claude Opus 4.6 Thinking (6.2 s), auto/coding (4.4 s), GPT-OSS 120B
+      (4.2 s) answered. An edit in git-test through OmniRoute's Claude Sonnet 4.6: read, edit, approved, done, $0.
+    - Code-index tools for Qanuvi's own agent: project_map, find_symbol, outline, read_lines, search, called in the
+      agent's process (no MCP server), read-only (no approval, allowed in plan mode); the instructions prefer them over
+      reading whole files. Live: qwen2.5-coder:3b found grant_minutes with one find_symbol call (2.4k tokens, 8 s).
+    - Approval cards by agent (owner, 2026-11-11): Qanuvi agent: Approve · Allow for N min (N set on the Agents page,
+      1–240, default 10) · Decline; a paid agent (Claude Code): Approve · Allow for this session · Decline. Slim
+      buttons on one line, Decline quiet at the end. Live: "Allow for 10 min" on the first edit, the second went
+      through by itself. "Qanuvi brain" is called "Qanuvi core" in the app.
+    - Seen: the agent's answers show markdown as plain text (**bold**); render it in the pane.
+    - Free models first in plan runs: when the run's agent is paid and Qanuvi core has models, each step (money and
+      security work and steps naming a model excepted) first goes to Qanuvi's own agent ("qanuvi:auto", shown as
+      "Qanuvi core (free)"); when that does not finish the step, the paid agent takes over from the model it would
+      have used, and climbs as before. Run option, on by default. The run panel shows the steps free models finished
+      and what they saved, measured from the user's own runs (average cost of a finished paid step of the same kind;
+      this run's paid steps when there is no history). Live (free-test, 4 steps): README, add, sort on Qanuvi core
+      (OmniRoute Claude Sonnet 4.6) $0; the price step went straight to Claude Code Sonnet 5.5, $0.05; about $0.12
+      saved; all files right, all steps marked done.
+    - Crash fix (2026-11-11): the owner's laptop display went black then grey. Windows logs: Qanuvi's WebView2 grew
+      5.4 → 8.9 GB in two minutes (with Photoshop 6.6 GB on 15.3 GB RAM), the desktop compositor ran out of memory
+      (DWM exit 0xc00001ad ×6), disk paging errors, forced restart. Cause: the page's project effect called
+      agent.loadProject → newSession, which read agent.providerId right after writing it, so the effect depended on
+      it; restoring the last session (step 4 on Claude Code, default agent Qanuvi) set it back, the effect ran again —
+      an endless loop, ~50,000 DOM nodes a second. Fixed in both places (newSession reads settings only; the effect
+      runs its work untracked). Verified: nodes steady at 3,665, window ~200 MB. Not the local model (Ollama ~150 MB).
+    - Qanuvi core records: sessions save brain.json by adding their own changes under a lock file (two sessions at
+      once used to overwrite each other); tested with 8 threads.
+    - Markdown in the agent pane (agent/markdown.ts, small and safe: escaped first, then headings, bold, italics,
+      code, lists, quotes, http(s) links opened in the browser); text being written stays plain.
+    - Local servers: Ollama is the local engine (it is llama.cpp inside), so no separate llama.cpp. Other servers on
+      this computer (LM Studio, plain llama.cpp, vLLM) can have a start command that Qanuvi runs when they do not
+      answer. OmniRoute now starts hidden (`serve --no-open --no-tray`; `--daemon` opened a console window). The agent
+      starts a stopped Ollama/OmniRoute itself mid-turn and asks the same model again ("omniroute is not running;
+      Qanuvi starts it.").
+    - Load measured (owner's PC, 2026-11-11): Qanuvi idle ~200 MB (window ~185–210 MB + 8–15 MB core), CPU ~15–20%
+      (the machine's own idle). Local qwen2.5-coder:3b: graphics memory 0.5 → 2.8 GB (stays loaded 15 min), RAM −1 GB,
+      GPU/CPU peaks ~70–76% for seconds. OpenRouter: no local load beyond Qanuvi. OmniRoute: ~400–560 MB RAM. All
+      three together: free RAM 7.3 → 5.9 GB. Seen: qwen2.5-coder:3b read only line 1 of cart.txt and guessed the rest.
+    - Room check before anything heavy (owner, 2026-11-11: "measure the host PC before running anything"):
+      machine::room() reads free memory and free graphics memory right then; a local model loads only when it fits
+      (its size + context; the card takes what it can, the rest must fit in memory with 1.5 GB left for the computer),
+      otherwise the next model takes the turn with the reason in numbers. Starting Ollama/OmniRoute checks the same
+      way. A model already loaded needs nothing more.
+    - Online only (owner): "Use models on this computer (Ollama)" on the Qanuvi agent panel; off = no Ollama card, the
+      OpenRouter guide opens first for new users, local models in the list are skipped, nothing is installed, loaded
+      or started here. Live: off → a question went to Claude Sonnet on OmniRoute ("no model on this computer is set
+      up"), right answer.
+    - Logo v6 (purple Q, green braces, red dot) everywhere: taskbar/app icons, title bar, favicon.
+- [x] **24 done (2026-11-11)** apart from what moved to 24b (the decider) and 24c (first-time setup).
+- [-] **24c. First-time setup from Qanuvi's own knowledge (owner, 2026-11-10; wizard and OmniRoute done 2026-11-11, remote knowledge waits for qanuvi.com)**: on first run Qanuvi
+  offers to set up free AI by itself, from what it knows (like the OpenRouter and OmniRoute setups: find what is
+  installed, start it, connect it, pick the best free models), with the user's yes at each outside step. That
+  knowledge (guides, model lists, rankings) is later updated remotely from qanuvi.com; how is to be planned.
+  - Owner's wizard (2026-11-11): one guided setup so the user configures nothing by hand.
+    - Local: measure the PC; if it fits, download and install Ollama itself (with Windows' admin prompt when needed),
+      pull the fitting coder and chat models, start and connect them. Tell the truth when the PC is weak: small
+      local models answer questions but are not good enough for real coding — say so and steer to online models.
+    - OpenRouter: open the sign-up/sign-in page in the browser, wait for the user, then take the key (pasted into the
+      wizard) and set everything up (check key, free models, test messages, order).
+    - OmniRoute (owner said yes, 2026-11-11): install if missing (npm), start hidden, make Qanuvi's key, connect
+      API-key providers itself (reusing the OpenRouter key), build a free fallback combo, watch sign-ins and quota
+      and warn before they expire; sign-ins (Antigravity/Google, Kiro, Kimi) open in the browser for the user and
+      Qanuvi does the rest (`omniroute oauth start` — to be tried first). Advanced users can turn the assistance off
+      and use OmniRoute's panel. Each outside step only after the user's yes.
+    - Remote knowledge from qanuvi.com: provider steps, free-model lists, rankings, OmniRoute commands, published
+      by the owner and fetched by each Qanuvi when newer (signed, checked like the guides are now; shown before use).
+  - Built (2026-11-11):
+    - OmniRoute run by Qanuvi (omniroute.rs, OmniRoutePanel): connections with health (working / needs sign-in /
+      resting / error, from OmniRoute's provider status), Test, Renew sign-in (Antigravity: OmniRoute's own login
+      helper, which catches Google's answer itself; others open OmniRoute's own page), a curated list of free
+      providers (Antigravity, OpenRouter, Gemini AI Studio, Groq, Cerebras, NVIDIA NIM, Mistral; dated, for qanuvi.com
+      to update) connected with a pasted key or the key Qanuvi keeps (sent on stdin, never on a command line), the
+      whole catalog (371 providers) for experts, and the "qanuvi-free" fallback combo built from the models that
+      answered Qanuvi's test (then put in Qanuvi core's list). "Let Qanuvi run OmniRoute for me" can be turned off.
+      Live: connections read right (Kiro and Kimi need sign-in), OpenRouter tested, qanuvi-free made (Sonnet 4.6 →
+      Opus 4.6 Thinking → GPT-OSS 120B) next to the owner's own combos, untouched.
+    - Setup wizard (SetupWizard): this computer (memory, card, free now) with an honest verdict (localVerdict: "for
+      questions" on small cards, "for coding" with a capable coder that runs fast, "none"); ticks for local /
+      OpenRouter / OmniRoute; installs Ollama, Node.js (winget, Windows asks itself) and OmniRoute (npm) at a click
+      (other systems get the official command), downloads the fitting models, takes the OpenRouter key and tests the
+      free models, starts and connects OmniRoute, reuses the OpenRouter key there, tests and makes the combo; ends with
+      online models first and the Qanuvi agent chosen. Opened from "Set up free AI" and from the Agents page. Live on
+      the owner's PC (all installed): every step ran, 11 models, window ~220 MB. Not yet tried live: the installs
+      themselves (nothing missing here) and the Google sign-in.
+- [ ] **24d. More free providers, images and video (owner, 2026-11-11, later)**: other big free sources besides
+  OmniRoute and OpenRouter (free Claude/Gemini through sign-ins like Antigravity: Kiro, Amazon Q, GitHub Copilot
+  Free, Gemini CLI; Kimi models where a free tier exists), and image and video generation: free tiers (Pollinations,
+  AI Horde, a local Stable Diffusion WebUI; video is mostly paid) and paid APIs the user connects (fal.ai, Runway,
+  Leonardo, Ideogram, Recraft, MiniMax). Unofficial "web" bridges are left out by default (they break and may break
+  the site's terms).
+  - Checked on the web 2026-11-11 (to recheck before building): no big provider gives Kimi K3 free — Moonshot's API
+    starts after a small top-up, OpenRouter lists K3/K3.1 Pro paid only; free K3 claims come from small unverified
+    sites. Free big open models do exist: Ollama Cloud (Kimi K2, GLM, Qwen3, gpt-oss; one request at a time, session
+    caps), NVIDIA NIM (many models, evaluation limits), ModelScope (~2,000 calls a day), Gemini AI Studio (Gemini Flash
+    free), Mistral (Codestral, Devstral; data may be used for training), Cloudflare Workers AI, Groq, Z.ai GLM; no
+    free Claude API anywhere (only through sign-ins like Antigravity or Kiro). Kimi K3.1 Pro weights are open (too
+    big for a home PC).
+  - Small (2026-11-11): sign-in rows show the account to sign in with; "Test" on a sign-in connection tests one of its
+    models (OmniRoute cannot test those and said "SKIP", which used to read as a pass).
+- [ ] **Release for self-development (owner, 2026-11-11)**: after 24b, a release build (installer) the owner uses to
+  develop the rest of Qanuvi with Qanuvi itself.
+- [x] **24b. The decider (owner's design 2026-11-10, revised 2026-11-11; built and tested 2026-11-11)**: one model takes the
+  decisions (what kind of job, which model does it, when to hand over, whether the result is good enough), the others
+  do the work.
+  - Who decides: if the user has any paid agent, it must be the decider. With no paid agent, the free models decide,
+    best first, one after another (the next takes over when one is unavailable).
+  - Modes (the user picks one):
+    1. **Paid decides, free works**: the paid model decides; free models do the work; the paid one does what the free
+       ones could not, or steps in when they get into trouble (Qanuvi core watches: broken tool calls, failed tests,
+       repeated errors, a step not finished).
+    2. **Priority**: save tokens / balanced / solve problems first (bigger plans spend more on the paid model).
+    3. **Direct**: only the paid model, as today; Qanuvi core helps with context (memory, packets); MCP tools stay the
+       model's own feature.
+    4. **Free decides, paid works** (for chat): a free model decides what to send to the paid one (which model,
+       how much context), so the paid one gets fewer, better requests.
+  - Quality first, cost second: cost control is a choice, quality always matters. A free model's result is checked
+    before it is accepted (the project's tests where there are any; the decider reviews the change — a short look at
+    the diff, not a re-run); not good enough goes to the paid model.
+  - Small paid packages: GitHub Copilot (its $10 plan and its bigger ones) is a must, later; Claude Code first.
+  - Today's brain (question/change by words, local first for questions, list order for changes, handover on rate
+    limits, outages and broken tool calls, records per model) is the fallback whenever the decider is unavailable or
+    answers nonsense.
+  - A model the user picks is the only one used (owner, 2026-11-11): no rotation, no handover, whatever else is set;
+    when it fails, the error says why and the pane offers "Switch to Auto".
+  - Built so far (2026-11-11):
+    - src/lib/core/decider.ts: modes, seats (decider/workers; a personal model or Copilot can take a seat later),
+      the plan assignment prompt and its parser (money and security always paid; unreadable answers fall back to
+      rules by priority), the review prompt (anything unclear = not accepted), the chat model choice, decision records.
+    - Rust: brain::decide asks Qanuvi core's free models one after another for a short decision (no tools);
+      core_decide command; requests without tools leave the tools field out.
+    - Plan runs: with a paid agent and free models, the decider (the paid agent, read-only, one call) assigns every
+      step to free or paid; a free model's "done" is reviewed by the decider against the step's diff and the tests;
+      rejected → the step reopens and the paid model gets it with the reason; decisions kept in the run record.
+      Direct and Free-decides modes keep free models out of plan runs.
+    - "How the team works" panel on the Agents page (four modes, priority).
+    - Fix: a model or permission mode chosen mid-session now reaches the running agent (set_model /
+      set_permission_mode, the same requests the CLI agent takes); choosing on the Agents page also applies to the
+      current session. Live: gemma chosen → "you chose it", provider busy (429) → no rotation, "Switch to Auto" → the
+      same session went on with the local model.
+  - Built next (2026-11-11):
+    - Free decides, paid works (chat): the paid agent's model menu has "Auto (a free model picks)"; per message a free
+      model picks one of the paid agent's own models (generic: whichever paid agent the user has), and the pick and
+      its reason show in the conversation.
+    - A troubled free chat (Qanuvi agent on Auto) goes to the paid agent with what the free model did: automatic in
+      "Paid decides" and "Priority", a "Hand this to ..." button otherwise.
+    - The run panel shows the decisions (assignments and reviews).
+    - Command menu: "/" opens it, any other key closes it, picking closes it, the agent chip opens it.
+    - Fix: the review saw changes from earlier steps (diff against the last commit), so a correct step 3 was
+      rejected. The runner now keeps the files' text before each free step and the review sees only that step's lines
+      (stepDiff, with tests).
+  - Live tests (2026-11-11):
+    - Menu: "/" opens; a, Right, Left, Esc, Up, Enter and 1 each close it; Enter sends nothing; chip opens it.
+    - Free decides: a free model picked Haiku 5.5 for a simple file question; answer correct, $0.0042.
+    - Plan run (paid decides, free-test, 4 steps): steps 1-3 free, step 4 paid (money); every free step reviewed and
+      accepted first try after the fix; 4/4 done, $0.03; Qanuvi + WebView at most 250 MB, free RAM never under 4.5 GB.
+    - Not tested live: the automatic hand-over (the free models did not fail any request in the tests).
+  - Moved to 24e: plan runs always go to the paid agent when one is installed.
+- [ ] **24e. Paid agent on top, in every mode (owner, 2026-11-11)**: when a paid agent is active (installed, signed
+  in, not at its limit) it is always the top layer: the decider and the overall monitor that keeps everything on track.
+  Free models may work and even take a first pass at deciding, but the paid agent checks and can overrule.
+  - Plan runs: always the paid agent as decider, whichever agent is chosen for new sessions (today a run with the
+    Qanuvi agent chosen is free-only and nobody reviews).
+  - Free decides, paid works: the free model stays the first layer (picks the model, trims the request); the paid
+    agent sees that pick with the request and can overrule it (ask for a bigger model, or say the trimmed request lost
+    something). Overrules are recorded, so the free picks get better and the user can see how often it happens.
+  - Free chat (Qanuvi agent on Auto) with a paid agent present: the paid agent reviews free models' changes (not
+    questions) before they count, as in plan runs; trouble hands over as today.
+  - The monitor: one short, read-only paid call at the checkpoints (a step done, a change made, trouble seen, a free
+    pick), never per message for plain questions; its notes go into the decisions list.
+  - When the paid agent is not active (limit, sign-in expired, offline): the free models take the top seat one after
+    another, as with no paid agent, and hand it back when the paid one returns; the pane says so.
+  - Direct mode: unchanged (only the paid agent works). No paid agent: unchanged (free models decide).
+  - [x] Plan runs and plan writing use the paid agent whenever it is active (agent.runProviderId), whichever agent new
+    sessions use (2026-11-11). Live: Qanuvi agent set for new sessions, run of step 1 on free-test: Claude Code
+    assigned it, a free model did it, Claude Code reviewed and accepted it.
+  - [ ] The run's cost line leaves out the decider's own calls (assignment, reviews): the live review cost $0.04 on
+    Opus 5.5 while the run showed $0. Count them, and consider a cheaper model for short reviews.
+  - [ ] Free decides, paid works: the paid agent sees and can overrule the free pick.
+  - [ ] Free chat with a paid agent present: the paid agent reviews changes.
+  - [ ] Paid agent not active: free models hold the top seat and hand it back; the pane says so.
