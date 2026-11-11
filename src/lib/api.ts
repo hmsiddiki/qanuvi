@@ -251,15 +251,26 @@ export const api = {
     /** A new empty file or folder (never replaces one that is there). */
     create: (projectId: string, path: string, folder: boolean) =>
       invoke<void>("files_create", { projectId, path, folder }),
+    /** Renames or moves a file or folder inside the project (never replaces). */
+    rename: (projectId: string, from: string, to: string) => invoke<void>("files_rename", { projectId, from, to }),
+    /** Moves a file or folder to the Recycle Bin. */
+    trash: (projectId: string, path: string) => invoke<void>("files_trash", { projectId, path }),
     search: (projectId: string, query: string, regex: boolean, caseSensitive: boolean) =>
       invoke<SearchResult>("files_search", { projectId, query, regex, caseSensitive }),
   },
   term: {
     shells: () => invoke<Shell[]>("term_shells"),
-    spawn: (projectId: string, shell: string, cols: number, rows: number, onEvent: (e: TermEvent) => void) => {
+    spawn: (
+      projectId: string,
+      shell: string,
+      cols: number,
+      rows: number,
+      onEvent: (e: TermEvent) => void,
+      dir: string | null = null,
+    ) => {
       const channel = new Channel<TermEvent>();
       channel.onmessage = onEvent;
-      return invoke<string>("term_spawn", { projectId, shell, cols, rows, onEvent: channel });
+      return invoke<string>("term_spawn", { projectId, shell, cols, rows, dir, onEvent: channel });
     },
     write: (id: string, data: string) => invoke<void>("term_write", { id, data }),
     resize: (id: string, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),

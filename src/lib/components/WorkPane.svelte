@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { contextMenu } from "$lib/stores/contextMenu.svelte";
+  import * as files from "$lib/fileActions";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
@@ -60,6 +62,34 @@
   $effect(() => {
     if (editor.activeKey) ui.view = "editor";
   });
+
+  /** Right-click on a file tab. */
+  function tabMenu(e: MouseEvent, tab: (typeof fileTabs)[number]) {
+    const tabs = fileTabs;
+    const at = tabs.findIndex((t) => t.key === tab.key);
+    const closeAll = async (list: typeof tabs) => {
+      for (const t of list) await editor.close(t.key);
+    };
+    const own = project && !tab.global && tab.projectId === project.id ? project : null;
+    contextMenu.show(e, [
+      [
+        { label: "Close", hint: "Ctrl+W", action: () => editor.close(tab.key) },
+        {
+          label: "Close others",
+          disabled: tabs.length < 2,
+          action: () => closeAll(tabs.filter((t) => t.key !== tab.key)),
+        },
+        { label: "Close to the right", disabled: at === tabs.length - 1, action: () => closeAll(tabs.slice(at + 1)) },
+        { label: "Close saved", action: () => closeAll(tabs.filter((t) => !t.dirty)) },
+      ],
+      own && [
+        { label: "Copy path", action: () => files.copyPath(own, tab.path) },
+        { label: "Copy relative path", action: () => files.copyRelativePath(tab.path) },
+        { label: "Reveal in File Explorer", action: () => files.reveal(own, tab.path) },
+      ],
+      own && [{ label: "Add to the message", action: () => files.addToMessage(tab.path) }],
+    ]);
+  }
 
   function fileName(path: string) {
     return path.split("/").pop() ?? path;
@@ -123,6 +153,7 @@
                     ui.view = "editor";
                   }}
                   onauxclick={(e) => e.button === 1 && editor.close(tab.key)}
+                  oncontextmenu={(e) => tabMenu(e, tab)}
                 >
                   <FileCode size={13} />
                   <span class="name">{tab.label ?? fileName(tab.path)}</span>
@@ -298,6 +329,7 @@
           <TerminalView
             projectId={t.projectId}
             shell={t.shell}
+            dir={t.dir}
             visible={t.projectId === project?.id && t.key === activeTerm}
             ontitle={(title) => (t.title = title.length > 30 ? `${title.slice(0, 30)}…` : title || t.title)}
             onexit={() => (t.ended = true)}

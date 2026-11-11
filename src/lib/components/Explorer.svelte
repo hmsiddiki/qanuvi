@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { contextMenu } from "$lib/stores/contextMenu.svelte";
+  import * as files from "$lib/fileActions";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Folder from "@lucide/svelte/icons/folder";
@@ -76,6 +78,64 @@
     await Promise.all([...open.map((p) => load(p)), loadGit()]);
   }
 
+  /** Right-click on a file or folder. */
+  function rowMenu(e: MouseEvent, entry: Entry, letter: string | undefined) {
+    const p = project;
+    const rel = entry.path;
+    const dir = entry.is_dir ? rel : files.parentOf(rel);
+    const after = () => refreshAround(rel);
+    contextMenu.show(e, [
+      entry.is_dir
+        ? [
+            { label: "New file…", action: () => files.newItem(p, dir, false, after) },
+            { label: "New folder…", action: () => files.newItem(p, dir, true, after) },
+          ]
+        : [
+            { label: "Open", action: () => editor.open(p.id, rel) },
+            { label: "Add to the message", action: () => files.addToMessage(rel) },
+          ],
+      [{ label: "Open in terminal", action: () => files.openTerminal(p, dir) }],
+      [
+        { label: "Rename…", action: () => files.rename(p, rel, after) },
+        { label: "Delete", danger: true, action: () => files.trash(p, rel, entry.is_dir, after) },
+      ],
+      [
+        { label: "Copy path", action: () => files.copyPath(p, rel) },
+        { label: "Copy relative path", action: () => files.copyRelativePath(rel) },
+        { label: "Reveal in File Explorer", action: () => files.reveal(p, rel) },
+      ],
+      !entry.is_dir &&
+        !!letter && [
+          { label: "Git: stage", action: () => files.stage(p, rel) },
+          { label: "Git: discard changes", danger: true, action: () => files.discard(p, rel) },
+        ],
+    ]);
+  }
+
+  /** Right-click on the tree's empty space: the project's top. */
+  function rootMenu(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('[role="treeitem"]')) return;
+    const p = project;
+    contextMenu.show(e, [
+      [
+        { label: "New file…", action: () => files.newItem(p, "", false, () => refresh()) },
+        { label: "New folder…", action: () => files.newItem(p, "", true, () => refresh()) },
+      ],
+      [{ label: "Open in terminal", action: () => files.openTerminal(p, "") }],
+      [
+        { label: "Refresh", action: () => refresh() },
+        { label: "Collapse folders", action: () => collapseAll() },
+        { label: "Reveal in File Explorer", action: () => files.reveal(p, "") },
+      ],
+    ]);
+  }
+
+  /** After a change: the folder it was in (and the top) load again. */
+  async function refreshAround(rel: string) {
+    await Promise.all([load(files.parentOf(rel)), load(""), loadGit()]);
+    if (expanded.has(rel)) await load(rel);
+  }
+
   export function collapseAll() {
     expanded.clear();
   }
@@ -116,7 +176,7 @@
     </header>
   {/if}
   {#if error}<p class="error">{error}</p>{/if}
-  <div class="tree" role="tree" aria-label="Files">
+  <div class="tree" role="tree" aria-label="Files" tabindex="-1" oncontextmenu={rootMenu}>
     {#each flat as { entry, depth, ignored } (entry.path)}
       {@const open = expanded.has(entry.path)}
       {@const letter = deco.files.get(entry.path)}
@@ -131,6 +191,7 @@
         style:padding-left="{8 + depth * 14}px"
         title={entry.path}
         onclick={() => (entry.is_dir ? toggle(entry) : editor.open(project.id, entry.path))}
+        oncontextmenu={(e) => rowMenu(e, entry, letter)}
       >
         {#if entry.is_dir}
           <span class="chev"

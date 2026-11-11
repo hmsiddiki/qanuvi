@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
+  import * as files from "$lib/fileActions";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import ProjectPanel from "./ProjectPanel.svelte";
   import { panel, type PanelView } from "$lib/stores/panel.svelte";
@@ -207,6 +209,19 @@
             <button
               type="button"
               class="project-main"
+              oncontextmenu={(e) =>
+                contextMenu.show(e, [
+                  [
+                    { label: "Open", action: () => projects.select(p.id) },
+                    { label: "Open in a new window", action: () => windows.openProject(p.id, p.name) },
+                  ],
+                  [{ label: "Project settings…", action: () => (ui.settingsFor = p.id) }],
+                  !p.master && [
+                    { label: "Copy path", action: () => copyText(p.path) },
+                    { label: "Reveal in File Explorer", action: () => files.reveal(p, "") },
+                  ],
+                  [{ label: "Remove from Qanuvi…", danger: true, action: () => removeProject(p.id, p.name) }],
+                ])}
               title="{p.master
                 ? `On ${masters.list.find((m) => m.id === p.master)?.name ?? 'a server'}: `
                 : ''}{p.path}  ·  {style.label}"
@@ -278,6 +293,18 @@
               <button
                 type="button"
                 class="session-main"
+                oncontextmenu={(e) =>
+                  contextMenu.show(e, [
+                    [{ label: "Open", action: () => agent.select(s.id) }],
+                    [
+                      {
+                        label: "Rename…",
+                        action: () =>
+                          contextMenu.ask("Rename the session", s.title, "Rename", (t) => agent.rename(s.id, t)),
+                      },
+                      { label: "Delete", danger: true, action: () => agent.remove(s.id) },
+                    ],
+                  ])}
                 title="{s.title} · {s.model}"
                 onclick={() => agent.select(s.id)}
               >

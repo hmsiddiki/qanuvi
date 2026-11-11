@@ -3,6 +3,9 @@
    * One CodeMirror view for all tabs. Each tab keeps its own editor state (text, cursor, undo history); switching
    * tabs swaps the state, which is cheaper than a view per tab.
    */
+  import { clipboardText, contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
+  import { addToMessage } from "$lib/fileActions";
+  import { ui } from "$lib/stores/ui.svelte";
   import { onDestroy, onMount } from "svelte";
   import { basicSetup } from "codemirror";
   import { EditorState, Compartment } from "@codemirror/state";
@@ -37,6 +40,68 @@
     const v = await api.git.versions(t.projectId, t.path).catch(() => null);
     const base = v ? (v.index ?? v.head) : null;
     if (view && shownKey === t.key) view.dispatch({ effects: setGitBase.of(base) });
+  }
+
+  /** Right-click in the editor. */
+  function menu(e: MouseEvent) {
+    const v = view;
+    const t = tab;
+    if (!v || !t) return;
+    // A right-click outside the selection moves the cursor there first, as editors do.
+    const at = v.posAtCoords({ x: e.clientX, y: e.clientY });
+    const sel = v.state.selection.main;
+    if (at !== null && (at < sel.from || at > sel.to)) v.dispatch({ selection: { anchor: at } });
+    const s = v.state.selection.main;
+    const text = v.state.sliceDoc(s.from, s.to);
+    const word = v.state.wordAt(s.head);
+    const name = word ? v.state.sliceDoc(word.from, word.to) : "";
+    const project = !t.global && !t.config;
+    const lines = { from: v.state.doc.lineAt(s.from).number, to: v.state.doc.lineAt(s.to).number, text };
+    const insert = (value: string) => {
+      v.dispatch(v.state.replaceSelection(value));
+      v.focus();
+    };
+    contextMenu.show(e, [
+      project && name && [{ label: `Go to definition of ${name}`, action: () => goToDefinition(name) }],
+      [
+        {
+          label: "Cut",
+          hint: "Ctrl+X",
+          disabled: !text,
+          action: async () => (await copyText(text)) && insert(""),
+        },
+        { label: "Copy", hint: "Ctrl+C", disabled: !text, action: () => copyText(text) },
+        { label: "Paste", hint: "Ctrl+V", action: async () => insert(await clipboardText()) },
+        {
+          label: "Select all",
+          hint: "Ctrl+A",
+          action: () => (v.dispatch({ selection: { anchor: 0, head: v.state.doc.length } }), v.focus()),
+        },
+      ],
+      project && [
+        {
+          label: text ? "Add the selection to the message" : "Add this line to the message",
+          action: () => addToMessage(t.path, text ? lines : { from: lines.from, to: lines.from, text: "" }),
+        },
+        { label: "Git: who changed this line", hint: "Alt+B", action: () => blame() },
+      ],
+    ]);
+  }
+
+  /** The symbol's definition from the code index: the only match opens; several open the "Go to" box. */
+  async function goToDefinition(name: string) {
+    const t = tab;
+    if (!t) return;
+    try {
+      const found = (await api.index.find(t.projectId, name)).filter((d) => d.name === name);
+      if (found.length === 1) await editor.open(t.projectId, found[0].path, found[0].line);
+      else {
+        ui.quickOpenText = `#${name}`;
+        ui.quickOpen = true;
+      }
+    } catch (err) {
+      blameText = errorText(err);
+    }
   }
 
   function blame() {
@@ -161,7 +226,7 @@
   });
 </script>
 
-<div class="code-editor" bind:this={host}>
+<div class="code-editor" bind:this={host} oncontextmenu={menu} role="presentation">
   {#if blameText}<div class="blame" role="status">{blameText}</div>{/if}
 </div>
 

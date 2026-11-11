@@ -148,6 +148,25 @@ async fn files_read(
     blocking(move || files::read_file(&root, &path)).await
 }
 
+/// Renames or moves a file or folder inside the project.
+#[tauri::command]
+async fn files_rename(
+    state: State<'_, AppState>,
+    project_id: String,
+    from: String,
+    to: String,
+) -> Res<()> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::rename(&root, &from, &to)).await
+}
+
+/// Moves a file or folder to the Recycle Bin.
+#[tauri::command]
+async fn files_trash(state: State<'_, AppState>, project_id: String, path: String) -> Res<()> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || files::trash(&root, &path)).await
+}
+
 #[tauri::command]
 async fn files_create(
     state: State<'_, AppState>,
@@ -248,6 +267,7 @@ fn term_shells() -> Vec<terminal::Shell> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn term_spawn(
     window: tauri::Window,
     state: State<AppState>,
@@ -255,12 +275,14 @@ fn term_spawn(
     shell: String,
     cols: u16,
     rows: u16,
+    dir: Option<String>,
     on_event: Channel<terminal::TermEvent>,
 ) -> Res<String> {
     let root = project_root(&state, &project_id)?;
+    let cwd = files::folder_in(&root, dir.as_deref())?;
     let id = state
         .terminals
-        .spawn(&project_id, &root, &shell, cols, rows, on_event.into())?;
+        .spawn(&project_id, &cwd, &shell, cols, rows, on_event.into())?;
     state.terminals.set_owner(&id, window.label());
     Ok(id)
 }
@@ -1436,6 +1458,8 @@ pub fn run() {
             files_read,
             files_write,
             files_create,
+            files_rename,
+            files_trash,
             files_search,
             index_find,
             checks_run,

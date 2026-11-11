@@ -172,6 +172,12 @@ impl Master {
                 &s(args, "path"),
                 b(args, "folder"),
             )),
+            "files_rename" => to(files::rename(
+                &self.root(args)?,
+                &s(args, "from"),
+                &s(args, "to"),
+            )),
+            "files_trash" => to(files::trash(&self.root(args)?, &s(args, "path"))),
             "files_write" => to(files::write_file(
                 &self.root(args)?,
                 &s(args, "path"),
@@ -219,9 +225,10 @@ impl Master {
                     sink.send(serde_json::to_value(e).unwrap_or(Value::Null))
                         .is_ok()
                 });
+                let cwd = files::folder_in(&root, opt(args, "dir").as_deref())?;
                 let id = self.terminals.spawn(
                     &s(args, "projectId"),
-                    &root,
+                    &cwd,
                     &s(args, "shell"),
                     n(args, "cols").max(10) as u16,
                     n(args, "rows").max(4) as u16,

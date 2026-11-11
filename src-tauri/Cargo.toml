@@ -62,6 +62,7 @@ sha2 = "0.11.1"
 spake2 = "0.4.0"
 hkdf = "0.13.0"
 ed25519-dalek = "2"
+trash = "5"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

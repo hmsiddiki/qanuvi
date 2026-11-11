@@ -7,6 +7,8 @@ export interface TerminalTab {
   shell: string;
   title: string;
   ended: boolean;
+  /** A folder of the project to start in (right-click → Open in terminal); the project's top otherwise. */
+  dir?: string;
 }
 
 let counter = 0;
@@ -38,12 +40,15 @@ class TerminalsStore {
   /** Projects on a server: their terminals run the server's own default shell (this PC's list does not apply). */
   remote: (projectId: string) => boolean = () => false;
 
-  open(projectId: string, shellId?: string): void {
+  open(projectId: string, shellId?: string, dir?: string): void {
     const onServer = this.remote(projectId);
     const shell = onServer ? "" : shellId || settings.value.defaultShell || this.shells[0]?.id || "";
     const label = onServer ? "Server terminal" : (this.shells.find((s) => s.id === shell)?.label ?? "Terminal");
     const key = `term-${++counter}`;
-    this.tabs = [...this.tabs, { key, projectId, shell, title: label, ended: false }];
+    this.tabs = [
+      ...this.tabs,
+      { key, projectId, shell, title: dir ? `${label} · ${dir.split("/").pop()}` : label, ended: false, dir },
+    ];
     this.activeByProject = { ...this.activeByProject, [projectId]: key };
   }
 

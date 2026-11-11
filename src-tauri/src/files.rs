@@ -239,6 +239,55 @@ pub fn create(root: &Path, rel: &str, folder: bool) -> Result<(), String> {
     }
 }
 
+/// Renames or moves a file or folder inside the project (right-click → Rename). Never replaces something already
+/// there.
+pub fn rename(root: &Path, from: &str, to: &str) -> Result<(), String> {
+    let (from, to) = (from.trim().trim_matches('/'), to.trim().trim_matches('/'));
+    if from.is_empty() || to.is_empty() {
+        return Err("Give a name.".into());
+    }
+    let a = resolve(root, from)?;
+    if !a.exists() {
+        return Err(format!("{from} is not there any more."));
+    }
+    let b = resolve(root, to)?;
+    if b.exists() {
+        return Err(format!("{to} exists already."));
+    }
+    std::fs::rename(&a, &b).map_err(|e| format!("{from}: {e}"))
+}
+
+/// Moves a file or folder of the project to the system's Recycle Bin (Trash), where it can be restored.
+pub fn trash(root: &Path, rel: &str) -> Result<(), String> {
+    let rel = rel.trim().trim_matches('/');
+    if rel.is_empty() || rel == "." {
+        return Err("The project folder itself is not deleted from here.".into());
+    }
+    let p = resolve(root, rel)?;
+    if !p.exists() {
+        return Err(format!("{rel} is not there any more."));
+    }
+    trash::delete(&p).map_err(|e| format!("{rel} could not be moved to the Recycle Bin: {e}"))
+}
+
+/// A folder inside the project to start a terminal in (right-click → Open in terminal); the project root otherwise.
+pub fn folder_in(root: &Path, rel: Option<&str>) -> Result<std::path::PathBuf, String> {
+    match rel
+        .map(|r| r.trim().trim_matches('/'))
+        .filter(|r| !r.is_empty())
+    {
+        Some(r) => {
+            let p = resolve(root, r)?;
+            if p.is_dir() {
+                Ok(p)
+            } else {
+                Err(format!("{r} is not a folder."))
+            }
+        }
+        None => Ok(root.to_path_buf()),
+    }
+}
+
 /// Saves to a path that was already checked by the caller (see `write_file` for the rules).
 pub fn write_path(
     path: &Path,
@@ -555,5 +604,35 @@ mod create_tests {
         assert!(create(dir.path(), "../outside.txt", false).is_err());
         assert!(create(dir.path(), "missing/x.txt", false).is_err());
         assert!(create(dir.path(), "  ", false).is_err());
+    }
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::*;
+
+    #[test]
+    fn renames_inside_the_project_without_replacing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+        std::fs::write(dir.path().join("b.txt"), "b").unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        assert!(
+            rename(dir.path(), "a.txt", "b.txt")
+                .unwrap_err()
+                .contains("exists")
+        );
+        rename(dir.path(), "a.txt", "sub/c.txt").unwrap();
+        assert!(dir.path().join("sub/c.txt").is_file());
+        assert!(rename(dir.path(), "b.txt", "../out.txt").is_err());
+        assert!(rename(dir.path(), "gone.txt", "x.txt").is_err());
+        assert!(trash(dir.path(), "").is_err());
+        assert!(trash(dir.path(), "../x").is_err());
+        assert_eq!(
+            folder_in(dir.path(), Some("sub")).unwrap(),
+            resolve(dir.path(), "sub").unwrap()
+        );
+        assert!(folder_in(dir.path(), Some("b.txt")).is_err());
+        assert_eq!(folder_in(dir.path(), None).unwrap(), dir.path());
     }
 }

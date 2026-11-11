@@ -1,5 +1,6 @@
 <script lang="ts">
   /** One terminal: an xterm.js screen connected to a real shell in the Rust core. */
+  import { clipboardText, contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import { onDestroy, onMount } from "svelte";
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
@@ -12,9 +13,33 @@
     visible: boolean;
     onexit?: () => void;
     ontitle?: (title: string) => void;
+    /** A folder of the project to start in. */
+    dir?: string;
   }
 
-  let { projectId, shell, visible, onexit, ontitle }: Props = $props();
+  let { projectId, shell, visible, onexit, ontitle, dir }: Props = $props();
+
+  function menu(e: MouseEvent) {
+    const t = term;
+    if (!t) return;
+    const selected = t.getSelection();
+    contextMenu.show(e, [
+      [
+        { label: "Copy", disabled: !selected, action: () => copyText(selected) },
+        {
+          label: "Paste",
+          disabled: !id || exited,
+          action: async () => {
+            const text = await clipboardText();
+            if (text && id) await api.term.write(id, text);
+            t.focus();
+          },
+        },
+        { label: "Select all", action: () => t.selectAll() },
+      ],
+      [{ label: "Clear", action: () => (t.clear(), t.focus()) }],
+    ]);
+  }
 
   let host: HTMLDivElement;
   let term: Terminal | null = null;
@@ -93,14 +118,21 @@
     });
 
     api.term
-      .spawn(projectId, shell, term.cols, term.rows, (event) => {
-        if (event.kind === "data") term?.write(event.data);
-        else {
-          exited = true;
-          term?.write("\r\n\x1b[90m[The shell has ended. Close this tab or open a new terminal.]\x1b[0m\r\n");
-          onexit?.();
-        }
-      })
+      .spawn(
+        projectId,
+        shell,
+        term.cols,
+        term.rows,
+        (event) => {
+          if (event.kind === "data") term?.write(event.data);
+          else {
+            exited = true;
+            term?.write("\r\n\x1b[90m[The shell has ended. Close this tab or open a new terminal.]\x1b[0m\r\n");
+            onexit?.();
+          }
+        },
+        dir ?? null,
+      )
       .then((newId) => (id = newId))
       .catch((e) => term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`));
 
@@ -124,7 +156,7 @@
   });
 </script>
 
-<div class="terminal-view" class:hidden={!visible} bind:this={host}></div>
+<div class="terminal-view" class:hidden={!visible} bind:this={host} oncontextmenu={menu} role="presentation"></div>
 
 <style>
   .terminal-view {

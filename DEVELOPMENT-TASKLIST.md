@@ -604,7 +604,7 @@ runs on or off; with it off nothing is sent anywhere.
     resized, reordered by dragging and hidden: Open editors; Files (tree with new file / new folder / refresh /
     collapse all); Outline (symbols of the current file, from the code index); Timeline (the file's commits and
     saves, plus Qanuvi's entries for changes an agent made: which session and model, opening that session); as
-    options, "Touched in this session" and the current plan's steps. The Inbox becomes a drop-down from the sidebar.
+    an option, "Touched in this session". The Inbox becomes a drop-down from the sidebar.
     Built: the panel (Explorer / Search / Git icons; a "..." menu shows or hides sections); sections open and close,
     drag into another order, resize from their lower edge; Files has New file / New folder (files_create: never
     replaces, stays inside the project) / Refresh / Collapse; Outline from the code index; Timeline: agent changes
@@ -613,7 +613,7 @@ runs on or off; with it off nothing is sent anywhere.
     view is split: its list in the panel, the diff and history in the work area under a "Changes" tab. Search moved
     into the panel (Ctrl+Shift+F opens it). The Inbox is a drop-down beside its sidebar entry (Esc or a click outside
     closes it). Live: Outline of agent.rs, Timeline of notes.txt (5 agent sessions) and agent.rs (3 commits), New
-    file, a change opening its diff, Search, the Inbox. Still to come: the current plan's steps as a section.
+    file, a change opening its diff, Search, the Inbox.
     Changed after the owner tried it (2026-11-11): four columns were too many (sidebar, conversation, panel,
     editor) and Files was squeezed. The panel now lives in the left sidebar behind a mode switch at its top
     (Workspace | Explorer | Search | Git; collapsed, the icons stand in a column and open the sidebar); the editor
@@ -628,8 +628,8 @@ runs on or off; with it off nothing is sent anywhere.
     conversation left or right, what the sidebar shows, save under a name, remove own layouts) and Settings →
     Appearance (editor font size 10-24 px; interface size 80-150 %, the window's own zoom). The sections menu (...)
     sits in the sidebar's switch row. Live: VS Code-like (files left, editor middle, conversation right), font 17 px
-    and 115 %, back to Qanuvi and the usual sizes. Later: the current plan's steps as an Explorer section.
-- [ ] **15d. Own right-click menus** (added by the owner 2026-11-10)
+    and 115 %, back to Qanuvi and the usual sizes.
+- [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
     editor (cut, copy, paste, go to definition, find references, format, add to agent message, git: blame line, stage
@@ -640,6 +640,18 @@ runs on or off; with it off nothing is sent anywhere.
   - The browser's own menu and its reload shortcut are turned off in release builds (kept in development for
     inspecting the interface).
   - Validate: a right-click in each place shows only its own actions; nothing reloads the interface.
+  - Built: one menu for the whole window (arrow keys, Enter, Esc, a click elsewhere) and a name prompt. File tree:
+    open, add to the message, new file / folder (in that folder), open in terminal (in that folder), rename (open
+    tabs follow), delete (to the Recycle Bin, after asking; its tabs close), copy path / relative path, reveal in File
+    Explorer, git stage / discard; the tree's empty space: new file / folder, terminal, refresh, collapse, reveal.
+    Tabs: close, close others, close to the right, close saved, copy paths, reveal, add to the message. Editor: go to
+    definition (code index), cut / copy / paste / select all, add the selection or line to the message, who changed
+    this line. Conversation: copy, quote in reply; tool steps: open the file, copy its path, copy the result.
+    Terminal: copy, paste, select all, clear. Git view: open changes / file, stage or unstage, discard, history, copy
+    path. Sidebar: projects (open, new window, settings, copy path, reveal, remove), sessions (open, rename, delete).
+    Text fields: cut / copy / paste / select all. Elsewhere nothing in a release build, and F5 / Ctrl+R do not reload.
+    Backend: files_rename (never replaces), files_trash (Recycle Bin), terminals start in a chosen folder. Live: every
+    menu read through the release build; new file, rename, open in terminal and delete done for real.
 
 - [x] **15e. Where Qanuvi keeps its data** (added by the owner 2026-11-10; built 2026-11-11)
   - Everything Qanuvi stores can live in a folder the user chooses, on any drive, not only the system drive (C: on

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import AttachMenu from "./AttachMenu.svelte";
   import { overruleIn } from "$lib/core/decider";
   import { reviewFreeTurn } from "$lib/stores/chatReview";
@@ -141,6 +142,31 @@
   }
 
   /** Opens a file an agent step worked on, when it is inside the project. */
+  /** Right-click on a message: copy it, or quote it in the reply. */
+  function messageMenu(e: MouseEvent, text: string) {
+    const picked = window.getSelection()?.toString() ?? "";
+    contextMenu.show(e, [
+      [
+        picked && { label: "Copy the selection", hint: "Ctrl+C", action: () => copyText(picked) },
+        { label: "Copy the message", action: () => copyText(text) },
+      ],
+      [
+        {
+          label: "Quote in reply",
+          action: () => {
+            const quote = (picked || text)
+              .trim()
+              .split("\n")
+              .map((l) => `> ${l}`)
+              .join("\n");
+            agent.draft = `${quote}\n\n${agent.draft}`;
+            agent.input?.focus();
+          },
+        },
+      ],
+    ]);
+  }
+
   function openFile(file: string | null) {
     if (!file || !project) return;
     const root = project.path.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
@@ -191,7 +217,7 @@
     {:else}
       {#each agent.items as item (item.id)}
         {#if item.kind === "user"}
-          <div class="user">
+          <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text)}>
             {item.text}
             {#if item.attachments?.length}
               <div class="chips">
@@ -205,10 +231,30 @@
           {:else}
             <!-- Escaped first, then formatted (agent/markdown.ts): the text cannot add HTML of its own. -->
             <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-            <div class="text md" onclick={openLink} role="presentation">{@html renderMarkdown(item.text)}</div>
+            <div
+              class="text md"
+              onclick={openLink}
+              oncontextmenu={(e) => messageMenu(e, item.text)}
+              role="presentation"
+            >
+              {@html renderMarkdown(item.text)}
+            </div>
           {/if}
         {:else if item.kind === "tool"}
-          <button type="button" class="step {item.state}" disabled={!item.file} onclick={() => openFile(item.file)}>
+          <button
+            type="button"
+            class="step {item.state}"
+            disabled={!item.file}
+            onclick={() => openFile(item.file)}
+            oncontextmenu={(e) =>
+              contextMenu.show(e, [
+                [
+                  { label: "Open the file", disabled: !item.file, action: () => openFile(item.file) },
+                  { label: "Copy the file's path", disabled: !item.file, action: () => copyText(item.file ?? "") },
+                ],
+                [{ label: "Copy the result", disabled: !item.result, action: () => copyText(item.result) }],
+              ])}
+          >
             <span class="step-icon">
               {#if item.state === "running"}<LoaderCircle
                   size={13}

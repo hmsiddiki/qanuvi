@@ -3,6 +3,7 @@
    * Source Control, as in VS Code (Milestone 15b): commit message and commit, staged and unstaged changes, merge
    * conflicts, branches, pull / push / fetch, stash and history. Everything runs through the installed git.
    */
+  import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
@@ -270,6 +271,30 @@
         scmView.selected = { path: c.path, side: s };
         if (part === "list") ui.show("diff");
       }}
+      oncontextmenu={(e) =>
+        contextMenu.show(e, [
+          [
+            {
+              label: "Open changes",
+              action: () => {
+                scmView.historyFor = null;
+                scmView.selected = { path: c.path, side: s };
+                ui.show("diff");
+              },
+            },
+            { label: "Open file", disabled: c.deleted, action: () => editor.open(project.id, c.path) },
+          ],
+          [
+            s === "staged"
+              ? { label: "Unstage", action: () => unstage(c) }
+              : { label: "Stage", action: () => stage(c) },
+            s !== "staged" && { label: "Discard changes", danger: true, action: () => revert(c) },
+          ],
+          [
+            { label: "History of this file", action: () => showHistory(c.path) },
+            { label: "Copy relative path", action: () => copyText(c.path) },
+          ],
+        ])}
     >
       <span class="badge g{l === '!' ? 'C' : l}">{l}</span>
       <span class="name">{name(c.path)}</span>

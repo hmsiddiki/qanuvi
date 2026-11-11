@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ContextMenu from "$lib/components/ContextMenu.svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import SettingsView from "$lib/components/SettingsView.svelte";
   import { startWatch } from "$lib/stores/watch.svelte";
@@ -233,6 +234,8 @@
     <StatusBar />
   </div>
 {/if}
+
+<ContextMenu />
 
 {#if ui.quickOpen && projects.current}
   <QuickOpen
