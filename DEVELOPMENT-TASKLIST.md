@@ -99,6 +99,19 @@ runs on or off; with it off nothing is sent anywhere.
     the layout; a wrongly signed file is refused; "Later" and "Skip" behave; an update offered during a running step
     waits for the step to end.
 
+  - Decided by the owner (2026-11-11), built next:
+    - Installer (option 1): the NSIS installer branded (Qanuvi logo and colours on the side and header images, the Q
+      icon on the setup file), fewer steps (welcome, an optional folder, progress, finish with "Launch Qanuvi"),
+      installed for the current Windows user (no admin prompt), Start menu and desktop shortcuts. Updates use the
+      same installer silently. A fully custom one-click installer is for later, before a public release.
+    - No admin rights for the app: it runs as the user. A step that changes the system (installing a program, system
+      settings, services) asks in Qanuvi's approval card first, then Windows asks for admin for that one step.
+    - Update flow: download in the background with a thin progress bar in the status bar; then "Qanuvi 0.x.y is
+      ready - Restart now / Later" with what is new; on Restart now: close, install silently, reopen where the user
+      was. The dev channel is served at https://qlopy.top/qanuvi-updates/dev/ (latest.json, installer, signature),
+      written by one publish command.
+    - Reload window (Ctrl+Shift+R and in the command list): the interface reloads while sessions, terminals and agents
+      keep running and reconnect. Restart Qanuvi: a full restart (asks first when an agent is working).
 - [-] **2. Layout: sidebar, agent pane, tabbed work pane, terminal panel** (built 2026-11-10, waiting for the owner's
   review)
   - Three panes as in the design: sidebar (left), agent pane (middle), work pane with tabs (right); the terminal panel
