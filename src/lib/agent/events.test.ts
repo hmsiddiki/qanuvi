@@ -185,3 +185,13 @@ describe("live text and the model at work", () => {
     );
   });
 });
+
+describe("messages sent while the agent works", () => {
+  it("keeps the mark, and only on those messages", () => {
+    const items = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "Fix the header" }),
+      JSON.stringify({ type: "qanuvi_user", text: "Also the footer", during: true }),
+    ]);
+    expect(items.map((i) => i.kind === "user" && i.during)).toEqual([undefined, true]);
+  });
+});

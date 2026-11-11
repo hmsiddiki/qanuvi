@@ -111,7 +111,8 @@
 
   async function send(event?: SubmitEvent) {
     event?.preventDefault();
-    if (!project || !agent.draft.trim() || running) return;
+    // While the agent works the message joins the task: the agent reads it before its next step.
+    if (!project || !agent.draft.trim()) return;
     const text = agent.draft;
     agent.draft = "";
     if (!(await agent.send(project.id, text))) agent.draft = text;
@@ -218,6 +219,10 @@
       {#each agent.items as item (item.id)}
         {#if item.kind === "user"}
           <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text)}>
+            {#if item.during}<span
+                class="during"
+                title="Sent while the agent was working; it reads it before its next step">Added while it worked</span
+              >{/if}
             {item.text}
             {#if item.attachments?.length}
               <div class="chips">
@@ -371,7 +376,11 @@
       bind:value={agent.draft}
       bind:this={agent.input}
       rows="3"
-      placeholder={project ? "Ask Qanuvi…  (Enter to send, Shift+Enter for a new line)" : "Add a project first"}
+      placeholder={!project
+        ? "Add a project first"
+        : running
+          ? "Add to the task while it works…  (Enter to send; the agent reads it before its next step)"
+          : "Ask Qanuvi…  (Enter to send, Shift+Enter for a new line)"}
       aria-label="Message to the agent"
       disabled={!project}
       onkeydown={keydown}
@@ -385,11 +394,16 @@
         <button type="button" class="stop" title="Stop" aria-label="Stop" onclick={() => agent.stop()}>
           <Square size={12} />
         </button>
-      {:else}
-        <button type="submit" class="send" title="Send" aria-label="Send" disabled={!agent.draft.trim() || !project}>
-          <ArrowUp size={15} />
-        </button>
       {/if}
+      <button
+        type="submit"
+        class="send"
+        title={running ? "Send: joins the task, the agent reads it before its next step" : "Send"}
+        aria-label="Send"
+        disabled={!agent.draft.trim() || !project}
+      >
+        <ArrowUp size={15} />
+      </button>
     </div>
   </form>
   <div class="agent-line">
@@ -768,6 +782,15 @@
     resize: none;
     outline: none;
     user-select: text;
+  }
+
+  .user .during {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--qx-text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
   }
 
   textarea::placeholder {

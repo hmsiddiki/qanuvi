@@ -7,7 +7,7 @@
 import { withoutOverruleNote } from "$lib/core/decider";
 
 export type Item =
-  | { kind: "user"; id: string; text: string; attachments?: string[] }
+  | { kind: "user"; id: string; text: string; attachments?: string[]; during?: boolean }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
   | {
@@ -128,6 +128,7 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
       id: `u${seq}`,
       text: withoutOverruleNote(str(msg.text)),
       ...(attachments.length ? { attachments } : {}),
+      ...(msg.during === true ? { during: true } : {}),
     });
   } else if (type === "qanuvi_permission") {
     const i = out.findIndex((x) => x.kind === "approval" && x.id === str(msg.request_id));

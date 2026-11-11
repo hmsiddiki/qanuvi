@@ -342,6 +342,25 @@ impl Agent {
         ctx.saturating_sub(3_500).max(2_000) * 3 / 4
     }
 
+    /// Messages the user sent while a turn runs: added to the conversation now (other requests wait their turn).
+    fn take_added_messages(&mut self) {
+        while let Ok(m) = self.input.try_recv() {
+            if m["type"] != "user" {
+                self.queued.push_back(m);
+                continue;
+            }
+            let text = text_of(&m["message"]["content"]);
+            if text.trim().is_empty() {
+                continue;
+            }
+            self.history.push(json!({
+                "role": "user",
+                "content": format!("(The user added this while you were working; take it into account from now on:)\n{text}")
+            }));
+            self.notice("", "Your new message reached the agent while it was working; it takes it into account now.");
+        }
+    }
+
     fn turn(&mut self, text: &str) {
         let start = Instant::now();
         let job = if self.opts.mode == "plan" {
@@ -394,6 +413,8 @@ impl Agent {
                 continue;
             };
             let ep = ep.clone();
+            // What the user wrote while this turn runs is taken in before the next step, as a person would.
+            self.take_added_messages();
             let system = system_prompt(&self.root, &self.opts.mode, &model);
             let mut messages = vec![json!({"role": "system", "content": system})];
             messages.extend(fit(&self.history, self.budget(&model)));

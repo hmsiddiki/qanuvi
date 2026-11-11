@@ -166,13 +166,20 @@ ${text}`
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
+    // Sent while the agent works: it joins the task (the agent takes it in before its next step).
+    const during = !!this.selectedId && (this.busy || ["running", "waiting"].includes(this.selected?.status ?? ""));
     this.busy = true;
     let currentId = this.selectedId;
     // Show the message straight away; the stored copy is the same text.
     const files = this.attachments;
     this.items = reduce(
       this.items,
-      JSON.stringify({ type: "qanuvi_user", text, ...(files.length ? { attachments: files.map((f) => f.name) } : {}) }),
+      JSON.stringify({
+        type: "qanuvi_user",
+        text,
+        ...(files.length ? { attachments: files.map((f) => f.name) } : {}),
+        ...(during ? { during: true } : {}),
+      }),
       ++this.#seq,
     );
     try {
@@ -182,14 +189,17 @@ ${text}`
       let model = this.model;
       let sent = text;
       // Paid agent on top (24e): what a free model changes in chat is reviewed by the paid one.
-      this.freeTurn = null;
-      if (this.providerId === "qanuvi" && this.model === "auto" && this.info?.available && paidAgent()) {
+      if (!during) this.freeTurn = null;
+      if (!during && this.providerId === "qanuvi" && this.model === "auto" && this.info?.available && paidAgent()) {
         const mode = settings.value.team.mode;
         if (mode === "paid-decides" || mode === "priority")
           this.freeTurn = { projectId, request: text, before: await snapshotChanges(projectId) };
       }
       this.freePicked = null;
-      if (this.#forceModel) {
+      if (during) {
+        // The running session keeps its model; the message only joins the task.
+        model = this.selected?.model || this.model;
+      } else if (this.#forceModel) {
         // The paid agent overruled the free pick: this message goes to the model it asked for.
         model = this.#forceModel;
         this.#forceModel = null;

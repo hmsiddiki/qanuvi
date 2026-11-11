@@ -717,11 +717,19 @@ impl Agents {
                         params![id, model, mode],
                     );
                 }
+                // A message while the agent is working joins the task (both agents take it in mid-turn).
+                let during =
+                    get(db, id).is_ok_and(|s| s.status == "running" || s.status == "waiting");
                 send_line(
                     &mut running.stdin,
                     &user_message(&with_context(context, prompt), files),
                 )?;
-                append_event(db, id, &user_line(prompt, files));
+                let mut line: Value =
+                    serde_json::from_str(&user_line(prompt, files)).unwrap_or(Value::Null);
+                if during {
+                    line["during"] = json!(true);
+                }
+                append_event(db, id, &line.to_string());
                 drop(map);
                 set_status(db, id, "running");
                 return get(db, id);

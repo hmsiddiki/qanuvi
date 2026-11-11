@@ -82,12 +82,27 @@ runs on or off; with it off nothing is sent anywhere.
   (target/debug or target/release) uses dev.qanuvi.desktop.source for its data and window storage, filled once from a
   copy of the installed copy's data; the title bar says "test build". The installed Qanuvi's data is never touched
   by trying a change (QANUVI_SHARED_DATA=1 turns this off). Live: installed copy and test build open side by side.
+  Fixed 2026-11-12: the window storage (WebView2) of a test build is now its own too; before, it opened the installed
+  copy's folder, so both shared settings, and a test build with the debug port could not start beside it.
 - [ ] **1d. Automatic backups and restore (owner, 2026-11-11)**: the owner lost his sessions, memory and settings
   when the uninstaller's "Delete the application data" box was ticked (it deletes for good). Done: the box now says
   "Also delete my Qanuvi data (sessions, memory, settings, model list). This cannot be undone." To do: a daily backup
   of the database (a consistent copy while Qanuvi runs), brain.json and the window's settings into a folder the user
   chooses (another drive is best), the last 7 kept; Settings → Backups: folder, last backup, back up now, restore a
   backup (applied at the next start, the current data kept beside it).
+- [x] **15j. Messages while the agent works (owner, 2026-11-12)**: the box sends while a task runs (Send beside Stop);
+  the message joins the task and the agent reads it before its next step (Claude Code takes it mid-turn, Qanuvi's own
+  agent adds it to the conversation before each step). It shows "Added while it worked". Live: Claude Code followed a
+  change of plan sent during its second step.
+- [ ] **15k. Search like VS Code (owner, 2026-11-12, next release)**: the search panel found 0 results for a word that
+  is in the project. To do: results grouped per file with the line and the match highlighted, case, whole word and
+  regex toggles, files to include and exclude, gitignore respected, results while typing, replace and replace all,
+  click to open at the line; fast on large projects (search in Rust, streamed).
+- [ ] **24g. Qanuvi introduces itself to every model (owner, 2026-11-12, next release)**: an agent asked for "a Qanuvi
+  plan" had to dig through Qanuvi's source to learn what one is. To do: every session starts with a short brief from
+  Qanuvi core: what Qanuvi is, the plan and task list format (sections, steps, needs, model per step) with an example,
+  where plans live and how the runner runs them, the Inbox, memory, and what the agent may ask Qanuvi to do. Kept
+  short (cached), one copy for all agents, updated with the app (and by signed remote knowledge, 24c).
 - [ ] **1e. Task Manager lists WebView2 apart from Qanuvi (owner, 2026-11-11, later)**: the WebView2 processes are
   Qanuvi's children (checked), but Task Manager shows them under "WebView2 Manager". Try giving the window and its
   processes Qanuvi's app id so Windows groups them; cosmetic.

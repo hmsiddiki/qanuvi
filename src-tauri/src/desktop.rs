@@ -1352,7 +1352,9 @@ pub fn run() {
         eprintln!("{note}");
     }
     let data = crate::data_location::resolve(&defaults);
-    if data != defaults.base
+    // A test build sets it always: WebView2's own default is the installed copy's folder (named after the app id),
+    // which a test build must never share.
+    if (data != defaults.base || crate::data_location::from_source())
         && let Some(web) = defaults.webview_for(&data)
     {
         // SAFETY: start-up, before the window or any other thread exists. WebView2 reads this when it creates the
