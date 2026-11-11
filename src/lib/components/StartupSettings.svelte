@@ -10,6 +10,11 @@
   let waitFor = $state("");
   let headroom = $state<string | null>(null);
   let note = $state("");
+  /** Claude Code's own settings already send it through a proxy (headroom wrap): Qanuvi keeps that address. */
+  let claudeRoute = $state<string | null>(null);
+  invoke<string | null>("claude_settings_base_url")
+    .then((u) => (claudeRoute = u))
+    .catch(() => {});
 
   invoke<string | null>("startup_headroom")
     .then((p) => (headroom = p))
@@ -57,6 +62,10 @@
           enabled: true,
         },
       ]);
+    if (claudeRoute) {
+      note = `Headroom starts with Qanuvi now. Claude Code already goes through it (its own settings send it to ${claudeRoute}), so that stays as it is.`;
+      return;
+    }
     if (!settings.agent("claude-code").baseUrl) settings.setAgent("claude-code", { baseUrl: "http://127.0.0.1:8787" });
     note = "Headroom starts with Qanuvi now, and Claude Code goes through it (Settings, Agents shows the address).";
   }
@@ -77,6 +86,12 @@
     <span><strong>Headroom is installed</strong> <span class="muted">({headroom})</span></span>
     <button type="button" class="btn primary" onclick={addHeadroom}>Start it with Qanuvi</button>
   </div>
+{/if}
+{#if claudeRoute}
+  <p class="note">
+    Claude Code's own settings send every Claude Code (Qanuvi's too) to <code>{claudeRoute}</code>. Start-up here only
+    makes sure that proxy runs while Qanuvi is open.
+  </p>
 {/if}
 {#if note}<p class="note">{note}</p>{/if}
 

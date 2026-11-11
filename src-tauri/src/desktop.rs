@@ -348,6 +348,21 @@ fn startup_headroom() -> Option<String> {
     crate::terminal::find_on_path("headroom").map(|p| p.to_string_lossy().into_owned())
 }
 
+/// The proxy address Claude Code's own user settings send it to (headroom wrap sets one), if any: then every Claude
+/// Code, Qanuvi's too, goes through it already.
+#[tauri::command]
+fn claude_settings_base_url() -> Option<String> {
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
+    let text = std::fs::read_to_string(
+        std::path::Path::new(&home)
+            .join(".claude")
+            .join("settings.json"),
+    )
+    .ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    v["env"]["ANTHROPIC_BASE_URL"].as_str().map(str::to_string)
+}
+
 /// A plan's private details (the plan run puts them into each step's request).
 #[tauri::command]
 fn plan_private(project_id: String, file: String) -> Vec<String> {
@@ -1672,6 +1687,7 @@ pub fn run() {
             startup_restart,
             startup_stop,
             startup_headroom,
+            claude_settings_base_url,
             plan_private_add,
             plan_private_clear,
             agent_grants,
