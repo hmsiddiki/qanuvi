@@ -58,7 +58,7 @@ export interface Settings {
   /** Start with Qanuvi: commands started hidden when Qanuvi starts (a Headroom proxy, for example). */
   startup: StartupItem[];
   /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
-  updates: { autoDownload: boolean };
+  updates: { autoDownload: boolean; claudeAuto?: boolean };
 }
 
 /** A command Qanuvi starts with itself (hidden), and the address that answers once it runs. */
@@ -202,7 +202,7 @@ export function parseSettings(json: string | null): Settings {
   }
   {
     const up = raw.updates && typeof raw.updates === "object" ? (raw.updates as Record<string, unknown>) : {};
-    s.updates = { autoDownload: up.autoDownload === true };
+    s.updates = { autoDownload: up.autoDownload === true, claudeAuto: up.claudeAuto === true };
   }
   if (Array.isArray(raw.startup))
     for (const it of raw.startup as Record<string, unknown>[]) {

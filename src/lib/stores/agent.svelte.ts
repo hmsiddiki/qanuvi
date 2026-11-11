@@ -69,6 +69,8 @@ ${text}`
    * use; without one, the agent chosen for new sessions.
    */
   get runProviderId(): string {
+    // Free decides, free works: runs go to Qanuvi's own agent with the free models.
+    if (settings.value.team.mode === "free-only" && settings.value.brain.models.length) return "qanuvi";
     const paid = paidAgent();
     return this.info?.available && paid ? paid.id : settings.value.agent;
   }
@@ -375,6 +377,27 @@ ${text}`
     this.items = [];
     this.errors = [];
     this.providerId = paidId;
+    this.model = a.model;
+    this.mode = a.mode;
+    this.effort = a.effort;
+    return this.send(projectId, prompt);
+  }
+
+  /**
+   * The paid agent hit its usage limit: the work goes on with Qanuvi's own agent and the free models, given the request
+   * and what was done so far.
+   */
+  async handToFree(projectId: string): Promise<boolean> {
+    if (!settings.value.brain.models.length) return false;
+    const lastUser = [...this.items].reverse().find((i) => i.kind === "user");
+    if (!lastUser || lastUser.kind !== "user") return false;
+    const done = itemsToMarkdown("What the paid agent did before its limit", this.items).slice(-5000);
+    const prompt = `${lastUser.text}\n\n(The paid agent worked on this first and hit its usage limit. Go on from where it stopped; what it did, for reference:)\n\n${done}`;
+    const a = settings.agent("qanuvi");
+    this.selectedId = null;
+    this.items = [];
+    this.errors = [];
+    this.providerId = "qanuvi";
     this.model = a.model;
     this.mode = a.mode;
     this.effort = a.effort;

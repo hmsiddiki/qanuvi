@@ -18,7 +18,9 @@ export type TeamMode =
   /** Only the paid model works; Qanuvi core gives it context. */
   | "direct"
   /** A free model decides what to send to the paid one (which paid model), so it gets fewer, better requests. */
-  | "free-decides";
+  | "free-decides"
+  /** Free models decide and work; the paid agent is not used (its limit is reached, or the owner wants no cost). */
+  | "free-only";
 
 export type Priority = "save" | "balanced" | "solve";
 
@@ -31,7 +33,7 @@ export const DEFAULT_TEAM: TeamSettings = { mode: "paid-decides", priority: "bal
 
 export function parseTeam(raw: unknown): TeamSettings {
   const t = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const modes: TeamMode[] = ["paid-decides", "priority", "direct", "free-decides"];
+  const modes: TeamMode[] = ["paid-decides", "priority", "direct", "free-decides", "free-only"];
   const prios: Priority[] = ["save", "balanced", "solve"];
   return {
     mode: modes.includes(t.mode as TeamMode) ? (t.mode as TeamMode) : DEFAULT_TEAM.mode,

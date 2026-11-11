@@ -43,6 +43,7 @@
   import ModePicker from "./ModePicker.svelte";
   import { ask } from "$lib/stores/confirm.svelte";
   import { guidanceNote, isStopOrder, looksSecret } from "$lib/plan/guidance";
+  import { isLimit } from "$lib/plan/limits";
   import { runner } from "$lib/stores/runner.svelte";
   import CommandMenu from "./CommandMenu.svelte";
 
@@ -358,6 +359,12 @@
             {#if !item.ok && agent.provider.id === "qanuvi" && agent.model === "auto" && agent.info?.available && project}
               <button type="button" class="to-auto" onclick={() => project && agent.handToPaid(project.id)}
                 >Hand this to {paidAgent()?.name ?? "the paid agent"}</button
+              >
+            {/if}
+            {#if !item.ok && isLimit(item.text) && agent.provider.id !== "qanuvi" && settings.value.brain.models.length && project}
+              <!-- The paid agent hit its limit: the free models can go on now. -->
+              <button type="button" class="to-auto" onclick={() => project && agent.handToFree(project.id)}
+                >Continue with free models</button
               >
             {/if}
             {#if !item.ok && item.text.includes("Switch to Auto") && agent.model !== "auto"}

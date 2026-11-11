@@ -342,6 +342,18 @@ fn startup_stop(state: State<AppState>, id: String) -> Vec<crate::startup::Statu
     state.startup.statuses()
 }
 
+/// Claude Code's installed and newest versions.
+#[tauri::command]
+async fn claude_versions() -> Res<crate::claude_update::Versions> {
+    blocking(crate::claude_update::versions).await
+}
+
+/// Updates Claude Code through its own `claude update`.
+#[tauri::command]
+async fn claude_update() -> Res<String> {
+    blocking(crate::claude_update::update).await
+}
+
 /// Where Headroom is installed, if it is (for the one-click setup).
 #[tauri::command]
 fn startup_headroom() -> Option<String> {
@@ -1687,6 +1699,8 @@ pub fn run() {
             startup_restart,
             startup_stop,
             startup_headroom,
+            claude_versions,
+            claude_update,
             claude_settings_base_url,
             plan_private_add,
             plan_private_clear,

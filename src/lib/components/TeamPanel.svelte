@@ -25,6 +25,11 @@
       text: `Only ${paidName} works. Qanuvi core still gives it context (memory, the right files).`,
     },
     {
+      id: "free-only",
+      label: "Free decides, free works",
+      text: `Only your free models work (Qanuvi's own agent decides and does the work); ${paidName} is not used. For when its limit is reached, or to spend nothing. Chats and plan runs both go to the free models.`,
+    },
+    {
       id: "free-decides",
       label: "Free decides, paid works",
       text: `A free model decides what to send to ${paidName} and which of its models, so it gets fewer, better requests.`,

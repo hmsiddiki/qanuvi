@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { claudeUpdate } from "$lib/stores/claudeUpdate.svelte";
   import FileCog from "@lucide/svelte/icons/file-cog";
   import CirclePlus from "@lucide/svelte/icons/circle-plus";
   import Plug from "@lucide/svelte/icons/plug";
@@ -76,6 +77,33 @@
       </header>
       {#if !available(p)}<p class="hint">{p.installHint}</p>{/if}
       {#if p.id === "claude-code" && agent.info?.path}<p class="path">{agent.info.path}</p>{/if}
+      {#if p.id === "claude-code" && available(p)}
+        <div class="cc-update">
+          {#if claudeUpdate.versions?.newer}
+            <span
+              >Claude Code <strong>{claudeUpdate.versions.latest}</strong> is out (this one is
+              {claudeUpdate.versions.installed}). Newer models need it.</span
+            >
+            <button type="button" disabled={claudeUpdate.busy} onclick={() => claudeUpdate.update()}
+              >{claudeUpdate.busy ? "Updating…" : "Update Claude Code"}</button
+            >
+          {:else if claudeUpdate.versions}
+            <span class="dim">Claude Code {claudeUpdate.versions.installed} is the newest.</span>
+          {:else}
+            <button type="button" class="link" onclick={() => claudeUpdate.check()}>Look for a newer Claude Code</button
+            >
+          {/if}
+          <label class="check small"
+            ><input
+              type="checkbox"
+              checked={!!settings.value.updates.claudeAuto}
+              onchange={(e) =>
+                settings.set("updates", { ...settings.value.updates, claudeAuto: e.currentTarget.checked })}
+            /> Keep it up to date by itself (when no agent is working)</label
+          >
+          {#if claudeUpdate.note}<p class="dim">{claudeUpdate.note}</p>{/if}
+        </div>
+      {/if}
 
       <label class="check">
         <input
@@ -202,6 +230,36 @@
 </div>
 
 <style>
+  .cc-update {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    font-size: 12px;
+  }
+
+  .cc-update .dim {
+    color: var(--qx-text-muted);
+  }
+
+  .cc-update button {
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--qx-accent);
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-accent);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .cc-update button.link {
+    border: 0;
+    background: none;
+    color: var(--qx-accent);
+    padding: 0;
+  }
   .agents {
     height: 100%;
     overflow: auto;

@@ -125,8 +125,24 @@ runs on or off; with it off nothing is sent anywhere.
     hand asks first.
   Live (scratch plan, Haiku): a mid-step message was followed and kept as a note, step 2 continued step 1's session,
   the mode stayed Auto, the run finished both steps; a project secret reached the test command.
-- [ ] **24i. Before a run (next)**: the paid agent reads the plan once and lists what it will need (logins, decisions,
-  risky steps) so the owner answers once up front and the run then goes unattended; risky steps are marked to wait.
+- [x] **24i. Before a run (owner, 2026-11-12)**: "Check what the run needs from me first" (on by default): the agent
+  reads the open steps once and lists logins (saved as project secrets), decisions (kept as plan notes), risky steps
+  (wait or go ahead) and things to set up; open questions and risky steps to wait at pause the run there. Live: the
+  scratch plan's missing key, open choice and risky delete were found; the run did step 6 and stopped before step 7.
+- [x] **24l. Runs go on through usage limits; Team per run (owner, 2026-11-12)**: a usage limit ("resets 5:20am") is
+  no failure: the run waits for the reset and tries the step again, or lets free models work until then (Run dialog,
+  "When the paid agent hits its usage limit"). The Run dialog has "Team for this run" with the Settings modes; Team has
+  a new mode "Free decides, free works" (runs and the run agent go to Qanuvi's own agent with the free models). A chat
+  that hits the paid limit offers "Continue with free models". Plan steps get logs, notes and private details across
+  sessions; a stopped step's session resumes the plan.
+- [x] **1g. Claude Code kept current (owner, 2026-11-12)**: Settings, Agents shows Claude Code's version against the
+  newest (npm registry) with "Update Claude Code" (its own `claude update`) and "Keep it up to date by itself".
+  Qanuvi does not bundle Claude Code (Anthropic's software). Release rule in scripts/publish-update.mjs: no release
+  while Claude Code is out of date or knows a newer model (per family) than Qanuvi offers.
+- [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
+  billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
+  (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so
+  every Qanuvi knows it. Headroom can sit in front of it for the free models too (`--openai-api-url`), to be tested.
 - [ ] **1f. Qanuvi's own resource use (next)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
   WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
 - [ ] **24j. Plan housekeeping (next)**: move finished sections to an archive file next to the plan, and add another

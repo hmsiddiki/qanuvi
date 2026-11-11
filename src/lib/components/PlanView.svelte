@@ -532,7 +532,8 @@
   }
 
   /* The step a run is working on now: a ring that turns. */
-  .status.working {
+  /* Placed before the status colours, so it is written with more weight: a step being worked on always shows the ring. */
+  .status.working.working {
     border-color: color-mix(in srgb, var(--qx-status-running) 30%, transparent);
     border-top-color: var(--qx-status-running);
     background: transparent;

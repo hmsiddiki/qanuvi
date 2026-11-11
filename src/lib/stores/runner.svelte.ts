@@ -6,6 +6,7 @@
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { reduceAll } from "$lib/agent/events";
 import { waitsBefore } from "$lib/plan/preflight";
+import { isLimit, limitResetAt } from "$lib/plan/limits";
 import {
   addedSteps,
   canCarry,
@@ -90,6 +91,10 @@ class RunnerStore {
   currentModel = $state("");
   /** Qanuvi is running the project's tests for the current step. */
   checking = $state(false);
+  /** The run waits for a usage limit to reset (shown in the run panel). */
+  waitingUntil = $state<Date | null>(null);
+  /** Free models work until this time (the paid agent's limit resets then). */
+  #freeUntil: Date | null = null;
   /** Average paid cost of a finished step per kind of job, from earlier runs (to show what free models saved). */
   paidPerStep = $state<Partial<Record<string, number>>>({});
   #stopRequested = false;
@@ -337,6 +342,39 @@ class RunnerStore {
     }
   }
 
+  /** When the usage limit this attempt met resets, or null when it met none. */
+  async #limitReset(a: Attempt): Promise<Date | null> {
+    if (!a.sessionId) return null;
+    const lines = await api.agent.events(a.sessionId).catch(() => [] as string[]);
+    for (const l of lines.slice(-8).reverse()) {
+      if (!isLimit(l)) continue;
+      let text = l;
+      try {
+        const m = JSON.parse(l);
+        text = String(m.result ?? m.text ?? m.message?.content?.[0]?.text ?? l);
+      } catch {
+        // The raw line.
+      }
+      const at = limitResetAt(text);
+      if (at) return at;
+    }
+    return null;
+  }
+
+  /** Waits until the time (Stop ends it); answers false when the owner stopped the run. */
+  async #waitUntil(at: Date): Promise<boolean> {
+    this.waitingUntil = at;
+    while (Date.now() < at.getTime()) {
+      if (this.#stopRequested) {
+        this.waitingUntil = null;
+        return false;
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    this.waitingUntil = null;
+    return !this.#stopRequested;
+  }
+
   /** Ends the turn the run is waiting for, as stopped. */
   #endTurn: (() => void) | null = null;
 
@@ -416,7 +454,8 @@ class RunnerStore {
     const stats = await this.#learned();
     this.paidPerStep = paidPerStep(stats);
     // Free models first only makes sense on a paid agent, with free models set up.
-    const team = settings.value.team;
+    // This run's Team mode, else the one in Settings.
+    const team = options.teamMode ? { ...settings.value.team, mode: options.teamMode } : settings.value.team;
     // The run's own Team choice (Team settings, paid only, or free first) decides; older runs set freeFirst.
     const canFree = provider.id !== "qanuvi" && settings.value.brain.models.length > 0;
     const freeFirst = options.team
@@ -558,11 +597,15 @@ class RunnerStore {
           break;
         }
         const chosen = live && live.step === stepRun ? live : null;
-        const model = chosen
-          ? nextModel(models, stepRun.attempts.slice(chosen.from), chosen.model, options.attemptsPerModel)
-          : free
-            ? nextModelFreeFirst(models, stepRun.attempts, FREE_MODEL, first, options.attemptsPerModel)
-            : nextModel(models, stepRun.attempts, first, options.attemptsPerModel);
+        // The paid agent's limit is not reset yet and the owner chose free models meanwhile.
+        const freeNow = !!this.#freeUntil && Date.now() < this.#freeUntil.getTime() && canFree && !isFree(first);
+        const model = freeNow
+          ? FREE_MODEL
+          : chosen
+            ? nextModel(models, stepRun.attempts.slice(chosen.from), chosen.model, options.attemptsPerModel)
+            : free
+              ? nextModelFreeFirst(models, stepRun.attempts, FREE_MODEL, first, options.attemptsPerModel)
+              : nextModel(models, stepRun.attempts, first, options.attemptsPerModel);
         if (model === null && options.replan && !stepRun.replacedBy) {
           // Back to the planner, once: rewrite the step into smaller ones and carry on with those.
           const added = await this.#replan(project, file, run, stepRun, provider);
@@ -646,6 +689,26 @@ class RunnerStore {
         );
         await this.#settleCarry(attempt, section, options, carryOn);
         await this.#logAttempt(project, file, stepRun, attempt);
+        // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
+        if (attempt.outcome === "error" || attempt.outcome === "open") {
+          const resetAt = await this.#limitReset(attempt);
+          if (resetAt) {
+            await this.#dropCarry();
+            if (options.onLimit === "free" && canFree) {
+              this.#freeUntil = resetAt;
+              agent.notice(
+                `The paid agent hit its limit (resets ${resetAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}): free models work until then.`,
+              );
+              continue;
+            }
+            if (!(await this.#waitUntil(resetAt))) {
+              this.#finish(run, "stopped", "Stopped by you while waiting for the usage limit to reset.");
+              stepRun.status = "waiting";
+              break;
+            }
+            continue;
+          }
+        }
         const after = await api.files.read(project.id, file).catch(() => null);
         if (attempt.outcome === "open" && after) {
           const outcome = stepOutcome(after.text, stepRun);

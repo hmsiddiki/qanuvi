@@ -37,6 +37,10 @@ export interface RunOptions {
   model?: string;
   /** A step that keeps failing moves to a stronger model; missing: yes. */
   strongerOnFail?: boolean;
+  /** The Team mode for this run (the same choices as Settings, Team); missing: the Settings choice. */
+  teamMode?: import("$lib/core/decider").TeamMode;
+  /** When the paid agent hits its usage limit: wait for the reset and go on, or let free models work until then. */
+  onLimit?: "wait" | "free";
   /** Steps the run pauses before (risky ones the owner wants to see, or a question left open), with why (24i). */
   waitBefore?: { step: string; why: string }[];
   /** When every step of the plan is done, its private details (logins) are deleted; missing: yes. */
@@ -118,7 +122,7 @@ export interface PlanRun {
   deciderCalls?: { model: string; costUsd: number }[];
 }
 
-export type RunTeam = "settings" | "paid" | "free";
+export type RunTeam = "settings" | "paid" | "free" | "free-only";
 
 /** The models a step may move up to after failures: the agent's list, or none when the run stays on one model. */
 export function ladder(models: AgentModel[], strongerOnFail: boolean | undefined): AgentModel[] {

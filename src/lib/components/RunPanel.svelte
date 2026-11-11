@@ -12,17 +12,8 @@
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import {
-    costRatio,
-    freeSavings,
-    isFree,
-    DECIDER,
-    parseRanges,
-    inRanges,
-    type PauseMode,
-    type RunTeam,
-  } from "$lib/plan/runner";
-  import { freeWorks } from "$lib/core/decider";
+  import { costRatio, freeSavings, isFree, DECIDER, parseRanges, inRanges, type PauseMode } from "$lib/plan/runner";
+  import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
   import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
@@ -49,7 +40,23 @@
   /** One model for every step ("" = as the plan says), and whether a failing step may move to a stronger one. */
   let oneModel = $state("");
   let strongerOnFail = $state(true);
-  let team = $state<RunTeam>("settings");
+  /** This run's Team mode ("settings": the one in Settings, Team). */
+  let team = $state<"settings" | TeamMode>("settings");
+  const TEAM_LABELS: Record<TeamMode, string> = {
+    "paid-decides": "Paid decides, free works",
+    priority: "Priority",
+    direct: "Direct (only the paid agent)",
+    "free-decides": "Free decides, paid works",
+    "free-only": "Free decides, free works",
+  };
+  /** Modes that need free models set up. */
+  const NEEDS_FREE: TeamMode[] = ["paid-decides", "priority", "free-decides", "free-only"];
+  /** Free decides, free works (here or in Settings): the run goes to Qanuvi's own agent. */
+  let freeOnly = $derived(team === "free-only" || (team === "settings" && settings.value.team.mode === "free-only"));
+  /** Free models are set up (Qanuvi's own agent can work). */
+  let hasFree = $derived(settings.value.brain.models.length > 0);
+  /** When the paid agent hits its usage limit. */
+  let onLimit = $state<"wait" | "free">("wait");
   /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
   let carryOn = $state(true);
   let carryK = $state(80);
@@ -71,14 +78,6 @@
   let replan = $state(true);
   /** Free models can go first when the run's agent is a paid one and Qanuvi core has models. */
   let canFree = $derived(provider.id !== "qanuvi" && settings.value.brain.models.length > 0);
-  /** What "Use Team settings" means right now, in a few words. */
-  let teamNow = $derived(
-    !canFree
-      ? "only this agent (no free models set up)"
-      : freeWorks(settings.value.team, true, true)
-        ? "the paid agent decides; free models do simple steps"
-        : "only the paid agent works",
-  );
   /** The steps the run would cover, with the model each would use by the plan. */
   let stepModels = $derived(
     openSteps.map((s) => s.model?.trim() || settings.agent(provider.id).model).filter((m) => !!m),
@@ -91,7 +90,7 @@
     providerId: string;
     oneModel: string;
     strongerOnFail: boolean;
-    team: RunTeam;
+    team: "settings" | TeamMode;
     budget: number;
     perModel: number;
     pause: PauseMode;
@@ -104,6 +103,7 @@
     carryK: number;
     forgetPrivate: boolean;
     checkFirst: boolean;
+    onLimit: "wait" | "free";
   }
   function restore(): boolean {
     try {
@@ -113,7 +113,7 @@
       const p = providerById(providerId || agent.runProviderId);
       oneModel = k.oneModel && p.models.some((m) => m.id === k.oneModel) ? k.oneModel : "";
       strongerOnFail = k.strongerOnFail ?? !oneModel;
-      if (k.team === "settings" || k.team === "paid" || k.team === "free") team = k.team;
+      if (k.team === "settings" || (typeof k.team === "string" && k.team in TEAM_LABELS)) team = k.team;
       if (typeof k.budget === "number") budget = k.budget;
       if (typeof k.perModel === "number") perModel = k.perModel;
       if (k.pause) pause = k.pause;
@@ -126,6 +126,7 @@
       if (typeof k.carryK === "number") carryK = k.carryK;
       if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
       if (typeof k.checkFirst === "boolean") checkFirst = k.checkFirst;
+      if (k.onLimit === "wait" || k.onLimit === "free") onLimit = k.onLimit;
       return true;
     } catch {
       return false;
@@ -149,6 +150,7 @@
       carryK,
       forgetPrivate,
       checkFirst,
+      onLimit,
     };
     localStorage.setItem(KEY(), JSON.stringify(k));
   }
@@ -322,11 +324,15 @@
         providerId: provider.id,
         model: oneModel,
         strongerOnFail,
-        team,
+        team: "settings",
+        teamMode: team === "settings" ? undefined : team,
         carryOn,
         forgetPrivateWhenDone: forgetPrivate,
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 80)) * 1000,
         waitBefore,
+        onLimit,
+        // Free decides, free works: the whole run goes to Qanuvi's own agent with the free models.
+        ...(freeOnly && hasFree ? { providerId: "qanuvi", model: "" } : {}),
       });
     } catch (e) {
       error = String(e instanceof Error ? e.message : e);
@@ -476,18 +482,31 @@
     <label class="check" title="After the failed tries above, the step goes to the next stronger model.">
       <input type="checkbox" bind:checked={strongerOnFail} /> A step that keeps failing moves to a stronger model
     </label>
-    {#if canFree}
-      <label class="team">
-        Who works
+    <div class="grid team">
+      <label>
+        Team for this run
         <select bind:value={team}>
-          <option value="settings">Use Team settings: {teamNow}</option>
-          <option value="paid">{provider.name} only</option>
-          <option value="free">Free models first, {provider.name} when they do not finish a step</option>
+          <option value="settings">As in Settings: {TEAM_LABELS[settings.value.team.mode]}</option>
+          {#each Object.entries(TEAM_LABELS) as [id, name] (id)}
+            <option value={id} disabled={!hasFree && NEEDS_FREE.includes(id as TeamMode)}>{name}</option>
+          {/each}
         </select>
       </label>
-      {#if team !== "paid"}
-        <p class="hint">Money and security steps, and steps that name their own model, always go to {provider.name}.</p>
-      {/if}
+      <label>
+        When {provider.name} hits its usage limit
+        <select bind:value={onLimit}>
+          <option value="wait">Wait for the reset, then go on</option>
+          <option value="free" disabled={!hasFree}>Free models work until the reset</option>
+        </select>
+      </label>
+    </div>
+    {#if !hasFree}
+      <p class="hint">
+        Free models are not set up yet (Settings, Models and providers): with them a run can also go on while the paid
+        agent is limited.
+      </p>
+    {:else if team !== "direct" && !freeOnly}
+      <p class="hint">Money and security steps, and steps that name their own model, always go to {provider.name}.</p>
     {/if}
     {#if mode === "default"}<p class="hint warn">In Manual mode the run waits for your approval at every edit.</p>{/if}
     <label
@@ -561,6 +580,12 @@
             Step {current.number ?? ""} · {current.title} · {label(runner.currentModel)}
             {#if currentAttempt > 1}<span class="dim"> (try {currentAttempt})</span>{/if}
             {#if runner.checking}<span class="dim"> · running the tests</span>{/if}
+            {#if runner.waitingUntil}<span class="dim">
+                · usage limit reached: goes on by itself at {runner.waitingUntil.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</span
+              >{/if}
           {:else}
             Starting…
           {/if}
@@ -738,7 +763,7 @@
     height: 24px;
   }
 
-  label.team {
+  .grid.team {
     margin-top: var(--qx-space-3);
   }
 

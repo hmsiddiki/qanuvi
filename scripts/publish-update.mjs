@@ -27,6 +27,16 @@ if (!fs.existsSync(keyFile)) {
   process.exit(1);
 }
 
+// 0. The release rule: Claude Code and its models are current before a release (QANUVI_RELEASE_ANYWAY=1 skips it).
+if (!process.env.QANUVI_RELEASE_ANYWAY) {
+  const problems = await releaseCheck(root);
+  if (problems.length) {
+    console.error("Not released: first bring these up to date (or set QANUVI_RELEASE_ANYWAY=1):");
+    for (const p of problems) console.error(" - " + p);
+    process.exit(2);
+  }
+}
+
 // 1. The version, everywhere it is written.
 const conf = path.join(root, "src-tauri/tauri.conf.json");
 const c = JSON.parse(fs.readFileSync(conf, "utf8"));
@@ -66,3 +76,55 @@ const latest = {
 };
 fs.writeFileSync(path.join(outDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
 console.log(`Published ${name} and latest.json to ${outDir} (${baseUrl}/latest.json)`);
+
+/** What is out of date before a release: Claude Code itself, and models it knows that Qanuvi does not offer yet. */
+async function releaseCheck(root) {
+  const problems = [];
+  let installed = "";
+  try {
+    installed = (execSync("claude --version", { encoding: "utf8" }).match(/\d+\.\d+\.\d+/) ?? [""])[0];
+  } catch {
+    problems.push("Claude Code is not installed on this computer, so its version and models cannot be checked.");
+    return problems;
+  }
+  try {
+    const res = await fetch("https://registry.npmjs.org/@anthropic-ai/claude-code/latest");
+    const latest = (await res.json()).version;
+    const n = (v) => v.split(".").map(Number);
+    const [a, b] = [n(latest), n(installed)];
+    if (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2]))))
+      problems.push(`Claude Code ${latest} is out (here ${installed}): run "claude update", then publish again.`);
+  } catch {
+    console.warn("(The newest Claude Code version could not be looked up; going on.)");
+  }
+  // The models the installed Claude Code knows, by family, against the ones Qanuvi offers.
+  try {
+    const exe = execSync(process.platform === "win32" ? "where claude" : "command -v claude", { encoding: "utf8" })
+      .split(/\r?\n/)[0]
+      .trim();
+    const text = fs.readFileSync(fs.realpathSync(exe)).toString("latin1");
+    const known = new Set(text.match(/claude-(fable|opus|sonnet|haiku)-\d+(?:-\d+)?(?![\w.-])/g) ?? []);
+    const providers = fs.readFileSync(path.join(root, "src/lib/agents/providers.ts"), "utf8");
+    const offered = new Set(providers.match(/claude-(fable|opus|sonnet|haiku)-\d+(?:-\d+)?/g) ?? []);
+    const ver = (id) => id.split("-").slice(2).map(Number);
+    const newer = (x, y) => {
+      const [a, b] = [ver(x), ver(y)];
+      for (let i = 0; i < Math.max(a.length, b.length); i++)
+        if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+      return false;
+    };
+    for (const family of ["fable", "opus", "sonnet", "haiku"]) {
+      const best = (set) =>
+        [...set].filter((m) => m.startsWith(`claude-${family}-`)).reduce((t, m) => (!t || newer(m, t) ? m : t), "");
+      const k = best(known);
+      const o = best(offered);
+      if (k && (!o || newer(k, o)))
+        problems.push(
+          `Claude Code knows ${k}, but Qanuvi offers ${o || "no " + family + " model"}: add it to src/lib/agents/providers.ts (and the knowledge file).`,
+        );
+    }
+  } catch {
+    console.warn("(Claude Code's models could not be read; going on.)");
+  }
+  return problems;
+}

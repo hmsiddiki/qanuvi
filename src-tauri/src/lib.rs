@@ -10,6 +10,7 @@ pub mod brief;
 pub mod browser;
 pub mod browser_mcp;
 pub mod checks;
+pub mod claude_update;
 pub mod data_location;
 pub mod files;
 pub mod git;
