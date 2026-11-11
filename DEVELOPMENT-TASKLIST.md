@@ -629,6 +629,22 @@ runs on or off; with it off nothing is sent anywhere.
     Appearance (editor font size 10-24 px; interface size 80-150 %, the window's own zoom). The sections menu (...)
     sits in the sidebar's switch row. Live: VS Code-like (files left, editor middle, conversation right), font 17 px
     and 115 %, back to Qanuvi and the usual sizes.
+- [ ] **15i. A language-aware editor and debugging (owner, 2026-11-11; after the self-development build runs
+  reliably)**: the editor becomes as strong as VS Code's for real work, through the same open standards.
+  - Language servers (LSP): completion, errors and warnings underlined plus a Problems list, hover, exact go to
+    definition and find references, rename a symbol, formatting, quick fixes. PHP first (Intelephense or Phpactor),
+    then TypeScript / JavaScript / Svelte, Rust (rust-analyzer), Python (Pyright), HTML / CSS / JSON.
+  - Debugging (DAP): breakpoints in the gutter, continue / step, variables, call stack and watch in a "Run and debug"
+    sidebar mode, a debug console; VS Code's launch.json read as it is. PHP with Xdebug and Node first, then Python
+    and Rust (CodeLLDB).
+  - Qanuvi's own part: agents use the same language intelligence (they see the project's errors; "Fix with agent"
+    on any problem; renames and reference searches through the server: more exact, fewer tokens).
+  - Light, unlike VS Code (owner asked): nothing bundled (each server or adapter installs on demand, with the
+    user's yes); a server starts on the first file of its language and stops when the project closes or after a
+    while unused; debuggers run only while debugging; Qanuvi checks free memory before starting a big one (as for
+    local models) and says so when short; each language can be turned off in Settings.
+  - Order: 1. LSP for PHP, TypeScript / Svelte, Rust, with the Problems list. 2. Formatting, quick fixes, "Fix with
+    agent". 3. Debugging (PHP / Xdebug and Node first). 4. Split editor, minimap.
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
