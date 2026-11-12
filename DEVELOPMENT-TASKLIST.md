@@ -169,6 +169,8 @@ runs on or off; with it off nothing is sent anywhere.
   - Linux CI: the Ubuntu job twice ended with "the hosted runner lost communication" in the Rust tests (Windows and
     macOS pass). A step that runs the Rust tests one at a time on Linux was added to .github/workflows/build.yml;
     read the last test it started (Playwright on github.com/hmsiddiki/qanuvi/actions) and fix that test.
+  - Committed after 0.1.11, not published yet: the Update Claude Code button also works for winget installs (runs
+    winget upgrade). Publish it with the next batch, after asking the owner.
   - Next, in the order agreed: (1) the Linux culprit; (2) 1d automatic backups and restore; (3) 24j plan housekeeping
     (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
     OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
