@@ -1,6 +1,7 @@
 <script lang="ts">
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import AttachMenu from "./AttachMenu.svelte";
+  import { clipboardFiles, pastedAttachments } from "$lib/agent/paste";
   import { overruleIn } from "$lib/core/decider";
   import { reviewFreeTurn } from "$lib/stores/chatReview";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
@@ -181,6 +182,17 @@
   /** "/" as the whole message opens the menu (read from the text, so every keyboard layout works). */
   function input() {
     if (agent.draft === "/") commandsOpen = true;
+  }
+
+  /** Ctrl+V with an image (a screenshot) or copied files: they become attachments; plain text pastes as usual. */
+  async function paste(event: ClipboardEvent) {
+    const files = clipboardFiles(event.clipboardData);
+    if (!files.length) return;
+    event.preventDefault();
+    const images = agent.attachments.filter((a) => a.kind === "image").length;
+    const got = await pastedAttachments(files, images);
+    if (got.attachments.length) agent.attachments = [...agent.attachments, ...got.attachments];
+    agent.error = got.errors.join(" ");
   }
 
   /** Opens a file an agent step worked on, when it is inside the project. */
@@ -431,7 +443,8 @@
       aria-label="Message to the agent"
       disabled={!project}
       onkeydown={keydown}
-      oninput={input}></textarea>
+      oninput={input}
+      onpaste={paste}></textarea>
     <div class="tools">
       <AttachMenu disabled={!project} />
       <CommandMenu bind:open={commandsOpen} disabled={!project} />

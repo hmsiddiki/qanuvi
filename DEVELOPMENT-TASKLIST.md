@@ -98,6 +98,11 @@ runs on or off; with it off nothing is sent anywhere.
   backed up first as a "before restore" backup, which can be restored back. A move and a restore cannot both be
   booked. Live on the test build: the daily backup ran on time (20 files, window settings in), and the restore across
   a restart brought it back and kept the data from before. For the owner's review: the Backups page by mouse.
+- [x] **15n. Paste images into the message box (owner, 2026-11-12)**: Ctrl+V with a screenshot or a copied image did
+  nothing; only the + menu attached images. Now a pasted image (PNG, JPEG, GIF, WebP, up to 5 MB) or files copied in
+  the file manager (images, or text up to 200 KB) become attachments ("Pasted image 1.png"); plain text pastes as
+  before. Live on the test build: a screenshot pasted with Ctrl+V showed as an attachment chip. Not done yet: the
+  right-click menu's Paste is still text only, and dropping files onto the box.
 - [x] **15j. Messages while the agent works (owner, 2026-11-12)**: the box sends while a task runs (Send beside Stop);
   the message joins the task and the agent reads it before its next step (Claude Code takes it mid-turn, Qanuvi's own
   agent adds it to the conversation before each step). It shows "Added while it worked". Live: Claude Code followed a
