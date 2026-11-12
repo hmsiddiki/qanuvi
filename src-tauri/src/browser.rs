@@ -304,15 +304,26 @@ impl Browser {
     fn send(&mut self, method: &str, params: Value) -> Result<u64, String> {
         self.next_id += 1;
         let id = self.next_id;
-        self.ws
-            .send(Message::text(
-                json!({"id": id, "method": method, "params": params}).to_string(),
-            ))
-            .map_err(|e| format!("The browser connection closed: {e}"))?;
+        let mut sent = self.ws.send(Message::text(
+            json!({"id": id, "method": method, "params": params}).to_string(),
+        ));
+        // Interrupted by a signal: the message is already queued, so only the flush is tried again.
+        for _ in 0..20 {
+            match sent {
+                Err(tungstenite::Error::Io(ref e))
+                    if e.kind() == std::io::ErrorKind::Interrupted =>
+                {
+                    sent = self.ws.flush();
+                }
+                _ => break,
+            }
+        }
+        sent.map_err(|e| format!("The browser connection closed: {e}"))?;
         Ok(id)
     }
 
-    /// The next message from the browser, or None after a short wait.
+    /// The next message from the browser, or None after a short wait. A read that a signal interrupted (EINTR on
+    /// Linux, seen while other tests start processes) is only a wait too; the websocket keeps any partial frame.
     fn read(&mut self) -> Result<Option<Value>, String> {
         match self.ws.read() {
             Ok(Message::Text(t)) => Ok(serde_json::from_str(t.as_str()).ok()),
@@ -320,7 +331,9 @@ impl Browser {
             Err(tungstenite::Error::Io(e))
                 if matches!(
                     e.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::Interrupted
                 ) =>
             {
                 Ok(None)
