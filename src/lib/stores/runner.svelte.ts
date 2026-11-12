@@ -21,8 +21,13 @@ import {
   attemptEntry,
   logPath,
   logsBlock,
-  contextBlock,
+  knowledgeBlock,
   mapPath,
+  factsPath,
+  apiPath,
+  apiSection,
+  mergeApi,
+  isCode,
   resultEntry,
   loadPlanNotes,
   savePlanNotes,
@@ -233,14 +238,31 @@ class RunnerStore {
     return true;
   }
 
+  /** API.md: what the plan added, from Qanuvi's code index for the files the step changed (no model tokens). */
+  async #updateApi(project: Project, file: string, step: StepRun): Promise<void> {
+    const code = (step.changed ?? []).filter(isCode).slice(0, 30);
+    if (!code.length) return;
+    const updates = new Map<string, string>();
+    for (const p of code) {
+      const exists = await api.files.read(project.id, p).then(
+        () => true,
+        () => false,
+      );
+      updates.set(p, exists ? apiSection(p, await api.index.outline(project.id, p).catch(() => [])) : "");
+    }
+    const path = apiPath(file);
+    const now = await api.files.read(project.id, path).catch(() => null);
+    await api.files.write(project.id, path, mergeApi(now?.text ?? "", updates), now?.hash ?? null).catch(() => {});
+  }
+
   /** Something the owner said during the run: every later step gets it. */
   addNote(text: string): void {
     const run = this.run;
     const note = text.replace(/\s+/g, " ").trim().slice(0, 400);
     if (!run || !note || looksSecret(note)) return;
     run.notes = [...(run.notes ?? []), note];
-    savePlanNotes(run.projectId, run.file, run.notes);
     void this.#save(run);
+    void api.files.logAppend(run.projectId, factsPath(run.file), `- (the owner) ${note}\n`).catch(() => {});
   }
 
   /** A login or password given during the run: kept for this plan (credential store), for every later step. */
@@ -268,8 +290,10 @@ class RunnerStore {
     const found = notesIn(texts.slice(-3).join("\n")).filter((n) => !(run.notes ?? []).includes(n));
     if (found.length) {
       run.notes = [...(run.notes ?? []), ...found];
-      savePlanNotes(run.projectId, run.file, run.notes);
       await this.#save(run);
+      await api.files
+        .logAppend(run.projectId, factsPath(run.file), found.map((n) => `- ${n}\n`).join(""))
+        .catch(() => {});
     }
   }
 
@@ -445,7 +469,14 @@ class RunnerStore {
     // Keep a reference to this run: the rest of the run works on it, whatever else is shown meanwhile.
     const run = this.run;
     // The plan's notes from earlier runs: the owner's instructions hold for every run of this plan.
-    run.notes = loadPlanNotes(project.id, file);
+    run.notes = [];
+    {
+      const kept = loadPlanNotes(project.id, file);
+      if (kept.length) {
+        await api.files.logAppend(project.id, factsPath(file), kept.map((n) => `- ${n}\n`).join("")).catch(() => {});
+        savePlanNotes(project.id, file, []);
+      }
+    }
     // The user watching a step can change its mode (for the rest of the run, kept for this plan) and its model (this
     // step, written into its Model line) from the chat pickers.
     let live = null as { step: StepRun; model: string; from: number } | null;
@@ -675,27 +706,30 @@ class RunnerStore {
         const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
         const resumedWith = this.#resumeText;
         this.#resumeText = "";
+        // The plan's shared knowledge first (the same for steps in a row, so it is read from the cache), then the step.
+        const read = async (p: string) => (await api.files.read(project.id, p).catch(() => null))?.text ?? "";
         let prompt =
+          knowledgeBlock(
+            file,
+            await read(mapPath(file)),
+            await read(factsPath(file)),
+            run.steps
+              .filter((x) => x !== stepRun && x.changed?.length)
+              .map((x) => ({ number: x.number, files: x.changed ?? [] })),
+            options.indexTools,
+          ) +
+          "\n" +
           (resumedWith
             ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
             : "") +
           stepPrompt(file, fresh, done) +
-          notesBlock(run.notes ?? []) +
           privateBlock(privateDetails) +
           logsBlock(file, ownLog, ownLogExists) +
           (fullNow
             ? ""
             : "\n\nChecks: run only the tests for what this step changes (and lint the files you touch). The full suite " +
               "and the plan's other whole-project checks run once, at the last step of this section; skip them here, " +
-              "even where the plan's rules ask for them after every step.") +
-          contextBlock(
-            file,
-            (await api.files.read(project.id, mapPath(file)).catch(() => null))?.text ?? "",
-            run.steps
-              .filter((x) => x !== stepRun && x.changed?.length)
-              .map((x) => ({ number: x.number, files: x.changed ?? [] })),
-            options.indexTools,
-          );
+              "even where the plan's rules ask for them after every step.");
         // The reviewer turned down a free model's work: the next model hears why.
         const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
         if (rejected)
@@ -836,6 +870,7 @@ class RunnerStore {
       // Steps added while this one ran (the user asked for them mid-step) come next.
       await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
       await this.#collectNotes(run, stepRun);
+      await this.#updateApi(project, file, stepRun);
       if (run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed") && stepRun.number) {
         const now = await api.files.read(project.id, file).catch(() => null);
         const waiting = new Set(run.steps.filter((x) => x.status === "waiting" && x.number).map((x) => x.number!));

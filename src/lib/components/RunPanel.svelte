@@ -675,16 +675,11 @@
       </p>
     {/if}
     {#if run.notes?.length}
-      <details class="decisions" open>
-        <summary>Notes kept for this plan: every step and run gets them ({run.notes.length})</summary>
+      <details class="decisions">
+        <summary>Notes from this run ({run.notes.length}), kept in the plan's FACTS.md for every step and model</summary
+        >
         <ul>
-          {#each run.notes as n, i (i)}
-            <li>
-              {n}
-              <button type="button" class="link" title="Remove this note" onclick={() => runner.removeNote(i)}>×</button
-              >
-            </li>
-          {/each}
+          {#each run.notes as n, i (i)}<li>{n}</li>{/each}
         </ul>
       </details>
     {/if}

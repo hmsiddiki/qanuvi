@@ -153,3 +153,35 @@ describe("what a step gets to find its way", () => {
     expect(contextBlock("P.md", "", [], false)).not.toContain("find_symbol");
   });
 });
+
+import { apiSection, isCode, knowledgeBlock, mergeApi } from "./guidance";
+
+describe("the plan's shared knowledge", () => {
+  it("gives every step the map and facts first, and asks to keep them small", () => {
+    const longMap = Array.from({ length: 90 }, (_, i) => `f${i}.php — x`).join("\n");
+    const b = knowledgeBlock("PLAN-D.md", longMap, "Tests: php tests/run.php --strict", [], true);
+    expect(b.startsWith("This plan's knowledge")).toBe(true);
+    expect(b).toContain("FACTS.md:\nTests: php tests/run.php --strict");
+    expect(b).toContain("MAP.md has 90 lines: tidy it to under 80");
+    expect(b).toContain("never passwords or keys");
+  });
+
+  it("keeps API.md one part per file, replaced when a file changes", () => {
+    expect(isCode("src/Cart/CartLine.php")).toBe(true);
+    expect(isCode("README.md")).toBe(false);
+    expect(isCode("vendor/x/y.php")).toBe(false);
+    const a = apiSection("src/A.php", [{ name: "resetCache", kind: "method", line: 88, container: "CartStorage" }]);
+    expect(a).toBe("### src/A.php\n- method CartStorage::resetCache :88");
+    let api = mergeApi(
+      "",
+      new Map([
+        ["src/B.php", "### src/B.php\n- class B :3"],
+        ["src/A.php", a],
+      ]),
+    );
+    expect(api.indexOf("src/A.php")).toBeLessThan(api.indexOf("src/B.php"));
+    api = mergeApi(api, new Map([["src/B.php", ""]]));
+    expect(api).not.toContain("src/B.php");
+    expect(api).toContain("CartStorage::resetCache :88");
+  });
+});

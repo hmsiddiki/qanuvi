@@ -298,3 +298,104 @@ export function contextBlock(
   );
   return lines.join("\n");
 }
+
+/**
+ * The plan's knowledge, shared by every step, session and model (the owner's design, 2026-11-12): MAP.md (what is
+ * where), FACTS.md (decisions, conventions, how to run and test, gotchas), API.md (what the plan added, written by
+ * Qanuvi from its code index) and a log per step. Small files, kept current, so no session rediscovers the project.
+ */
+export const MAP_LINES = 80;
+export const FACTS_LINES = 60;
+
+export function factsPath(planFile: string): string {
+  return `${logDir(planFile)}/FACTS.md`;
+}
+export function apiPath(planFile: string): string {
+  return `${logDir(planFile)}/API.md`;
+}
+
+function lineCount(text: string): number {
+  return text.split("\n").filter((l) => l.trim()).length;
+}
+
+/**
+ * What every step gets first (the same for steps in a row, so it is read from the cache): where the knowledge is, the
+ * map and the facts, the files the last steps changed, how to find code, and the rule to keep the files current.
+ */
+export function knowledgeBlock(
+  planFile: string,
+  map: string,
+  facts: string,
+  recent: { number: string | null; files: string[] }[],
+  indexTools: boolean,
+): string {
+  const dir = logDir(planFile);
+  const cut = (t: string) => (t.length > 8000 ? t.slice(0, 8000) + "\n…" : t.trim());
+  const lines = [
+    `This plan's knowledge, shared by every step and model, is in ${dir}/: MAP.md (what is where), FACTS.md (decisions, conventions, how to run and test, gotchas), API.md (functions and classes the plan added, with file and line; read it before opening files) and a log per step. Start from it; do not rediscover what it says.`,
+  ];
+  if (map.trim()) lines.push("", "MAP.md:", cut(map));
+  if (facts.trim()) lines.push("", "FACTS.md:", cut(facts));
+  const shown = recent.filter((r) => r.files.length).slice(-3);
+  if (shown.length) {
+    lines.push("", "Files the last steps changed:");
+    for (const r of shown)
+      lines.push(`- ${r.number ?? "step"}: ${r.files.slice(0, 25).join(", ")}${r.files.length > 25 ? ", …" : ""}`);
+  }
+  if (indexTools)
+    lines.push(
+      "",
+      "Finding your way: use Qanuvi's code index (find_symbol for where something is defined, outline for what a file " +
+        "holds, read_lines for just the lines you need, project_map for the layout) rather than reading whole files " +
+        "with cat or sed.",
+    );
+  const tidy: string[] = [];
+  if (lineCount(map) > MAP_LINES) tidy.push(`MAP.md has ${lineCount(map)} lines: tidy it to under ${MAP_LINES}`);
+  if (lineCount(facts) > FACTS_LINES)
+    tidy.push(`FACTS.md has ${lineCount(facts)} lines: tidy it to under ${FACTS_LINES}`);
+  lines.push(
+    "",
+    `Before you finish: update ${dir}/MAP.md (one line per file, "path — what it holds or does", under ${MAP_LINES} lines; create it if missing) and ${dir}/FACTS.md (what later steps must know: decisions, conventions, how to run things, gotchas; under ${FACTS_LINES} lines; never passwords or keys). Change or remove lines that are no longer right instead of adding more.` +
+      (tidy.length ? " " + tidy.join("; ") + "." : ""),
+    "",
+  );
+  return lines.join("\n");
+}
+
+const CODE = /\.(php|js|mjs|cjs|ts|tsx|jsx|svelte|vue|py|rs|go|java|kt|cs|rb|swift|dart|c|cc|cpp|h|hpp)$/i;
+
+/** Whether a changed file is code the index outlines. */
+export function isCode(path: string): boolean {
+  return CODE.test(path) && !/(^|\/)(node_modules|vendor|dist|build)\//.test(path);
+}
+
+/** One file's part of API.md, from the code index's outline. */
+export function apiSection(
+  path: string,
+  items: { name: string; kind: string; line: number; container: string | null }[],
+): string {
+  if (!items.length) return "";
+  const rows = items
+    .slice(0, 40)
+    .map((i) => `- ${i.kind} ${i.container ? i.container + "::" : ""}${i.name} :${i.line}`);
+  return [`### ${path}`, ...rows].join("\n");
+}
+
+/** API.md with the given files' parts replaced (an empty part removes the file); files in path order. */
+export function mergeApi(existing: string, updates: Map<string, string>): string {
+  const parts = new Map<string, string>();
+  for (const chunk of existing.split(/\n(?=### )/)) {
+    const m = chunk.match(/^### (.+)/);
+    if (m) parts.set(m[1].trim(), chunk.trim());
+  }
+  for (const [path, section] of updates) {
+    if (section) parts.set(path, section);
+    else parts.delete(path);
+  }
+  const body = [...parts.keys()].sort().map((k) => parts.get(k));
+  return [
+    "# What this plan added (written by Qanuvi from its code index after each step)",
+    "",
+    ...body.flatMap((b) => [b, ""]),
+  ].join("\n");
+}
