@@ -19,10 +19,21 @@
   import { agent } from "$lib/stores/agent.svelte";
   import { ago, gitState } from "$lib/stores/git.svelte";
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
-  import { lsp, type Doc } from "$lib/stores/lsp.svelte";
+  import { lsp, type Doc, type Problem } from "$lib/stores/lsp.svelte";
   import { lspExtensions, toDiagnostics } from "$lib/lsp/codemirror";
-  import { findReferences, goToDefinition as lspDefinition, renameBlocked, renameSymbol } from "$lib/lsp/actions";
+  import {
+    findReferences,
+    fixWithAgent,
+    formatDocument,
+    goToDefinition as lspDefinition,
+    problemsAt,
+    quickFixMenu,
+    renameBlocked,
+    renameSymbol,
+    setShownView,
+  } from "$lib/lsp/actions";
   import { serverFor } from "$lib/lsp/protocol";
+  import { settings } from "$lib/stores/settings.svelte";
 
   interface Props {
     tab: EditorTab;
@@ -64,6 +75,8 @@
     const server = serverFor(t.path);
     const lspFile = project && !!server && lsp.enabled(server);
     const lines = { from: v.state.doc.lineAt(s.from).number, to: v.state.doc.lineAt(s.to).number, text };
+    const d = lspFile ? currentDoc() : null;
+    const here = d ? problemsAt(v, d) : [];
     const insert = (value: string) => {
       v.dispatch(v.state.replaceSelection(value));
       v.focus();
@@ -75,6 +88,15 @@
           lspFile && { label: `Find references to ${name}`, hint: "Shift+F12", action: () => references() },
           lspFile && { label: `Rename ${name}`, hint: "F2", action: () => rename() },
         ],
+      lspFile && [
+        { label: "Quick fix…", hint: "Ctrl+.", action: () => quickFix() },
+        here.length > 0 && {
+          label: here.length === 1 ? "Fix with agent" : `Fix these ${here.length} problems with agent`,
+          action: () => fixWithAgent(here),
+        },
+        { label: "Format document", hint: "Shift+Alt+F", action: () => format(false) },
+        text && { label: "Format selection", hint: "Ctrl+K Ctrl+F", action: () => format(true) },
+      ],
       [
         {
           label: "Cut",
@@ -152,6 +174,20 @@
     return true;
   }
 
+  /** Ctrl+. : the language server's fixes at the cursor, and "Fix with agent" for the problems there. */
+  function quickFix() {
+    const d = currentDoc();
+    if (view && d) quickFixMenu(view, d, note);
+    return true;
+  }
+
+  function format(onlySelection: boolean) {
+    const d = currentDoc();
+    const v = view;
+    if (v && d) formatDocument(v, d, onlySelection).then((r) => note(r || "Already formatted."));
+    return true;
+  }
+
   /** Go to definition: the language server first (exact), else the code index: one match opens, several "Go to". */
   async function goToDefinition(name: string) {
     const t = tab;
@@ -192,8 +228,21 @@
   }
 
   function save() {
-    if (!view || !shownKey) return true;
-    editor.save(shownKey, view.state.doc.toString());
+    const v = view;
+    const key = shownKey;
+    if (!v || !key) return true;
+    const d = currentDoc();
+    const s = d ? serverFor(d.path) : null;
+    // Format on save (Settings, Languages): only when the file's server already runs, and at most 3 s, so a slow
+    // or missing server never holds the save back.
+    if (d && s && settings.value.languages.formatOnSave && lsp.state[`${d.projectId}::${s}`] === "ready") {
+      formatDocument(v, d, false, 3000, true).then((r) => {
+        if (r && r !== "Formatted.") note(`Saved without formatting: ${r}`);
+        if (view === v && shownKey === key) editor.save(key, v.state.doc.toString());
+      });
+      return true;
+    }
+    editor.save(key, v.state.doc.toString());
     return true;
   }
 
@@ -207,6 +256,9 @@
         { key: "F12", run: definitionKey, preventDefault: true },
         { key: "Shift-F12", run: references, preventDefault: true },
         { key: "F2", run: rename, preventDefault: true },
+        { key: "Mod-.", run: quickFix, preventDefault: true },
+        { key: "Shift-Alt-f", run: () => format(false), preventDefault: true },
+        { key: "Mod-k Mod-f", run: () => format(true), preventDefault: true },
       ]),
       gitGutter(),
       lintGutter(),
@@ -278,6 +330,7 @@
 
   onMount(() => {
     view = new EditorView({ parent: host });
+    setShownView(() => (view && shownKey ? { view, key: shownKey } : null));
     show(tab);
   });
 
@@ -311,7 +364,18 @@
   function showProblems() {
     const d = currentDoc();
     if (!view || !d) return;
-    view.dispatch(setDiagnostics(view.state, toDiagnostics(view.state, lsp.problemsFor(d.projectId, d.path))));
+    const buttons = (p: Problem) => [
+      {
+        name: "Quick fix",
+        apply: (v: EditorView, from: number) => {
+          v.dispatch({ selection: { anchor: from } });
+          quickFix();
+        },
+      },
+      { name: "Fix with agent", apply: () => fixWithAgent([p]) },
+    ];
+    const list = toDiagnostics(view.state, lsp.problemsFor(d.projectId, d.path), buttons);
+    view.dispatch(setDiagnostics(view.state, list));
   }
 
   $effect(() => {
@@ -334,6 +398,7 @@
   }
 
   onDestroy(() => {
+    setShownView(() => null);
     if (view && shownKey) editor.states.set(shownKey, view.state);
     view?.destroy();
     view = null;

@@ -247,8 +247,12 @@ runs on or off; with it off nothing is sent anywhere.
     rustup component is missing too); installing one downloads from npm or rustup, so it waits for the owner's yes.
   - Done 2026-11-13, committed, NOT published: 15i part 1 live check on a scratch project with the release build
     (see 15i "Live check"); five fixes from it. Verify green (265 + 156 tests).
-  - RESUME HERE (new conversation): 15i part 2 (formatting, quick fixes, "Fix with agent"), unless the owner says
-    yes to 24r first (asked 2026-11-13, no answer yet). Older open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13 (later), committed, NOT published: 15i part 2 code (formatting, quick fixes, "Fix with agent";
+    see 15i "Built (part 2)"). Verify green (273 + 156 tests; no Rust change). Checked against Intelephense and
+    rust-analyzer with a probe script; not yet driven in the window.
+  - RESUME HERE (new conversation): drive 15i part 2 in the running app on a scratch project, then 15i part 3
+    (debugging, PHP / Xdebug and Node first), unless the owner says yes to 24r first (asked 2026-11-13, no answer
+    yet). Unpublished since 0.1.13: 24o, 24n part 6, 15i parts 1 and 2. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -985,6 +989,24 @@ runs on or off; with it off nothing is sent anywhere.
     without a restart (statuses read again, at most every 30 s); (3) F2 asks the server first: no name prompt when
     it cannot rename (free Intelephense: "renames only with its paid licence"); (4) the name prompt gives the focus
     back (after F2, Ctrl+S did not save); (5) the status bar's Ln/Col follows a tab switch.
+  - Built (part 2, 2026-11-13; not yet driven in the window): formatting: Shift+Alt+F the file, Ctrl+K Ctrl+F the
+    selection (also in the right-click menu), one undoable change, the file's indent guessed and sent (tabs, 4 or 2
+    spaces); nothing changes if the text changed meanwhile. Format on save (Settings, Languages; off by default):
+    only when the file's server already runs and can format, at most 3 s, then saved anyway. Quick fixes: Ctrl+. (or
+    the right-click menu, or "Quick fix" in a problem's hover box) opens a menu at the cursor with the server's code
+    actions for the problems there (preferred fix first, quick fixes, refactors, then whole-file ones; disabled ones
+    with the reason), resolved when the server sends them without the edit, then their command run; edits a server
+    sends back (workspace/applyEdit) go through the same code as a rename (lsp/actions.ts applyWorkspaceEdit: the
+    shown file one undoable change, other tabs left unsaved, closed files written). "Fix with agent" on a problem
+    (hover box, Ctrl+. menu, right-click, the Problems list's row and its file's "Fix all with agent", right-click
+    there with copy too) adds a request to the message box (place, message, server code, the lines around one
+    problem); the user reads and sends it, so it costs nothing until sent. Pure helpers with tests: lsp/fix.ts.
+    Checked against the real servers with a probe script on a scratch folder (same capabilities as the client):
+    Intelephense (free) formats the file and the selection but has no code actions (the menu says they need its paid
+    licence, "Fix with agent" is still there); rust-analyzer formats the file (no selection formatting: said so),
+    gives quick fixes such as "Add missing match arm" and "Remove all unused imports" that resolve to edits. Open:
+    drive it in the running app on a scratch project (menu at the cursor, hover box buttons, format on save, a
+    rust-analyzer fix applied); agents seeing the project's problems by themselves is part of the later Qanuvi part.
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:

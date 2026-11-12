@@ -59,8 +59,11 @@ export interface Settings {
   startup: StartupItem[];
   /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
   updates: { autoDownload: boolean; claudeAuto?: boolean };
-  /** Language servers (15i): servers turned off, servers not to offer again, minutes unused before one stops. */
-  languages: { off: string[]; never: string[]; idleMinutes: number };
+  /**
+   * Language servers (15i): servers turned off, servers not to offer again, minutes unused before one stops, and
+   * whether Ctrl+S formats the file through its server first.
+   */
+  languages: { off: string[]; never: string[]; idleMinutes: number; formatOnSave: boolean };
 }
 
 /** A command Qanuvi starts with itself (hidden), and the address that answers once it runs. */
@@ -146,7 +149,7 @@ const DEFAULTS: Settings = {
   approveMinutes: 10,
   appearance: { editorFontSize: 13, uiScale: 100 },
   updates: { autoDownload: false },
-  languages: { off: [], never: [], idleMinutes: 10 },
+  languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false },
   startup: [],
   team: DEFAULT_TEAM,
 };
@@ -212,7 +215,12 @@ export function parseSettings(json: string | null): Settings {
     const ids = (v: unknown) =>
       Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length < 40))] : [];
     const idle = typeof lg.idleMinutes === "number" && Number.isFinite(lg.idleMinutes) ? lg.idleMinutes : 10;
-    s.languages = { off: ids(lg.off), never: ids(lg.never), idleMinutes: Math.min(240, Math.max(1, Math.round(idle))) };
+    s.languages = {
+      off: ids(lg.off),
+      never: ids(lg.never),
+      idleMinutes: Math.min(240, Math.max(1, Math.round(idle))),
+      formatOnSave: lg.formatOnSave === true,
+    };
   }
   if (Array.isArray(raw.startup))
     for (const it of raw.startup as Record<string, unknown>[]) {

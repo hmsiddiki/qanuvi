@@ -60,6 +60,21 @@
   {/each}
   {#if lsp.installError}<p class="error">{lsp.installError}</p>{/if}
 
+  <label class="save">
+    <input
+      type="checkbox"
+      checked={l.formatOnSave}
+      onchange={(e) => settings.set("languages", { ...l, formatOnSave: e.currentTarget.checked })}
+    />
+    <span
+      ><strong>Format on save</strong>
+      <span class="muted"
+        >Ctrl+S formats the file through its language server first (when it runs and can format; at most 3 seconds).
+        Shift+Alt+F formats at any time.</span
+      ></span
+    >
+  </label>
+
   <label class="idle">
     <span><strong>Stop an unused server after</strong> <span class="muted">{l.idleMinutes} min</span></span>
     <input
@@ -137,6 +152,17 @@
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+
+  .save {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 14px 20px 0;
+  }
+
+  .save .muted {
+    display: block;
   }
 
   .idle {

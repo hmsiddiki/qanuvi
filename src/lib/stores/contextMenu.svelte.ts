@@ -25,12 +25,17 @@ class ContextMenuStore {
   show(event: MouseEvent, groups: MenuGroups): void {
     event.preventDefault();
     event.stopPropagation();
+    this.showAt(event.clientX, event.clientY, groups);
+  }
+
+  /** Shows a menu at a point of the window (a key opened it, for example Ctrl+. at the cursor). */
+  showAt(x: number, y: number, groups: MenuGroups): void {
     const clean = groups
       .filter((g): g is readonly Maybe<MenuItem>[] => !!g)
       .map((g) => g.filter((i): i is MenuItem => !!i))
       .filter((g) => g.length);
     if (!clean.length) return;
-    this.open = { x: event.clientX, y: event.clientY, groups: clean };
+    this.open = { x, y, groups: clean };
   }
 
   close(): void {

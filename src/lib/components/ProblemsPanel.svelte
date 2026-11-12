@@ -1,13 +1,16 @@
 <script lang="ts">
   /**
    * The bottom panel's Problems and References lists (15i): what the language servers report for the project, and
-   * the last "find references" (or several definitions). A click opens the place.
+   * the last "find references" (or several definitions). A click opens the place; "Fix with agent" (on a problem,
+   * a file, or its right-click menu) puts a request in the conversation's message box for the user to send.
    */
   import CircleX from "@lucide/svelte/icons/circle-x";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Info from "@lucide/svelte/icons/info";
   import { editor } from "$lib/stores/editor.svelte";
   import { lsp, type Place, type Problem } from "$lib/stores/lsp.svelte";
+  import { fixWithAgent } from "$lib/lsp/actions";
+  import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
 
   interface Props {
     projectId: string | null;
@@ -39,6 +42,26 @@
     editor.open(p.projectId, p.path, p.range.start.line + 1, p.range.start.character + 1);
   }
 
+  function problemMenu(e: MouseEvent, p: Problem, list: Problem[]) {
+    contextMenu.show(e, [
+      [
+        { label: "Open", action: () => openProblem(p) },
+        { label: "Fix with agent", action: () => fixWithAgent([p]) },
+        list.length > 1 && {
+          label: `Fix all ${list.length} in this file with agent`,
+          action: () => fixWithAgent(list),
+        },
+      ],
+      [
+        { label: "Copy the message", action: () => copyText(p.message) },
+        {
+          label: "Copy with its place",
+          action: () => copyText(`${p.path}:${p.range.start.line + 1}:${p.range.start.character + 1} ${p.message}`),
+        },
+      ],
+    ]);
+  }
+
   function openPlace(p: Place) {
     editor.open(p.projectId, p.path, p.line, p.column);
   }
@@ -62,9 +85,17 @@
     {:else}
       <ul>
         {#each groups as [path, list] (path)}
-          <li class="file">{path} <span class="muted">{list.length}</span></li>
+          <li class="file">
+            {path} <span class="muted">{list.length}</span>
+            <button
+              type="button"
+              class="fix"
+              title="Put a request to fix them in the message box"
+              onclick={() => fixWithAgent(list)}>Fix all with agent</button
+            >
+          </li>
           {#each list as p, i (i)}
-            <li>
+            <li class="item" oncontextmenu={(e) => problemMenu(e, p, list)}>
               <button type="button" class="row" onclick={() => openProblem(p)}>
                 {#if p.severity === "error"}<CircleX size={13} class="sev error" />
                 {:else if p.severity === "warning"}<TriangleAlert size={13} class="sev warning" />
@@ -73,6 +104,12 @@
                 {#if p.source}<span class="muted">{p.source}</span>{/if}
                 <span class="muted pos">[{p.range.start.line + 1}, {p.range.start.character + 1}]</span>
               </button>
+              <button
+                type="button"
+                class="fix"
+                title="Put a request to fix it in the message box"
+                onclick={() => fixWithAgent([p])}>Fix with agent</button
+              >
             </li>
           {/each}
         {/each}
@@ -147,6 +184,47 @@
   .file {
     padding: 4px 10px 2px;
     font-weight: 600;
+  }
+
+  .file,
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .item .row {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .fix {
+    flex: none;
+    margin-right: 10px;
+    padding: 0 6px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: transparent;
+    color: var(--qx-text-secondary);
+    font: inherit;
+    cursor: pointer;
+    visibility: hidden;
+  }
+
+  .file .fix {
+    margin-left: auto;
+    font-weight: normal;
+  }
+
+  .file:hover .fix,
+  .item:hover .fix,
+  .fix:focus-visible {
+    visibility: visible;
+  }
+
+  .fix:hover {
+    color: inherit;
+    border-color: var(--qx-accent);
   }
 
   .row {

@@ -20,6 +20,10 @@ export interface Capabilities {
   definitionProvider?: unknown;
   referencesProvider?: unknown;
   renameProvider?: unknown;
+  documentFormattingProvider?: unknown;
+  documentRangeFormattingProvider?: unknown;
+  codeActionProvider?: boolean | { resolveProvider?: boolean; codeActionKinds?: string[] };
+  executeCommandProvider?: { commands?: string[] };
   textDocumentSync?: number | { change?: number; save?: unknown };
 }
 
@@ -37,6 +41,8 @@ export class LspClient {
   #handlers = new Map<string, Handler[]>();
   #versions = new Map<string, number>();
   #onExit: (why: string) => void;
+  /** Applies a WorkspaceEdit the server asks for (after a quick fix runs a command); answers whether it did. */
+  applyEdit: (edit: unknown) => Promise<boolean> = async () => false;
 
   constructor(
     readonly projectId: string,
@@ -78,8 +84,38 @@ export class LspClient {
             definition: { linkSupport: true },
             references: {},
             rename: { prepareSupport: false },
+            formatting: {},
+            rangeFormatting: {},
+            codeAction: {
+              codeActionLiteralSupport: {
+                codeActionKind: {
+                  valueSet: [
+                    "",
+                    "quickfix",
+                    "refactor",
+                    "refactor.extract",
+                    "refactor.inline",
+                    "refactor.rewrite",
+                    "source",
+                    "source.organizeImports",
+                    "source.fixAll",
+                  ],
+                },
+              },
+              isPreferredSupport: true,
+              disabledSupport: true,
+              dataSupport: true,
+              resolveSupport: { properties: ["edit"] },
+            },
           },
-          workspace: { workspaceFolders: true, configuration: true, applyEdit: false },
+          workspace: {
+            workspaceFolders: true,
+            configuration: true,
+            // Quick fixes that run a command come back as workspace/applyEdit; file creation or renames are not taken.
+            applyEdit: true,
+            workspaceEdit: { documentChanges: true },
+            executeCommand: {},
+          },
           window: { workDoneProgress: false },
         },
         // Intelephense keeps its index in a folder of its own choosing; nothing else to set here.
@@ -129,6 +165,14 @@ export class LspClient {
 
   /** Requests the server makes of the editor. Unknown ones get an empty answer, so the server goes on. */
   #answer(id: number | string, method: string, params: unknown) {
+    if (method === "workspace/applyEdit") {
+      const edit = (params as { edit?: unknown })?.edit;
+      this.applyEdit(edit).then(
+        (applied) => this.#write({ jsonrpc: "2.0", id, result: { applied } }),
+        (e) => this.#write({ jsonrpc: "2.0", id, result: { applied: false, failureReason: String(e) } }),
+      );
+      return;
+    }
     let result: unknown = null;
     if (method === "workspace/configuration") {
       const items = (params as { items?: unknown[] })?.items ?? [];

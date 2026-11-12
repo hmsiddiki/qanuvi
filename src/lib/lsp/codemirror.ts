@@ -6,7 +6,7 @@ import type { Extension } from "@codemirror/state";
 import { EditorState } from "@codemirror/state";
 import { EditorView, hoverTooltip } from "@codemirror/view";
 import { snippet, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
-import type { Diagnostic } from "@codemirror/lint";
+import type { Action, Diagnostic } from "@codemirror/lint";
 import { renderMarkdown } from "$lib/agent/markdown";
 import { lsp, type Doc, type Place, type Problem } from "$lib/stores/lsp.svelte";
 import {
@@ -141,14 +141,25 @@ export function lspExtensions(current: Current): Extension {
   return [hover(current), completion(current)];
 }
 
-/** The server's problems for a file, as CodeMirror's lint shows them. */
-export function toDiagnostics(state: EditorState, problems: Problem[]): Diagnostic[] {
+/** The server's problems for a file, as CodeMirror's lint shows them; `actions` adds buttons to each. */
+export function toDiagnostics(
+  state: EditorState,
+  problems: Problem[],
+  actions?: (p: Problem) => Action[],
+): Diagnostic[] {
   return problems.map((p) => {
     const from = toOffset(state.doc, p.range.start);
     let to = toOffset(state.doc, p.range.end);
     // An empty range still needs a visible mark: the word (or character) at that point.
     if (to <= from) to = Math.min(state.doc.length, from + 1);
-    return { from, to, severity: p.severity, message: p.message, source: p.source || undefined };
+    return {
+      from,
+      to,
+      severity: p.severity,
+      message: p.message,
+      source: p.source || undefined,
+      actions: actions?.(p),
+    };
   });
 }
 

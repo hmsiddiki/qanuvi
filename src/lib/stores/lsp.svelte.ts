@@ -24,6 +24,8 @@ export interface Problem {
   severity: Severity;
   message: string;
   source: string;
+  /** The diagnostic as the server sent it: handed back when asking for its quick fixes. */
+  raw?: unknown;
 }
 
 export interface Place {
@@ -61,6 +63,8 @@ class LspStore {
   lastError = $state("");
   references = $state<{ title: string; places: Place[] } | null>(null);
   bottom = $state<BottomView>("terminal");
+  /** Applies a WorkspaceEdit in a project (set by lsp/actions.ts, which knows the editor). */
+  editApplier: (projectId: string, edit: unknown) => Promise<boolean> = async () => false;
 
   #clients = new Map<string, LspClient>();
   #lastUsed = new Map<string, number>();
@@ -141,6 +145,7 @@ class LspStore {
       this.#clients.set(key, client);
       this.state = { ...this.state, [key]: "starting" };
       const c = client;
+      c.applyEdit = (edit) => this.editApplier(doc.projectId, edit);
       c.on("textDocument/publishDiagnostics", (p) => this.#diagnostics(doc.projectId, root, p));
       c.ready.then(
         () => this.#clients.get(key) === c && (this.state = { ...this.state, [key]: "ready" }),
@@ -235,6 +240,7 @@ class LspStore {
     if (path === null) return;
     const key = `${projectId}::${path}`;
     const list: Problem[] = (p.diagnostics ?? []).map((d) => ({
+      raw: d,
       projectId,
       path,
       range: d.range,
