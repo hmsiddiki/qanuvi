@@ -240,11 +240,13 @@ runs on or off; with it off nothing is sent anywhere.
     housekeeping, the Plan view stale-file fix, and the model switch with handover. Nothing unpublished now.
   - Done 2026-11-12 (later), committed, NOT published (ask the owner first): (5) 24o finishing pass, with the two
     open notes below folded in (archive numbers, footer switching text). Verify green (248 + 152 tests). Next: (6).
-  - RESUME HERE (new conversation): next is (6) 24n part 6 (edit and resend, rewind,
-    search), then (7) 15i language servers and debugging. Open notes: drive 24j, the stale-file fix and the model
-    switch live on the scratch plan (never on the owner's folders); the planner (PlannerDialog) does not yet avoid
-    step numbers that are only in the plan's archive (fold into 24o); the chat footer shows the picked model while
-    the old one is still finishing its edit (say "switching after the edit in hand" there, 24o).
+  - Done 2026-11-12 (later), committed, NOT published (ask the owner first): (6) 24n part 6, edit and resend, rewind
+    and search (see 24n). Verify green (257 + 152 tests). Unpublished since 0.1.13 in all: 24o and 24n part 6.
+  - RESUME HERE (new conversation): next is (7) 15i language servers and debugging. Open notes: drive 24j, 24o, 24n
+    part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
+    idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
+    plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
+    with the plan's kept settings).
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
@@ -267,6 +269,18 @@ runs on or off; with it off nothing is sent anywhere.
     / commands, the model, mode and effort in reach, a queue of messages while it works (15j), and stop.
   - Session abilities: edit and resend an earlier message (branching from there), rewind changes to a step, search
     in the conversation, export, and a compact "what changed" summary at the end of each task.
+    Done 2026-11-12 (part 6: edit and resend, rewind, search), committed, NOT published: on hover (or right-click) a
+    message of the owner offers Edit and Rewind. Edit opens the message in place (Enter sends, Esc cancels) and
+    "Send as a branch" starts a new session on the same agent, model, mode and effort, titled "... (branch)", told
+    what was said before (owner and agent text, a line per step, the newest 24k characters) and whether the files
+    were reset; the original session stays as it was. This works the same for every agent (no agent-side fork
+    needed). A checkbox "Also undo the file changes made from here on (N steps in K files)" rewinds first. Rewind
+    undoes the Edit/MultiEdit steps from that message on, newest first, per file, after a preview of the files;
+    a file changed since, or written whole by a step, is left as it is and named; failed steps are skipped. Search:
+    Ctrl+F in the pane (or the footer's search button): a bar with "n of m", Enter / Shift+Enter, Esc; groups and
+    folds holding a hit open, step cards with a hit show all, words marked with the CSS Highlight API. Code:
+    agent/sessionTools.ts (+ tests), agent.branch, AgentPane. Export, the "what changed" summary and the virtual list
+    stay open. Not driven in the running app yet.
   - Fast with long sessions (virtual list) and light on memory, as the rest of Qanuvi.
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.

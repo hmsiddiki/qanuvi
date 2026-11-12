@@ -9,6 +9,7 @@ import { chatModelPrompt, deciderSeat, overruleNote, parseChatModel, strongerMod
 import { itemsToMarkdown } from "$lib/agent/events";
 import { freeDecide, ownSetup, setupFor } from "./brain.svelte";
 import { snapshotChanges } from "./changes";
+import { branchPreamble } from "$lib/agent/sessionTools";
 
 /** Agent sessions of the current project and the conversation of the selected one. */
 class AgentStore {
@@ -206,8 +207,11 @@ ${text}`
     };
   }
 
-  /** `note`: words Qanuvi adds for the agent after the user's (not shown as theirs). */
-  async send(projectId: string, prompt: string, note = ""): Promise<boolean> {
+  /**
+   * `note`: words Qanuvi adds for the agent after the user's (not shown as theirs); `before`: words it puts in front
+   * (a branch's earlier conversation, 24n part 6), not shown either.
+   */
+  async send(projectId: string, prompt: string, note = "", before = ""): Promise<boolean> {
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
@@ -241,7 +245,7 @@ ${text}`
       const context = this.selectedId ? null : await memoryContext(projectId, text);
       // Free decides, paid works: a free model picks the paid agent's model for this message.
       let model = this.model;
-      let sent = text + note;
+      let sent = before + text + note;
       // Paid agent on top (24e): what a free model changes in chat is reviewed by the paid one.
       if (!during) this.freeTurn = null;
       if (!during && this.providerId === "qanuvi" && this.model === "auto" && this.info?.available && paidAgent()) {
@@ -262,7 +266,7 @@ ${text}`
         model = pick.model;
         // The paid agent sits on top (24e): it sees the pick and can overrule it.
         if (pick.model !== providerById(this.providerId).models[0]?.id) {
-          sent = text + overruleNote(modelLabel(providerById(this.providerId), pick.model), pick.why);
+          sent = before + text + overruleNote(modelLabel(providerById(this.providerId), pick.model), pick.why);
           this.freePicked = { text, model: pick.model };
         }
       }
@@ -460,6 +464,29 @@ ${text}`
     } catch (e) {
       this.error = errorText(e);
     }
+  }
+
+  /**
+   * Edit and resend (24n part 6): a new session goes on from before the user message at `index`, with the message as
+   * changed. It is told what was said before (every agent can take that); the original session stays as it was.
+   * `rewound`: the file changes from that message on were undone first.
+   */
+  async branch(projectId: string, index: number, edited: string, rewound: boolean): Promise<boolean> {
+    const from = this.selected;
+    if (!from || this.busy) return false;
+    const preamble = branchPreamble(this.items.slice(0, index), rewound);
+    // The branch keeps the agent, model, mode and effort of the session it comes from.
+    this.selectedId = null;
+    this.items = [];
+    this.errors = [];
+    this.grants = [];
+    const ok = await this.send(projectId, edited, "", preamble);
+    if (!ok) {
+      await this.select(from.id);
+      return false;
+    }
+    if (this.selectedId) await this.rename(this.selectedId, `${from.title} (branch)`).catch(() => {});
+    return true;
   }
 
   async stop(): Promise<void> {

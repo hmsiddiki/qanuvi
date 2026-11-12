@@ -19,6 +19,12 @@
   import MentionPicker, { type Choice } from "./MentionPicker.svelte";
   import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
   import { revertEdits, type Edit } from "$lib/agent/diff";
+  import { matchesIn, rewindFrom, rewindText, rowsToOpen, searchItems } from "$lib/agent/sessionTools";
+  import Pencil from "@lucide/svelte/icons/pencil";
+  import Undo2 from "@lucide/svelte/icons/undo-2";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import XIcon from "@lucide/svelte/icons/x";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { api, errorText } from "$lib/api";
   import { tick, untrack } from "svelte";
@@ -378,9 +384,16 @@
 
   /** Opens a file an agent step worked on, when it is inside the project. */
   /** Right-click on a message: copy it, or quote it in the reply. */
-  function messageMenu(e: MouseEvent, text: string) {
+  function messageMenu(e: MouseEvent, text: string, userId = "") {
     const picked = window.getSelection()?.toString() ?? "";
+    const own = userId && session && !running;
     contextMenu.show(e, [
+      own
+        ? [
+            { label: "Edit and send again (a branch)", action: () => startEdit(userId, text) },
+            { label: "Rewind the files to before this message", action: () => void rewindTo(userId) },
+          ]
+        : [],
       [
         picked && { label: "Copy the selection", hint: "Ctrl+C", action: () => copyText(picked) },
         { label: "Copy the message", action: () => copyText(text) },
@@ -422,6 +435,213 @@
     return null;
   }
 
+  // Edit and resend (24n part 6): the message as changed goes to a new session (a branch) that is told what was said
+  // before it; the original session stays as it was. The file changes made from it on can be undone first.
+  let editing = $state<{ id: string; text: string; rewind: boolean } | null>(null);
+  const indexOfItem = (id: string) => agent.items.findIndex((i) => i.id === id);
+  function startEdit(id: string, text: string) {
+    editing = { id, text, rewind: false };
+  }
+  /** File-changing steps from a message on, for the edit box's checkbox. */
+  function changesFrom(id: string): { steps: number; files: number } {
+    const i = indexOfItem(id);
+    if (i < 0) return { steps: 0, files: 0 };
+    const r = rewindFrom(agent.items, i);
+    return { steps: r.steps, files: r.files.length + r.cannot.length };
+  }
+  async function resend() {
+    const e = editing;
+    if (!e || !project || running || !e.text.trim()) return;
+    const i = indexOfItem(e.id);
+    if (i < 0) return;
+    let rewound = false;
+    if (e.rewind) {
+      const r = await rewindTo(e.id);
+      if (r === "cancel") return;
+      rewound = r === "done";
+    }
+    editing = null;
+    await agent.branch(project.id, i, e.text.trim(), rewound);
+  }
+  function editKeys(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      editing = null;
+    } else if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      void resend();
+    }
+  }
+
+  /**
+   * Rewind (24n part 6): the Edit/Write steps from a message on undone in their files, newest first, after a preview.
+   * A file changed since, or written whole by a step, is left as it is and named.
+   */
+  async function rewindTo(id: string): Promise<"done" | "cancel" | "nothing"> {
+    const p = projects.current;
+    const i = indexOfItem(id);
+    if (!p || i < 0) return "nothing";
+    const plan = rewindFrom(agent.items, i);
+    if (!plan.files.length && !plan.cannot.length) {
+      agent.notice("No file changes from this message on: nothing to rewind.");
+      return "nothing";
+    }
+    const ready: { rel: string; text: string; hash: string }[] = [];
+    const left = plan.cannot.map((c) => `${inProject(p.path, c.file) ?? c.file}: ${c.why}`);
+    for (const f of plan.files) {
+      const rel = inProject(p.path, f.file);
+      if (!rel) {
+        left.push(`${f.file}: outside the project`);
+        continue;
+      }
+      const now = await api.files.read(p.id, rel).catch(() => null);
+      if (!now) {
+        left.push(`${rel}: could not be read`);
+        continue;
+      }
+      const back = rewindText(now.text, f.edits);
+      if (back === null) left.push(`${rel}: changed since (or the changed text is there more than once)`);
+      else if (back !== now.text) ready.push({ rel, text: back, hash: now.hash });
+    }
+    if (!ready.length) {
+      agent.notice(`Nothing could be rewound here (${left.join("; ")}). Source control can undo it.`);
+      return "nothing";
+    }
+    const message =
+      `Undo the changes made from this message on in ${ready.length} file${ready.length === 1 ? "" : "s"}?\n\n` +
+      ready.map((r) => r.rel).join("\n") +
+      (left.length ? `\n\nLeft as they are:\n${left.join("\n")}` : "");
+    if (!(await ask(message, { title: "Rewind the files", okLabel: "Undo the changes" }))) return "cancel";
+    const failed: string[] = [];
+    for (const r of ready) {
+      try {
+        await api.files.write(p.id, r.rel, r.text, r.hash);
+      } catch (e) {
+        failed.push(`${r.rel}: ${errorText(e)}`);
+      }
+    }
+    const done = ready.length - failed.length;
+    agent.notice(
+      `Rewound ${done} file${done === 1 ? "" : "s"} to before this message.` +
+        (failed.length || left.length ? ` Not undone: ${[...failed, ...left].join("; ")}.` : ""),
+    );
+    return done ? "done" : "nothing";
+  }
+
+  // Search in the conversation (24n part 6): Ctrl+F in the pane. Groups and folds with a hit open, step cards with a
+  // hit show all; the words are marked with the CSS Highlight API (no change to the messages' own markup).
+  let searchOpen = $state(false);
+  let query = $state("");
+  let hitIndex = $state(0);
+  let hitCount = $state(0);
+  let searchBox = $state<HTMLInputElement>();
+  let paneEl = $state<HTMLElement>();
+  let hitRanges: Range[] = [];
+  /** The words the view last moved to a hit for. */
+  let shownFor = "";
+  let hitIds = $derived(searchOpen ? new Set(searchItems(agent.items, query)) : new Set<string>());
+  async function openSearch() {
+    searchOpen = true;
+    const picked = window.getSelection()?.toString().trim() ?? "";
+    if (picked && !picked.includes("\n")) query = picked;
+    await tick();
+    searchBox?.focus();
+    searchBox?.select();
+  }
+  function closeSearch() {
+    searchOpen = false;
+    query = "";
+    clearHighlights();
+    agent.input?.focus();
+  }
+  function clearHighlights() {
+    hitRanges = [];
+    hitCount = 0;
+    if (typeof CSS !== "undefined" && "highlights" in CSS) {
+      CSS.highlights.delete("chat-hit");
+      CSS.highlights.delete("chat-hit-now");
+    }
+  }
+  function markHits() {
+    const q = query.trim();
+    if (!searchOpen || !q || !scroller) return clearHighlights();
+    const ranges: Range[] = [];
+    const walker = document.createTreeWalker(scroller, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const node = n as Text;
+      for (const at of matchesIn(node.data, q)) {
+        const r = document.createRange();
+        r.setStart(node, at);
+        r.setEnd(node, at + q.length);
+        ranges.push(r);
+      }
+    }
+    hitRanges = ranges;
+    hitCount = ranges.length;
+    if (hitIndex >= hitCount) hitIndex = 0;
+    if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined")
+      CSS.highlights.set("chat-hit", new Highlight(...ranges));
+    showHit(false);
+  }
+  function showHit(scroll = true) {
+    const r = hitRanges[hitIndex];
+    if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight !== "undefined") {
+      if (r) CSS.highlights.set("chat-hit-now", new Highlight(r));
+      else CSS.highlights.delete("chat-hit-now");
+    }
+    if (r && scroll) r.startContainer.parentElement?.scrollIntoView({ block: "center" });
+  }
+  function nextHit(d: number) {
+    if (!hitCount) return;
+    hitIndex = (hitIndex + d + hitCount) % hitCount;
+    showHit();
+  }
+  function searchKeys(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      nextHit(event.shiftKey ? -1 : 1);
+    }
+  }
+  // Rows holding a hit open, so the hit can show.
+  $effect(() => {
+    if (!hitIds.size) return;
+    const extra = rowsToOpen(rows, hitIds);
+    untrack(() => {
+      if (extra.some((id) => !opened.has(id))) opened = new Set([...opened, ...extra]);
+    });
+  });
+  // Marked again when the words, the conversation or what is open change; the first hit is shown.
+  $effect(() => {
+    void hitIds;
+    void opened;
+    void agent.items.length;
+    const typed = query;
+    tick().then(() => {
+      markHits();
+      // Only new words move the view to the first hit; lines arriving while searching do not.
+      if (typed !== shownFor) {
+        shownFor = typed;
+        if (typed && hitCount) showHit();
+      }
+    });
+  });
+  $effect(() => {
+    void query;
+    hitIndex = 0;
+  });
+  // Ctrl+F while the pane has the focus (the editor keeps its own find).
+  function windowKeys(event: KeyboardEvent) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f" && !event.shiftKey && !event.altKey) {
+      if (paneEl?.contains(document.activeElement) || paneEl?.matches(":hover")) {
+        event.preventDefault();
+        void openSearch();
+      }
+    }
+  }
+
   function openFile(file: string | null) {
     if (!file || !project) return;
     const root = project.path.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
@@ -437,7 +657,32 @@
   }
 </script>
 
-<section class="agent-pane" aria-label="Agent">
+<svelte:window onkeydown={windowKeys} />
+
+<section class="agent-pane" aria-label="Agent" bind:this={paneEl}>
+  {#if searchOpen}
+    <div class="search-bar" role="search">
+      <Search size={13} />
+      <input
+        type="text"
+        placeholder="Find in the conversation"
+        aria-label="Find in the conversation"
+        bind:value={query}
+        bind:this={searchBox}
+        onkeydown={searchKeys}
+      />
+      <span class="dim count">{query.trim() ? (hitCount ? `${hitIndex + 1} of ${hitCount}` : "no match") : ""}</span>
+      <button type="button" title="Previous (Shift+Enter)" aria-label="Previous match" onclick={() => nextHit(-1)}
+        ><ChevronUp size={13} /></button
+      >
+      <button type="button" title="Next (Enter)" aria-label="Next match" onclick={() => nextHit(1)}
+        ><ChevronDown size={13} /></button
+      >
+      <button type="button" title="Close (Esc)" aria-label="Close the search" onclick={closeSearch}
+        ><XIcon size={13} /></button
+      >
+    </div>
+  {/if}
   <div class="conversation" bind:this={scroller}>
     {#if !project}
       <div class="empty">
@@ -600,6 +845,16 @@
     <button
       type="button"
       class="gear"
+      title="Find in the conversation (Ctrl+F)"
+      aria-label="Find in the conversation"
+      disabled={!agent.items.length}
+      onclick={() => (searchOpen ? closeSearch() : openSearch())}
+    >
+      <Search size={13} />
+    </button>
+    <button
+      type="button"
+      class="gear"
       title="Agent settings and configuration files"
       aria-label="Agent settings"
       onclick={openAgentSettings}
@@ -626,7 +881,12 @@
       </button>
       {#if opened.has(item.id)}
         <div class="group-steps">
-          {#each item.steps as step (step.id)}<StepCard {step} onopen={openFile} onrevert={revertStep} />{/each}
+          {#each item.steps as step (step.id)}<StepCard
+              {step}
+              onopen={openFile}
+              onrevert={revertStep}
+              reveal={hitIds.has(step.id)}
+            />{/each}
         </div>
       {/if}
     </div>
@@ -639,23 +899,65 @@
       >
     {/if}
   {:else if item.kind === "user"}
-    <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text)}>
-      {#if item.during}<span class="during" title="Sent while the agent was working; it reads it before its next step"
-          >Added while it worked</span
-        >{/if}
-      {item.text}
-      {#if item.images?.length}
-        <div class="chips">
-          {#each item.images as image, i (i)}<ChatImage {image} />{/each}
+    {#if editing && editing.id === item.id}
+      {@const c = changesFrom(item.id)}
+      <div class="user editing">
+        <!-- svelte-ignore a11y_autofocus -->
+        <textarea
+          bind:value={editing.text}
+          rows={Math.min(10, Math.max(2, editing.text.split("\n").length))}
+          aria-label="The message, changed"
+          autofocus
+          onkeydown={editKeys}></textarea>
+        {#if c.steps}
+          <label class="check"
+            ><input type="checkbox" bind:checked={editing.rewind} /> Also undo the file changes made from here on ({c.steps}
+            step{c.steps === 1 ? "" : "s"} in {c.files} file{c.files === 1 ? "" : "s"})</label
+          >
+        {/if}
+        <div class="edit-actions">
+          <span class="dim">Goes to a new session (a branch); this one stays as it is.</span>
+          <button type="button" onclick={() => (editing = null)}>Cancel</button>
+          <button type="button" class="primary" disabled={!editing.text.trim() || running} onclick={resend}
+            >Send as a branch</button
+          >
         </div>
-      {/if}
-      {#if otherFiles(item).length}
-        <div class="chips">
-          {#each otherFiles(item) as name, i (i)}<span class="chip" title={name}>📎 {name}</span>{/each}
-        </div>
-      {/if}
-      {#if item.at}<span class="time">{clockTime(item.at)}</span>{/if}
-    </div>
+      </div>
+    {:else}
+      <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text, item.id)}>
+        {#if session && !running && !item.during}
+          <span class="msg-actions">
+            <button
+              type="button"
+              title="Edit and send again, as a branch (this session stays as it is)"
+              aria-label="Edit and send again"
+              onclick={() => startEdit(item.id, item.text)}><Pencil size={11} /></button
+            >
+            <button
+              type="button"
+              title="Rewind the files to before this message (undoes the changes made from here on, after a preview)"
+              aria-label="Rewind the files to before this message"
+              onclick={() => rewindTo(item.id)}><Undo2 size={11} /></button
+            >
+          </span>
+        {/if}
+        {#if item.during}<span class="during" title="Sent while the agent was working; it reads it before its next step"
+            >Added while it worked</span
+          >{/if}
+        {item.text}
+        {#if item.images?.length}
+          <div class="chips">
+            {#each item.images as image, i (i)}<ChatImage {image} />{/each}
+          </div>
+        {/if}
+        {#if otherFiles(item).length}
+          <div class="chips">
+            {#each otherFiles(item) as name, i (i)}<span class="chip" title={name}>📎 {name}</span>{/each}
+          </div>
+        {/if}
+        {#if item.at}<span class="time">{clockTime(item.at)}</span>{/if}
+      </div>
+    {/if}
   {:else if item.kind === "text"}
     {#if item.live}
       {#if !looksLikeCall(item.text)}<div class="text live">{item.text}</div>{/if}
@@ -669,7 +971,7 @@
     {/if}
   {:else if item.kind === "tool"}
     <div class="tl" class:fail={item.state === "failed"}>
-      <StepCard step={item} onopen={openFile} onrevert={revertStep} />
+      <StepCard step={item} onopen={openFile} onrevert={revertStep} reveal={hitIds.has(item.id)} />
     </div>
   {:else if item.kind === "thinking"}
     <details class="thinking tl">
@@ -757,6 +1059,83 @@
 {/snippet}
 
 <style>
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--qx-border);
+    color: var(--qx-text-secondary);
+  }
+  .search-bar input {
+    flex: 1;
+    min-width: 0;
+  }
+  .search-bar .count {
+    font-size: var(--qx-text-small);
+    min-width: 56px;
+    text-align: right;
+  }
+  .search-bar button {
+    display: inline-flex;
+    padding: 2px;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  :global(::highlight(chat-hit)) {
+    background-color: color-mix(in srgb, var(--qx-accent) 35%, transparent);
+  }
+  :global(::highlight(chat-hit-now)) {
+    background-color: var(--qx-accent);
+    color: var(--qx-bg-panel);
+  }
+  .user {
+    position: relative;
+  }
+  .msg-actions {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    display: none;
+    gap: 2px;
+  }
+  .user:hover .msg-actions,
+  .user:focus-within .msg-actions {
+    display: inline-flex;
+  }
+  .msg-actions button {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-bg-panel);
+    color: var(--qx-text-secondary);
+    cursor: pointer;
+  }
+  .msg-actions button:hover {
+    color: var(--qx-text);
+  }
+  .user.editing {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .user.editing textarea {
+    width: 100%;
+    resize: vertical;
+    font: inherit;
+  }
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .edit-actions .dim {
+    flex: 1;
+    font-size: var(--qx-text-small);
+  }
   .agent-pane {
     height: 100%;
     display: flex;

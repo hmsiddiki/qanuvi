@@ -21,11 +21,14 @@
     step,
     onopen,
     onrevert,
+    reveal = false,
   }: {
     step: Tool;
     onopen: (file: string | null) => void;
     /** Undoes the step's edits in the file; answers why not when it cannot. */
     onrevert?: (step: Tool) => Promise<string | null>;
+    /** A search in the conversation found something in this step: it opens and shows all. */
+    reveal?: boolean;
   } = $props();
 
   // A file change shows as a diff (open from the start: the change is the point of the step).
@@ -63,6 +66,14 @@
 
   let inAll = $state(false);
   let outAll = $state(false);
+  $effect(() => {
+    if (reveal) {
+      open = true;
+      inAll = true;
+      outAll = true;
+      diffAll = true;
+    }
+  });
   let copied = $state("");
 
   const lines = (t: string) => t.split("\n").length;
