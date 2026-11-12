@@ -95,6 +95,23 @@ export function rewindFrom(items: Item[], from: number): Rewind {
   };
 }
 
+/**
+ * Per step id: how many later steps changed the same file. A step later ones built on is not reverted alone (that
+ * leaves the file half old, half new); it rewinds from there instead, like a checkpoint restore.
+ */
+export function laterChanges(items: Item[]): Map<string, number> {
+  const seen = new Map<string, number>();
+  const out = new Map<string, number>();
+  for (let i = items.length - 1; i >= 0; i--) {
+    const x = items[i];
+    if (x.kind !== "tool" || !x.file || !(x.edits?.length || x.whole)) continue;
+    if (x.state === "failed" || x.state === "stopped") continue; // changed nothing
+    out.set(x.id, seen.get(x.file) ?? 0);
+    seen.set(x.file, (seen.get(x.file) ?? 0) + 1);
+  }
+  return out;
+}
+
 /** A file's text with the rewind's edits undone (newest first), or null when it changed since. */
 export function rewindText(text: string, edits: Edit[]): string | null {
   return revertEdits(text, edits);

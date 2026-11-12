@@ -280,7 +280,16 @@ runs on or off; with it off nothing is sent anywhere.
   - Owner question 2026-11-13: steps with no Model: line are routed at run time (routing.ts chooseModel + Team
     decider); offered to keep step model picks out of the plan file (model ids hold a word the owner's no-attribution
     check searches for). Not agreed yet.
-  - RESUME HERE (new conversation): drive the waiting-message hold (above), 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
+  - PUBLISHED 0.1.15 on the dev channel 2026-11-13 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24t, 24s
+    part 3, the waiting-message hold, the Plan view's search for new plan files. Owner declined keeping step model
+    picks out of the plan file.
+  - Done 2026-11-13 (later), committed, NOT published (owner: "it's important"; done the way VS Code's chat does it):
+    a step card offers Revert only when no later step changed that file; otherwise "Rewind to here" (this change and
+    every one after it, all files, after the preview), so a file is never left half old, half new (sessionTools
+    laterChanges). After Revert the card shows Redo; after a rewind a bar above the box offers Redo. Redo writes back
+    exactly what the undo replaced, and only while the file is still as the undo left it. Undo records live in the
+    window for the open chat only. Verify green (298 + 156). Not driven live yet.
+  - RESUME HERE (new conversation): drive Revert / Rewind to here / Redo and the waiting-message hold, 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
     project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the

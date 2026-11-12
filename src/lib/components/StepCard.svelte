@@ -22,12 +22,21 @@
     step,
     onopen,
     onrevert,
+    onredo,
+    onrewind,
+    later = 0,
     reveal = false,
   }: {
     step: Tool;
     onopen: (file: string | null) => void;
     /** Undoes the step's edits in the file; answers why not when it cannot. */
     onrevert?: (step: Tool) => Promise<string | null>;
+    /** Puts a reverted change back as it was; answers why not when the file changed since. */
+    onredo?: (step: Tool) => Promise<string | null>;
+    /** Undoes this change and every change after it (all files), after a preview: for a step later ones built on. */
+    onrewind?: (step: Tool) => void;
+    /** Later steps that changed the same file: undoing this one alone could break them, so it rewinds instead. */
+    later?: number;
     /** A search in the conversation found something in this step: it opens and shows all. */
     reveal?: boolean;
   } = $props();
@@ -44,8 +53,18 @@
   async function revert() {
     if (!onrevert) return;
     const why = await onrevert(step);
-    if (why === null) reverted = true;
-    else revertNote = why;
+    if (why === null) {
+      reverted = true;
+      revertNote = "";
+    } else revertNote = why;
+  }
+  async function redo() {
+    if (!onredo) return;
+    const why = await onredo(step);
+    if (why === null) {
+      reverted = false;
+      revertNote = "";
+    } else revertNote = why;
   }
 
   /** Lines a folded IN or OUT block shows. */
@@ -130,13 +149,23 @@
         >{/if}
     </button>
     {#if step.edits && !step.whole && step.state === "done" && onrevert}
-      <button
-        type="button"
-        class="file"
-        disabled={reverted}
-        title={reverted ? "This change was undone" : "Undo this change in the file"}
-        onclick={revert}>{reverted ? "Reverted" : "Revert"}</button
-      >
+      {#if reverted}
+        <button type="button" class="file" disabled title="This change was undone">Reverted</button>
+        {#if onredo}<button type="button" class="file" title="Put the change back as it was" onclick={redo}>Redo</button
+          >{/if}
+      {:else if later && onrewind}
+        <!-- Like a checkpoint restore: never half old, half new. -->
+        <button
+          type="button"
+          class="file"
+          title={`${later} later step${later === 1 ? "" : "s"} also changed this file: undoing this one alone could break ${later === 1 ? "it" : "them"}. Rewind undoes this change and every change after it, in all files, after a preview (Redo puts them back).`}
+          onclick={() => onrewind(step)}>Rewind to here</button
+        >
+      {:else}
+        <button type="button" class="file" title="Undo this change in the file (Redo puts it back)" onclick={revert}
+          >Revert</button
+        >
+      {/if}
     {/if}
     {#if step.file}
       <button type="button" class="file" title="Open {step.file}" onclick={() => onopen(step.file)}>Open</button>

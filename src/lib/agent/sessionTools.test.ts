@@ -3,6 +3,7 @@ import type { Item, Row } from "./events";
 import {
   BRANCH_CHARS,
   branchPreamble,
+  laterChanges,
   matchesIn,
   rewindFrom,
   rewindText,
@@ -49,6 +50,27 @@ describe("branchPreamble", () => {
     expect(p).toContain("answer 399");
     expect(p).not.toContain("answer 0 ");
     expect(p.length).toBeLessThan(BRANCH_CHARS + 2000);
+  });
+});
+
+describe("laterChanges", () => {
+  it("counts later changes to the same file; failed or stopped steps and other files do not count", () => {
+    const items: Item[] = [
+      tool("0", { edits: [{ old: "a", new: "b" }] }),
+      tool("1", { file: "C:/p/b.ts", edits: [{ old: "x", new: "y" }] }),
+      tool("2", { edits: [{ old: "b", new: "c" }], state: "failed" }),
+      user("3", "more"),
+      tool("4", { edits: [{ old: "b", new: "c" }] }),
+      tool("5", { whole: true, edits: [{ old: "", new: "all" }] }),
+      tool("6", { name: "Read", file: "C:/p/a.ts" }),
+    ];
+    const later = laterChanges(items);
+    expect(later.get("0")).toBe(2);
+    expect(later.get("1")).toBe(0);
+    expect(later.get("4")).toBe(1);
+    expect(later.get("5")).toBe(0);
+    expect(later.has("2")).toBe(false);
+    expect(later.has("6")).toBe(false);
   });
 });
 

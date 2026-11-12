@@ -20,7 +20,7 @@
   import MentionPicker, { type Choice } from "./MentionPicker.svelte";
   import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
   import { revertEdits, type Edit } from "$lib/agent/diff";
-  import { matchesIn, rewindFrom, rewindText, rowsToOpen, searchItems } from "$lib/agent/sessionTools";
+  import { matchesIn, laterChanges, rewindFrom, rewindText, rowsToOpen, searchItems } from "$lib/agent/sessionTools";
   import { tokensK } from "$lib/agent/handover";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Undo2 from "@lucide/svelte/icons/undo-2";
@@ -431,7 +431,12 @@
   }
 
   /** Revert from the chat: the step's edits undone in the file, when the file still has them as the step left them. */
-  async function revertStep(step: { file: string | null; edits?: Edit[]; whole?: boolean }): Promise<string | null> {
+  async function revertStep(step: {
+    id: string;
+    file: string | null;
+    edits?: Edit[];
+    whole?: boolean;
+  }): Promise<string | null> {
     const p = projects.current;
     if (!p || !step.file || !step.edits || step.whole) return "This change cannot be undone from the chat.";
     const rel = inProject(p.path, step.file);
@@ -447,8 +452,64 @@
     } catch (e) {
       return errorText(e);
     }
+    undone.set(step.id, [{ rel, before: now.text, after: back }]);
     return null;
   }
+
+  /**
+   * What an undo replaced (Revert or Rewind), so Redo can put it back exactly; per step id, in this chat only. A file
+   * changed again since the undo is left as it is (Redo would overwrite that newer work).
+   */
+  type Undone = { rel: string; before: string; after: string };
+  const undone = new Map<string, Undone[]>();
+  /** The last rewind in this chat, offered as Redo above the message box. */
+  let rewound = $state<Undone[] | null>(null);
+  $effect(() => {
+    void agent.selectedId;
+    untrack(() => {
+      undone.clear();
+      rewound = null;
+    });
+  });
+
+  /** Writes each file back as it was before the undo; answers what could not be put back. */
+  async function putBack(files: Undone[]): Promise<string[]> {
+    const p = projects.current;
+    if (!p) return ["no project open"];
+    const left: string[] = [];
+    for (const f of files) {
+      const now = await api.files.read(p.id, f.rel).catch(() => null);
+      if (!now) left.push(`${f.rel}: could not be read`);
+      else if (now.text !== f.after) left.push(`${f.rel}: changed again since the undo`);
+      else await api.files.write(p.id, f.rel, f.before, now.hash).catch((e) => left.push(`${f.rel}: ${errorText(e)}`));
+    }
+    return left;
+  }
+
+  async function redoStep(step: { id: string }): Promise<string | null> {
+    const files = undone.get(step.id);
+    if (!files)
+      return "Nothing to put back here (the undo was made before this chat was reopened); Source control can.";
+    const left = await putBack(files);
+    if (left.length) return `Not put back: ${left.join("; ")}. Source control can.`;
+    undone.delete(step.id);
+    return null;
+  }
+
+  async function redoRewind() {
+    const files = rewound;
+    if (!files) return;
+    rewound = null;
+    const left = await putBack(files);
+    const done = files.length - left.length;
+    agent.notice(
+      `Put back ${done} file${done === 1 ? "" : "s"} as before the rewind.` +
+        (left.length ? ` Not put back: ${left.join("; ")}.` : ""),
+    );
+  }
+
+  /** Per step id: later steps that changed the same file (counted from the end, once per change of the list). */
+  let laterById = $derived(laterChanges(agent.items));
 
   // Edit and resend (24n part 6): the message as changed goes to a new session (a branch) that is told what was said
   // before it; the original session stays as it was. The file changes made from it on can be undone first.
@@ -501,7 +562,7 @@
       agent.notice("No file changes from this message on: nothing to rewind.");
       return "nothing";
     }
-    const ready: { rel: string; text: string; hash: string }[] = [];
+    const ready: { rel: string; text: string; hash: string; before: string }[] = [];
     const left = plan.cannot.map((c) => `${inProject(p.path, c.file) ?? c.file}: ${c.why}`);
     for (const f of plan.files) {
       const rel = inProject(p.path, f.file);
@@ -516,28 +577,31 @@
       }
       const back = rewindText(now.text, f.edits);
       if (back === null) left.push(`${rel}: changed since (or the changed text is there more than once)`);
-      else if (back !== now.text) ready.push({ rel, text: back, hash: now.hash });
+      else if (back !== now.text) ready.push({ rel, text: back, hash: now.hash, before: now.text });
     }
     if (!ready.length) {
       agent.notice(`Nothing could be rewound here (${left.join("; ")}). Source control can undo it.`);
       return "nothing";
     }
     const message =
-      `Undo the changes made from this message on in ${ready.length} file${ready.length === 1 ? "" : "s"}?\n\n` +
+      `Undo the changes made from here on in ${ready.length} file${ready.length === 1 ? "" : "s"}?\n\n` +
       ready.map((r) => r.rel).join("\n") +
       (left.length ? `\n\nLeft as they are:\n${left.join("\n")}` : "");
     if (!(await ask(message, { title: "Rewind the files", okLabel: "Undo the changes" }))) return "cancel";
     const failed: string[] = [];
+    const written: Undone[] = [];
     for (const r of ready) {
       try {
         await api.files.write(p.id, r.rel, r.text, r.hash);
+        written.push({ rel: r.rel, before: r.before, after: r.text });
       } catch (e) {
         failed.push(`${r.rel}: ${errorText(e)}`);
       }
     }
     const done = ready.length - failed.length;
+    if (written.length) rewound = written;
     agent.notice(
-      `Rewound ${done} file${done === 1 ? "" : "s"} to before this message.` +
+      `Rewound ${done} file${done === 1 ? "" : "s"} to before this point.` +
         (failed.length || left.length ? ` Not undone: ${[...failed, ...left].join("; ")}.` : ""),
     );
     return done ? "done" : "nothing";
@@ -823,6 +887,20 @@
       </span>
     </div>
   {/if}
+  {#if rewound}
+    <div class="handover-bar" role="status">
+      <span>Rewound {rewound.length} file{rewound.length === 1 ? "" : "s"}.</span>
+      <span class="handover-actions">
+        <button
+          type="button"
+          class="link"
+          title="Put the files back as they were before the rewind"
+          onclick={redoRewind}>Redo</button
+        >
+        <button type="button" class="link" onclick={() => (rewound = null)}>Dismiss</button>
+      </span>
+    </div>
+  {/if}
   {#if waitingMsgs.length}
     <div class="waiting" aria-live="polite">
       <div class="waiting-head">
@@ -1037,6 +1115,9 @@ With the agent now: a message it has cannot be taken back.`}
               {step}
               onopen={openFile}
               onrevert={revertStep}
+              onredo={redoStep}
+              onrewind={(s) => void rewindTo(s.id)}
+              later={laterById.get(step.id) ?? 0}
               reveal={hitIds.has(step.id)}
             />{/each}
         </div>
@@ -1127,7 +1208,15 @@ With the agent now: a message it has cannot be taken back.`}
     {/if}
   {:else if item.kind === "tool"}
     <div class="tl" class:fail={item.state === "failed"}>
-      <StepCard step={item} onopen={openFile} onrevert={revertStep} reveal={hitIds.has(item.id)} />
+      <StepCard
+        step={item}
+        onopen={openFile}
+        onrevert={revertStep}
+        onredo={redoStep}
+        onrewind={(s) => void rewindTo(s.id)}
+        later={laterById.get(item.id) ?? 0}
+        reveal={hitIds.has(item.id)}
+      />
     </div>
   {:else if item.kind === "thinking"}
     <details class="thinking tl">
