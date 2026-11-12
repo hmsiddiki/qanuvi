@@ -148,12 +148,54 @@ class RunnerStore {
 
   /** Pauses after the current step; Resume opens the run's settings to change and go on. */
   pause(): void {
-    if (!this.running) return;
+    if (!this.running || this.pausing) return;
     this.pausing = true;
+    const run = this.run;
+    const step = run?.steps.find((s) => s.status === "running");
+    if (!run || !step || !this.#sendMore) return;
+    // Now, not after the whole step: the agent ends the edit it is making and writes where it is.
+    this.#pauseNow = true;
+    const log = logPath(run.file, step);
+    this.#sendMore(
+      `(Qanuvi: the owner pauses the run now. Finish only the edit you are making; do not start anything new. Then add a short "Progress" note to ${log}: what is done, what is left, which files you touched and anything half-way. Then stop and answer "Paused". When the run resumes, this same session goes on from here.)`,
+    );
+    // An agent that does not stop is stopped (its session is kept all the same).
+    setTimeout(() => {
+      if (this.#pauseNow && this.#endTurn) {
+        if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
+        this.#endTurn();
+      }
+    }, 180_000);
   }
 
+  /** The step's agent is pausing now (not at the end of the step). */
+  #pauseNow = false;
+  /** Sends a message to the step session running now (set while a turn runs). */
+  #sendMore: ((text: string) => void) | null = null;
+
+  /** Stop asked while a step works: the agent finishes the edit it is making first (a second Stop is at once). */
+  stopping = $state(false);
+
   stop(): void {
+    // Gently first: the edit in hand is finished, so no file is left half-written.
+    if (!this.stopping && this.#sendMore && this.#sessionId && !this.#stopRequested) {
+      this.stopping = true;
+      this.#stopRequested = true;
+      this.#sendMore(
+        '(Qanuvi: the owner stops the run. Finish only the edit you are making, start nothing new, then stop and answer "Stopped".)',
+      );
+      setTimeout(() => {
+        if (this.stopping) this.#stopNow();
+      }, 60_000);
+      return;
+    }
+    this.#stopNow();
+  }
+
+  /** Stops at once: the agent and the turn the run waits for. */
+  #stopNow(): void {
     this.#stopRequested = true;
+    this.stopping = false;
     if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
     // Stop always works, also when the turn's own end never arrives (a lost event, an agent that hangs).
     this.#endTurn?.();
@@ -200,6 +242,44 @@ class RunnerStore {
       .logAppend(project.id, logPath(file, step), resultEntry(step.status, step.reason) + files)
       .catch(() => {});
   }
+
+  /**
+   * The plan's last run, after a restart (or another plan shown): so the button says Resume and a run paused in a
+   * step goes on in that step's session. A session that cannot be opened again gives a new one, which reads the
+   * step's progress note in its log.
+   */
+  async restoreLast(project: Project, file: string): Promise<void> {
+    if (this.running || (this.run && this.run.projectId === project.id && this.run.file === file)) return;
+    const records = await api.runs.list(project.id).catch(() => []);
+    const last = records.filter((r) => r.file === file).sort((a, b) => b.updated_at - a.updated_at)[0];
+    if (!last || this.running) return;
+    let run: PlanRun;
+    try {
+      run = JSON.parse(last.data);
+    } catch {
+      return;
+    }
+    if (run.status === "running") run.status = "stopped";
+    for (const s of run.steps) if (s.status === "running") s.status = "waiting";
+    this.run = run;
+    const p = run.pausedSession;
+    if (run.status === "paused" && p) {
+      const s = agent.sessions.find((x) => x.id === p.sessionId) ?? null;
+      this.#carry = {
+        sessionId: p.sessionId,
+        model: p.model,
+        section: p.section,
+        tokens: 0,
+        steps: 1,
+        base: totalsOf(s),
+      };
+      this.#resumeText =
+        "You paused this step at the owner's request and the run now resumes: go on from where you stopped (your Progress note is in the step's log).";
+    }
+  }
+
+  /** The step session is kept for Resume (the run was paused in the middle of a step). */
+  #keepForResume = false;
 
   /** The owner's message that resumed the run (it goes first in the step's request). */
   #resumeText = "";
@@ -466,6 +546,8 @@ class RunnerStore {
     );
     this.#stopRequested = false;
     this.pausing = false;
+    this.stopping = false;
+    this.#pauseNow = false;
     this.run = {
       id: crypto.randomUUID(),
       projectId: project.id,
@@ -800,6 +882,35 @@ class RunnerStore {
         stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
         await this.#logAttempt(project, file, stepRun, attempt);
         // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
+        // Paused now by the owner: the attempt is no failure, the session is kept, Resume goes on in it.
+        if (this.#pauseNow) {
+          this.#pauseNow = false;
+          attempt.outcome = "stopped";
+          attempt.note = "paused by the owner";
+          stepRun.attempts.push(attempt);
+          stepRun.status = "waiting";
+          if (attempt.sessionId && (!this.#carry || this.#carry.sessionId !== attempt.sessionId))
+            this.#carry = {
+              sessionId: attempt.sessionId,
+              model: attempt.model,
+              section,
+              tokens: 0,
+              steps: 1,
+              base: this.#lastTotals,
+            };
+          this.#keepForResume = true;
+          // Saved with the run, so Resume finds the session after a restart (or a new one reads the progress note).
+          if (attempt.sessionId)
+            run.pausedSession = { sessionId: attempt.sessionId, model: attempt.model, section, number: stepRun.number };
+          this.#resumeText =
+            "You paused this step at the owner's request and the run now resumes: go on from where you stopped (your Progress note is in the step's log).";
+          this.#finish(
+            run,
+            "paused",
+            `Paused in step ${stepRun.number ?? stepRun.title}. Resume goes on in the same session (you can change the run's settings first).`,
+          );
+          break;
+        }
         // Over the step's limits: the run pauses and says so (Resume to go on, maybe with other limits or a model).
         if (this.#overLimit) {
           const why = this.#overLimit;
@@ -930,7 +1041,11 @@ class RunnerStore {
       }
     }
     if (run.status === "running") this.#finish(run, "done", runSummary(run));
-    await this.#dropCarry();
+    this.#sendMore = null;
+    this.stopping = false;
+    // A run paused in a step keeps that step's session for Resume.
+    if (!(run.status === "paused" && this.#keepForResume)) await this.#dropCarry();
+    this.#keepForResume = false;
     // The whole plan is done: its private details are deleted, unless the owner chose to keep them.
     if (options.forgetPrivateWhenDone !== false) {
       const end = await api.files.read(project.id, file).catch(() => null);
@@ -1184,6 +1299,27 @@ class RunnerStore {
         resolve({ sessionId: id, last, outcome, note });
       };
       this.#endTurn = () => finish("stopped");
+      this.#sendMore = (more: string) => {
+        if (!id) return;
+        api.agent
+          .start(
+            project.id,
+            id,
+            more,
+            agentModel,
+            mode,
+            s.baseUrl,
+            s.effort,
+            () => {},
+            lean,
+            indexTools,
+            s.browserTools,
+            null,
+            agentId,
+            setupFor(agentId),
+          )
+          .catch(() => {});
+      };
       // The step's limits (cost and time): checked while the turn runs; over them, the turn stops and the run asks.
       const guard = setInterval(() => {
         if (settled) return clearInterval(guard);

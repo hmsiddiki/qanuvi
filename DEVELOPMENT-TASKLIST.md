@@ -139,11 +139,44 @@ runs on or off; with it off nothing is sent anywhere.
   newest (npm registry) with "Update Claude Code" (its own `claude update`) and "Keep it up to date by itself".
   Qanuvi does not bundle Claude Code (Anthropic's software). Release rule in scripts/publish-update.mjs: no release
   while Claude Code is out of date or knows a newer model (per family) than Qanuvi offers.
+- [x] **24m. Plans that run unattended and cheaply (owner, 2026-11-12; 0.1.10 and 0.1.11)**:
+  - The plan's shared knowledge per plan file in .qanuvi/plan-logs/<plan>/ (kept out of git): MAP.md (what is where,
+    kept by the steps), FACTS.md (decisions, conventions, how to run and test, gotchas; owner's and steps' notes go
+    there), API.md (what the plan added, written by Qanuvi from the code index, no model tokens), a log per step
+    (attempts, failures, results, files changed). Every step gets MAP and FACTS first (cache-friendly) and keeps them
+    small (80 / 60 lines). Plans that need or name other plans are told where those keep their knowledge.
+  - Steps use the code index (hint in every step), get the files the last steps changed (by modification time), and
+    code hints only from the plan's own folder (no vendor code). Sessions go on across sections (same model, under
+    150k tokens). Full test suite once per section by default.
+  - Run control: one header button (Run / Resume / Pause + Stop). Pause and Stop wait only for the edit in hand; Pause
+    writes a progress note in the step's log and keeps the session; Resume opens the run's settings as they were and
+    goes on in the same session, also after a restart (the paused session is saved with the run; if it cannot be
+    reopened, a new session reads the progress note).
+  - Cost: "per step at most $X / N minutes" pauses a runaway step; the run panel shows cost per finished step against
+    the plan's earlier runs, the plan's spend so far, and tool calls by kind (reading / changing / running).
+  - Live tests on the scratch plan only (see feedback memory: never on the owner's folders).
+- [ ] **CHECKPOINT 2026-11-12 (resume here in a new conversation)**:
+  - Published: 0.1.11 on the dev channel (https://qlopy.top/qanuvi-updates/dev/latest.json). Published with
+    QANUVI_RELEASE_ANYWAY=1 because Claude Code on this PC is 2.1.302 (2.1.322 is out): the owner runs `claude update`
+    (or Settings, Agents, Update Claude Code) so the release rule passes next time. Never publish without the owner's yes.
+  - Measured: in a 30-minute window, Qanuvi's PLAN-D step 83b sent about 3.3M context tokens ($2.16) while the long
+    development conversation sent about 21.6M (contexts up to 732k tokens). The development conversation, not Qanuvi,
+    was eating the 5-hour window; keep development conversations short.
+  - Owner's PLAN-D (content/plugins/qcommerce/PLAN-D.md in the amirularham folder): 82a-82z and 83a done, 83b was
+    running on Opus 5.5 under 0.1.10. Advice given: update to 0.1.11, pause (it now waits only for the edit), put the
+    QCOMMERCE_TEST_* login in Project settings, Secrets, run on Opus 5.5 or Fable 5.2 with "Check what the run needs"
+    on and a per-step limit.
+  - Linux CI: the Ubuntu job twice ended with "the hosted runner lost communication" in the Rust tests (Windows and
+    macOS pass). A step that runs the Rust tests one at a time on Linux was added to .github/workflows/build.yml;
+    read the last test it started (Playwright on github.com/hmsiddiki/qanuvi/actions) and fix that test.
+  - Next, in the order agreed: (1) the Linux culprit; (2) 1d automatic backups and restore; (3) 24j plan housekeeping
+    (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
+    OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so
   every Qanuvi knows it. Headroom can sit in front of it for the free models too (`--openai-api-url`), to be tested.
-- [ ] **1f. Qanuvi's own resource use (next)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
+- [x] **1f. Qanuvi's own resource use (done 2026-11-12)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
   WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
 - [ ] **24j. Plan housekeeping (next)**: move finished sections to an archive file next to the plan, and add another
   plan's steps into the current one, both with a preview and the owner's confirmation.

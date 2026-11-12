@@ -45,6 +45,10 @@
   import { formatCost } from "$lib/agent/events";
 
   let showRun = $state(false);
+  // The plan's last run (also after a restart): the button says Resume, and a run paused in a step goes on in it.
+  $effect(() => {
+    if (file) void runner.restoreLast(project, file);
+  });
 
   /** What the current or last run did on a step: the model of its last try, the result and the cost. */
   function stepRunInfo(step: Step) {
@@ -228,11 +232,18 @@
           type="button"
           class="run-btn"
           disabled={runner.pausing}
-          title="Finish the step it is on, then pause"
-          onclick={() => runner.pause()}><Pause size={12} /> {runner.pausing ? "Pausing…" : "Pause"}</button
+          title="The agent finishes the edit it is making, notes where it is, and stops; Resume goes on in the same session"
+          onclick={() => runner.pause()}
+          ><Pause size={12} /> {runner.pausing ? "Pausing (finishing its edit)…" : "Pause"}</button
         >
-        <button type="button" class="run-btn stop" title="Stop now" onclick={() => runner.stop()}
-          ><Square size={11} /> Stop</button
+        <button
+          type="button"
+          class="run-btn stop"
+          title={runner.stopping
+            ? "Click again to stop at once"
+            : "The agent finishes the edit it is making, then the run stops"}
+          onclick={() => runner.stop()}
+          ><Square size={11} /> {runner.stopping ? "Stopping (finishing its edit)…" : "Stop"}</button
         >
       {:else}
         <!-- Not running: Resume when the last run stopped with steps left, else Run; both open the run's settings. -->

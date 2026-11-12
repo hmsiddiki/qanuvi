@@ -125,6 +125,8 @@ export interface PlanRun {
   message: string;
   startedAt: number;
   endedAt: number | null;
+  /** Paused in the middle of a step: its session, so Resume goes on in it (also after a restart). */
+  pausedSession?: { sessionId: string; model: string; section: string; number: string | null };
   /** What the decider decided in this run, with its reasons (24b). */
   decisions?: import("$lib/core/decider").DecisionRecord[];
   /** What the owner said during the run and what steps left for later ones: every later step gets them. */
