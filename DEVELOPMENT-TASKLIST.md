@@ -253,10 +253,10 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-13, committed, NOT published: 24r code (see 24r "Built"). Verify green (278 + 156 tests). Not yet
     driven in the window, and Claude Code's exact timing of reading a queued message was not probed (a headless probe
     was blocked on this PC); check it on a scratch project first.
-  - Owner's ideas 2026-11-13, answered, waiting for the owner's yes: 24s (below).
+  - Owner agreed 2026-11-13: 24s in the lean form (below), next after the 24r check.
   - RESUME HERE (new conversation): drive 24r in the running app on a scratch project (a long command such as
     sleep 120, send a message, watch the waiting area and the timer, press "Stop this command, read my message now";
-    once in a plan step too). If the owner said yes to 24s, build it next. Then drive 15i part 2 in the running app on a scratch
+    once in a plan step too). Then build 24s part 1 (handover in chat). Then drive 15i part 2 in the running app on a scratch
     project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6,
     15i parts 1 and 2 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -270,18 +270,28 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
-- [ ] **24s. Conversations as containers, bookmarks, and handover in the chat (owner, 2026-11-13; proposed, waiting
-  for the owner's yes)**: in plain chat the context also grows until each tool call re-reads 150k+ tokens.
-  - A conversation (container) keeps what lasts: title, bookmark (a "Saved" group on top of the session list,
-    rename, unpin, search), the running handover note (goal, done and checked, left, files and why, decisions) and its
-    sessions. Sessions inside it come and go.
-  - Handover in chat: the 24p parts (handoverDue, handoverRequest) watch each answer's context. Past a limit (setting,
-    default about 150k, 0 = off) a bar offers "Hand over to a fresh session"; an "always" option does it by itself.
-    Never mid-edit: the agent finishes the edit in hand and writes the note; the new session in the same
-    container starts from the note and the last request. One timeline, with a thin "new session · context carried
-    over" line.
-  - Opening a saved conversation later starts from its note, not a resume of the old heavy session.
-  - Every agent (Claude Code, Qanuvi's own, free models); suggests, never forces.
+- [ ] **24s. Handover in plain chat, bookmarks, reopening from the note (owner, 2026-11-13; agreed 2026-11-13,
+  lean form chosen over a container layer)**: in plain chat the context grows until each tool call re-reads 150k+
+  tokens. A separate container table under every chat was weighed and left out: edit and resend, rewind, branches,
+  find, file history, cost totals, remote access and plan runs all assume one chat = one session, and reworking them
+  buys nothing visible. The same result comes from linked sessions. About 3 short sessions:
+  - (1) Handover in chat (every chat, bookmarked or not): each answer's context size is read (no extra cost; the 24p
+    parts handoverDue and handoverRequest). Past the limit the agent finishes the edit in hand, writes the handover
+    note (goal, done and checked, left, files and why, decisions, facts learned); a new session starts with the note
+    and the last request and gets a "continues from" link to the old one (sessions column, migration). The chat
+    shows the linked sessions as one timeline with a thin "New session · context carried over (was 152k)" line;
+    the session features work on the current session, older parts read only. A message sent during the handover
+    waits (24r area) and goes to the new session. Settings, Agents, Chat handover: When = Ask me first (default:
+    a bar "This chat is heavy, hand over now?" / Not now), Automatic, Off; Limit = 150k (0 = off); a chat can turn it
+    off for itself. Plan steps keep their own limit (Run panel, 200k). Every agent (Claude Code, Qanuvi's own, free
+    models). Check first whether Claude Code's own /compact works in the stream-json session; Qanuvi's note stays
+    the main way (other agents need it).
+  - (2) Bookmarks: a star on the chat and in the session list; starred chats in a "Saved" group on top (rename,
+    unstar, search); housekeeping never deletes them; unbookmarked ones follow the usual clean-up.
+  - (3) Reopening a bookmark starts a fresh session from its last handover note, not a resume of the old heavy
+    session; no note yet: written once at that moment (never on every leave: that spends tokens on chats never
+    opened again). The note opens in a small panel, readable and editable; the next session works from the edited
+    version.
 - [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, built 2026-11-13)**: a
   message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
   the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the
