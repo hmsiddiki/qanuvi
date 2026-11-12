@@ -263,7 +263,10 @@ runs on or off; with it off nothing is sent anywhere.
   - PUBLISHED 0.1.14 on the dev channel 2026-11-13 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24o, 24n
     part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2. Nothing unpublished now. Owner agreed 24t chat clean-up.
   - Done 2026-11-13 (later), committed, NOT published: 24t chat clean-up (see 24t "Built"). Verify green (293 + 156).
-  - Done 2026-11-13 (later), committed, NOT published: 24s part 3 (see 24s "Built (part 3)"). Verify green (295 + 156).
+  - Done 2026-11-13 (later), committed, NOT published: 24s part 3 (see 24s "Built (part 3)"), then tied to Chat
+    handover (Automatic: no bar, no click; Ask me first: bar and note panel; Off: resumes). Verify green (295 + 156).
+  - UNPUBLISHED since 0.1.14 (commits ff286e5, b6700ae, 9800403): 24t chat clean-up, 24s part 3. None driven live
+    yet. Publish only with the owner's yes.
   - RESUME HERE (new conversation): drive 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
     project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
