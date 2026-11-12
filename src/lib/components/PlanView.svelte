@@ -481,6 +481,9 @@
                       );
                       // Not saved: show what the file says, not the choice that did not stick.
                       if (!saved) el.value = findStep(plan?.steps ?? [], step)?.model ?? "";
+                      // The step that is running hands over to the chosen model after the edit in hand; any other
+                      // step starts on it when its turn comes.
+                      else if (el.value) runner.switchStepModel(project.id, file, step.number, step.title, el.value);
                     }}
                   >
                     <option value="">Default model</option>

@@ -14,8 +14,10 @@ import {
   contextSize,
   HANDOVER_DEFAULT,
   HANDOVER_RESUME,
+  SWITCH_RESUME,
   handoverDue,
   handoverRequest,
+  modelSwitchRequest,
   needingCount,
   keepRunSetting,
   reopenedSteps,
@@ -41,7 +43,7 @@ import {
   savePlanNotes,
   stepKey,
 } from "$lib/plan/guidance";
-import { providerById, type AgentProvider } from "$lib/agents/providers";
+import { modelLabel, providerById, type AgentProvider } from "$lib/agents/providers";
 import { freeDecide, setupFor } from "./brain.svelte";
 import {
   FREE_MODEL,
@@ -152,6 +154,20 @@ class RunnerStore {
   pausing = $state(false);
 
   /** Pauses after the current step; Resume opens the run's settings to change and go on. */
+  /**
+   * The owner picked a model for a step of the running plan. The step running now hands over to it (its agent
+   * finishes the edit in hand and writes a progress note); any other step just starts on it when its turn comes (the
+   * runner reads each step's Model line when it starts). Returns whether the running step is switching.
+   */
+  switchStepModel(projectId: string, file: string, number: string | null, title: string, model: string): boolean {
+    const r = this.run;
+    if (!this.running || !r || r.projectId !== projectId || r.file !== file) return false;
+    const current = r.steps.find((x) => x.status === "running");
+    if (!current || current.number !== number || current.title !== title) return false;
+    this.#switchStep?.(model);
+    return true;
+  }
+
   pause(): void {
     if (!this.running || this.pausing) return;
     this.pausing = true;
@@ -178,6 +194,10 @@ class RunnerStore {
    * a new session goes on with the step. Holds the context size that set it off.
    */
   #handover = 0;
+  /** The model the owner switched the running step to; the handover that follows is for that, not for size. */
+  #switchTo: string | null = null;
+  /** Switches the running step to a model (chat picker or the step's model in the Plan view); set while a run goes. */
+  #switchStep: ((model: string) => void) | null = null;
   /** Handovers in the current step. */
   #handovers = 0;
   /** The handover limit of the run going now (tokens; 0 = never). */
@@ -596,6 +616,34 @@ class RunnerStore {
     // The user watching a step can change its mode (for the rest of the run, kept for this plan) and its model (this
     // step, written into its Model line) from the chat pickers.
     let live = null as { step: StepRun; model: string; from: number } | null;
+    // The step running now goes to another model: counted from the next attempt (so a step can still fail over and
+    // never retries for ever); the agent at work finishes its edit and writes a progress note, then the chosen model
+    // goes on in a new session. The model the step is already on changes nothing.
+    const switchStep = (current: StepRun, model: string) => {
+      void this.#writeStepModel(project, file, current, model);
+      if (model === (this.#liveModel ?? this.currentModel)) return;
+      live = { step: current, model, from: current.attempts.length + 1 };
+      this.#liveModel = model;
+      if (this.#sendMore && this.#stepLog && !this.#handover && !this.#pauseNow && !this.#stopRequested) {
+        this.#switchTo = model;
+        this.#handover = 1;
+        this.#sendMore(modelSwitchRequest(this.#stepLog, modelLabel(provider, model)));
+        agent.notice(
+          `Step ${current.number ?? current.title}: ${modelLabel(provider, model)} takes over after the edit in hand.`,
+        );
+        // An agent that does not stop is stopped; the new session checks whatever it left.
+        setTimeout(() => {
+          if (this.#switchTo === model && this.#handover && this.#endTurn) {
+            if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
+            this.#endTurn();
+          }
+        }, 180_000);
+      }
+    };
+    this.#switchStep = (model) => {
+      const current = run.steps.find((x) => x.status === "running");
+      if (current) switchStep(current, model);
+    };
     agent.onPlanChange = (change) => {
       const current = run.steps.find((x) => x.status === "running");
       if (change.mode) {
@@ -603,12 +651,7 @@ class RunnerStore {
         keepRunSetting(project.id, file, { mode: change.mode });
         void this.#save(run);
       }
-      if (change.model && current) {
-        // Counted from the next attempt, so a step can still fail over and never retries for ever.
-        live = { step: current, model: change.model, from: current.attempts.length + 1 };
-        this.#liveModel = change.model;
-        void this.#writeStepModel(project, file, current, change.model);
-      }
+      if (change.model && current) switchStep(current, change.model);
     };
     await this.#save(run);
 
@@ -700,12 +743,15 @@ class RunnerStore {
     for (const stepRun of run.steps) {
       if (run.status !== "running") break;
       // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
+      let freshModel: string | null | undefined;
       {
         const now = await api.files.read(project.id, file).catch(() => null);
         const nowStep = now
           ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
           : undefined;
         if (now) for (const x of parsePlan(now.text).steps) if (x.status === "x" && x.number) doneNumbers.add(x.number);
+        // The step's Model line as it is now: the owner may have changed it while earlier steps ran.
+        if (nowStep) freshModel = nowStep.model;
         const unmet = unmetNeed(nowStep?.needs, doneNumbers, await this.#otherPlans(project, nowStep?.needs));
         if (unmet) {
           stepRun.status = "skipped";
@@ -731,7 +777,7 @@ class RunnerStore {
       const planned = steps.find((s) => s.line === stepRun.line);
       const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
       const choice = chooseModel({
-        stepModel: oneModel || (planned?.model ?? null),
+        stepModel: oneModel || (freshModel !== undefined ? freshModel : (planned?.model ?? null)),
         type,
         rules,
         stats,
@@ -744,7 +790,11 @@ class RunnerStore {
       const first = choice.model;
       // Free first, except money and security work and steps that name their model.
       const assigned = assignment.get(stepRun.number ?? String(stepRun.line));
-      const free = freeFirst && type !== "security" && !planned?.model && (assigned?.worker ?? "free") === "free";
+      const free =
+        freeFirst &&
+        type !== "security" &&
+        !(freshModel !== undefined ? freshModel : planned?.model) &&
+        (assigned?.worker ?? "free") === "free";
       stepRun.choice = free
         ? `free first (decider: ${assigned?.why || "free models can do it"}); then ${first}: ${choice.reason}`
         : freeFirst && assigned?.worker === "paid"
@@ -917,9 +967,22 @@ class RunnerStore {
         // A step marked done goes through the usual checks below (tests, review) like any other.
         if (this.#handover && !this.#pauseNow && !this.#overLimit && !this.#stopRequested) {
           const size = this.#handover;
+          const switchTo = this.#switchTo;
           this.#handover = 0;
+          this.#switchTo = null;
           const now = await api.files.read(project.id, file).catch(() => null);
-          if (now && stepOutcome(now.text, stepRun) === "open") {
+          if (now && stepOutcome(now.text, stepRun) === "open" && switchTo) {
+            // The owner's switch: no failed try, and not counted against the handover limit.
+            attempt.outcome = "stopped";
+            attempt.note = `handed over to ${switchTo} (the owner's choice)`;
+            stepRun.attempts.push(attempt);
+            await this.#dropCarry();
+            if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
+            this.#resumeText = SWITCH_RESUME;
+            this.#resumeIsHandover = true;
+            continue;
+          }
+          if (now && stepOutcome(now.text, stepRun) === "open" && !switchTo) {
             this.#handovers++;
             attempt.outcome = "stopped";
             attempt.note = `handed over to a new session at about ${Math.round(size / 1000)}k tokens of context`;
@@ -1106,6 +1169,7 @@ class RunnerStore {
         await api.agent.planPrivateClear(project.id, file).catch(() => {});
     }
     agent.onPlanChange = null;
+    this.#switchStep = null;
     agent.planSessionId = null;
     await this.#save(run);
   }
@@ -1501,6 +1565,7 @@ class RunnerStore {
     }
     this.#sessionId = null;
     this.#liveModel = null;
+    this.#switchTo = null;
     agent.planSessionId = null;
     const last = turn.last as Session | null;
     // The session stays open: the runner decides whether the next step continues it (#settleCarry).

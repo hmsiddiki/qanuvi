@@ -167,6 +167,24 @@ export function handoverRequest(log: string, context: number): string {
 export const HANDOVER_RESUME =
   "An earlier session worked on this step until its context grew too big, and handed it over to you. Read its Progress note in the step's log first. Before you go on, read the files it names and check that what it calls done really is (fix it if not). Then finish what is left; do not redo what is done and correct.";
 
+/**
+ * What the step's agent is told when the owner picks another model for the step while it works: finish the edit in
+ * hand, write the progress note, stop; the chosen model goes on in a new session.
+ */
+export function modelSwitchRequest(log: string, model: string): string {
+  return (
+    `(Qanuvi: the owner picked ${model} for this step; it takes over in a new session. Finish the edit you are making ` +
+    `so no file is left half-written or broken; do not start anything new. Then add a "Progress" note to ${log} that ` +
+    `a new session can work from without guessing: what is done and checked, what is left (in order), the files you ` +
+    `touched and why, anything half-way, decisions you made and their reasons, and facts about the code you learned ` +
+    `(names, places, traps). Do not mark the step done unless it is. Then stop and answer "Handed over".)`
+  );
+}
+
+/** The first words of the session on the model the owner switched the step to. */
+export const SWITCH_RESUME =
+  "The owner switched this step to you while another model was working on it; that model stopped after the edit in hand and wrote a Progress note in the step's log. Read the note first. Before you go on, read the files it names and check that what it calls done really is (fix it if not). Then finish what is left; do not redo what is done and correct.";
+
 /** At most this many steps share one session, whatever its size says. */
 export const CARRY_MAX_STEPS = 6;
 

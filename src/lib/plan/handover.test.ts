@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { HANDOVER_MAX, HANDOVER_RESUME, contextSize, handoverDue, handoverRequest } from "./guidance";
+import {
+  HANDOVER_MAX,
+  HANDOVER_RESUME,
+  SWITCH_RESUME,
+  contextSize,
+  handoverDue,
+  handoverRequest,
+  modelSwitchRequest,
+} from "./guidance";
 
 describe("a long step hands over to a new session", () => {
   it("hands over only past the limit, never when it is off, and not without end", () => {
@@ -26,5 +34,16 @@ describe("a long step hands over to a new session", () => {
     expect(ask).toMatch(/Do not mark the step done unless it is/);
     // The new session checks the earlier work before building on it.
     expect(HANDOVER_RESUME).toMatch(/check that what it calls done really is/);
+  });
+});
+
+describe("the owner switches a running step to another model", () => {
+  it("asks for the edit in hand, a progress note in the log, and a stop", () => {
+    const r = modelSwitchRequest(".qanuvi/plan-logs/p/93a.md", "Opus 5.5");
+    expect(r).toContain("Opus 5.5");
+    expect(r).toContain("Finish the edit you are making");
+    expect(r).toContain(".qanuvi/plan-logs/p/93a.md");
+    expect(r).toContain("Do not mark the step done unless it is");
+    expect(SWITCH_RESUME).toContain("Progress note");
   });
 });

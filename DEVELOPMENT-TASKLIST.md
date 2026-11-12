@@ -228,6 +228,14 @@ runs on or off; with it off nothing is sent anywhere.
     reload wiped the error at once, and the dropdown still showed Fable. Now every change in the Plan view (model,
     status, title) reads the file as it is, finds the step by number and title, and writes; a failure stays on screen
     and the dropdown goes back to what the file says; the view re-reads the file every 4 s while open.
+  - Done 2026-11-12 (owner: a model picked while a step works should take over after the current job, with the
+    context), committed, NOT published: picking a model in the chat footer, or in the running step's dropdown in
+    the Plan view, now hands the step over: the agent at work finishes the edit in hand, writes a Progress note in
+    the step's log and stops; the chosen model goes on in a new session that checks the note first (no failed try,
+    not counted against the handover limit; stopped after 3 minutes if it does not stop). Before, the pick only
+    applied from the next try or fix round. Each step now starts on its Model line as it is when it starts, so a
+    later step's model changed during a run is used (before, the models read at the run's start were used). Code:
+    guidance.ts (modelSwitchRequest, SWITCH_RESUME), runner switchStepModel. Not yet driven live.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
