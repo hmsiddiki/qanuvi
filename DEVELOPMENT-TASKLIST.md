@@ -254,11 +254,13 @@ runs on or off; with it off nothing is sent anywhere.
     driven in the window, and Claude Code's exact timing of reading a queued message was not probed (a headless probe
     was blocked on this PC); check it on a scratch project first.
   - Owner agreed 2026-11-13: 24s in the lean form (below), next after the 24r check.
-  - RESUME HERE (new conversation): drive 24r in the running app on a scratch project (a long command such as
-    sleep 120, send a message, watch the waiting area and the timer, press "Stop this command, read my message now";
-    once in a plan step too). Then build 24s part 1 (handover in chat). Then drive 15i part 2 in the running app on a scratch
-    project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6,
-    15i parts 1 and 2 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13 (later), committed, NOT published: 24s part 1 code (see 24s "Built (part 1)"). The owner drives
+    24r on a release build of 46c2cb2 (copied out of target/release) with a scratch project (slow.sh, PLAN-CHECK.md).
+  - RESUME HERE (new conversation): get the owner's 24r results and fix what they found; then drive 24s part 1 on
+    a scratch project (set the limit low, for example 20k, to see the bar, a handover, the folded note, a message
+    sent during it, reopening the chat from the list). Then 24s parts 2 and 3, then drive 15i part 2 in the running
+    app on a scratch project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13:
+    24o, 24n part 6, 15i parts 1 and 2, 24r, 24s part 1 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -286,6 +288,19 @@ runs on or off; with it off nothing is sent anywhere.
     off for itself. Plan steps keep their own limit (Run panel, 200k). Every agent (Claude Code, Qanuvi's own, free
     models). Check first whether Claude Code's own /compact works in the stream-json session; Qanuvi's note stays
     the main way (other agents need it).
+  - Built (part 1, 2026-11-13; not yet driven in the window): migration 5 (sessions.continues_from, handover_off;
+    agent::link, set_handover_off, commands agent_link / agent_handover_off, also in master.rs). agent/handover.ts:
+    chatHandoverDue (Not now holds back until 50k more), chatHandoverRequest (the agent answers with a note starting
+    "Handover note"), chatResumePrompt / parseResume, noteAfter (falls back to the conversation's end), chainOf,
+    chatsOnly. events.ts shows the request as a "Handing over…" line and the new session's first message as "New
+    session · context carried over (was 152k)" with the note folded under it. stores/agent: context read from each
+    assistant answer's usage; Ask shows the bar (Hand over now / Not now / Never in this chat), Automatic starts at
+    once; the turn that answered ends, then a new session starts in the same chat (same agent, model, mode, title,
+    linked); no answer in 3 min: stopped, the conversation's end stands in. Messages sent meanwhile wait ("goes to
+    the new session") and are sent to it. select() loads the whole chain, older parts marked older (no edit,
+    rewind or waiting area); the sidebar lists only the newest session of a chat; deleting a chat deletes its chain.
+    Settings, Agents, Chat handover card (When, Limit in thousands). Plan sessions skipped (runner has 24p). Not
+    done: the /compact probe (headless probes are blocked on this PC). Verify green (289 + 156 tests).
   - (2) Bookmarks: a star on the chat and in the session list; starred chats in a "Saved" group on top (rename,
     unstar, search); housekeeping never deletes them; unbookmarked ones follow the usual clean-up.
   - (3) Reopening a bookmark starts a fresh session from its last handover note, not a resume of the old heavy

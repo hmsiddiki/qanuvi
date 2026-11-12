@@ -125,6 +125,16 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 5 {
+        // Chat handover (24s): a session that goes on from an earlier one names it; a chat can turn handover off.
+        conn.execute_batch(
+            "BEGIN;
+             ALTER TABLE sessions ADD COLUMN continues_from TEXT;
+             ALTER TABLE sessions ADD COLUMN handover_off INTEGER NOT NULL DEFAULT 0;
+             PRAGMA user_version = 5;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -147,7 +157,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 4);
+        assert_eq!(version, 5);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

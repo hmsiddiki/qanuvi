@@ -363,6 +363,12 @@ impl Master {
             }
             "agent_interrupt" => to(self.agents.interrupt(db, &s(args, "sessionId"))),
             "agent_rename" => to(agent::rename(db, &s(args, "sessionId"), &s(args, "title"))),
+            "agent_link" => to(agent::link(db, &s(args, "sessionId"), &s(args, "from"))),
+            "agent_handover_off" => to(agent::set_handover_off(
+                db,
+                &s(args, "sessionId"),
+                b(args, "off"),
+            )),
             "agent_delete" => {
                 self.agents.stop(&s(args, "sessionId"));
                 to(agent::delete(db, &s(args, "sessionId")))

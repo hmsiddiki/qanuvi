@@ -288,7 +288,7 @@
               </button>
             {/if}
           </header>
-          {#each agent.sessions as s (s.id)}
+          {#each agent.chats as s (s.id)}
             <div class="session" class:current={s.id === agent.selectedId}>
               <button
                 type="button"

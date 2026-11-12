@@ -197,6 +197,10 @@ export interface Session {
   duration_ms: number;
   created_at: number;
   updated_at: number;
+  /** The session this one goes on from after a chat handover (24s). */
+  continues_from?: string | null;
+  /** This chat never hands over by itself (24s). */
+  handover_off?: boolean;
 }
 
 export type AgentEvent =
@@ -453,6 +457,9 @@ export const api = {
     configure: (sessionId: string, change: { model?: string; mode?: string }) =>
       invoke<void>("agent_configure", { sessionId, model: change.model ?? null, mode: change.mode ?? null }),
     rename: (sessionId: string, title: string) => invoke<void>("agent_rename", { sessionId, title }),
+    /** Records that a session goes on from an earlier one after a chat handover (24s). */
+    link: (sessionId: string, from: string) => invoke<void>("agent_link", { sessionId, from }),
+    handoverOff: (sessionId: string, off: boolean) => invoke<void>("agent_handover_off", { sessionId, off }),
     remove: (sessionId: string) => invoke<void>("agent_delete", { sessionId }),
   },
   browser: {

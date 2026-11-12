@@ -152,6 +152,10 @@ pub struct Session {
     pub duration_ms: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// The session this one goes on from after a chat handover (24s); the chat shows them as one timeline.
+    pub continues_from: Option<String>,
+    /// This chat never hands over by itself (24s).
+    pub handover_off: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -305,7 +309,34 @@ fn from_row(row: &Row) -> rusqlite::Result<Session> {
         duration_ms: row.get("duration_ms")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
+        continues_from: row.get("continues_from")?,
+        handover_off: row.get::<_, i64>("handover_off")? != 0,
     })
+}
+
+/// Records that `id` goes on from `from` after a chat handover (24s).
+pub fn link(db: &Db, id: &str, from: &str) -> Result<(), String> {
+    if id == from {
+        return Err("A session cannot go on from itself.".into());
+    }
+    db.conn()
+        .execute(
+            "UPDATE sessions SET continues_from = ?2 WHERE id = ?1",
+            params![id, from],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Turns chat handover off (or on again) for one chat (24s).
+pub fn set_handover_off(db: &Db, id: &str, off: bool) -> Result<(), String> {
+    db.conn()
+        .execute(
+            "UPDATE sessions SET handover_off = ?2 WHERE id = ?1",
+            params![id, off as i64],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 pub fn get(db: &Db, id: &str) -> Result<Session, String> {
@@ -1444,6 +1475,13 @@ mod tests {
         rename(&db, "s1", "  Better title ").unwrap();
         assert_eq!(get(&db, "s1").unwrap().title, "Better title");
         assert!(rename(&db, "s1", " ").is_err());
+        assert_eq!(get(&db, "s1").unwrap().continues_from, None);
+        assert!(link(&db, "s1", "s1").is_err());
+        link(&db, "s1", "s0").unwrap();
+        set_handover_off(&db, "s1", true).unwrap();
+        let s = get(&db, "s1").unwrap();
+        assert_eq!(s.continues_from.as_deref(), Some("s0"));
+        assert!(s.handover_off);
 
         mark_interrupted(&db);
         assert_eq!(get(&db, "s1").unwrap().status, "ended");

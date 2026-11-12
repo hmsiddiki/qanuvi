@@ -209,6 +209,50 @@
   {/each}
 
   {#if settings.value.ai}
+    <section class="card">
+      <header>
+        <div class="title">
+          <strong>Chat handover</strong>
+          <span>Every agent</span>
+        </div>
+      </header>
+      <p class="note">
+        Each step re-reads the whole chat. Past the limit, the agent finishes the edit in hand and writes a note; a new
+        session goes on from it in the same chat. Plan steps keep their own limit (Run panel).
+      </p>
+      <div class="grid">
+        <label>
+          When
+          <select
+            value={settings.value.chatHandover.when}
+            onchange={(e) =>
+              settings.set("chatHandover", {
+                ...settings.value.chatHandover,
+                when: e.currentTarget.value as "ask" | "auto" | "off",
+              })}
+          >
+            <option value="ask">Ask me first</option>
+            <option value="auto">Automatic</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Limit (thousand tokens, 0 = off)
+          <input
+            type="number"
+            min="0"
+            max="1000"
+            step="10"
+            value={Math.round(settings.value.chatHandover.limit / 1000)}
+            onchange={(e) =>
+              settings.set("chatHandover", {
+                ...settings.value.chatHandover,
+                limit: Math.max(0, Math.min(1000, Math.round(Number(e.currentTarget.value) || 0))) * 1000,
+              })}
+          />
+        </label>
+      </div>
+    </section>
     <RoutingSettings
       provider={PROVIDERS.find((p) => p.id === settings.value.agent) ?? PROVIDERS[0]}
       project={projects.current}

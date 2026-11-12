@@ -64,7 +64,15 @@ export interface Settings {
    * whether Ctrl+S formats the file through its server first.
    */
   languages: { off: string[]; never: string[]; idleMinutes: number; formatOnSave: boolean };
+  /**
+   * Chat handover (24s): past `limit` tokens of context (0 = never) a chat goes on in a new session that starts from
+   * a handover note. ask: a bar asks first; auto: it happens by itself; off: never.
+   */
+  chatHandover: { when: "ask" | "auto" | "off"; limit: number };
 }
+
+/** Default context size at which a chat offers a handover (24s). */
+export const CHAT_HANDOVER_LIMIT = 150_000;
 
 /** A command Qanuvi starts with itself (hidden), and the address that answers once it runs. */
 export interface StartupItem {
@@ -150,6 +158,7 @@ const DEFAULTS: Settings = {
   appearance: { editorFontSize: 13, uiScale: 100 },
   updates: { autoDownload: false },
   languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false },
+  chatHandover: { when: "ask", limit: CHAT_HANDOVER_LIMIT },
   startup: [],
   team: DEFAULT_TEAM,
 };
@@ -220,6 +229,15 @@ export function parseSettings(json: string | null): Settings {
       never: ids(lg.never),
       idleMinutes: Math.min(240, Math.max(1, Math.round(idle))),
       formatOnSave: lg.formatOnSave === true,
+    };
+  }
+  {
+    const h =
+      raw.chatHandover && typeof raw.chatHandover === "object" ? (raw.chatHandover as Record<string, unknown>) : {};
+    const limit = typeof h.limit === "number" && Number.isFinite(h.limit) ? h.limit : CHAT_HANDOVER_LIMIT;
+    s.chatHandover = {
+      when: h.when === "auto" || h.when === "off" ? h.when : "ask",
+      limit: Math.min(1_000_000, Math.max(0, Math.round(limit))),
     };
   }
   if (Array.isArray(raw.startup))

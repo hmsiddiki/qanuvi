@@ -10,6 +10,19 @@ import { itemsToMarkdown } from "$lib/agent/events";
 import { freeDecide, ownSetup, setupFor } from "./brain.svelte";
 import { snapshotChanges } from "./changes";
 import { branchPreamble } from "$lib/agent/sessionTools";
+import { contextSize } from "$lib/plan/guidance";
+import {
+  chainOf,
+  chatHandoverDue,
+  chatHandoverRequest,
+  chatResumePrompt,
+  chatsOnly,
+  lastRequest,
+  noteAfter,
+} from "$lib/agent/handover";
+
+/** An agent that does not answer the handover request within this time is stopped; its last words stand in. */
+const HANDOVER_WAIT_MS = 180_000;
 
 /** Agent sessions of the current project and the conversation of the selected one. */
 class AgentStore {
@@ -49,6 +62,151 @@ class AgentStore {
 
   get selected(): Session | null {
     return this.sessions.find((s) => s.id === this.selectedId) ?? null;
+  }
+
+  /** The chats to list (24s): sessions another one goes on from show through that one. */
+  get chats(): Session[] {
+    return chatsOnly(this.sessions);
+  }
+
+  /** The selected session's context size now: what its last model call read (24s). */
+  context = $state(0);
+  /** The bar "This chat is heavy, hand over now?" shows (Chat handover: Ask me first). */
+  offer = $state(false);
+  /** A handover in progress: the session handing over, its size, where the request is, messages held for the new one. */
+  handover = $state<{ fromId: string; was: number; requestAt: number; queued: string[] } | null>(null);
+  /** Per session: the context size at which the owner said "Not now". */
+  #notNow = new Map<string, number>();
+  #handoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Whether to offer or start a handover now (after a model call's size is known, or a turn's end). */
+  #checkHandover(): void {
+    const s = this.selected;
+    if (!s || this.handover || this.planSessionId === s.id || !this.#projectId) return;
+    const setting = settings.value.chatHandover;
+    if (!chatHandoverDue(this.context, setting, !!s.handover_off, this.#notNow.get(s.id) ?? 0)) {
+      this.offer = false;
+      return;
+    }
+    if (setting.when === "auto") void this.handOver();
+    else this.offer = true;
+  }
+
+  /** "Not now": the bar goes until the context has grown a good deal more. */
+  notNow(): void {
+    if (this.selectedId) this.#notNow.set(this.selectedId, this.context);
+    this.offer = false;
+  }
+
+  /** "Never in this chat": this chat no longer hands over by itself. */
+  async handoverOffForChat(off = true): Promise<void> {
+    const s = this.selected;
+    if (!s) return;
+    try {
+      await api.agent.handoverOff(s.id, off);
+      s.handover_off = off;
+      if (off) this.offer = false;
+    } catch (e) {
+      this.error = errorText(e);
+    }
+  }
+
+  /**
+   * Hands the chat over (24s): the agent finishes the edit in hand and answers with a note; when its turn ends, a new
+   * session starts from the note and the last request and goes on in the same chat.
+   */
+  async handOver(): Promise<void> {
+    const s = this.selected;
+    const projectId = this.#projectId;
+    if (!s || !projectId || this.handover) return;
+    this.offer = false;
+    const was = this.context;
+    this.handover = { fromId: s.id, was, requestAt: this.items.length, queued: [] };
+    try {
+      await this.#write(projectId, s, chatHandoverRequest(was));
+      this.busy = true;
+      if (this.#handoverTimer) clearTimeout(this.#handoverTimer);
+      this.#handoverTimer = setTimeout(() => {
+        if (this.handover?.fromId !== s.id) return;
+        api.agent.stop(s.id).catch(() => {});
+        void this.#finishHandover();
+      }, HANDOVER_WAIT_MS);
+    } catch (e) {
+      this.handover = null;
+      this.error = errorText(e);
+    }
+  }
+
+  /** Writes Qanuvi's words into a session (a handover request): its own model and mode, nothing else added. */
+  async #write(projectId: string, s: Session, text: string): Promise<void> {
+    const a = settings.agent(s.agent);
+    await api.agent.start(
+      projectId,
+      s.id,
+      text,
+      s.model,
+      s.mode,
+      a.baseUrl,
+      this.effort,
+      this.handler(() => s.id),
+      false,
+      a.indexTools,
+      a.browserTools,
+      null,
+      s.agent,
+      setupFor(s.agent),
+      [],
+    );
+  }
+
+  /** The old session answered with its note (or was stopped): the new session starts in the same chat. */
+  async #finishHandover(): Promise<void> {
+    const h = this.handover;
+    const projectId = this.#projectId;
+    if (!h || !projectId) return;
+    if (this.#handoverTimer) clearTimeout(this.#handoverTimer);
+    this.#handoverTimer = null;
+    const from = this.sessions.find((x) => x.id === h.fromId);
+    // The chat moved on meanwhile (another chat was opened): nothing is started behind the owner's back.
+    if (this.selectedId !== h.fromId || !from) {
+      this.handover = null;
+      return;
+    }
+    const note = noteAfter(this.items, h.requestAt, () =>
+      itemsToMarkdown("The end of the earlier session", this.items.slice(0, h.requestAt)).slice(-6000),
+    );
+    const prompt = chatResumePrompt(note, lastRequest(this.items, h.requestAt), h.was);
+    // The earlier part stays on screen, read only; the new session's lines follow it. Messages held for the new
+    // session leave the old part: they are sent again below.
+    const held = new Set(h.queued);
+    this.items = this.items
+      .filter((i, k) => k < h.requestAt || !(i.kind === "user" && i.waiting && held.has(i.text)))
+      .map((i) => ({ ...i, older: true }));
+    this.selectedId = null;
+    this.providerId = from.agent;
+    this.model = from.model;
+    this.mode = from.mode;
+    this.context = 0;
+    const ok = await this.send(projectId, prompt);
+    const id = this.selectedId as string | null;
+    if (!ok || !id) {
+      this.handover = null;
+      this.busy = false;
+      await this.select(from.id);
+      this.error ||= "The new session did not start; the chat stays as it was.";
+      return;
+    }
+    await api.agent.link(id, from.id).catch((e) => (this.error = errorText(e)));
+    await this.rename(id, from.title).catch(() => {});
+    const now = this.sessions.find((x) => x.id === id);
+    if (now) {
+      now.continues_from = from.id;
+      now.handover_off = from.handover_off;
+    }
+    const queued = h.queued;
+    this.handover = null;
+    // Messages written during the handover go to the new session, in order (they join its first turn).
+    for (const text of queued) await this.send(projectId, text);
   }
 
   /** Adds text to the message box (after what is there), for example a page or an element from the preview. */
@@ -108,6 +266,8 @@ ${text}`
     this.selectedId = null;
     this.items = [];
     this.errors = [];
+    this.context = 0;
+    this.offer = false;
     // Read from settings, never back from this.providerId: an effect that calls this must not come to depend on
     // the session's agent (that made a loop between this and select(), 2026-11-11).
     const providerId = settings.value.agent;
@@ -128,11 +288,24 @@ ${text}`
       this.model = s.model;
       this.mode = s.mode;
     }
+    this.offer = false;
     try {
-      const [lines, times] = await Promise.all([api.agent.events(id), api.agent.times(id).catch(() => [] as number[])]);
+      // A chat that was handed over shows its earlier sessions first, read only (24s).
+      const chain = chainOf(this.sessions, id);
+      const parts = await Promise.all(
+        (chain.length ? chain : [{ id }]).map((c) =>
+          Promise.all([api.agent.events(c.id), api.agent.times(c.id).catch(() => [] as number[])]),
+        ),
+      );
       if (this.selectedId === id) {
-        this.items = reduceAll(lines, times);
+        const [lines] = parts[parts.length - 1];
+        const older = parts
+          .slice(0, -1)
+          .flatMap(([l, t], k) => reduceAll(l, t).map((i) => ({ ...i, id: `p${k}:${i.id}`, older: true })));
+        this.items = [...older, ...reduceAll(lines, parts[parts.length - 1][1])];
         this.#seq = lines.length;
+        this.context = contextSize(lines);
+        this.#checkHandover();
       }
     } catch (e) {
       this.error = errorText(e);
@@ -185,6 +358,12 @@ ${text}`
           this.mode = event.session.mode;
         }
         if (["idle", "ended", "failed", "stopped"].includes(event.session.status)) {
+          // The turn that answered the handover request ended: the new session takes over.
+          const h = this.handover;
+          if (h && event.session.id === h.fromId && this.items.slice(h.requestAt).some((i) => i.kind === "text")) {
+            void this.#finishHandover();
+            return;
+          }
           this.busy = false;
           this.turnsEnded++;
         }
@@ -194,6 +373,14 @@ ${text}`
       if (event.kind === "line") {
         if (event.line.includes('"qanuvi_interrupted"')) this.interrupting = false;
         this.items = reduce(this.items, event.line, ++this.#seq, Math.floor(Date.now() / 1000));
+        // Each model call's size is in its answer (no extra reads): past the limit, the chat offers a handover.
+        if (event.line.includes('"usage"') && event.line.includes('"assistant"')) {
+          const size = contextSize([event.line]);
+          if (size) {
+            this.context = size;
+            this.#checkHandover();
+          }
+        }
         // An approval answered by a standing one: the minutes left change.
         if (event.line.includes('"auto":true')) this.loadGrants();
       } else if (event.kind === "error") {
@@ -216,6 +403,17 @@ ${text}`
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
+    // During a handover the message waits and goes to the new session (24s).
+    if (this.handover && this.selectedId === this.handover.fromId && !note && !before) {
+      this.handover.queued.push(text);
+      this.items = reduce(
+        this.items,
+        JSON.stringify({ type: "qanuvi_user", text, during: true }),
+        ++this.#seq,
+        nowSeconds(),
+      );
+      return true;
+    }
     // Sent while the agent works: it joins the task (the agent takes it in before its next step).
     const during = !!this.selectedId && (this.busy || ["running", "waiting"].includes(this.selected?.status ?? ""));
     this.busy = true;
@@ -519,10 +717,13 @@ ${text}`
     this.busy = false;
   }
 
+  /** Deletes a chat: the session and the earlier ones it goes on from (24s). */
   async remove(id: string): Promise<void> {
-    await api.agent.remove(id).catch((e) => (this.error = errorText(e)));
-    this.sessions = this.sessions.filter((s) => s.id !== id);
-    if (this.selectedId === id) this.newSession();
+    const ids = chainOf(this.sessions, id).map((s) => s.id);
+    if (!ids.includes(id)) ids.push(id);
+    for (const x of ids) await api.agent.remove(x).catch((e) => (this.error = errorText(e)));
+    this.sessions = this.sessions.filter((s) => !ids.includes(s.id));
+    if (this.selectedId && ids.includes(this.selectedId)) this.newSession();
   }
 
   async rename(id: string, title: string): Promise<void> {

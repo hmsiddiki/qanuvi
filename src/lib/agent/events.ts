@@ -7,6 +7,7 @@
 import { withoutOverruleNote } from "$lib/core/decider";
 import { withoutGuidance } from "$lib/plan/guidance";
 import type { Edit } from "./diff";
+import { CHAT_HANDOVER_MARK, parseResume, tokensK } from "./handover";
 
 /** An image in a message: stored in the data folder (`file`), or still in hand (`src`, a data address). */
 export interface ShownImage {
@@ -68,8 +69,13 @@ export type Item = (
   /** The agent's to-do list (TodoWrite): one card, updated in place each time the agent writes the list again. */
   | { kind: "todos"; id: string; todos: Todo[] }
   | { kind: "result"; id: string; ok: boolean; seconds: number; costUsd: number; text: string }
-  | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string }
-) & { at?: number };
+  /** note: a chat handover's note (24s), shown folded under the line. */
+  | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string; note?: string }
+) & {
+  at?: number;
+  /** From an earlier session of the chat (24s): read only. */
+  older?: boolean;
+};
 
 export interface Todo {
   text: string;
@@ -282,7 +288,24 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
   // Anything else ends the live text: the whole message (or a handover, or the end) takes its place.
   let out = items.filter((x) => !((x.kind === "text" || x.kind === "thinking") && x.live));
   out = takeIn(out, type, msg);
-  if (type === "qanuvi_user") {
+  if (type === "qanuvi_user" && str(msg.text).startsWith(CHAT_HANDOVER_MARK)) {
+    const size = /about (\d+)k tokens/.exec(str(msg.text))?.[1];
+    out.push({
+      kind: "notice",
+      id: `ho${seq}`,
+      text: `Handing over to a new session${size ? ` (context ${size}k)` : ""}: the agent finishes the edit in hand and writes a note.`,
+      tone: "info",
+    });
+  } else if (type === "qanuvi_user" && parseResume(str(msg.text))) {
+    const r = parseResume(str(msg.text))!;
+    out.push({
+      kind: "notice",
+      id: `nw${seq}`,
+      text: `New session · context carried over${r.was ? ` (was ${tokensK(r.was)})` : ""}`,
+      tone: "info",
+      note: r.note,
+    });
+  } else if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
     const images: ShownImage[] = Array.isArray(msg.images)
       ? msg.images

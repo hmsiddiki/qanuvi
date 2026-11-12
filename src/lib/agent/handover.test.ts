@@ -1,0 +1,105 @@
+import { describe, expect, it } from "vitest";
+import {
+  CHAT_HANDOVER_MARK,
+  chainOf,
+  chatHandoverDue,
+  chatHandoverRequest,
+  chatResumePrompt,
+  chatsOnly,
+  lastRequest,
+  noteAfter,
+  parseResume,
+} from "./handover";
+import { reduceAll, type Item } from "./events";
+
+const ask = { when: "ask" as const, limit: 150_000 };
+
+describe("chatHandoverDue", () => {
+  it("is due past the limit unless off, for the chat or everywhere", () => {
+    expect(chatHandoverDue(149_000, ask, false, 0)).toBe(false);
+    expect(chatHandoverDue(152_000, ask, false, 0)).toBe(true);
+    expect(chatHandoverDue(152_000, { ...ask, when: "off" }, false, 0)).toBe(false);
+    expect(chatHandoverDue(152_000, { ...ask, limit: 0 }, false, 0)).toBe(false);
+    expect(chatHandoverDue(152_000, ask, true, 0)).toBe(false);
+  });
+
+  it("holds back after Not now until the context grew 50k more", () => {
+    expect(chatHandoverDue(180_000, ask, false, 152_000)).toBe(false);
+    expect(chatHandoverDue(202_000, ask, false, 152_000)).toBe(true);
+  });
+});
+
+describe("request and resume", () => {
+  it("asks for a note and is shown as a line, not as the user's words", () => {
+    const req = chatHandoverRequest(152_400);
+    expect(req.startsWith(CHAT_HANDOVER_MARK)).toBe(true);
+    expect(req).toContain("152k");
+    const items = reduceAll([JSON.stringify({ type: "qanuvi_user", text: req })]);
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe("notice");
+  });
+
+  it("reads the note and size back from the new session's first message", () => {
+    const prompt = chatResumePrompt("Handover note\nGoal: totals.", "Fix the totals", 152_000);
+    expect(parseResume(prompt)).toEqual({ note: "Handover note\nGoal: totals.", was: 152_000 });
+    expect(parseResume("Fix the totals")).toBeNull();
+    const [item] = reduceAll([JSON.stringify({ type: "qanuvi_user", text: prompt })]);
+    expect(item).toMatchObject({ kind: "notice", note: "Handover note\nGoal: totals." });
+    expect(item.kind === "notice" && item.text).toContain("was 152k");
+  });
+
+  it("works without a last request", () => {
+    expect(parseResume(chatResumePrompt("Handover note\nAll done here.", "", 160_000))?.note).toBe(
+      "Handover note\nAll done here.",
+    );
+  });
+});
+
+describe("noteAfter and lastRequest", () => {
+  const items: Item[] = [
+    { kind: "user", id: "u1", text: "Fix the totals" },
+    { kind: "text", id: "t1", text: "Working on it." },
+    { kind: "notice", id: "ho3", text: "Handing over", tone: "info" },
+    { kind: "text", id: "t2", text: "Edit finished.\n\nHandover note\nGoal: totals. Done: cart.php. Left: tests." },
+  ];
+
+  it("takes the agent's note after the request, from its first line", () => {
+    expect(noteAfter(items, 2, () => "fallback")).toBe("Handover note\nGoal: totals. Done: cart.php. Left: tests.");
+  });
+
+  it("falls back when the agent gave no note", () => {
+    expect(noteAfter(items.slice(0, 3), 2, () => "fallback")).toBe("fallback");
+  });
+
+  it("finds the user's last request before the handover", () => {
+    expect(lastRequest(items, 2)).toBe("Fix the totals");
+    expect(lastRequest([], 0)).toBe("");
+  });
+});
+
+describe("chains", () => {
+  const s = [
+    { id: "c", continues_from: "b" },
+    { id: "b", continues_from: "a" },
+    { id: "a", continues_from: null },
+    { id: "x" },
+  ];
+
+  it("walks a chat back to its first session, oldest first", () => {
+    expect(chainOf(s, "c").map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(chainOf(s, "x").map((x) => x.id)).toEqual(["x"]);
+    expect(chainOf(s, "missing")).toEqual([]);
+  });
+
+  it("stops at a loop", () => {
+    const loop = [
+      { id: "a", continues_from: "b" },
+      { id: "b", continues_from: "a" },
+    ];
+    expect(chainOf(loop, "a").map((x) => x.id)).toEqual(["b", "a"]);
+  });
+
+  it("lists only the newest session of each chat", () => {
+    expect(chatsOnly(s).map((x) => x.id)).toEqual(["c", "x"]);
+  });
+});

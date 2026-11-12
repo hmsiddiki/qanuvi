@@ -20,6 +20,7 @@
   import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
   import { revertEdits, type Edit } from "$lib/agent/diff";
   import { matchesIn, rewindFrom, rewindText, rowsToOpen, searchItems } from "$lib/agent/sessionTools";
+  import { tokensK } from "$lib/agent/handover";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Undo2 from "@lucide/svelte/icons/undo-2";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
@@ -272,7 +273,9 @@
   let working = $derived(currentModel(agent.items));
   /** Messages sent while the agent works that it has not read yet (24r): shown above the box, not in the timeline. */
   let waitingMsgs = $derived(
-    running ? agent.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user" && !!i.waiting) : [],
+    running
+      ? agent.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user" && !!i.waiting && !i.older)
+      : [],
   );
   /** The conversation as timeline rows: look-around steps grouped, long runs folded. */
   let rows = $derived(
@@ -753,11 +756,37 @@
     </div>
   {/if}
 
+  {#if agent.offer && !agent.handover}
+    <div class="handover-bar" role="status">
+      <span
+        >This chat is heavy ({tokensK(agent.context)} of context): each step re-reads it all. Hand over to a new session now?</span
+      >
+      <span class="handover-actions">
+        <button
+          type="button"
+          class="link"
+          title="The agent finishes the edit in hand and writes a note; a new session goes on from it in this chat"
+          onclick={() => agent.handOver()}>Hand over now</button
+        >
+        <button type="button" class="link" onclick={() => agent.notNow()}>Not now</button>
+        <button
+          type="button"
+          class="link"
+          title="This chat never offers a handover again (Settings, Agents, Chat handover is for all chats)"
+          onclick={() => agent.handoverOffForChat()}>Never in this chat</button
+        >
+      </span>
+    </div>
+  {/if}
   {#if waitingMsgs.length}
     <div class="waiting" aria-live="polite">
       <div class="waiting-head">
-        <span>Waiting · the agent reads {waitingMsgs.length === 1 ? "it" : "them"} after the current step</span>
-        {#if session && session.agent !== "qanuvi"}
+        <span
+          >{agent.handover
+            ? "Waiting · goes to the new session once the handover is done"
+            : `Waiting · the agent reads ${waitingMsgs.length === 1 ? "it" : "them"} after the current step`}</span
+        >
+        {#if session && session.agent !== "qanuvi" && !agent.handover}
           <button
             type="button"
             class="link"
@@ -951,8 +980,8 @@
         </div>
       </div>
     {:else}
-      <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text, item.id)}>
-        {#if session && !running && !item.during}
+      <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text, item.older ? "" : item.id)}>
+        {#if session && !running && !item.during && !item.older}
           <span class="msg-actions">
             <button
               type="button"
@@ -1080,6 +1109,11 @@
         <button type="button" class="to-auto" onclick={() => (agent.model = "auto")}>Switch to Auto</button>
       {/if}
     </div>
+  {:else if item.kind === "notice" && item.note}
+    <details class="handover-line">
+      <summary>{item.text} · <span class="link">the note</span></summary>
+      <pre class="handover-note">{item.note}</pre>
+    </details>
   {:else if item.kind === "notice"}
     <div class="notice {item.tone}">{item.text}</div>
   {/if}
@@ -1691,6 +1725,50 @@
     color: var(--qx-text-muted);
     font-size: 11px;
     font-weight: 600;
+  }
+
+  .handover-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--qx-space-1) var(--qx-space-2);
+    margin: 0 var(--qx-space-2) var(--qx-space-1);
+    padding: var(--qx-space-1) var(--qx-space-2);
+    border: 1px solid color-mix(in srgb, var(--qx-status-waiting) 45%, var(--qx-border));
+    border-radius: var(--qx-radius-input);
+    background: color-mix(in srgb, var(--qx-status-waiting) 7%, var(--qx-bg-panel));
+    font-size: var(--qx-text-small);
+  }
+
+  .handover-actions {
+    display: flex;
+    gap: var(--qx-space-2);
+  }
+
+  .handover-line {
+    margin: var(--qx-space-2) 0;
+    padding-top: var(--qx-space-1);
+    border-top: 1px solid var(--qx-border);
+    color: var(--qx-text-muted);
+    font-size: 11px;
+  }
+
+  .handover-line summary {
+    cursor: pointer;
+  }
+
+  .handover-note {
+    max-height: 320px;
+    overflow: auto;
+    margin: var(--qx-space-1) 0 0;
+    padding: var(--qx-space-1) var(--qx-space-2);
+    border-radius: var(--qx-radius-input);
+    background: var(--qx-bg-panel);
+    color: var(--qx-text);
+    font-family: var(--qx-font-mono, monospace);
+    font-size: 11.5px;
+    white-space: pre-wrap;
   }
 
   .waiting-msg {
