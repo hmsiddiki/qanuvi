@@ -245,8 +245,8 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-13, committed, NOT published: 15i part 1 code (language servers; see 15i "Built"). Verify green
     (262 + 156 tests). Not yet seen with a real server: no server is installed on this PC yet (rust-analyzer's
     rustup component is missing too); installing one downloads from npm or rustup, so it waits for the owner's yes.
-  - RESUME HERE (new conversation): 15i part 1 live check on a scratch project (install Intelephense and
-    rust-analyzer from Settings, Languages, after the owner's yes; check errors, hover, completion, F12, Shift+F12,
+  - RESUME HERE (new conversation): 15i part 1 live check on a scratch project (Intelephense and rust-analyzer
+    installed 2026-11-13 with the owner's yes: Intelephense is 141 MB in the data folder; check errors, hover, completion, F12, Shift+F12,
     F2, the Problems tab, idle stop), then 15i part 2. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
