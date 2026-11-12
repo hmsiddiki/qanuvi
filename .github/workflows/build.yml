@@ -47,12 +47,12 @@ jobs:
 
       - run: npm ci
 
-      # Linux only: the Rust tests one at a time, so a test that stops the runner shows by name (the last one started).
+      # Linux only: each Rust test on its own with a memory, process and time limit, so a runaway test fails by name
+      # instead of taking the runner down with its log ("the hosted runner lost communication").
       - name: Rust tests one at a time (Linux)
         if: matrix.platform == 'ubuntu-22.04'
-        timeout-minutes: 25
-        working-directory: src-tauri
-        run: cargo test -- --test-threads=1 2>&1 | tee ../rust-tests.log
+        timeout-minutes: 40
+        run: bash scripts/ci-linux-tests.sh
 
       - name: Checks and tests
         # A test that hangs fails within minutes with its name, instead of holding the runner for an hour.
