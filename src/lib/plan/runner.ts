@@ -47,6 +47,10 @@ export interface RunOptions {
   forgetPrivateWhenDone?: boolean;
   /** Steps in a row on the same model and in the same section continue one session; missing: yes. */
   carryOn?: boolean;
+  /** A session also goes on into the next section (same model, still under the limit); missing: yes. */
+  carryAcrossSections?: boolean;
+  /** The full test suite after every step, or once at the end of each section (steps test what they changed). */
+  fullChecks?: "step" | "section";
   /** Past this many tokens of context the next step starts a new session (with the run's notes). */
   carryLimit?: number;
   /** Who works: the Team settings, the paid agent only, or free models first (then the paid agent). */
@@ -99,6 +103,8 @@ export interface StepRun {
   choice?: string;
   /** The planner rewrote this step into the steps named here. */
   replacedBy?: string;
+  /** Files the step changed (modified while it ran). */
+  changed?: string[];
   /** Why the run skipped, or could not finish, the step (24f). */
   reason?: string;
 }

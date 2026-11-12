@@ -284,6 +284,35 @@ pub fn write_file(
     write_path(&path, rel, text, expected_hash)
 }
 
+/// Files in the project modified at or after \`since\` (what a step changed), Qanuvi's own folder left out; at most
+/// \`limit\`. Works for folders inside other repositories too, where git cannot tell.
+pub fn changed_since(
+    root: &Path,
+    since: std::time::SystemTime,
+    limit: usize,
+) -> Result<Vec<String>, String> {
+    let root_c = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for e in walk_files(&root_c) {
+        let rel = rel_string(&root_c, e.path());
+        if rel.starts_with(".qanuvi/") {
+            continue;
+        }
+        if e.metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .is_some_and(|t| t >= since)
+        {
+            out.push(rel);
+            if out.len() >= limit {
+                break;
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
 /// Where plan runs keep a log per step (attempts, failures, results): any model in any later session can read them.
 pub const PLAN_LOGS: &str = ".qanuvi/plan-logs/";
 
@@ -1042,5 +1071,18 @@ mod rename_tests {
         assert!(log_append(p, "src/x.md", "no").is_err());
         assert!(log_append(p, ".qanuvi/plan-logs/../../x.md", "no").is_err());
         assert!(log_append(p, ".qanuvi/plan-logs/a.txt", "no").is_err());
+    }
+
+    #[test]
+    fn finds_the_files_a_step_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        std::fs::write(p.join("old.php"), "a").unwrap();
+        let since = std::time::SystemTime::now();
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        std::fs::create_dir_all(p.join("src")).unwrap();
+        std::fs::write(p.join("src/new.php"), "b").unwrap();
+        log_append(p, ".qanuvi/plan-logs/P/1.md", "x").unwrap();
+        assert_eq!(changed_since(p, since, 50).unwrap(), ["src/new.php"]);
     }
 }

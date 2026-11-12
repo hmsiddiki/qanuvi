@@ -59,7 +59,10 @@
   let onLimit = $state<"wait" | "free">("wait");
   /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
   let carryOn = $state(true);
-  let carryK = $state(80);
+  let carryK = $state(150);
+  /** Sessions also go on into the next section; full checks per step or per section. */
+  let carryAcross = $state(true);
+  let fullChecks = $state<"step" | "section">("section");
   /** The plan's private details are deleted once every step is done. */
   let forgetPrivate = $state(true);
   let openSteps = $derived(plan.steps.filter((s) => s.status !== "x" && s.status !== "!"));
@@ -101,6 +104,8 @@
     replan: boolean;
     carryOn: boolean;
     carryK: number;
+    carryAcross: boolean;
+    fullChecks: "step" | "section";
     forgetPrivate: boolean;
     checkFirst: boolean;
     onLimit: "wait" | "free";
@@ -124,6 +129,8 @@
       if (typeof k.replan === "boolean") replan = k.replan;
       if (typeof k.carryOn === "boolean") carryOn = k.carryOn;
       if (typeof k.carryK === "number") carryK = k.carryK;
+      if (typeof k.carryAcross === "boolean") carryAcross = k.carryAcross;
+      if (k.fullChecks === "step" || k.fullChecks === "section") fullChecks = k.fullChecks;
       if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
       if (typeof k.checkFirst === "boolean") checkFirst = k.checkFirst;
       if (k.onLimit === "wait" || k.onLimit === "free") onLimit = k.onLimit;
@@ -148,6 +155,8 @@
       replan,
       carryOn,
       carryK,
+      carryAcross,
+      fullChecks,
       forgetPrivate,
       checkFirst,
       onLimit,
@@ -327,8 +336,10 @@
         team: "settings",
         teamMode: team === "settings" ? undefined : team,
         carryOn,
+        carryAcrossSections: carryAcross,
+        fullChecks,
         forgetPrivateWhenDone: forgetPrivate,
-        carryLimit: Math.max(20, Math.min(400, Number(carryK) || 80)) * 1000,
+        carryLimit: Math.max(20, Math.min(400, Number(carryK) || 150)) * 1000,
         waitBefore,
         onLimit,
         // Free decides, free works: the whole run goes to Qanuvi's own agent with the free models.
@@ -472,6 +483,19 @@
     >
       <input type="checkbox" bind:checked={carryOn} /> Continue the session across steps, up to
       <input type="number" class="small" min="20" max="400" step="10" bind:value={carryK} disabled={!carryOn} />k tokens
+    </label>
+    <label class="check" title="Steps of a plan build on each other: the session goes on into the next section too.">
+      <input type="checkbox" bind:checked={carryAcross} disabled={!carryOn} /> Also into the next section
+    </label>
+    <label
+      class="check"
+      title="Each step tests what it changes; the full test suite and the plan's whole-project checks run once at the last step of each section."
+    >
+      Full test suite
+      <select bind:value={fullChecks}>
+        <option value="section">once per section (steps test what they change)</option>
+        <option value="step">after every step</option>
+      </select>
     </label>
     <label
       class="check"

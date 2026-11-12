@@ -261,6 +261,9 @@ export const api = {
     listAll: (projectId: string) => invoke<{ files: string[]; truncated: boolean }>("files_list_all", { projectId }),
     /** Every Markdown file, ignore rules or not (task lists can sit in any folder). */
     markdown: (projectId: string) => invoke<string[]>("files_markdown", { projectId }),
+    /** Files modified since a moment (ms since 1970): what a plan step changed. */
+    changedSince: (projectId: string, sinceMs: number) =>
+      invoke<string[]>("files_changed_since", { projectId, sinceMs: Math.floor(sinceMs) }),
     /** Adds to a plan step's log (under .qanuvi/plan-logs). */
     logAppend: (projectId: string, path: string, text: string) =>
       invoke<void>("files_log_append", { projectId, path, text }),

@@ -130,6 +130,18 @@ struct FileList {
     truncated: bool,
 }
 
+/// Files modified since a moment (milliseconds since 1970): what a plan step changed.
+#[tauri::command]
+async fn files_changed_since(
+    state: State<'_, AppState>,
+    project_id: String,
+    since_ms: u64,
+) -> Res<Vec<String>> {
+    let root = project_root(&state, &project_id)?;
+    let since = std::time::UNIX_EPOCH + std::time::Duration::from_millis(since_ms);
+    blocking(move || files::changed_since(&root, since, 200)).await
+}
+
 /// Adds to a plan step's log (under .qanuvi/plan-logs).
 #[tauri::command]
 async fn files_log_append(
@@ -1658,6 +1670,7 @@ pub fn run() {
             files_list_all,
             files_markdown,
             files_log_append,
+            files_changed_since,
             files_replace,
             files_read,
             files_write,

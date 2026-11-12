@@ -258,3 +258,43 @@ export function logsBlock(planFile: string, own: string, ownExists: boolean): st
     ...(ownExists ? [`This step was tried before: read its log ${own} first and do not repeat what failed.`] : []),
   ].join("\n");
 }
+
+/** The plan map: what earlier steps built and where (kept by the steps themselves). */
+export function mapPath(planFile: string): string {
+  return `${logDir(planFile)}/MAP.md`;
+}
+
+/**
+ * What a step gets so it does not have to find its way from nothing: the plan map, the files the last steps changed,
+ * how to find code (Qanuvi's index), and the rule to keep the map current.
+ */
+export function contextBlock(
+  planFile: string,
+  map: string,
+  recent: { number: string | null; files: string[] }[],
+  indexTools: boolean,
+): string {
+  const path = mapPath(planFile);
+  const lines = [""];
+  if (map.trim()) {
+    const cut = map.length > 8000 ? map.slice(0, 8000) + "\n…" : map;
+    lines.push(`The plan map (${path}): what earlier steps built and where. Start from it.`, cut.trim(), "");
+  }
+  const shown = recent.filter((r) => r.files.length).slice(-3);
+  if (shown.length) {
+    lines.push("Files the last steps changed:");
+    for (const r of shown)
+      lines.push(`- ${r.number ?? "step"}: ${r.files.slice(0, 25).join(", ")}${r.files.length > 25 ? ", …" : ""}`);
+    lines.push("");
+  }
+  if (indexTools)
+    lines.push(
+      "Finding your way: use Qanuvi's code index (find_symbol for where something is defined, outline for what a file " +
+        "holds, read_lines for just the lines you need, project_map for the layout) rather than reading whole files " +
+        "with cat or sed.",
+    );
+  lines.push(
+    `When the step is done, update the plan map ${path} (create it if it is missing): under 80 lines, one line per file, "path — what it holds or does", grouped by area; add what this step created or changed, keep earlier lines unless they are wrong now.`,
+  );
+  return lines.join("\n");
+}

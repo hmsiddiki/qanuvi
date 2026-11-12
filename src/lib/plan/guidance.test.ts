@@ -131,3 +131,25 @@ describe("step logs", () => {
     expect(logsBlock("PLAN.md", ".qanuvi/plan-logs/PLAN/2.md", false)).not.toContain("tried before");
   });
 });
+
+import { contextBlock, mapPath } from "./guidance";
+
+describe("what a step gets to find its way", () => {
+  it("passes the map, the last changes, the index hint and the rule to keep the map", () => {
+    const b = contextBlock(
+      "PLAN-D.md",
+      "src/Cart/CartLine.php — a cart line and its chosen amount",
+      [
+        { number: "82d", files: ["src/Checkout/Separate.php"] },
+        { number: "82e", files: [] },
+      ],
+      true,
+    );
+    expect(b).toContain("CartLine.php — a cart line");
+    expect(b).toContain("- 82d: src/Checkout/Separate.php");
+    expect(b).not.toContain("- 82e");
+    expect(b).toContain("find_symbol");
+    expect(b).toContain(`update the plan map ${mapPath("PLAN-D.md")}`);
+    expect(contextBlock("P.md", "", [], false)).not.toContain("find_symbol");
+  });
+});

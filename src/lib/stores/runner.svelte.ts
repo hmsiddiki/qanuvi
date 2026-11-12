@@ -21,6 +21,8 @@ import {
   attemptEntry,
   logPath,
   logsBlock,
+  contextBlock,
+  mapPath,
   resultEntry,
   loadPlanNotes,
   savePlanNotes,
@@ -174,7 +176,10 @@ class RunnerStore {
   /** Adds the step's result (done, blocked, skipped with why) to its log. */
   async #logResult(project: Project, file: string, step: StepRun): Promise<void> {
     if (step.status === "waiting" || step.status === "running") return;
-    await api.files.logAppend(project.id, logPath(file, step), resultEntry(step.status, step.reason)).catch(() => {});
+    const files = step.changed?.length ? `Files changed: ${step.changed.join(", ")}\n` : "";
+    await api.files
+      .logAppend(project.id, logPath(file, step), resultEntry(step.status, step.reason) + files)
+      .catch(() => {});
   }
 
   /** The owner's message that resumed the run (it goes first in the step's request). */
@@ -648,7 +653,12 @@ class RunnerStore {
         }
         this.currentModel = model;
         const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
-        const testCommand = options.packets ? project.settings.test_command.trim() : "";
+        // The full suite after every step, or only at the last step of a section (the others test what they changed).
+        const lastOfSection = !run.steps
+          .slice(run.steps.indexOf(stepRun) + 1)
+          .some((x) => x.status === "waiting" && steps.find((s) => s.line === x.line)?.section === fresh.section);
+        const fullNow = options.fullChecks !== "section" || lastOfSection;
+        const testCommand = options.packets && fullNow ? project.settings.test_command.trim() : "";
         // The plan's private details (read each step: one given during the last step counts at once).
         const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
         const ownLog = logPath(file, fresh);
@@ -662,7 +672,20 @@ class RunnerStore {
           stepPrompt(file, fresh, done) +
           notesBlock(run.notes ?? []) +
           privateBlock(privateDetails) +
-          logsBlock(file, ownLog, ownLogExists);
+          logsBlock(file, ownLog, ownLogExists) +
+          (fullNow
+            ? ""
+            : "\n\nChecks: run only the tests for what this step changes (and lint the files you touch). The full suite " +
+              "and the plan's other whole-project checks run once, at the last step of this section; skip them here, " +
+              "even where the plan's rules ask for them after every step.") +
+          contextBlock(
+            file,
+            (await api.files.read(project.id, mapPath(file)).catch(() => null))?.text ?? "",
+            run.steps
+              .filter((x) => x !== stepRun && x.changed?.length)
+              .map((x) => ({ number: x.number, files: x.changed ?? [] })),
+            options.indexTools,
+          );
         // The reviewer turned down a free model's work: the next model hears why.
         const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
         if (rejected)
@@ -672,9 +695,17 @@ class RunnerStore {
         // Same model, same section, still small: the step continues the last step's session (it knows the work).
         const section = fresh.section ?? "";
         const carryOn =
-          (!!resumedWith && !!this.#carry) || canCarry(this.#carry, model, section, options.carryLimit ?? 80_000);
+          (!!resumedWith && !!this.#carry) ||
+          canCarry(
+            this.#carry,
+            model,
+            // Across sections too (steps of a plan build on each other), unless the owner chose per section.
+            options.carryAcrossSections === false ? section : (this.#carry?.section ?? section),
+            options.carryLimit ?? 150_000,
+          );
         if (!carryOn) await this.#dropCarry();
         const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
+        const stepStarted = Date.now() - 2000;
         const attempt = await this.#attempt(
           project,
           prompt,
@@ -688,6 +719,9 @@ class RunnerStore {
           resume,
         );
         await this.#settleCarry(attempt, section, options, carryOn);
+        // What the step changed, for the next steps (and its log).
+        const changed = await api.files.changedSince(project.id, stepStarted).catch(() => [] as string[]);
+        stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
         await this.#logAttempt(project, file, stepRun, attempt);
         // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
         if (attempt.outcome === "error" || attempt.outcome === "open") {
