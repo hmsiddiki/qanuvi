@@ -245,9 +245,10 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-13, committed, NOT published: 15i part 1 code (language servers; see 15i "Built"). Verify green
     (262 + 156 tests). Not yet seen with a real server: no server is installed on this PC yet (rust-analyzer's
     rustup component is missing too); installing one downloads from npm or rustup, so it waits for the owner's yes.
-  - RESUME HERE (new conversation): 15i part 1 live check on a scratch project (Intelephense and rust-analyzer
-    installed 2026-11-13 with the owner's yes: Intelephense is 141 MB in the data folder; check errors, hover, completion, F12, Shift+F12,
-    F2, the Problems tab, idle stop), then 15i part 2. Older open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13, committed, NOT published: 15i part 1 live check on a scratch project with the release build
+    (see 15i "Live check"); five fixes from it. Verify green (265 + 156 tests).
+  - RESUME HERE (new conversation): 15i part 2 (formatting, quick fixes, "Fix with agent"), unless the owner says
+    yes to 24r first (asked 2026-11-13, no answer yet). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -259,6 +260,17 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
+- [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; proposed, waiting for the owner's yes)**: a
+  message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
+  the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the
+  chat already shows it as part of the conversation.
+  - (1) Keep it in a "waiting, read after the current step" area above the box until the agent has taken it in.
+  - (2) A running timer on long commands (for example "Bash · 12 min").
+  - (3) "Stop this command, read my message now": Claude Code's control request "interrupt" (what Esc does in its
+    own terminal) ends the turn and its command, keeps the session, and the waiting message is read next. In a plan
+    run the runner treats it as paused by the user, not a failed try. Later, optional: end only the command's own
+    process (must not hit the MCP helpers that are also Claude Code's children). Qanuvi's own agent: simpler, it runs
+    the commands itself.
 - [ ] **24q. No token bursts: smaller steps and pacing (owner, 2026-11-13)**: measured on PLAN-D (3 days, about 45
   steps, $218 at API prices): the cost is cache reads, not new input. Each tool call re-reads the whole context, so
   a step of about 180 turns at 100-150k context reads about 20M tokens (88b 20.7M / $8.53, 87c 19.0M, 93z 21.8M,
@@ -961,6 +973,18 @@ runs on or off; with it off nothing is sent anywhere.
     (Install / Not now / Don't ask again), a Problems tab (count, filter, by file, errors first) and a References tab
     in the bottom panel, F12 / Shift+F12 / F2 and the right-click menu (the code index stays the fallback for F12),
     Settings, Languages (status, Install, on/off per language, idle minutes). Projects on a server get none yet.
+  - Live check (2026-11-13, release build, scratch project with PHP and Rust): Intelephense and rust-analyzer start
+    on the first file, underlines and gutter dots, Problems tab (by file, codes, positions, "ready" per server),
+    hover, completion, F12, Shift+F12 (References tab), F2 on Rust (3 places, file left unsaved), idle stop (rust-
+    analyzer ended 10 minutes after its last use while Intelephense stayed for an open file), both servers end with
+    the window. Memory: Intelephense about 113 MB, rust-analyzer about 430 MB once it has indexed std. Test builds
+    keep data in dev.qanuvi.desktop.source, so a server installed by the installed app is not there (by design).
+    Fixed from the check: (1) completion now asks for snippets and expands them with CodeMirror (protocol.ts
+    snippetTemplate): a method gives total() instead of total, which Intelephense then flagged as an undefined
+    property; (2) a server installed from outside the window (another window, npm or rustup in a terminal) is seen
+    without a restart (statuses read again, at most every 30 s); (3) F2 asks the server first: no name prompt when
+    it cannot rename (free Intelephense: "renames only with its paid licence"); (4) the name prompt gives the focus
+    back (after F2, Ctrl+S did not save); (5) the status bar's Ln/Col follows a tab switch.
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:

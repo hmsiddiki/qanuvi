@@ -104,9 +104,23 @@
   // ---------- The name prompt ----------
   let promptInput: HTMLInputElement | undefined = $state();
   let promptValue = $state("");
+  // What had the focus when the prompt opened (the editor after F2); it gets it back when the prompt closes.
+  let returnFocus: HTMLElement | null = null;
   $effect(() => {
     const p = contextMenu.prompt;
-    if (!p) return;
+    if (!p) {
+      const el = returnFocus;
+      returnFocus = null;
+      // Only when nothing else took the focus meanwhile (a new file's tab, for example).
+      if (el)
+        tick().then(() => {
+          const now = document.activeElement;
+          if (el.isConnected && (!now || now === document.body)) el.focus();
+        });
+      return;
+    }
+    if (!returnFocus && document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
+      returnFocus = document.activeElement;
     promptValue = p.value;
     tick().then(() => {
       if (!promptInput) return;

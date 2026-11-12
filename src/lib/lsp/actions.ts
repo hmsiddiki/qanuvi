@@ -83,6 +83,16 @@ export async function findReferences(view: EditorView, doc: Doc, name: string): 
   }
 }
 
+const CANNOT_RENAME = "The language server of this file cannot rename.";
+
+/** Why a rename cannot start, asked before the name prompt opens; "" when it can. */
+export async function renameBlocked(doc: Doc): Promise<string> {
+  const c = await lsp.clientFor(doc);
+  if (c?.client.capabilities.renameProvider) return "";
+  // Intelephense keeps rename for its paid licence; say so rather than leave the user guessing.
+  return c?.client.server === "php" ? "Intelephense renames only with its paid licence." : CANNOT_RENAME;
+}
+
 /** Renames the symbol at `pos` everywhere the server says; answers what happened, in words. */
 export async function renameSymbol(view: EditorView, doc: Doc, pos: number, name: string): Promise<string> {
   let edit: unknown;
@@ -91,7 +101,7 @@ export async function renameSymbol(view: EditorView, doc: Doc, pos: number, name
   } catch (e) {
     return errorText(e);
   }
-  if (edit === null) return "The language server of this file cannot rename.";
+  if (edit === null) return CANNOT_RENAME;
   const root = rootOf(doc.projectId);
   const files = editsByFile(edit);
   let changed = 0;

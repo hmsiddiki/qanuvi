@@ -69,6 +69,7 @@ class LspStore {
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
   #notNow = new Set<string>();
   #statusLoad: Promise<void> | null = null;
+  #statusAt = 0;
   #idle: ReturnType<typeof setInterval> | undefined;
 
   constructor() {
@@ -77,11 +78,13 @@ class LspStore {
   }
 
   loadStatuses(force = false): Promise<void> {
-    if (!this.#statusLoad || force)
+    if (!this.#statusLoad || force) {
+      this.#statusAt = Date.now();
       this.#statusLoad = api.lsp
         .statuses()
         .then((s) => void (this.statuses = s))
         .catch(() => void (this.statuses = []));
+    }
     return this.#statusLoad;
   }
 
@@ -115,7 +118,13 @@ class LspStore {
     let client = this.#clients.get(key);
     if (!client) {
       await this.loadStatuses();
-      const st = this.status(server);
+      let st = this.status(server);
+      // Installed meanwhile from outside this window (another window, npm or rustup in a terminal): look again,
+      // at most every 30 s, since the check starts programs (rust-analyzer --version).
+      if (!st?.found && Date.now() - this.#statusAt > 30_000) {
+        await this.loadStatuses(true);
+        st = this.status(server);
+      }
       if (!st?.found) {
         const l = settings.value.languages;
         if (st && !l.never.includes(server) && !this.#notNow.has(server)) this.offer = { server, status: st };

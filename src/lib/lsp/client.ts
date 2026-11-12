@@ -68,7 +68,8 @@ export class LspClient {
             hover: { contentFormat: ["markdown", "plaintext"] },
             completion: {
               completionItem: {
-                snippetSupport: false,
+                // Methods come back as total()$0 or addItem(${1:$name}, ...); the editor walks them with Tab.
+                snippetSupport: true,
                 documentationFormat: ["markdown", "plaintext"],
                 insertReplaceSupport: false,
               },

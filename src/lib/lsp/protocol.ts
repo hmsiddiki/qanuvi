@@ -192,6 +192,69 @@ export function markupText(contents: unknown): string {
   return c.value;
 }
 
+/**
+ * An LSP snippet ($1, ${2:name}, ${3|a,b|}, $0, \$ escapes) as a CodeMirror snippet template, so Tab walks the
+ * arguments and the cursor ends where the server meant. Placeholders inside placeholders keep only their words;
+ * variables (${TM_FILENAME}) keep their default, or their name.
+ */
+export function snippetTemplate(text: string): string {
+  let out = "";
+  // A literal "{" right after "$" or "#" would start a CodeMirror field; escape it.
+  const literal = (ch: string) => (out += ch === "{" && /[$#]$/.test(out) ? "\\{" : ch);
+  // A placeholder's words from `from` to its closing brace, nested placeholders flattened: [words, index after].
+  const inner = (from: number): [string, number] => {
+    let words = "";
+    let depth = 1;
+    let j = from;
+    while (j < text.length && depth > 0) {
+      const rest = text.slice(j);
+      const open = /^\$\{(\d+|[A-Za-z_]\w*):?/.exec(rest) ?? /^\$\d+/.exec(rest);
+      if (rest[0] === "\\" && rest.length > 1) {
+        words += rest[1];
+        j += 2;
+      } else if (open) {
+        if (open[0].startsWith("${")) depth++;
+        j += open[0].length;
+      } else {
+        if (rest[0] === "}") depth--;
+        else words += rest[0];
+        j++;
+      }
+    }
+    return [words.replace(/[{}]/g, ""), j];
+  };
+  let i = 0;
+  while (i < text.length) {
+    const rest = text.slice(i);
+    let m: RegExpExecArray | null;
+    if (rest[0] === "\\" && rest.length > 1 && "$}\\,|".includes(rest[1])) {
+      literal(rest[1]);
+      i += 2;
+    } else if ((m = /^\$(\d+)/.exec(rest) ?? /^\$\{(\d+)\}/.exec(rest))) {
+      out += "${" + m[1] + "}";
+      i += m[0].length;
+    } else if ((m = /^\$\{(\d+)\|([^,|]*)[^}]*\}/.exec(rest))) {
+      out += "${" + m[1] + ":" + m[2].replace(/[{}]/g, "") + "}";
+      i += m[0].length;
+    } else if ((m = /^\$\{(\d+):/.exec(rest))) {
+      const [words, end] = inner(i + m[0].length);
+      out += "${" + m[1] + ":" + words + "}";
+      i = end;
+    } else if ((m = /^\$\{([A-Za-z_]\w*)\}/.exec(rest))) {
+      for (const c of m[1]) literal(c);
+      i += m[0].length;
+    } else if ((m = /^\$\{([A-Za-z_]\w*):/.exec(rest))) {
+      const [words, end] = inner(i + m[0].length);
+      for (const c of words) literal(c);
+      i = end;
+    } else {
+      literal(rest[0]);
+      i++;
+    }
+  }
+  return out;
+}
+
 export type Severity = "error" | "warning" | "info" | "hint";
 
 export function severity(n: number | undefined): Severity {

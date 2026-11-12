@@ -9,6 +9,7 @@ import {
   relativePath,
   serverFor,
   severity,
+  snippetTemplate,
   toOffset,
   toPosition,
   uriKey,
@@ -73,5 +74,26 @@ describe("language server helpers", () => {
     );
     expect(markupText(null)).toBe("");
     expect([1, 2, 3, 4, undefined].map(severity)).toEqual(["error", "warning", "info", "hint", "error"]);
+  });
+});
+
+describe("snippetTemplate", () => {
+  it("turns LSP tab stops into CodeMirror fields", () => {
+    expect(snippetTemplate("total()$0")).toBe("total()${0}");
+    expect(snippetTemplate("total($0)")).toBe("total(${0})");
+    expect(snippetTemplate("addItem(${1:\\$name}, ${2:\\$qty})$0")).toBe("addItem(${1:$name}, ${2:$qty})${0}");
+    expect(snippetTemplate("greet(${1:name})")).toBe("greet(${1:name})");
+    expect(snippetTemplate("x(${1})")).toBe("x(${1})");
+  });
+  it("flattens nested placeholders, choices and variables", () => {
+    expect(snippetTemplate("f(${1:a, ${2:b}})")).toBe("f(${1:a, b})");
+    expect(snippetTemplate("${1|one,two|}")).toBe("${1:one}");
+    expect(snippetTemplate("// ${TM_FILENAME}")).toBe("// TM_FILENAME");
+    expect(snippetTemplate("${TM_SELECTED_TEXT:x}")).toBe("x");
+  });
+  it("keeps literal text that CodeMirror would read as a field", () => {
+    expect(snippetTemplate("\\${a}")).toBe("$\\{a}");
+    expect(snippetTemplate("#{x}")).toBe("#\\{x}");
+    expect(snippetTemplate("$var = 1; {}")).toBe("$var = 1; {}");
   });
 });

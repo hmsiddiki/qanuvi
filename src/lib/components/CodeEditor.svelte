@@ -21,7 +21,7 @@
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
   import { lsp, type Doc } from "$lib/stores/lsp.svelte";
   import { lspExtensions, toDiagnostics } from "$lib/lsp/codemirror";
-  import { findReferences, goToDefinition as lspDefinition, renameSymbol } from "$lib/lsp/actions";
+  import { findReferences, goToDefinition as lspDefinition, renameBlocked, renameSymbol } from "$lib/lsp/actions";
   import { serverFor } from "$lib/lsp/protocol";
 
   interface Props {
@@ -141,9 +141,13 @@
     if (!w) return true;
     const pos = w.from;
     const old = v.state.sliceDoc(w.from, w.to);
-    contextMenu.ask(`Rename ${old} to`, old, "Rename", async (value: string) => {
-      const name = value.trim();
-      if (name && name !== old) note(await renameSymbol(v, d, pos, name));
+    // Ask the server first: no point typing a new name it cannot apply.
+    renameBlocked(d).then((why) => {
+      if (why) return note(why);
+      contextMenu.ask(`Rename ${old} to`, old, "Rename", async (value: string) => {
+        const name = value.trim();
+        if (name && name !== old) note(await renameSymbol(v, d, pos, name));
+      });
     });
     return true;
   }
@@ -249,6 +253,10 @@
       view.setState(stateFor(t));
       // Mark the tab as having a live state, so later updates do not rebuild it from the saved text.
       editor.states.set(t.key, view.state);
+      // setState runs no update listener: give the status bar this tab's cursor, not the last tab's.
+      const head = view.state.selection.main.head;
+      const at = view.state.doc.lineAt(head);
+      oncursor?.(at.number, head - at.from + 1);
       loadBase(t);
       const ext = await loadLanguage(t.language);
       if (shownKey === t.key && view) view.dispatch({ effects: language.reconfigure(ext) });

@@ -5,11 +5,20 @@
 import type { Extension } from "@codemirror/state";
 import { EditorState } from "@codemirror/state";
 import { EditorView, hoverTooltip } from "@codemirror/view";
-import type { Completion, CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import { snippet, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import type { Diagnostic } from "@codemirror/lint";
 import { renderMarkdown } from "$lib/agent/markdown";
 import { lsp, type Doc, type Place, type Problem } from "$lib/stores/lsp.svelte";
-import { completionType, markupText, relativePath, toOffset, toPosition, type Position, type Range } from "./protocol";
+import {
+  completionType,
+  markupText,
+  relativePath,
+  snippetTemplate,
+  toOffset,
+  toPosition,
+  type Position,
+  type Range,
+} from "./protocol";
 
 /** The shown file, or null when the editor shows something without a server (a config file, a binary). */
 export type Current = () => Doc | null;
@@ -68,11 +77,6 @@ interface LspCompletion {
   textEdit?: { range?: Range; replace?: Range; newText: string };
 }
 
-/** Snippet text ($1, ${2:name}) as plain text: the placeholders' own words stay. */
-function plainSnippet(text: string): string {
-  return text.replace(/\$\{\d+(?::([^}]*))?\}/g, "$1").replace(/\$\d+/g, "");
-}
-
 function completion(current: Current): Extension {
   const source = async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const doc = current();
@@ -99,7 +103,7 @@ function completion(current: Current): Extension {
     const options: Completion[] = items.slice(0, 300).map((it, i) => {
       const edit = it.textEdit;
       const raw = edit?.newText ?? it.insertText ?? it.label;
-      const text = it.insertTextFormat === 2 ? plainSnippet(raw) : raw;
+      const snip = it.insertTextFormat === 2 ? snippet(snippetTemplate(raw)) : null;
       const range = edit?.range ?? edit?.replace;
       const doc = markupText(it.documentation);
       return {
@@ -116,12 +120,13 @@ function completion(current: Current): Extension {
               return dom;
             }
           : undefined,
-        apply: (view, _c, f, t) => {
+        apply: (view, c, f, t) => {
           const start = range ? toOffset(view.state.doc, range.start) : f;
           const end = range ? Math.max(t, toOffset(view.state.doc, range.end)) : t;
+          if (snip) return snip(view, c, start, end);
           view.dispatch({
-            changes: { from: start, to: end, insert: text },
-            selection: { anchor: start + text.length },
+            changes: { from: start, to: end, insert: raw },
+            selection: { anchor: start + raw.length },
           });
         },
       };
