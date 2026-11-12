@@ -113,6 +113,10 @@ pub fn update() -> Result<String, String> {
         String::from_utf8_lossy(&out.stderr)
     );
     let text: String = text.trim().chars().take(2000).collect();
+    // Installed with winget: Claude Code leaves the update to winget, so Qanuvi asks winget (the owner pressed Update).
+    if text.contains("winget upgrade") {
+        return winget_upgrade();
+    }
     if out.status.success() {
         Ok(text)
     } else {
@@ -121,6 +125,41 @@ pub fn update() -> Result<String, String> {
         } else {
             text
         })
+    }
+}
+
+/// Updates a Claude Code that winget installed, the way Claude Code itself asks for. Agreements are not accepted on
+/// the owner's behalf: when winget needs that, the answer says to run the command in a terminal.
+fn winget_upgrade() -> Result<String, String> {
+    let mut cmd = Command::new("winget");
+    cmd.args([
+        "upgrade",
+        "--id",
+        "Anthropic.ClaudeCode",
+        "--exact",
+        "--silent",
+    ]);
+    hidden(&mut cmd);
+    let out = cmd.output().map_err(|e| {
+        format!("winget could not start ({e}). Run: winget upgrade Anthropic.ClaudeCode")
+    })?;
+    let text: String = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.chars().all(|c| r"-\|/█▒ ".contains(c)))
+        .collect::<Vec<_>>()
+        .join(
+            "
+",
+        );
+    let text: String = text.chars().take(1500).collect();
+    if out.status.success() {
+        Ok(text)
+    } else {
+        Err(format!(
+            "winget did not finish the update. Run this in a terminal: winget upgrade Anthropic.ClaudeCode
+{text}"
+        ))
     }
 }
 
