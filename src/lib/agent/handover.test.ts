@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  REOPEN_FRESH_FROM,
+  forgetNote,
+  keepNote,
+  keptNote,
+  reopenFresh,
   CHAT_HANDOVER_MARK,
   chainOf,
   chatHandoverDue,
@@ -126,5 +131,35 @@ describe("chatGroups", () => {
     expect(titles(g.rest)).toEqual(["Fix the login form"]);
     expect(titles(chatGroups(chats, "login form").rest)).toEqual(["Fix the login form"]);
     expect(chatGroups(chats, "nothing").saved).toEqual([]);
+  });
+});
+
+describe("reopening a starred chat (24s part 3)", () => {
+  it("goes on fresh only for a heavy starred chat that is not live and not a plan step", () => {
+    const heavy = REOPEN_FRESH_FROM;
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, false)).toBe(true);
+    expect(reopenFresh({ saved: true, status: "stopped" }, heavy - 1, false)).toBe(false);
+    expect(reopenFresh({ saved: false, status: "ended" }, heavy, false)).toBe(false);
+    expect(reopenFresh({ saved: true, status: "idle" }, heavy, false)).toBe(false);
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, true)).toBe(false);
+  });
+
+  it("keeps a written note only while the session has no newer lines", () => {
+    const m = new Map<string, string>();
+    const store = {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+    };
+    expect(keptNote(store, "s1", 10)).toBeNull();
+    keepNote(store, "s1", 10, "Handover note\nGoal: x");
+    expect(keptNote(store, "s1", 10)).toBe("Handover note\nGoal: x");
+    expect(keptNote(store, "s1", 11)).toBeNull();
+    keepNote(store, "s1", 10, "  ");
+    expect(keptNote(store, "s1", 10)).toBeNull();
+    m.set("qanuvi.reopenNote.s1", "{broken");
+    expect(keptNote(store, "s1", 10)).toBeNull();
+    forgetNote(store, "s1");
+    expect(m.size).toBe(0);
   });
 });

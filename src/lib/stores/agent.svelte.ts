@@ -18,8 +18,12 @@ import {
   chatHandoverRequest,
   chatResumePrompt,
   chatsOnly,
+  forgetNote,
+  keepNote,
+  keptNote,
   lastRequest,
   noteAfter,
+  reopenFresh,
 } from "$lib/agent/handover";
 
 /** An agent that does not answer the handover request within this time is stopped; its last words stand in. */
@@ -75,7 +79,19 @@ class AgentStore {
   /** The bar "This chat is heavy, hand over now?" shows (Chat handover: Ask me first). */
   offer = $state(false);
   /** A handover in progress: the session handing over, its size, where the request is, messages held for the new one. */
-  handover = $state<{ fromId: string; was: number; requestAt: number; queued: string[] } | null>(null);
+  handover = $state<{
+    fromId: string;
+    was: number;
+    requestAt: number;
+    queued: string[];
+    /** Reopening a starred chat (24s part 3): only the note is wanted; a new session starts when a message is sent. */
+    noteOnly?: boolean;
+  } | null>(null);
+  /**
+   * A starred chat reopened (24s part 3): the next message starts a fresh session from a note (edited by the owner
+   * when they like) instead of re-reading the old session. `note` is null until it is written; `lines` stamps it.
+   */
+  reopened = $state<{ id: string; was: number; note: string | null; lines: number } | null>(null);
   /** Per session: the context size at which the owner said "Not now". */
   #notNow = new Map<string, number>();
   /**
@@ -125,13 +141,13 @@ class AgentStore {
    * Hands the chat over (24s): the agent finishes the edit in hand and answers with a note; when its turn ends, a new
    * session starts from the note and the last request and goes on in the same chat.
    */
-  async handOver(): Promise<void> {
+  async handOver(noteOnly = false): Promise<void> {
     const s = this.selected;
     const projectId = this.#projectId;
     if (!s || !projectId || this.handover) return;
     this.offer = false;
     const was = this.context;
-    this.handover = { fromId: s.id, was, requestAt: this.items.length, queued: [] };
+    this.handover = { fromId: s.id, was, requestAt: this.items.length, queued: [], noteOnly };
     try {
       await this.#write(projectId, s, chatHandoverRequest(was));
       this.busy = true;
@@ -185,12 +201,57 @@ class AgentStore {
     const note = noteAfter(this.items, h.requestAt, () =>
       itemsToMarkdown("The end of the earlier session", this.items.slice(0, h.requestAt)).slice(-6000),
     );
-    const prompt = chatResumePrompt(note, lastRequest(this.items, h.requestAt), h.was);
+    // Reopening a starred chat, nothing sent yet: the note is kept and shown for reading and editing (24s part 3).
+    if (h.noteOnly && !h.queued.length) {
+      const lines = (await api.agent.events(from.id).catch(() => [] as string[])).length;
+      keepNote(localStorage, from.id, lines, note);
+      this.handover = null;
+      this.busy = false;
+      if (this.selectedId === from.id) this.reopened = { id: from.id, was: h.was, note, lines };
+      return;
+    }
+    // A reopened chat's old last request is done or stale; the owner's new message says what comes next.
+    await this.#goOnFresh(
+      from,
+      note,
+      h.noteOnly ? "" : lastRequest(this.items, h.requestAt),
+      h.was,
+      h.queued,
+      h.requestAt,
+    );
+  }
+
+  /** Edits the note a reopened starred chat goes on from (kept with the same stamp). */
+  editReopenNote(note: string): void {
+    const r = this.reopened;
+    if (!r || r.note === null) return;
+    r.note = note;
+    keepNote(localStorage, r.id, r.lines, note);
+  }
+
+  /** "Resume as it was": the reopened chat goes on in its old session, re-reading all of it. */
+  resumeAsItWas(): void {
+    this.reopened = null;
+    this.#checkHandover();
+  }
+
+  /** The chat goes on in a new session that starts from `note`; `queued` messages join its first turn. */
+  async #goOnFresh(
+    from: Session,
+    note: string,
+    request: string,
+    was: number,
+    queued: string[],
+    requestAt = this.items.length,
+  ): Promise<void> {
+    const projectId = this.#projectId;
+    if (!projectId) return;
+    const prompt = chatResumePrompt(note, request, was);
     // The earlier part stays on screen, read only; the new session's lines follow it. Messages held for the new
     // session leave the old part: they are sent again below.
-    const held = new Set(h.queued);
+    const held = new Set(queued);
     this.items = this.items
-      .filter((i, k) => k < h.requestAt || !(i.kind === "user" && i.waiting && held.has(i.text)))
+      .filter((i, k) => k < requestAt || !(i.kind === "user" && i.waiting && held.has(i.text)))
       .map((i) => ({ ...i, older: true }));
     this.selectedId = null;
     this.providerId = from.agent;
@@ -218,7 +279,6 @@ class AgentStore {
       now.saved = !!(now.saved || from.saved);
     }
     from.saved = false;
-    const queued = h.queued;
     this.handover = null;
     // Messages written during the handover go to the new session, in order (they join its first turn).
     for (const text of queued) await this.send(projectId, text);
@@ -295,6 +355,7 @@ ${text}`
 
   newSession(): void {
     this.selectedId = null;
+    this.reopened = null;
     this.items = [];
     this.errors = [];
     this.context = 0;
@@ -312,6 +373,7 @@ ${text}`
 
   async select(id: string): Promise<void> {
     this.selectedId = id;
+    this.reopened = null;
     this.#fromHandover = false;
     this.loadGrants();
     this.errors = [];
@@ -338,7 +400,13 @@ ${text}`
         this.items = [...older, ...reduceAll(lines, parts[parts.length - 1][1])];
         this.#seq = lines.length;
         this.context = contextSize(lines);
-        this.#checkHandover();
+        // A heavy starred chat goes on fresh from a note (24s part 3); otherwise the usual handover check.
+        const now = this.selected;
+        this.reopened =
+          now && reopenFresh(now, this.context, now.id === this.planSessionId)
+            ? { id, was: this.context, note: keptNote(localStorage, id, lines.length), lines: lines.length }
+            : null;
+        if (!this.reopened) this.#checkHandover();
       }
     } catch (e) {
       this.error = errorText(e);
@@ -436,6 +504,20 @@ ${text}`
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
+    // A reopened starred chat (24s part 3): the message goes to a fresh session that starts from the note; with no
+    // note yet, the old session writes it once now and the message waits for the new session.
+    const r = this.reopened;
+    if (r && this.selectedId === r.id && !note && !before && !this.handover) {
+      const from = this.selected;
+      this.reopened = null;
+      if (from && r.note !== null) {
+        forgetNote(localStorage, r.id);
+        this.busy = true;
+        await this.#goOnFresh(from, r.note, "", r.was, [text]);
+        return true;
+      }
+      if (from) await this.handOver(true);
+    }
     // During a handover the message waits and goes to the new session (24s).
     if (this.handover && this.selectedId === this.handover.fromId && !note && !before) {
       this.handover.queued.push(text);

@@ -757,6 +757,43 @@
     </div>
   {/if}
 
+  {#if agent.reopened && agent.reopened.id === agent.selectedId && !agent.handover}
+    {@const r = agent.reopened}
+    <div class="handover-bar reopen" role="status">
+      {#if r.note === null}
+        <span
+          >Starred chat, {tokensK(r.was)} of context. Your next message starts a fresh session from a handover note (written
+          once now) instead of re-reading all of it.</span
+        >
+        <span class="handover-actions">
+          <button
+            type="button"
+            class="link"
+            title="The old session writes its note now; you can read and change it before you send"
+            onclick={() => agent.handOver(true)}>Write the note now</button
+          >
+          <button
+            type="button"
+            class="link"
+            title="The old session goes on and re-reads its whole context at each step"
+            onclick={() => agent.resumeAsItWas()}>Resume as it was</button
+          >
+        </span>
+      {:else}
+        <span>Your next message starts a fresh session from this note. Change it if anything is wrong or missing.</span>
+        <span class="handover-actions">
+          <button type="button" class="link" onclick={() => agent.resumeAsItWas()}>Resume as it was</button>
+        </span>
+        <textarea
+          class="reopen-note"
+          rows="8"
+          aria-label="Handover note"
+          value={r.note}
+          oninput={(e) => agent.editReopenNote(e.currentTarget.value)}></textarea>
+      {/if}
+    </div>
+  {/if}
+
   {#if agent.offer && !agent.handover}
     <div class="handover-bar" role="status">
       <span
@@ -1764,6 +1801,20 @@
   .handover-actions {
     display: flex;
     gap: var(--qx-space-2);
+  }
+
+  .reopen-note {
+    flex: 1 1 100%;
+    min-height: 6em;
+    max-height: 40vh;
+    resize: vertical;
+    padding: var(--qx-space-1) var(--qx-space-2);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-input);
+    background: var(--qx-bg-window);
+    color: var(--qx-text-secondary);
+    font-family: var(--qx-font-mono);
+    font-size: var(--qx-text-small);
   }
 
   .handover-line {

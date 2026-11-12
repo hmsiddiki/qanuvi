@@ -117,3 +117,37 @@ export function chatGroups<T extends { title: string; saved?: boolean }>(
   const shown = chats.filter((c) => words.every((w) => c.title.toLowerCase().includes(w)));
   return { saved: shown.filter((c) => c.saved), rest: shown.filter((c) => !c.saved) };
 }
+
+/** Below this much context a reopened starred chat simply resumes: a note would cost about what it saves. */
+export const REOPEN_FRESH_FROM = 40_000;
+
+/**
+ * Reopening a starred chat (24s part 3): a heavy one that is no longer live goes on in a fresh session from a note,
+ * not by re-reading its whole context. Plan steps and live sessions resume as they are.
+ */
+export function reopenFresh(s: { saved?: boolean; status: string }, context: number, planStep: boolean): boolean {
+  return !!s.saved && !planStep && !["running", "waiting", "idle"].includes(s.status) && context >= REOPEN_FRESH_FROM;
+}
+
+/**
+ * A note written on reopening is kept on this computer with the session's line count then: it stands for the chat
+ * only while the session has no newer lines (written once, never on every leave).
+ */
+const noteKey = (id: string) => `qanuvi.reopenNote.${id}`;
+
+export function keptNote(store: Pick<Storage, "getItem">, id: string, lines: number): string | null {
+  try {
+    const v = JSON.parse(store.getItem(noteKey(id)) ?? "null") as { lines?: unknown; note?: unknown } | null;
+    return v && v.lines === lines && typeof v.note === "string" && v.note.trim() ? v.note : null;
+  } catch {
+    return null;
+  }
+}
+
+export function keepNote(store: Pick<Storage, "setItem">, id: string, lines: number, note: string): void {
+  store.setItem(noteKey(id), JSON.stringify({ lines, note }));
+}
+
+export function forgetNote(store: Pick<Storage, "removeItem">, id: string): void {
+  store.removeItem(noteKey(id));
+}

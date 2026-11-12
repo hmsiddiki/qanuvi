@@ -263,9 +263,9 @@ runs on or off; with it off nothing is sent anywhere.
   - PUBLISHED 0.1.14 on the dev channel 2026-11-13 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24o, 24n
     part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2. Nothing unpublished now. Owner agreed 24t chat clean-up.
   - Done 2026-11-13 (later), committed, NOT published: 24t chat clean-up (see 24t "Built"). Verify green (293 + 156).
-  - RESUME HERE (new conversation): 24s part 3 (reopen a starred chat from its
-    handover note; note panel), then drive 24s part 2 and 15i part 2 in the running app on a scratch project, then
-    15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13 (later), committed, NOT published: 24s part 3 (see 24s "Built (part 3)"). Verify green (295 + 156).
+  - RESUME HERE (new conversation): drive 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
+    project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -343,6 +343,16 @@ runs on or off; with it off nothing is sent anywhere.
     session; no note yet: written once at that moment (never on every leave: that spends tokens on chats never
     opened again). The note opens in a small panel, readable and editable; the next session works from the edited
     version.
+  - Built (part 3, 2026-11-13; committed, NOT published, not driven in the window): opening a starred chat that is
+    not live (not running, waiting or idle), not a plan step and at 40k+ context (handover.ts REOPEN_FRESH_FROM;
+    below that a note costs about what it saves, so it resumes as before) shows a bar instead of the handover offer.
+    No note yet: "Write the note now" (the old session writes it once; the note then shows in an editable panel) or
+    just send (the note is written then, the message waits and goes to the new session). Note there: the panel shows
+    it; edits are kept; the next message starts a new linked session from the edited note (no stale "last request").
+    "Resume as it was" goes back to the old session. A written note is kept on this computer stamped with the
+    session's line count (keptNote / keepNote), so it is reused only while the session has no newer lines. Opening
+    a chat never spends tokens by itself (start-up restore shows the bar only). Store: agent.reopened, handOver(true)
+    (noteOnly), #goOnFresh (shared with the handover), editReopenNote, resumeAsItWas.
 - [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, built 2026-11-13)**: a
   message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
   the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the
