@@ -1195,6 +1195,29 @@ impl Agents {
         Ok(())
     }
 
+    /// Closes the agent process of sessions idle for longer than `secs`: they free their memory, and the next message
+    /// opens them again with their whole history (the agent resumes its session). Answers how many were closed.
+    pub fn close_idle(&self, db: &Db, secs: i64) -> usize {
+        let ids: Vec<String> = self
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect();
+        let mut closed = 0;
+        for id in ids {
+            if let Ok(s) = get(db, &id)
+                && s.status == "idle"
+                && now() - s.updated_at > secs
+            {
+                self.stop(&id);
+                closed += 1;
+            }
+        }
+        closed
+    }
+
     pub fn stop(&self, session_id: &str) {
         let running = self
             .map

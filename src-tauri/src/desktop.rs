@@ -342,6 +342,12 @@ fn startup_stop(state: State<AppState>, id: String) -> Vec<crate::startup::Statu
     state.startup.statuses()
 }
 
+/// What Qanuvi uses in all: itself and every process it started.
+#[tauri::command]
+fn qanuvi_usage() -> Option<crate::usage::Usage> {
+    crate::usage::usage()
+}
+
 /// Claude Code's installed and newest versions.
 #[tauri::command]
 async fn claude_versions() -> Res<crate::claude_update::Versions> {
@@ -1539,6 +1545,16 @@ pub fn run() {
                 accounts: crate::account::Accounts::default(),
                 startup: crate::startup::Startup::default(),
             });
+            // Agent processes of sessions idle for 10 minutes are closed (memory); a new message opens them again.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        state.agents.close_idle(&state.db, 600);
+                    }
+                }
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -1700,6 +1716,7 @@ pub fn run() {
             startup_stop,
             startup_headroom,
             claude_versions,
+            qanuvi_usage,
             claude_update,
             claude_settings_base_url,
             plan_private_add,

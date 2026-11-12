@@ -37,6 +37,7 @@ pub mod sink;
 pub mod startup;
 pub mod store;
 pub mod terminal;
+pub mod usage;
 
 #[cfg(feature = "desktop")]
 mod account;

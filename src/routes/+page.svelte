@@ -2,6 +2,7 @@
   import { updates } from "$lib/stores/updates.svelte";
   import { startup } from "$lib/stores/startup.svelte";
   import { claudeUpdate } from "$lib/stores/claudeUpdate.svelte";
+  import { usage } from "$lib/stores/usage.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import SettingsView from "$lib/components/SettingsView.svelte";
@@ -62,6 +63,7 @@
     updates.start();
     startup.start().catch(() => {});
     claudeUpdate.start();
+    usage.start();
     const flush = () => {
       layout.saveNow();
       workspace.flush();

@@ -5,6 +5,7 @@
    */
   import { updates } from "$lib/stores/updates.svelte";
   import { startup } from "$lib/stores/startup.svelte";
+  import { bytes, usage } from "$lib/stores/usage.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
@@ -203,6 +204,17 @@
   {/if}
 
   <span class="spacer"></span>
+
+  <!-- What Qanuvi uses in all: itself, its window's processes, the agents and start-up commands it started. -->
+  {#if usage.now}
+    <span
+      class="item static"
+      title={`Qanuvi in all (${usage.now.processes} processes):\n` +
+        usage.now.parts.map((p) => `${p.name}${p.count > 1 ? ` ×${p.count}` : ""}: ${bytes(p.memory)}`).join("\n")}
+    >
+      <span>{bytes(usage.now.memory)} · {usage.now.cpu.toFixed(0)}%</span>
+    </span>
+  {/if}
 
   <!-- Start with Qanuvi: each command's state; a click opens Settings, Start-up. -->
   {#each startup.statuses.filter((s) => s.state !== "off") as s (s.id)}
