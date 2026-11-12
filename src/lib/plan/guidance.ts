@@ -399,3 +399,36 @@ export function mergeApi(existing: string, updates: Map<string, string>): string
     ...body.flatMap((b) => [b, ""]),
   ].join("\n");
 }
+
+/**
+ * Other plans this one builds on: those its steps need ("Needs: OTHER-PLAN.md#4") and those its text names. Their
+ * knowledge is their own; a step is told where it is and reads it when it helps.
+ */
+export function referencedPlans(planText: string, planFile: string): string[] {
+  const self = planFile.replace(/\\/g, "/").toLowerCase();
+  const found = new Set<string>();
+  for (const m of planText.matchAll(/Needs:[^\n]*/gi))
+    for (const part of m[0].slice(6).split(","))
+      if (part.includes("#")) found.add(part.slice(0, part.lastIndexOf("#")).trim());
+  for (const m of planText.matchAll(/[\w./-]*(?:task[-_ ]?list|todo|plan|roadmap)[\w.-]*\.md/gi)) found.add(m[0]);
+  return [...found]
+    .map((p) => p.replace(/\\/g, "/").replace(/^\.\//, ""))
+    .filter(
+      (p) =>
+        p &&
+        p.toLowerCase() !== self &&
+        !p.toLowerCase().endsWith("/" + self) &&
+        !self.endsWith("/" + p.toLowerCase()) &&
+        !p.startsWith(".qanuvi/"),
+    );
+}
+
+/** The lines telling a step where referenced plans keep their knowledge. */
+export function referencedBlock(plans: string[]): string {
+  if (!plans.length) return "";
+  return [
+    "",
+    "Plans this one builds on keep their own knowledge (read their MAP.md, FACTS.md and API.md when the step touches their work):",
+    ...plans.slice(0, 8).map((p) => `- ${p}: ${logDir(p)}/`),
+  ].join("\n");
+}

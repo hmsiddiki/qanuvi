@@ -22,6 +22,9 @@ import {
   logPath,
   logsBlock,
   knowledgeBlock,
+  referencedBlock,
+  referencedPlans,
+  logDir,
   mapPath,
   factsPath,
   apiPath,
@@ -568,6 +571,19 @@ class RunnerStore {
     // Every step the run knows; one that turns up later was added while it ran (the user's guidance).
     const known = new Set(parsePlan(text).steps.map(stepKey));
     const reopened = new Set<string>();
+    // Plans this one builds on (needed or named) whose knowledge exists: every step is told where it is.
+    const planRefs: string[] = [];
+    for (const p of referencedPlans(text, file)) {
+      const has = await api.files.read(project.id, `${logDir(p)}/MAP.md`).then(
+        () => true,
+        () =>
+          api.files.read(project.id, `${logDir(p)}/FACTS.md`).then(
+            () => true,
+            () => false,
+          ),
+      );
+      if (has) planRefs.push(p);
+    }
     for (const stepRun of run.steps) {
       if (run.status !== "running") break;
       // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
@@ -718,6 +734,7 @@ class RunnerStore {
               .map((x) => ({ number: x.number, files: x.changed ?? [] })),
             options.indexTools,
           ) +
+          referencedBlock(planRefs) +
           "\n" +
           (resumedWith
             ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`

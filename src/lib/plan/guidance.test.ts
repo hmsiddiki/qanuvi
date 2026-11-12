@@ -185,3 +185,24 @@ describe("the plan's shared knowledge", () => {
     expect(api).toContain("CartStorage::resetCache :88");
   });
 });
+
+import { referencedBlock, referencedPlans } from "./guidance";
+
+describe("plans that build on other plans", () => {
+  it("finds the plans a plan needs or names, not itself", () => {
+    const text = [
+      "Builds on content/plugins/qcommerce/PLAN-C.md and the DEVELOPMENT-TASKLIST.md.",
+      "- [ ] **90. Hand over**",
+      "  - Needs: 89z, docs/OTHER-PLAN.md#4, docs/OTHER-PLAN.md#5",
+      "See PLAN-D.md for this plan.",
+    ].join("\n");
+    const refs = referencedPlans(text, "PLAN-D.md");
+    expect(refs.sort()).toEqual([
+      "DEVELOPMENT-TASKLIST.md",
+      "content/plugins/qcommerce/PLAN-C.md",
+      "docs/OTHER-PLAN.md",
+    ]);
+    expect(referencedBlock(["docs/OTHER-PLAN.md"])).toContain(".qanuvi/plan-logs/docs_OTHER-PLAN/");
+    expect(referencedBlock([])).toBe("");
+  });
+});
