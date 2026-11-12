@@ -16,6 +16,7 @@
   import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
   import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
+  import { finishedCost, planHistory } from "$lib/plan/costs";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
 
   interface Props {
@@ -27,11 +28,9 @@
     onclose: () => void;
     /** The plan file was changed here (the steps' models written in). */
     onchanged?: () => void;
-    /** Resume: show the run's settings (as they were) to change and start from the next open step. */
-    onresume?: () => void;
   }
 
-  let { project, file, plan, setup, onclose, onchanged, onresume }: Props = $props();
+  let { project, file, plan, setup, onclose, onchanged }: Props = $props();
 
   /** The agent for this run: any that works on this computer (Claude Code needs its command; Qanuvi's own, models). */
   let usable = $derived(
@@ -59,6 +58,9 @@
   let hasFree = $derived(settings.value.brain.models.length > 0);
   /** When the paid agent hits its usage limit. */
   let onLimit = $state<"wait" | "free">("wait");
+  /** Per step at most this much and this long (0: no limit). */
+  let stepUsd = $state(0);
+  let stepMin = $state(0);
   /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
   let carryOn = $state(true);
   let carryK = $state(150);
@@ -111,6 +113,8 @@
     forgetPrivate: boolean;
     checkFirst: boolean;
     onLimit: "wait" | "free";
+    stepUsd: number;
+    stepMin: number;
   }
   function restore(): boolean {
     try {
@@ -136,6 +140,8 @@
       if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
       if (typeof k.checkFirst === "boolean") checkFirst = k.checkFirst;
       if (k.onLimit === "wait" || k.onLimit === "free") onLimit = k.onLimit;
+      if (typeof k.stepUsd === "number") stepUsd = k.stepUsd;
+      if (typeof k.stepMin === "number") stepMin = k.stepMin;
       return true;
     } catch {
       return false;
@@ -162,6 +168,8 @@
       forgetPrivate,
       checkFirst,
       onLimit,
+      stepUsd,
+      stepMin,
     };
     localStorage.setItem(KEY(), JSON.stringify(k));
   }
@@ -261,7 +269,8 @@
       const r = await planner.ask(
         project,
         preflightPrompt(file, steps, known),
-        settings.agent(provider.id).model || defaultPlannerModel(provider),
+        // The model chosen for the run (so there is no surprise model); else the agent's default.
+        oneModel || settings.agent(provider.id).model || defaultPlannerModel(provider),
         "Before the run: what it needs",
         {
           agentId: provider.id,
@@ -344,6 +353,8 @@
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 150)) * 1000,
         waitBefore,
         onLimit,
+        stepCostLimit: Math.max(0, Number(stepUsd) || 0),
+        stepMinutes: Math.max(0, Number(stepMin) || 0),
         // Free decides, free works: the whole run goes to Qanuvi's own agent with the free models.
         ...(freeOnly && hasFree ? { providerId: "qanuvi", model: "" } : {}),
       });
@@ -354,6 +365,37 @@
 
   let run = $derived(runner.run && runner.run.projectId === project.id && runner.run.file === file ? runner.run : null);
   let totals = $derived(runner.totals);
+  /** This plan's earlier runs, to compare the cost per finished step (the aim: Qanuvi spends less). */
+  let history = $state<ReturnType<typeof planHistory> | null>(null);
+  $effect(() => {
+    void runner.changed;
+    const id = run?.id ?? "";
+    api.runs
+      .list(project.id)
+      .then((records) => (history = planHistory(records, file, id)))
+      .catch(() => (history = null));
+  });
+  let compare = $derived.by(() => {
+    if (!run) return "";
+    const now = finishedCost(run);
+    const tools = run.steps
+      .flatMap((s) => s.attempts)
+      .reduce(
+        (t, a) => ({
+          read: t.read + (a.tools?.read ?? 0),
+          change: t.change + (a.tools?.change ?? 0),
+          run: t.run + (a.tools?.run ?? 0),
+        }),
+        { read: 0, change: 0, run: 0 },
+      );
+    const parts: string[] = [];
+    if (now.steps) parts.push(`this run ${formatCost(now.cost / now.steps)} per finished step`);
+    if (history?.perStep != null) parts.push(`earlier runs ${formatCost(history.perStep)}`);
+    if (history && history.runs) parts.push(`this plan so far ${formatCost(history.cost + now.cost)}`);
+    const t = tools.read + tools.change + tools.run;
+    if (t) parts.push(`tool calls: ${tools.read} reading, ${tools.change} changing, ${tools.run} running`);
+    return parts.join(" · ");
+  });
   let saved = $derived(run ? freeSavings(run, runner.paidPerStep) : { steps: 0, estimateUsd: 0 });
   let deciderUsd = $derived((run?.deciderCalls ?? []).reduce((t, c) => t + c.costUsd, 0));
   let current = $derived(run?.steps.find((s) => s.status === "running") ?? null);
@@ -422,6 +464,13 @@
       <label>
         Budget for the run (USD, 0 = none)
         <input type="number" min="0" step="0.01" bind:value={budget} />
+      </label>
+      <label title="A step that goes over pauses the run, so a runaway step cannot eat your limit. 0: no limit.">
+        Per step at most (USD / minutes, 0 = none)
+        <span class="pair">
+          <input type="number" min="0" step="0.5" bind:value={stepUsd} />
+          <input type="number" min="0" step="5" bind:value={stepMin} />
+        </span>
       </label>
       <label>
         {strongerOnFail ? "Failed tries before a stronger model" : "Failed tries before it stops for you"}
@@ -541,6 +590,14 @@
     >
       <input type="checkbox" bind:checked={checkFirst} /> Check what the run needs from me first
     </label>
+    {#if checking}
+      <p class="hint">
+        Checking what the run needs from you: one short read-only pass on {modelLabel(
+          provider,
+          oneModel || settings.agent(provider.id).model,
+        )}, about a minute. The run starts after you answer.
+      </p>
+    {/if}
     {#if check}
       <div class="check-list">
         <strong>Before the run</strong>
@@ -596,7 +653,7 @@
 
 {#if error}<p class="error">{error}</p>{/if}
 
-{#if run}
+{#if run && !setup}
   <div class="panel status {run.status}">
     <div class="row">
       {#if run.status === "running"}
@@ -616,16 +673,6 @@
             Starting…
           {/if}
         </span>
-        <button
-          type="button"
-          class="pause"
-          disabled={runner.pausing}
-          title="Finish the step it is on, then pause; Resume lets you change the run's settings and go on"
-          onclick={() => runner.pause()}>{runner.pausing ? "Pausing after this step…" : "Pause"}</button
-        >
-        <button type="button" class="stop" title="Stop now (the step is left as it is)" onclick={() => runner.stop()}
-          ><Square size={11} /> Stop</button
-        >
       {:else}
         <span class="main">
           {run.status === "done"
@@ -641,14 +688,6 @@
           · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
           {#if run.message}<span class="dim"> · {run.message}</span>{/if}
         </span>
-        {#if run.status !== "done" && plan.steps.some((s) => s.status === " ")}
-          <button
-            type="button"
-            class="resume"
-            title="Change the run's settings if you like, then go on"
-            onclick={() => onresume?.()}>Resume</button
-          >
-        {/if}
       {/if}
     </div>
     {#if totals}
@@ -658,6 +697,9 @@
         {#each [...totals.byModel] as [model, t] (model)}
           <span class="model">{label(model)}: {t.attempts}× {formatCost(t.costUsd)}</span>
         {/each}
+        {#if compare}
+          <span class="saved compare">{compare}</span>
+        {/if}
         {#if saved.steps}
           <span class="saved"
             >Free models finished {saved.steps} step{saved.steps === 1 ? "" : "s"}{saved.estimateUsd !== null
@@ -801,6 +843,16 @@
   input.small {
     width: 64px;
     height: 24px;
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .compare {
+    color: var(--qx-text-secondary);
   }
 
   .grid.team {

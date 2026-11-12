@@ -1,5 +1,7 @@
 <script lang="ts">
   import { ask } from "$lib/stores/confirm.svelte";
+  import Pause from "@lucide/svelte/icons/pause";
+  import Square from "@lucide/svelte/icons/square";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
@@ -58,6 +60,14 @@
       tries: s.attempts.length,
       cost,
       why: s.choice ?? "",
+      tools: s.attempts.reduce(
+        (t, a) => ({
+          read: t.read + (a.tools?.read ?? 0),
+          change: t.change + (a.tools?.change ?? 0),
+          run: t.run + (a.tools?.run ?? 0),
+        }),
+        { read: 0, change: 0, run: 0 },
+      ),
     };
   }
 
@@ -85,6 +95,17 @@
   const open = new SvelteSet<number>();
 
   let plan = $derived<Plan | null>(text ? parsePlan(text) : null);
+  /** A run of this plan is going now. */
+  let thisRunning = $derived(runner.running && runner.run?.projectId === project.id && runner.run?.file === file);
+  /** The last run of this plan stopped or paused with steps still open: the button says Resume. */
+  let canResume = $derived(
+    !!runner.run &&
+      runner.run.projectId === project.id &&
+      runner.run.file === file &&
+      runner.run.status !== "done" &&
+      runner.run.status !== "running" &&
+      !!plan?.steps.some((s) => s.status === " "),
+  );
 
   const FILE_KEY = (id: string) => `qanuvi.plan.${id}`;
 
@@ -201,9 +222,30 @@
       <button type="button" class="link" onclick={() => editor.open(project.id, file)}>Open file</button>
     {/if}
     {#if file && settings.value.ai}
-      <button type="button" class="run-btn" disabled={runner.running} onclick={() => (showRun = !showRun)}>
-        <Play size={12} /> Run
-      </button>
+      {#if thisRunning}
+        <!-- Running: Pause (after the step it is on) and Stop. -->
+        <button
+          type="button"
+          class="run-btn"
+          disabled={runner.pausing}
+          title="Finish the step it is on, then pause"
+          onclick={() => runner.pause()}><Pause size={12} /> {runner.pausing ? "Pausing…" : "Pause"}</button
+        >
+        <button type="button" class="run-btn stop" title="Stop now" onclick={() => runner.stop()}
+          ><Square size={11} /> Stop</button
+        >
+      {:else}
+        <!-- Not running: Resume when the last run stopped with steps left, else Run; both open the run's settings. -->
+        <button
+          type="button"
+          class="run-btn"
+          disabled={runner.running}
+          title={canResume
+            ? "Go on from the next open step (the settings open as they were, to change if you like)"
+            : "Run the plan"}
+          onclick={() => (showRun = !showRun)}><Play size={12} /> {canResume ? "Resume" : "Run"}</button
+        >
+      {/if}
     {/if}
     {#if settings.value.ai}
       <IconButton
@@ -242,15 +284,7 @@
         {/if}
       </div>
     {:else if plan}
-      <RunPanel
-        {project}
-        {file}
-        {plan}
-        setup={showRun}
-        onclose={() => (showRun = false)}
-        onchanged={load}
-        onresume={() => (showRun = true)}
-      />
+      <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} onchanged={load} />
       {#each plan.sections.filter((s) => s.steps.length) as section (section.line)}
         {@const total = section.steps.length}
         {@const finished = done(section.steps)}
@@ -320,6 +354,8 @@
                     class="run-chip {info.status}"
                     title="{info.tries} tr{info.tries === 1 ? 'y' : 'ies'} in the run{info.why
                       ? ` · started on this model: ${info.why}`
+                      : ''}{info.tools.read + info.tools.change + info.tools.run
+                      ? ` · tool calls: ${info.tools.read} reading, ${info.tools.change} changing, ${info.tools.run} running`
                       : ''}"
                   >
                     {modelLabel(agent.provider, info.model)}{info.status === "running" ? " …" : ""} · {formatCost(
@@ -427,6 +463,10 @@
     font: inherit;
     font-size: var(--qx-text-small);
     cursor: pointer;
+  }
+
+  .run-btn.stop {
+    background: var(--qx-status-failed);
   }
 
   .run-btn:disabled {

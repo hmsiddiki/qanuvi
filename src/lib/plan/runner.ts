@@ -39,6 +39,9 @@ export interface RunOptions {
   strongerOnFail?: boolean;
   /** The Team mode for this run (the same choices as Settings, Team); missing: the Settings choice. */
   teamMode?: import("$lib/core/decider").TeamMode;
+  /** A step may cost at most this much (US dollars) and run this many minutes; 0 or missing: no limit. */
+  stepCostLimit?: number;
+  stepMinutes?: number;
   /** When the paid agent hits its usage limit: wait for the reset and go on, or let free models work until then. */
   onLimit?: "wait" | "free";
   /** Steps the run pauses before (risky ones the owner wants to see, or a question left open), with why (24i). */
@@ -87,6 +90,8 @@ export interface Attempt {
   testRuns?: number;
   /** Whether the last test run passed; null when Qanuvi did not run them. */
   testsPassed?: boolean | null;
+  /** What its tool calls were for: reading, changing files, running commands. */
+  tools?: import("./costs").ToolKinds;
   /** The last test failures sent to the agent (for the planner when the step is rewritten). */
   failure?: string;
 }

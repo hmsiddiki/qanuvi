@@ -30,7 +30,8 @@ export function preflightPrompt(
     )
     .join("\n");
   return [
-    `Before an unattended run of ${file}, read these open steps (and the code only where you must, read-only) and list`,
+    `Before an unattended run of ${file}, read these open steps (and the code only where you must, read-only: at most`,
+    "about ten quick looks; this check should take a minute or two, not a step's work) and list",
     "what the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.",
     "",
     "Already known:",

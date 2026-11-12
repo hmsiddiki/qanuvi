@@ -7,6 +7,7 @@ import { api, errorText, type AgentEvent, type Project, type Session } from "$li
 import { reduceAll } from "$lib/agent/events";
 import { waitsBefore } from "$lib/plan/preflight";
 import { isLimit, limitResetAt } from "$lib/plan/limits";
+import { overLimit, toolKinds } from "$lib/plan/costs";
 import {
   addedSteps,
   canCarry,
@@ -173,6 +174,7 @@ class RunnerStore {
           .catch(() => {});
     }
     const lines = a.sessionId ? await api.agent.events(a.sessionId).catch(() => [] as string[]) : [];
+    a.tools = toolKinds(lines);
     const texts = reduceAll(lines)
       .filter((i) => i.kind === "text")
       .map((i) => (i as { text: string }).text);
@@ -366,6 +368,13 @@ class RunnerStore {
     if (this.#carry) await api.agent.stop(this.#carry.sessionId).catch(() => {});
     this.#carry = null;
   }
+
+  /** The step's limits and what it had spent before this attempt (the watchdog's view). */
+  #limits: { usd?: number; minutes?: number } = {};
+  #stepSpentBefore = 0;
+  #attemptBase = 0;
+  #stepStartedAt = Date.now();
+  #overLimit: string | null = null;
 
   /** A model the user picked for the step running now. */
   #liveModel: string | null = null;
@@ -752,7 +761,7 @@ class RunnerStore {
         if (rejected)
           prompt += `\n\nA free model already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
         const before = isFree(model) ? await this.#snapshot(project) : null;
-        if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh), testCommand);
+        if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh, file), testCommand);
         // Same model, same section, still small: the step continues the last step's session (it knows the work).
         const section = fresh.section ?? "";
         const carryOn =
@@ -767,6 +776,12 @@ class RunnerStore {
         if (!carryOn) await this.#dropCarry();
         const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
         const stepStarted = Date.now() - 2000;
+        // The step's limits: what earlier attempts of it spent counts too.
+        if (!stepRun.attempts.length) this.#stepStartedAt = Date.now();
+        this.#stepSpentBefore = stepRun.attempts.reduce((t, a) => t + a.costUsd, 0);
+        this.#attemptBase = resume?.base.cost ?? 0;
+        this.#limits = { usd: options.stepCostLimit, minutes: options.stepMinutes };
+        this.#overLimit = null;
         const attempt = await this.#attempt(
           project,
           prompt,
@@ -785,6 +800,20 @@ class RunnerStore {
         stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
         await this.#logAttempt(project, file, stepRun, attempt);
         // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
+        // Over the step's limits: the run pauses and says so (Resume to go on, maybe with other limits or a model).
+        if (this.#overLimit) {
+          const why = this.#overLimit;
+          this.#overLimit = null;
+          await this.#dropCarry();
+          stepRun.attempts.push(attempt);
+          stepRun.status = "waiting";
+          this.#finish(
+            run,
+            "paused",
+            `Step ${stepRun.number ?? stepRun.title} was paused: ${why}. Resume to go on (raise the limit or choose another model).`,
+          );
+          break;
+        }
         if (attempt.outcome === "error" || attempt.outcome === "open") {
           const resetAt = await this.#limitReset(attempt);
           if (resetAt) {
@@ -1106,11 +1135,15 @@ class RunnerStore {
   }
 
   /** Where the code the step mentions is (from the index): one line per definition, outlines of its files. */
-  async #context(project: Project, step: Step): Promise<string> {
+  async #context(project: Project, step: Step, planFile = ""): Promise<string> {
     const m = mentions([step.title, step.note, ...step.details].join("\n"));
     const defs: Location[] = [];
+    // The plan's own folder only (a plugin's plan means the plugin's code), and never vendor code.
+    const home = planFile.includes("/") ? planFile.slice(0, planFile.lastIndexOf("/") + 1) : "";
+    const vendor = /(^|\/)(vendor|node_modules|tinymce|dist|build|third[-_]?party)\/|\.min\.js$/i;
     for (const name of m.names.slice(0, 8)) {
-      const hits = await api.index.find(project.id, name).catch(() => []);
+      const found = (await api.index.find(project.id, name).catch(() => [])).filter((h) => !vendor.test(h.path));
+      const hits = home ? found.filter((h) => h.path.startsWith(home)) : found;
       const exact = hits.filter((h) => h.name === name);
       for (const h of (exact.length ? exact : hits.slice(0, 1)).slice(0, 2)) defs.push(h);
     }
@@ -1151,6 +1184,18 @@ class RunnerStore {
         resolve({ sessionId: id, last, outcome, note });
       };
       this.#endTurn = () => finish("stopped");
+      // The step's limits (cost and time): checked while the turn runs; over them, the turn stops and the run asks.
+      const guard = setInterval(() => {
+        if (settled) return clearInterval(guard);
+        const spent = this.#stepSpentBefore + Math.max(0, (last?.cost_usd ?? 0) - this.#attemptBase);
+        const why = overLimit(spent, (Date.now() - this.#stepStartedAt) / 60_000, this.#limits);
+        if (why) {
+          clearInterval(guard);
+          this.#overLimit = why;
+          if (id) api.agent.stop(id).catch(() => {});
+          finish("stopped");
+        }
+      }, 15_000);
       const onEvent = (event: AgentEvent) => {
         show(event);
         if (event.kind === "session") {
