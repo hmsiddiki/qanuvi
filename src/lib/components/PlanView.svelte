@@ -45,6 +45,11 @@
   import { formatCost } from "$lib/agent/events";
 
   let showRun = $state(false);
+  /** The steps shown under the open start panel anyway ("Show steps"); folded again each time it opens. */
+  let peekSteps = $state(false);
+  $effect(() => {
+    if (showRun) peekSteps = false;
+  });
   // The plan's last run (also after a restart): the button says Resume, and a run paused in a step goes on in it.
   $effect(() => {
     if (file) void runner.restoreLast(project, file);
@@ -296,112 +301,131 @@
       </div>
     {:else if plan}
       <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} onchanged={load} />
-      {#each plan.sections.filter((s) => s.steps.length) as section (section.line)}
-        {@const total = section.steps.length}
-        {@const finished = done(section.steps)}
-        <section>
-          <h3>
-            <span>{section.title || "Steps"}</span>
-            <span class="count">{finished}/{total}</span>
-          </h3>
-          <div class="progress"><span style:width="{(finished / total) * 100}%"></span></div>
-          {#each section.steps.filter(visible) as step (step.line)}
-            {@const info = stepRunInfo(step)}
-            <div class="step" class:expanded={open.has(step.line)}>
-              <div class="row">
-                <button
-                  type="button"
-                  class="status s{step.status === ' '
-                    ? 'open'
-                    : step.status === '-'
-                      ? 'doing'
-                      : step.status === 'x'
-                        ? 'done'
-                        : 'blocked'}"
-                  class:working={(runner.running &&
-                    runner.run?.file === file &&
-                    runner.run.steps.some(
-                      (r) => r.status === "running" && r.number === step.number && r.title === step.title,
-                    )) ||
-                    (!!step.number &&
-                      agent.sessions.some(
-                        (x) =>
-                          x.project_id === project.id &&
-                          ["running", "waiting"].includes(x.status) &&
-                          x.title.startsWith(`Step ${step.number}:`),
-                      ))}
-                  title="{STATUS_LABELS[step.status]} (click to change)"
-                  aria-label="Status: {STATUS_LABELS[step.status]}"
-                  onclick={() => cycleStatus(step)}
-                ></button>
-                <button
-                  type="button"
-                  class="toggle"
-                  aria-label={open.has(step.line) ? "Hide details" : "Show details"}
-                  onclick={() => (open.has(step.line) ? open.delete(step.line) : open.add(step.line))}
-                >
-                  {#if open.has(step.line)}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
-                </button>
-                {#if step.number}<span class="num">{step.number}</span>{/if}
-                {#if editing === step.line}
-                  <!-- svelte-ignore a11y_autofocus -->
-                  <input
-                    class="title-edit"
-                    bind:value={editText}
-                    autofocus
-                    onkeydown={(e) => {
-                      if (e.key === "Enter") finishEdit(step, true);
-                      if (e.key === "Escape") finishEdit(step, false);
-                    }}
-                    onblur={() => finishEdit(step, true)}
-                  />
-                {:else}
-                  <button type="button" class="title" title="Double-click to rename" ondblclick={() => startEdit(step)}>
-                    {step.title}
-                  </button>
-                {/if}
-                {#if info}
-                  <span
-                    class="run-chip {info.status}"
-                    title="{info.tries} tr{info.tries === 1 ? 'y' : 'ies'} in the run{info.why
-                      ? ` · started on this model: ${info.why}`
-                      : ''}{info.tools.read + info.tools.change + info.tools.run
-                      ? ` · tool calls: ${info.tools.read} reading, ${info.tools.change} changing, ${info.tools.run} running`
-                      : ''}"
+      {#if showRun}
+        <!-- The start panel has the screen; the steps wait under one line (a range may need their numbers). -->
+        {@const all = plan.sections.flatMap((s) => s.steps)}
+        <div class="steps-hidden">
+          {all.length} steps · {all.length - done(all)} open
+          <button type="button" class="link" onclick={() => (peekSteps = !peekSteps)}
+            >{peekSteps ? "Hide steps" : "Show steps"}</button
+          >
+        </div>
+      {/if}
+      <div class="steps" hidden={showRun && !peekSteps}>
+        {#each plan.sections.filter((s) => s.steps.length) as section (section.line)}
+          {@const total = section.steps.length}
+          {@const finished = done(section.steps)}
+          <section>
+            <h3>
+              <span>{section.title || "Steps"}</span>
+              <span class="count">{finished}/{total}</span>
+            </h3>
+            <div class="progress"><span style:width="{(finished / total) * 100}%"></span></div>
+            {#each section.steps.filter(visible) as step (step.line)}
+              {@const info = stepRunInfo(step)}
+              <div class="step" class:expanded={open.has(step.line)}>
+                <div class="row">
+                  <button
+                    type="button"
+                    class="status s{step.status === ' '
+                      ? 'open'
+                      : step.status === '-'
+                        ? 'doing'
+                        : step.status === 'x'
+                          ? 'done'
+                          : 'blocked'}"
+                    class:working={(runner.running &&
+                      runner.run?.file === file &&
+                      runner.run.steps.some(
+                        (r) => r.status === "running" && r.number === step.number && r.title === step.title,
+                      )) ||
+                      (!!step.number &&
+                        agent.sessions.some(
+                          (x) =>
+                            x.project_id === project.id &&
+                            ["running", "waiting"].includes(x.status) &&
+                            x.title.startsWith(`Step ${step.number}:`),
+                        ))}
+                    title="{STATUS_LABELS[step.status]} (click to change)"
+                    aria-label="Status: {STATUS_LABELS[step.status]}"
+                    onclick={() => cycleStatus(step)}
+                  ></button>
+                  <button
+                    type="button"
+                    class="toggle"
+                    aria-label={open.has(step.line) ? "Hide details" : "Show details"}
+                    onclick={() => (open.has(step.line) ? open.delete(step.line) : open.add(step.line))}
                   >
-                    {modelLabel(agent.provider, info.model)}{info.status === "running" ? " …" : ""} · {formatCost(
-                      info.cost,
-                    )}
-                  </span>
-                {/if}
-                <select
-                  class="model"
-                  value={step.model ?? ""}
-                  title="Model for this step"
-                  onchange={(e) =>
-                    apply((t) => setStepModel(t, step.line, (e.target as HTMLSelectElement).value || null, step.title))}
-                >
-                  <option value="">Default model</option>
-                  {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
-                  {#if step.model && !agent.provider.models.some((m) => m.id === step.model)}
-                    <option value={step.model}>{step.model}</option>
-                  {/if}
-                </select>
-              </div>
-              {#if step.note}<p class="note">{step.note}</p>{/if}
-              {#if open.has(step.line)}
-                <div class="details">
-                  {#each step.details as d, i (i)}<div>{d}</div>{/each}
-                  {#if step.details.length === 0}<div class="muted">No details.</div>{/if}
-                  <button type="button" class="link" onclick={() => editor.open(project.id, file, step.line + 1)}>
-                    Show in the file
+                    {#if open.has(step.line)}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
                   </button>
+                  {#if step.number}<span class="num">{step.number}</span>{/if}
+                  {#if editing === step.line}
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <input
+                      class="title-edit"
+                      bind:value={editText}
+                      autofocus
+                      onkeydown={(e) => {
+                        if (e.key === "Enter") finishEdit(step, true);
+                        if (e.key === "Escape") finishEdit(step, false);
+                      }}
+                      onblur={() => finishEdit(step, true)}
+                    />
+                  {:else}
+                    <button
+                      type="button"
+                      class="title"
+                      title="Double-click to rename"
+                      ondblclick={() => startEdit(step)}
+                    >
+                      {step.title}
+                    </button>
+                  {/if}
+                  {#if info}
+                    <span
+                      class="run-chip {info.status}"
+                      title="{info.tries} tr{info.tries === 1 ? 'y' : 'ies'} in the run{info.why
+                        ? ` · started on this model: ${info.why}`
+                        : ''}{info.tools.read + info.tools.change + info.tools.run
+                        ? ` · tool calls: ${info.tools.read} reading, ${info.tools.change} changing, ${info.tools.run} running`
+                        : ''}"
+                    >
+                      {modelLabel(agent.provider, info.model)}{info.status === "running" ? " …" : ""} · {formatCost(
+                        info.cost,
+                      )}
+                    </span>
+                  {/if}
+                  <select
+                    class="model"
+                    value={step.model ?? ""}
+                    title="Model for this step"
+                    onchange={(e) =>
+                      apply((t) =>
+                        setStepModel(t, step.line, (e.target as HTMLSelectElement).value || null, step.title),
+                      )}
+                  >
+                    <option value="">Default model</option>
+                    {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
+                    {#if step.model && !agent.provider.models.some((m) => m.id === step.model)}
+                      <option value={step.model}>{step.model}</option>
+                    {/if}
+                  </select>
                 </div>
-              {/if}
-            </div>
-          {/each}
-        </section>
-      {/each}
+                {#if step.note}<p class="note">{step.note}</p>{/if}
+                {#if open.has(step.line)}
+                  <div class="details">
+                    {#each step.details as d, i (i)}<div>{d}</div>{/each}
+                    {#if step.details.length === 0}<div class="muted">No details.</div>{/if}
+                    <button type="button" class="link" onclick={() => editor.open(project.id, file, step.line + 1)}>
+                      Show in the file
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </section>
+        {/each}
+      </div>
     {/if}
   </div>
 </div>
@@ -535,6 +559,14 @@
     margin-bottom: var(--qx-space-4);
   }
 
+  .steps-hidden {
+    display: flex;
+    gap: var(--qx-space-2);
+    align-items: center;
+    margin: var(--qx-space-2) 0;
+    color: var(--qx-text-muted);
+    font-size: var(--qx-text-small);
+  }
   h3 {
     display: flex;
     justify-content: space-between;
