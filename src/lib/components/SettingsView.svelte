@@ -23,6 +23,8 @@
   import AppearanceSettings from "./AppearanceSettings.svelte";
   import UpdatesSettings from "./UpdatesSettings.svelte";
   import StartupSettings from "./StartupSettings.svelte";
+  import BackupsSettings from "./BackupsSettings.svelte";
+  import DatabaseBackup from "@lucide/svelte/icons/database-backup";
   import Power from "@lucide/svelte/icons/power";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import LayoutPanelLeft from "@lucide/svelte/icons/layout-panel-left";
@@ -58,6 +60,12 @@
       label: "Memory",
       icon: Brain,
       words: "memory entries preferences facts memory disk sync passphrase",
+    },
+    {
+      id: "backups",
+      label: "Backups",
+      icon: DatabaseBackup,
+      words: "backup back up restore daily copy lost data sessions settings folder drive",
     },
     { id: "account", label: "Account", icon: UserRound, words: "sign in qanuvi account email" },
     {
@@ -164,6 +172,8 @@
         <MastersView />
       {:else if tab === "memory"}
         <MemoryView />
+      {:else if tab === "backups"}
+        <BackupsSettings />
       {:else if tab === "account"}
         <AccountView />
       {:else if tab === "layout"}

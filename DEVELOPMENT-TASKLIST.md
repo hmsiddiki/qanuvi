@@ -84,12 +84,20 @@ runs on or off; with it off nothing is sent anywhere.
   by trying a change (QANUVI_SHARED_DATA=1 turns this off). Live: installed copy and test build open side by side.
   Fixed 2026-11-12: the window storage (WebView2) of a test build is now its own too; before, it opened the installed
   copy's folder, so both shared settings, and a test build with the debug port could not start beside it.
-- [ ] **1d. Automatic backups and restore (owner, 2026-11-11)**: the owner lost his sessions, memory and settings
-  when the uninstaller's "Delete the application data" box was ticked (it deletes for good). Done: the box now says
-  "Also delete my Qanuvi data (sessions, memory, settings, model list). This cannot be undone." To do: a daily backup
-  of the database (a consistent copy while Qanuvi runs), brain.json and the window's settings into a folder the user
-  chooses (another drive is best), the last 7 kept; Settings → Backups: folder, last backup, back up now, restore a
-  backup (applied at the next start, the current data kept beside it).
+- [x] **1d. Automatic backups and restore (owner, 2026-11-11; done 2026-11-12)**: the owner lost his sessions, memory
+  and settings when the uninstaller's "Delete the application data" box was ticked (it deletes for good). The box now
+  says "Also delete my Qanuvi data (sessions, memory, settings, model list). This cannot be undone." Done (backups.rs):
+  a daily backup (checked 2 minutes after start, then hourly) of the database (VACUUM INTO from a read-only
+  connection, checked with quick_check), the other data files (brain.json, agent histories, MCP configs, device file)
+  and the window's settings (WebView2 Local Storage). It goes to "Documents\Qanuvi backups" by default, so removing the
+  app's data never takes the backups with it (a test build uses "Qanuvi backups (test build)" and never takes the
+  installed copy's backups settings). A backup is built under a hidden name and renamed when whole. The last 7 daily
+  and manual backups are kept; a before-restore copy stays until removed. Settings → Backups: on/off, folder (a hint
+  when it is on the data's drive), last backup or the last error, Back up now, and a list with Restore… and Remove….
+  A restore is booked in the pointer file and applied at the next start before anything opens; the data in use is
+  backed up first as a "before restore" backup, which can be restored back. A move and a restore cannot both be
+  booked. Live on the test build: the daily backup ran on time (20 files, window settings in), and the restore across
+  a restart brought it back and kept the data from before. For the owner's review: the Backups page by mouse.
 - [x] **15j. Messages while the agent works (owner, 2026-11-12)**: the box sends while a task runs (Send beside Stop);
   the message joins the task and the agent reads it before its next step (Claude Code takes it mid-turn, Qanuvi's own
   agent adds it to the conversation before each step). It shows "Added while it worked". Live: Claude Code followed a
@@ -175,7 +183,7 @@ runs on or off; with it off nothing is sent anywhere.
     CI green on all three platforms (run 43146222756, commit 54cf0f5). Both fixes are unpublished, like the winget one.
   - Committed after 0.1.11, not published yet: the Update Claude Code button also works for winget installs (runs
     winget upgrade). Publish it with the next batch, after asking the owner.
-  - Next, in the order agreed: (1) the Linux culprit (done); (2) 1d automatic backups and restore; (3) 24j plan housekeeping
+  - Next, in the order agreed: (1) the Linux culprit (done); (2) 1d automatic backups and restore (done, unpublished); (3) 24j plan housekeeping
     (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
     OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6

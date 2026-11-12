@@ -1158,6 +1158,127 @@ async fn data_location_remove_old() -> Res<()> {
     .await
 }
 
+/// Backups (1d): where they go, whether daily backups are on, the last one, the list, and a restore booked.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupsInfo {
+    data: String,
+    dir: String,
+    default_dir: String,
+    custom: bool,
+    off: bool,
+    last_at: u64,
+    last_error: Option<String>,
+    keep: usize,
+    restore: Option<String>,
+    backups: Vec<crate::backups::Entry>,
+}
+
+fn backups_webview() -> Option<std::path::PathBuf> {
+    crate::data_location::Defaults::real().webview_for(&crate::paths::data_dir())
+}
+
+#[tauri::command]
+async fn backups_info() -> Res<BackupsInfo> {
+    blocking(|| {
+        let data = crate::paths::data_dir();
+        let test = crate::data_location::from_source();
+        let c = crate::backups::read_config(&data);
+        let dir = crate::backups::folder(&data, test);
+        let loc = crate::data_location::read(&crate::data_location::Defaults::real().base);
+        let s = |p: &std::path::Path| p.to_string_lossy().into_owned();
+        Ok(BackupsInfo {
+            data: s(&data),
+            dir: s(&dir),
+            default_dir: s(&crate::backups::default_dir(test)),
+            custom: c.dir.is_some(),
+            off: c.off,
+            last_at: c.last_at,
+            last_error: c.last_error,
+            keep: crate::backups::KEEP,
+            restore: loc.restore.as_deref().map(s),
+            backups: crate::backups::list(&dir),
+        })
+    })
+    .await
+}
+
+/// Sets the backups folder (empty: the default one) and whether daily backups run.
+#[tauri::command]
+async fn backups_set(folder: String, off: bool) -> Res<()> {
+    blocking(move || {
+        let data = crate::paths::data_dir();
+        let mut c = crate::backups::read_config(&data);
+        let folder = folder.trim();
+        c.dir = if folder.is_empty() {
+            None
+        } else {
+            let p = std::path::PathBuf::from(folder);
+            if !p.is_absolute() {
+                return Err("Choose a full folder path.".into());
+            }
+            if p.starts_with(&data) {
+                return Err("The backups folder cannot be inside Qanuvi's data folder.".into());
+            }
+            std::fs::create_dir_all(&p)
+                .map_err(|e| format!("{} cannot be created: {e}", p.display()))?;
+            Some(p)
+        };
+        c.off = off;
+        crate::backups::write_config(&data, &c)
+    })
+    .await
+}
+
+/// Backs up now. Answers the new backup's folder.
+#[tauri::command]
+async fn backups_now() -> Res<String> {
+    blocking(|| {
+        let web = backups_webview();
+        crate::backups::run_due(
+            &crate::paths::data_dir(),
+            web.as_deref(),
+            crate::data_location::from_source(),
+            true,
+        )?
+        .map(|p| p.to_string_lossy().into_owned())
+        .ok_or_else(|| "No backup was made.".to_string())
+    })
+    .await
+}
+
+/// Books a backup to be restored at the next start (the window asked the user first).
+#[tauri::command]
+async fn backups_restore(path: String) -> Res<()> {
+    blocking(move || {
+        let data = crate::paths::data_dir();
+        crate::backups::plan_restore(
+            &crate::data_location::Defaults::real().base,
+            &crate::backups::folder(&data, crate::data_location::from_source()),
+            std::path::Path::new(&path),
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+fn backups_cancel_restore() -> Res<()> {
+    crate::backups::cancel_restore(&crate::data_location::Defaults::real().base)
+}
+
+/// Removes one backup (the window asked the user first).
+#[tauri::command]
+async fn backups_remove(path: String) -> Res<()> {
+    blocking(move || {
+        let data = crate::paths::data_dir();
+        crate::backups::remove(
+            &crate::backups::folder(&data, crate::data_location::from_source()),
+            std::path::Path::new(&path),
+        )
+    })
+    .await
+}
+
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
 #[tauri::command]
 fn app_restart(app: tauri::AppHandle) -> Res<()> {
@@ -1526,6 +1647,15 @@ pub fn run() {
         eprintln!("{note}");
     }
     let data = crate::data_location::resolve(&defaults);
+    // A restore booked in Settings, Backups: applied now, before the database and the window open.
+    if let Some(note) = crate::backups::apply_pending(
+        &defaults.base,
+        &data,
+        defaults.webview_for(&data).as_deref(),
+        crate::data_location::from_source(),
+    ) {
+        eprintln!("{note}");
+    }
     // A test build sets it always: WebView2's own default is the installed copy's folder (named after the app id),
     // which a test build must never share.
     if (data != defaults.base || crate::data_location::from_source())
@@ -1556,6 +1686,24 @@ pub fn run() {
                 remotes: crate::remote::Remotes::default(),
                 accounts: crate::account::Accounts::default(),
                 startup: crate::startup::Startup::default(),
+            });
+            // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
+            // when the last good one is a day old.
+            let backup_dir = dir.clone();
+            let backup_web = crate::data_location::Defaults::real().webview_for(&dir);
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(120));
+                loop {
+                    if let Err(e) = crate::backups::run_due(
+                        &backup_dir,
+                        backup_web.as_deref(),
+                        crate::data_location::from_source(),
+                        false,
+                    ) {
+                        eprintln!("Backup failed: {e}");
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(3600));
+                }
             });
             // Agent processes of sessions idle for 10 minutes are closed (memory); a new message opens them again.
             let handle = app.handle().clone();
@@ -1632,6 +1780,12 @@ pub fn run() {
             data_location_move,
             data_location_cancel,
             data_location_remove_old,
+            backups_info,
+            backups_set,
+            backups_now,
+            backups_restore,
+            backups_cancel_restore,
+            backups_remove,
             app_restart,
             setup_tools,
             setup_install,

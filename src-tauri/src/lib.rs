@@ -5,6 +5,7 @@ pub mod agent;
 pub mod agent_config;
 pub mod agent_tools;
 pub mod attachments;
+pub mod backups;
 pub mod brain;
 pub mod brief;
 pub mod browser;

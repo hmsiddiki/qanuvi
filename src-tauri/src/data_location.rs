@@ -28,7 +28,10 @@ pub struct Location {
     /// The old copy of the window's storage (Windows), removed with `old`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub old_webview: Option<PathBuf>,
-    /// What happened at the last start (a finished or failed move), shown once.
+    /// A backup to restore at the next start (1d, `backups::apply_pending`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore: Option<PathBuf>,
+    /// What happened at the last start (a finished or failed move or restore), shown once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
@@ -88,6 +91,8 @@ pub fn seed_from_installed(test: &Defaults, installed: &Defaults) -> Option<Stri
     };
     // The installed copy's pointer (a custom data folder) is not this build's: this build stays in its own folder.
     let _ = std::fs::remove_file(test.base.join(POINTER));
+    // Nor its backups settings: a test build backs up into its own folder, never pruning the installed copy's backups.
+    let _ = std::fs::remove_file(test.base.join("backups.json"));
     Some(match data.and(web) {
         Ok(()) => format!(
             "This test build keeps its own data, started as a copy of {}.",
@@ -456,6 +461,9 @@ pub fn plan_move(d: &Defaults, current: &Path, chosen: &Path) -> Result<PathBuf,
         ));
     }
     let mut loc = read(base);
+    if loc.restore.is_some() {
+        return Err("A backup is booked to be restored; cancel that first.".into());
+    }
     loc.pending = Some(target.clone());
     loc.note = None;
     write(base, &loc)?;
