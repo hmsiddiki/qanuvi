@@ -273,6 +273,8 @@
   /** The model at work, as the agent named it (Qanuvi's brain names each pick and handover). */
   let working = $derived(currentModel(agent.items));
   /** Messages sent while the agent works that it has not read yet (24r): shown above the box, not in the timeline. */
+  /** A waiting message the agent took in only after its turn ended: it is reading it in a turn of its own. */
+  let readingNow = $derived(agent.items.some((i) => i.kind === "user" && i.waiting === "turn" && !i.older));
   let waitingMsgs = $derived(
     running
       ? agent.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user" && !!i.waiting && !i.older)
@@ -827,9 +829,12 @@
         <span
           >{agent.handover
             ? "Waiting · goes to the new session once the handover is done"
-            : `Waiting · the agent reads ${waitingMsgs.length === 1 ? "it" : "them"} after the current step`}</span
+            : readingNow
+              ? "Reading it now · the turn had ended, so it started a turn of its own"
+              : `Waiting · the agent reads ${waitingMsgs.length === 1 ? "it" : "them"} after the current step`}</span
         >
-        {#if session && session.agent !== "qanuvi" && !agent.handover}
+        <!-- Only while a message still waits behind the step in hand: stopping a turn that reads it would undo it. -->
+        {#if session && session.agent !== "qanuvi" && !agent.handover && waitingMsgs.some((m) => m.waiting === "held" || m.waiting === "sent")}
           <button
             type="button"
             class="link"
@@ -840,7 +845,42 @@
           >
         {/if}
       </div>
-      {#each waitingMsgs as m (m.id)}<div class="waiting-msg" title={m.text}>{m.text}</div>{/each}
+      {#each waitingMsgs as m (m.id)}
+        <div class="waiting-row">
+          <div
+            class="waiting-msg"
+            title={m.waiting === "held"
+              ? m.text
+              : `${m.text}
+
+With the agent now: a message it has cannot be taken back.`}
+          >
+            {m.text}
+          </div>
+          {#if m.waiting === "held"}
+            <span class="waiting-actions">
+              <span class="hold">sends in a few seconds</span>
+              <button type="button" class="link" onclick={() => agent.sendHeld(m.id)}>Send now</button>
+              <button
+                type="button"
+                class="link"
+                title="Drop it: the agent never sees it"
+                onclick={() => agent.dropHeld(m.id)}>Don't send</button
+              >
+            </span>
+          {:else if m.waiting === "turn" && session && session.agent !== "qanuvi"}
+            <span class="waiting-actions">
+              <button
+                type="button"
+                class="link"
+                disabled={agent.interrupting}
+                title="The agent already has it: this stops the turn it started for it, and your next message tells the agent to leave it"
+                onclick={() => agent.withdraw(m.id)}>Don't send</button
+              >
+            </span>
+          {/if}
+        </div>
+      {/each}
     </div>
   {/if}
   <form class="composer" class:dropping onsubmit={send} bind:this={composer}>
@@ -1053,10 +1093,14 @@
             >
           </span>
         {/if}
-        {#if item.during}<span class="during" title="Sent while the agent was working; it reads it before its next step"
-            >Added while it worked</span
+        {#if item.withdrawn}<span
+            class="during"
+            title="Its turn was stopped; your next message tells the agent to leave it">Withdrawn</span
+          >{:else if item.during}<span
+            class="during"
+            title="Sent while the agent was working; it reads it before its next step">Added while it worked</span
           >{/if}
-        {item.text}
+        {#if item.withdrawn}<s>{item.text}</s>{:else}{item.text}{/if}
         {#if item.images?.length}
           <div class="chips">
             {#each item.images as image, i (i)}<ChatImage {image} />{/each}
@@ -1855,7 +1899,27 @@
     white-space: pre-wrap;
   }
 
+  .waiting-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--qx-space-2);
+  }
+
+  .waiting-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: baseline;
+    gap: var(--qx-space-2);
+    font-size: 11px;
+  }
+
+  .waiting-actions .hold {
+    color: var(--qx-text-muted);
+  }
+
   .waiting-msg {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     color: var(--qx-text);
     text-overflow: ellipsis;

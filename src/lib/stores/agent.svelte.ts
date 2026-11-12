@@ -1,5 +1,7 @@
 import { api, errorText, type AgentEvent, type AgentInfo, type Attachment, type Grant, type Session } from "$lib/api";
+import { untrack } from "svelte";
 import { reduce, reduceAll, type Item } from "$lib/agent/events";
+import { HOLD_MS, withdrawnNote } from "$lib/agent/waiting";
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 import { settings } from "./settings.svelte";
@@ -53,6 +55,10 @@ class AgentStore {
   turnsEnded = $state(0);
   #projectId: string | null = null;
   #seq = 0;
+  /** Messages sent while the agent works, kept back for a few seconds (24r): by their item id. */
+  #held = new Map<string, { projectId: string; text: string; timer: ReturnType<typeof setTimeout> }>();
+  /** Per session: messages withdrawn after the agent had them; its next message tells it to leave them. */
+  #withdrawn = new Map<string, string[]>();
 
   get provider(): AgentProvider {
     return providerById(this.providerId);
@@ -354,6 +360,7 @@ ${text}`
   }
 
   newSession(): void {
+    this.#flushHeld();
     this.selectedId = null;
     this.reopened = null;
     this.items = [];
@@ -372,6 +379,7 @@ ${text}`
   }
 
   async select(id: string): Promise<void> {
+    this.#flushHeld();
     this.selectedId = id;
     this.reopened = null;
     this.#fromHandover = false;
@@ -467,6 +475,8 @@ ${text}`
           }
           this.busy = false;
           this.turnsEnded++;
+          // The turn ended while a message was kept back: it goes now, as the next message.
+          if (event.session.id === this.selectedId && event.session.status !== "failed") this.#flushHeld();
         }
         return;
       }
@@ -500,7 +510,13 @@ ${text}`
    * `note`: words Qanuvi adds for the agent after the user's (not shown as theirs); `before`: words it puts in front
    * (a branch's earlier conversation, 24n part 6), not shown either.
    */
-  async send(projectId: string, prompt: string, note = "", before = ""): Promise<boolean> {
+  async send(
+    projectId: string,
+    prompt: string,
+    note = "",
+    before = "",
+    opts: { noHold?: boolean; files?: Attachment[] } = {},
+  ): Promise<boolean> {
     const text = prompt.trim();
     if (!text) return false;
     this.error = "";
@@ -531,10 +547,24 @@ ${text}`
     }
     // Sent while the agent works: it joins the task (the agent takes it in before its next step).
     const during = !!this.selectedId && (this.busy || ["running", "waiting"].includes(this.selected?.status ?? ""));
+    // Kept back a few seconds first: "Don't send" can still drop it (files go at once, they are not kept back).
+    if (during && !opts.noHold && !note && !before && !this.attachments.length && HOLD_MS > 0) {
+      this.items = reduce(
+        this.items,
+        JSON.stringify({ type: "qanuvi_user", text, during: true, held: true }),
+        ++this.#seq,
+        nowSeconds(),
+      );
+      const id = this.items[this.items.length - 1].id;
+      this.#held.set(id, { projectId, text, timer: setTimeout(() => void this.sendHeld(id), HOLD_MS) });
+      return true;
+    }
     this.busy = true;
-    let currentId = this.selectedId;
+    // The chat the message was written in, also when another one is opened before it goes out.
+    const target = this.selectedId;
+    let currentId = target;
     // Show the message straight away; the stored copy is the same text.
-    const files = this.attachments;
+    const files = opts.files ?? this.attachments;
     this.items = reduce(
       this.items,
       JSON.stringify({
@@ -556,7 +586,7 @@ ${text}`
     );
     try {
       // A new session gets the relevant part of the user's memory with its first message.
-      const context = this.selectedId ? null : await memoryContext(projectId, text);
+      const context = target ? null : await memoryContext(projectId, text);
       // Free decides, paid works: a free model picks the paid agent's model for this message.
       let model = this.model;
       let sent = before + text + note;
@@ -584,9 +614,15 @@ ${text}`
           this.freePicked = { text, model: pick.model };
         }
       }
+      // Withdrawn after the agent had it: this message tells the agent to leave it.
+      const gone = target ? this.#withdrawn.get(target) : undefined;
+      if (target && gone?.length) {
+        sent += withdrawnNote(gone);
+        this.#withdrawn.delete(target);
+      }
       const session = await api.agent.start(
         projectId,
-        this.selectedId,
+        target,
         sent,
         model,
         // A message while it works keeps the running session's mode (a plan run's Auto stays Auto).
@@ -606,7 +642,7 @@ ${text}`
       if (this.attachments === files) this.attachments = [];
       currentId = session.id;
       this.#upsert(session);
-      this.selectedId = session.id;
+      if (this.selectedId === target) this.selectedId = session.id;
       return true;
     } catch (e) {
       this.error = errorText(e);
@@ -815,12 +851,56 @@ ${text}`
     if (!id || this.interrupting) return;
     this.interrupting = true;
     try {
+      // Messages still kept back go first: the agent reads them next.
+      await Promise.all(this.#flushHeld());
       if (id === this.planSessionId) this.onPlanInterrupt?.();
       await api.agent.interrupt(id);
     } catch (e) {
       this.error = errorText(e);
       this.interrupting = false;
     }
+  }
+
+  /** Sends a kept-back message now ("Send now", or its few seconds are up). */
+  sendHeld(id: string): Promise<boolean> {
+    const h = this.#held.get(id);
+    if (!h) return Promise.resolve(false);
+    clearTimeout(h.timer);
+    this.#held.delete(id);
+    this.items = this.items.filter((i) => i.id !== id);
+    return this.send(h.projectId, h.text, "", "", { noHold: true, files: [] });
+  }
+
+  /** "Don't send" on a kept-back message: it never reaches the agent. */
+  dropHeld(id: string): void {
+    const h = this.#held.get(id);
+    if (!h) return;
+    clearTimeout(h.timer);
+    this.#held.delete(id);
+    this.items = this.items.filter((i) => i.id !== id);
+  }
+
+  /**
+   * "Don't send" on a message the agent already started a turn for (the turn had ended before it took the message
+   * in): that turn stops, and the next message tells the agent to leave it. A message the agent has cannot be pulled
+   * back from it, only stopped and countermanded.
+   */
+  async withdraw(id: string): Promise<void> {
+    const sid = this.selectedId;
+    const item = this.items.find((i) => i.id === id);
+    if (!sid || item?.kind !== "user" || item.waiting !== "turn") return;
+    this.#withdrawn.set(sid, [...(this.#withdrawn.get(sid) ?? []), item.text]);
+    this.items = this.items.map((i) =>
+      i.id === id && i.kind === "user" ? { ...i, waiting: undefined, withdrawn: true } : i,
+    );
+    await this.interrupt();
+  }
+
+  /** Every kept-back message goes now (another chat opens, the turn ended, or "read my message now"). */
+  #flushHeld(): Promise<boolean>[] {
+    if (!this.#held.size) return [];
+    // Called from effects too (newSession): what the sends read must not become the effect's dependencies.
+    return untrack(() => [...this.#held.keys()].map((id) => this.sendHeld(id)));
   }
 
   /** The runner hears an interrupt on its step here. */

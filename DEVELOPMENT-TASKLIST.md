@@ -267,7 +267,20 @@ runs on or off; with it off nothing is sent anywhere.
     handover (Automatic: no bar, no click; Ask me first: bar and note panel; Off: resumes). Verify green (295 + 156).
   - UNPUBLISHED since 0.1.14 (commits ff286e5, b6700ae, 9800403): 24t chat clean-up, 24s part 3. None driven live
     yet. Publish only with the owner's yes.
-  - RESUME HERE (new conversation): drive 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
+  - Done 2026-11-13 (later), committed, NOT published (owner asked, from a real chat that seemed stuck): (a) a message
+    sent while the agent worked that Claude Code took in only after its turn ended started a turn of its own, but the
+    chat showed "Finished" until the first answer (70 s of thinking on a 126k chat); now the turn's init line sets the
+    session running, and the waiting area says "Reading it now" (state "turn") and hides "Stop this command" (it would
+    stop the very turn reading it). (b) Messages sent while it works are kept in Qanuvi 10 s first (agent/waiting.ts
+    HOLD_MS): Send now / Don't send; they go at once when the turn ends, another chat opens or "read my message now"
+    is pressed; messages with files are not kept back. In state "turn", Don't send stops that turn and the next message
+    tells the agent to leave it (withdrawnNote, hidden from the shown text); the row shows "Withdrawn". (c) Plan view:
+    Reload and opening the plan list look for new plan files (a PLAN-E written by an agent did not show until the
+    project was reopened). Verify green (297 + 156). Not driven live yet.
+  - Owner question 2026-11-13: steps with no Model: line are routed at run time (routing.ts chooseModel + Team
+    decider); offered to keep step model picks out of the plan file (model ids hold a word the owner's no-attribution
+    check searches for). Not agreed yet.
+  - RESUME HERE (new conversation): drive the waiting-message hold (above), 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
     project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the

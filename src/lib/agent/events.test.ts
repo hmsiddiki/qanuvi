@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withdrawnNote } from "./waiting";
 import {
   clockTime,
   elapsedLabel,
@@ -246,6 +247,36 @@ describe("messages sent while the agent works", () => {
     ]);
     expect(waiting(items)).toEqual([]);
     expect(items.map((i) => i.kind)).toEqual(["user", "result", "user", "text"]);
+  });
+
+  it("a message the turn ended before reading starts a turn of its own: shown as being read until the answer", () => {
+    const state = (items: ReturnType<typeof reduceAll>) =>
+      items.flatMap((i) => (i.kind === "user" && i.waiting ? [i.waiting] : []));
+    const lines = [
+      JSON.stringify({ type: "qanuvi_user", text: "Hi" }),
+      JSON.stringify({ type: "qanuvi_user", text: "Make the plan file", during: true }),
+      JSON.stringify({ type: "result", duration_ms: 1000 }),
+    ];
+    expect(state(reduceAll(lines))).toEqual(["next"]);
+    const reading = [...lines, JSON.stringify({ type: "system", subtype: "init", session_id: "s" })];
+    expect(state(reduceAll(reading))).toEqual(["turn"]);
+    expect(waiting(reduceAll([...reading, answer("Writing it")]))).toEqual([]);
+  });
+
+  it("a message kept back shows as held, and the stored message hides the withdrawal note", () => {
+    const held = reduceAll([JSON.stringify({ type: "qanuvi_user", text: "Wait", during: true, held: true })]);
+    expect(held[0]).toMatchObject({ kind: "user", waiting: "held" });
+    // Held is never read by a step's end or an answer: it is not with the agent yet.
+    const after = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "Wait", during: true, held: true }),
+      JSON.stringify({ type: "result", duration_ms: 1 }),
+      answer("ok"),
+    ]);
+    expect(waiting(after)).toEqual(["Wait"]);
+    const sent = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "Go on" + withdrawnNote(["Make the plan file"]) }),
+    ]);
+    expect(sent[0]).toMatchObject({ kind: "user", text: "Go on" });
   });
 
   it("an interrupt stops the running step without an error and the message is read next", () => {

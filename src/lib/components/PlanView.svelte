@@ -126,9 +126,13 @@
   async function discover() {
     try {
       // Any folder counts, also one the project's .gitignore leaves out (a plugin's own plan, for example).
-      candidates = findTaskLists(await api.files.markdown(project.id));
+      const found = findTaskLists(await api.files.markdown(project.id));
+      // Same list: nothing to change (opening the list must not redraw it under the pointer).
+      if (found.join("\n") !== candidates.join("\n")) candidates = found;
+      // The plan open now stays open while it is still there; a fresh project opens its saved plan.
       const saved = localStorage.getItem(FILE_KEY(project.id));
-      file = saved && candidates.includes(saved) ? saved : (candidates[0] ?? "");
+      if (!(file && candidates.includes(file)))
+        file = saved && candidates.includes(saved) ? saved : (candidates[0] ?? "");
     } catch (e) {
       error = errorText(e);
     }
@@ -215,6 +219,9 @@
   $effect(() => {
     void project.id;
     open.clear();
+    // Another project: its own saved plan opens, not a same-named file of the last one.
+    file = "";
+    candidates = [];
     discover().then(load);
     // Untracked: this effect must not re-run (and reload an old record) whenever the run changes.
     const id = project.id;
@@ -256,7 +263,14 @@
   <header>
     <FileText size={14} />
     {#if candidates.length > 1}
-      <select value={file} onchange={(e) => choose((e.target as HTMLSelectElement).value)} aria-label="Task list">
+      <!-- Looked up again as the list opens: a plan written after the project opened shows up (an agent's new PLAN-E). -->
+      <select
+        value={file}
+        onfocus={() => discover()}
+        onpointerdown={() => discover()}
+        onchange={(e) => choose((e.target as HTMLSelectElement).value)}
+        aria-label="Task list"
+      >
         {#each candidates as c (c)}<option value={c}>{c}</option>{/each}
       </select>
     {:else}
@@ -336,7 +350,9 @@
         <ListPlus size={13} />
       </IconButton>
     {/if}
-    <IconButton label="Reload" onclick={load}><RefreshCw size={13} /></IconButton>
+    <IconButton label="Reload the plan and look for new plan files" onclick={() => discover().then(load)}
+      ><RefreshCw size={13} /></IconButton
+    >
   </header>
 
   {#if error}<p class="error">{error}</p>{/if}

@@ -1185,6 +1185,13 @@ impl Agents {
                 let mut auto: Option<(String, Value)> = None;
                 match kind {
                     "system" if subtype == "init" => {
+                        // A turn starts. After an ended turn that is a message sent while it worked, taken in only
+                        // now: the session works again from here, not from its first answer (long thinking showed
+                        // "Finished" for a minute or more).
+                        if get(db, &session_id).is_ok_and(|s| s.status == "idle") {
+                            set_status(db, &session_id, "running");
+                            changed = true;
+                        }
                         if let Some(agent_id) = msg["session_id"].as_str() {
                             let _ = db.conn().execute(
                                 "UPDATE sessions SET agent_session_id = ?2 WHERE id = ?1",

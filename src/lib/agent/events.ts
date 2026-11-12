@@ -6,6 +6,7 @@
 
 import { withoutOverruleNote } from "$lib/core/decider";
 import { withoutGuidance } from "$lib/plan/guidance";
+import { withoutWithdrawn } from "./waiting";
 import type { Edit } from "./diff";
 import { CHAT_HANDOVER_MARK, parseResume, tokensK } from "./handover";
 
@@ -26,10 +27,13 @@ export type Item = (
       images?: ShownImage[];
       during?: boolean;
       /**
-       * Sent while the agent worked and not taken in yet (24r): "sent" until the step in hand ends, "next" once it did;
-       * the agent's next answer has read it.
+       * Sent while the agent worked and not taken in yet (24r): "held" while Qanuvi still keeps it back (a few seconds,
+       * Don't send drops it), "sent" until the step in hand ends, "next" once it did, "turn" when the turn had ended
+       * and the message started a turn of its own; the agent's next answer has read it.
        */
-      waiting?: "sent" | "next";
+      waiting?: "held" | "sent" | "next" | "turn";
+      /** Dropped with "Don't send" after the agent had started on it: its turn was stopped (shown struck through). */
+      withdrawn?: boolean;
     }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
@@ -255,8 +259,11 @@ function takeIn(items: Item[], type: string, msg: Json): Item[] {
     (obj(msg.message).content as unknown[]).some((b) => obj(b).type === "tool_result");
   if (toolResult || type === "result" || type === "qanuvi_interrupted")
     return items.map((x) => (x.kind === "user" && x.waiting === "sent" ? { ...x, waiting: "next" as const } : x));
+  // The turn had ended before the agent took the message in: Claude Code starts a turn for it (its init line).
+  if (type === "system" && msg.subtype === "init")
+    return items.map((x) => (x.kind === "user" && x.waiting === "next" ? { ...x, waiting: "turn" as const } : x));
   if (type !== "assistant") return items;
-  const read = items.filter((x) => x.kind === "user" && x.waiting === "next");
+  const read = items.filter((x) => x.kind === "user" && (x.waiting === "next" || x.waiting === "turn"));
   if (!read.length) return items;
   return [
     ...items.filter((x) => !read.includes(x)),
@@ -335,10 +342,12 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     out.push({
       kind: "user",
       id: `u${seq}`,
-      text: withoutGuidance(withoutOverruleNote(str(msg.text))),
+      text: withoutWithdrawn(withoutGuidance(withoutOverruleNote(str(msg.text)))),
       ...(attachments.length ? { attachments } : {}),
       ...(images.length ? { images } : {}),
-      ...(msg.during === true ? { during: true, waiting: "sent" as const } : {}),
+      ...(msg.during === true
+        ? { during: true, waiting: msg.held === true ? ("held" as const) : ("sent" as const) }
+        : {}),
     });
   } else if (type === "qanuvi_interrupted") {
     // "Stop this command, read my message now": the steps still running were ended.
