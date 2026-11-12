@@ -180,6 +180,10 @@ runs on or off; with it off nothing is sent anywhere.
   every Qanuvi knows it. Headroom can sit in front of it for the free models too (`--openai-api-url`), to be tested.
 - [x] **1f. Qanuvi's own resource use (done 2026-11-12)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
   WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
+- [ ] **1g. Status bar memory: the app apart from agents (owner, 2026-11-12, later)**: the status bar showed 835 MB,
+  which looked like Qanuvi alone. Measured: Qanuvi + WebView2 about 283 MB, a Claude Code agent 507 MB, a terminal
+  PowerShell 56 MB. To do: show the app's own memory in the status bar, with a hover breakdown of app (qanuvi.exe +
+  WebView2), each agent and terminals, plus the total.
 - [ ] **24j. Plan housekeeping (next)**: move finished sections to an archive file next to the plan, and add another
   plan's steps into the current one, both with a preview and the owner's confirmation.
 - [x] **15k. Search like VS Code (owner, 2026-11-12)**: the search panel found 0 results for a word that
