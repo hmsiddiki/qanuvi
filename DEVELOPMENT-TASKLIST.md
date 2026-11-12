@@ -219,6 +219,8 @@ runs on or off; with it off nothing is sent anywhere.
     Edit/MultiEdit/Write steps show a diff (+N −M, folded past 14 lines) with Open and Revert (only when the edited
     text is still in the file once; asks first; a whole-file Write has no Revert). Not driven in the running app yet:
     the owner checks after the update. Next: (4) 24j plan housekeeping.
+  - PUBLISHED 0.1.12 on the dev channel 2026-11-12 (owner: "release anyway"; QANUVI_RELEASE_ANYWAY=1, Claude Code
+    here 2.1.318, 2.1.322 out): everything listed above since 0.1.11. Nothing unpublished now. Next: (4) 24j.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
