@@ -1712,6 +1712,12 @@ fn agent_delete(state: State<AppState>, session_id: String) -> Res<()> {
     agent::delete(&state.db, &session_id)
 }
 
+/// Chat clean-up (24t): deletes chats not used for `days` days, keeping the chats in `keep` (open now).
+#[tauri::command]
+fn agent_clean_up(state: State<AppState>, days: i64, keep: Vec<String>) -> Res<usize> {
+    agent::clean_up_chats(&state.db, days, &keep, store::now())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Started by Qanuvi's own restart: the old instance closes first, so nothing it holds open is copied.
@@ -1988,6 +1994,7 @@ pub fn run() {
             agent_handover_off,
             agent_saved,
             agent_delete,
+            agent_clean_up,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Qanuvi");

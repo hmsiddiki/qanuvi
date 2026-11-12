@@ -38,7 +38,7 @@
       label: "Agents",
       icon: Bot,
       words:
-        "ai features claude code paid agent model permission mode effort address proxy config files routing chat handover context limit heavy new session",
+        "ai features claude code paid agent model permission mode effort address proxy config files routing chat handover context limit heavy new session chat clean-up cleanup delete old chats days",
     },
     {
       id: "models",

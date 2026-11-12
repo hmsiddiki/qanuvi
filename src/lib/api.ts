@@ -465,6 +465,8 @@ export const api = {
     /** Stars or unstars a chat (24s part 2). */
     saved: (sessionId: string, saved: boolean) => invoke<void>("agent_saved", { sessionId, saved }),
     remove: (sessionId: string) => invoke<void>("agent_delete", { sessionId }),
+    /** Chat clean-up (24t): deletes chats not used for `days` days, keeping `keep`; gives back how many went. */
+    cleanUp: (days: number, keep: string[]) => invoke<number>("agent_clean_up", { days, keep }),
   },
   browser: {
     /** The page the agent's browser tools are on in a session (null before they open one). */

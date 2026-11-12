@@ -69,6 +69,8 @@ export interface Settings {
    * a handover note. ask: a bar asks first; auto: it happens by itself; off: never.
    */
   chatHandover: { when: "ask" | "auto" | "off"; limit: number };
+  /** Chat clean-up (24t): chats not opened for this many days are deleted at start-up (0 = off). */
+  chatCleanupDays: 0 | 30 | 60 | 90;
 }
 
 /** Default context size at which a chat offers a handover (24s). */
@@ -159,6 +161,7 @@ const DEFAULTS: Settings = {
   updates: { autoDownload: false },
   languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false },
   chatHandover: { when: "ask", limit: CHAT_HANDOVER_LIMIT },
+  chatCleanupDays: 60,
   startup: [],
   team: DEFAULT_TEAM,
 };
@@ -240,6 +243,7 @@ export function parseSettings(json: string | null): Settings {
       limit: Math.min(1_000_000, Math.max(0, Math.round(limit))),
     };
   }
+  s.chatCleanupDays = ([0, 30, 60, 90] as const).find((d) => d === raw.chatCleanupDays) ?? 60;
   if (Array.isArray(raw.startup))
     for (const it of raw.startup as Record<string, unknown>[]) {
       const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");

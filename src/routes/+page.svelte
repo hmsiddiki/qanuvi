@@ -31,6 +31,7 @@
   import { editor } from "$lib/stores/editor.svelte";
   import { terminals } from "$lib/stores/terminals.svelte";
   import { agent } from "$lib/stores/agent.svelte";
+  import { inbox } from "$lib/stores/inbox.svelte";
   import { ui } from "$lib/stores/ui.svelte";
   import { untrack } from "svelte";
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
@@ -58,6 +59,20 @@
     if (!projects.startWith) remoteAccess.init();
     terminals.loadShells();
     agent.loadInfo();
+    // Chat clean-up (24t), once per start in the main window; said once, nothing when none went.
+    if (!projects.startWith)
+      agent
+        .cleanUpChats(settings.value.chatCleanupDays)
+        .then((n) => {
+          if (n > 0)
+            inbox.add({
+              kind: "chats",
+              title: `Removed ${n} chat${n === 1 ? "" : "s"} not opened for ${settings.value.chatCleanupDays} days`,
+              text: "Starred chats and plan steps are never removed. Settings, Agents, Chat clean-up changes this.",
+              open: { label: "Settings", view: "agents" },
+            });
+        })
+        .catch(() => {});
     knowledge.check().catch(() => {});
     startWatch();
     updates.start();

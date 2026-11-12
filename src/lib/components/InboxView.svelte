@@ -10,7 +10,12 @@
 
   let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting"));
 
-  const KIND: Record<InboxItem["kind"], string> = { run: "Plan run", "sign-in": "Sign-in", knowledge: "Knowledge" };
+  const KIND: Record<InboxItem["kind"], string> = {
+    run: "Plan run",
+    "sign-in": "Sign-in",
+    knowledge: "Knowledge",
+    chats: "Chats",
+  };
 
   function open(item: InboxItem) {
     inbox.markRead(item.id);

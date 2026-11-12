@@ -109,6 +109,18 @@ class WorkspaceStore {
     this.#pending.delete(projectId);
     localStorage.removeItem(key(projectId));
   }
+
+  /** The agent session each project was last on (kept from clean-up: it is the chat that opens next). */
+  sessions(): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(key(""))) continue;
+      const s = parseWorkspace(localStorage.getItem(k)).session;
+      if (s) out.push(s);
+    }
+    return out;
+  }
 }
 
 export const workspace = new WorkspaceStore();

@@ -3,6 +3,7 @@ import { reduce, reduceAll, type Item } from "$lib/agent/events";
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 import { settings } from "./settings.svelte";
+import { workspace } from "./workspace.svelte";
 import { memoryContext } from "./memory.svelte";
 import { modelLabel, paidAgent, providerById, type AgentProvider } from "$lib/agents/providers";
 import { chatModelPrompt, deciderSeat, overruleNote, parseChatModel, strongerModel } from "$lib/core/decider";
@@ -274,6 +275,22 @@ ${text}`
     } catch (e) {
       this.error = errorText(e);
     }
+  }
+
+  /**
+   * Chat clean-up (24t): deletes chats not opened for `days` days. The chat open now and the one each project was
+   * last on stay (as do starred, plan-step and running chats, kept by the app). Gives back how many were removed.
+   */
+  async cleanUpChats(days: number): Promise<number> {
+    if (days <= 0) return 0;
+    const keep = [...workspace.sessions(), ...(this.selectedId ? [this.selectedId] : [])];
+    const removed = await api.agent.cleanUp(days, keep);
+    const projectId = this.#projectId;
+    if (removed > 0 && projectId) {
+      const list = await api.agent.sessions(projectId).catch(() => null);
+      if (list && this.#projectId === projectId) this.sessions = list;
+    }
+    return removed;
   }
 
   newSession(): void {

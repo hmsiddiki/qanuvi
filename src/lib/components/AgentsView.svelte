@@ -35,6 +35,22 @@
     ui.show("editor");
   }
 
+  // Chat clean-up (24t): the "Clean up now" button and what it found.
+  let cleaning = $state(false);
+  let cleanedNote = $state("");
+  async function cleanUpNow() {
+    cleaning = true;
+    cleanedNote = "";
+    try {
+      const n = await agent.cleanUpChats(settings.value.chatCleanupDays);
+      cleanedNote = n ? `Removed ${n} chat${n === 1 ? "" : "s"}.` : "Nothing to remove.";
+    } catch (e) {
+      cleanedNote = errorText(e);
+    } finally {
+      cleaning = false;
+    }
+  }
+
   const available = (p: AgentProvider) =>
     p.id === "claude-code" ? !!agent.info?.available : settings.value.brain.models.length > 0;
   const statusText = (p: AgentProvider) =>
@@ -253,6 +269,38 @@
         </label>
       </div>
     </section>
+    <section class="card">
+      <header>
+        <div class="title">
+          <strong>Chat clean-up</strong>
+          <span>At start-up</span>
+        </div>
+      </header>
+      <p class="note">
+        Chats and all their lines stay in the database until removed. Starred chats, plan steps, running chats and the
+        chat open now are never removed; a handed-over chat goes as a whole, judged by its newest part.
+      </p>
+      <div class="grid">
+        <label>
+          Delete chats not opened for
+          <select
+            value={String(settings.value.chatCleanupDays)}
+            onchange={(e) => settings.set("chatCleanupDays", Number(e.currentTarget.value) as 0 | 30 | 60 | 90)}
+          >
+            <option value="0">Off</option>
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+        </label>
+        <div class="cleanup-now">
+          <button type="button" disabled={cleaning || settings.value.chatCleanupDays === 0} onclick={cleanUpNow}
+            >{cleaning ? "Cleaning up…" : "Clean up now"}</button
+          >
+          {#if cleanedNote}<span class="note">{cleanedNote}</span>{/if}
+        </div>
+      </div>
+    </section>
     <RoutingSettings
       provider={PROVIDERS.find((p) => p.id === settings.value.agent) ?? PROVIDERS[0]}
       project={projects.current}
@@ -436,6 +484,12 @@
     gap: 4px;
     color: var(--qx-text-secondary);
     font-size: var(--qx-text-small);
+  }
+
+  .cleanup-now {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--qx-space-2);
   }
 
   .grid .wide {

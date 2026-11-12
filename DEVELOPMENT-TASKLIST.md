@@ -262,7 +262,8 @@ runs on or off; with it off nothing is sent anywhere.
     Verify green (293 + 156 tests). Not yet driven in the window.
   - PUBLISHED 0.1.14 on the dev channel 2026-11-13 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24o, 24n
     part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2. Nothing unpublished now. Owner agreed 24t chat clean-up.
-  - RESUME HERE (new conversation): 24t chat clean-up (one session), then 24s part 3 (reopen a starred chat from its
+  - Done 2026-11-13 (later), committed, NOT published: 24t chat clean-up (see 24t "Built"). Verify green (293 + 156).
+  - RESUME HERE (new conversation): 24s part 3 (reopen a starred chat from its
     handover note; note panel), then drive 24s part 2 and 15i part 2 in the running app on a scratch project, then
     15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -285,6 +286,12 @@ runs on or off; with it off nothing is sent anywhere.
   - Runs once at start-up (and from a "Clean up now" button), in Rust, in one transaction; events go with their
     sessions. Says once how many chats it removed ("Removed 12 chats not opened for 60 days"), nothing when none.
   - Then VACUUM only when much was removed (database file shrinks; skipped when small).
+  - Built 2026-11-13, committed, NOT published: agent::clean_up_chats (Rust; chain grouped by continues_from, judged
+    by its newest part's updated_at; plan-step sessions found by "sessionId" in plan_runs records; idle sessions kept
+    too, since their process is alive; VACUUM after 5,000+ lines removed), command agent_clean_up, setting
+    chatCleanupDays (default 60), Settings card with "Clean up now", start-up call in the main window only (keeps
+    the chat open now and the session each project's workspace reopens), one inbox line "Removed N chats ...".
+    Rust test in sessions_are_stored_renamed_listed_and_deleted. Not driven live yet.
 - [ ] **24s. Handover in plain chat, bookmarks, reopening from the note (owner, 2026-11-13; agreed 2026-11-13,
   lean form chosen over a container layer)**: in plain chat the context grows until each tool call re-reads 150k+
   tokens. A separate container table under every chat was weighed and left out: edit and resend, rewind, branches,

@@ -10,7 +10,7 @@ const MAX = 100;
 export interface InboxItem {
   id: string;
   at: number;
-  kind: "run" | "sign-in" | "knowledge";
+  kind: "run" | "sign-in" | "knowledge" | "chats";
   title: string;
   text: string;
   read: boolean;

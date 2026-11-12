@@ -546,6 +546,121 @@ pub fn delete(db: &Db, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Session ids named anywhere in a plan run's record (its steps' tries keep `sessionId`).
+fn plan_session_ids(v: &Value, out: &mut std::collections::HashSet<String>) {
+    match v {
+        Value::Object(map) => {
+            for (k, x) in map {
+                if k == "sessionId"
+                    && let Value::String(s) = x
+                {
+                    out.insert(s.clone());
+                } else {
+                    plan_session_ids(x, out);
+                }
+            }
+        }
+        Value::Array(list) => list.iter().for_each(|x| plan_session_ids(x, out)),
+        _ => {}
+    }
+}
+
+/// Removed at once, the database file is compacted afterwards (VACUUM); fewer lines are not worth the rewrite.
+const VACUUM_AFTER_EVENTS: i64 = 5_000;
+
+/// Chat clean-up (24t): deletes chats not used for `days` days. A chat is its handover chain (`continues_from`),
+/// judged by its newest session's last use and removed whole. Kept: starred chats, plan-step sessions, sessions
+/// running, waiting or idle, and the chats in `keep` (open now). One transaction; events go with their sessions.
+/// Gives back how many chats were removed.
+pub fn clean_up_chats(db: &Db, days: i64, keep: &[String], at: i64) -> Result<usize, String> {
+    if days <= 0 {
+        return Ok(0);
+    }
+    let cutoff = at - days * 86_400;
+    let mut conn = db.conn();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let rows: Vec<(String, Option<String>, String, i64, bool)> = {
+        let mut stmt = tx
+            .prepare("SELECT id, continues_from, status, updated_at, saved FROM sessions")
+            .map_err(|e| e.to_string())?;
+        stmt.query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get::<_, i64>(4)? != 0,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?
+    };
+    let mut plan = std::collections::HashSet::new();
+    {
+        let mut stmt = tx
+            .prepare("SELECT data FROM plan_runs")
+            .map_err(|e| e.to_string())?;
+        let datas = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        for d in datas.flatten() {
+            if let Ok(v) = serde_json::from_str::<Value>(&d) {
+                plan_session_ids(&v, &mut plan);
+            }
+        }
+    }
+    // Each session's chat is named by the oldest session of its chain (following continues_from back).
+    let parent: HashMap<&str, &str> = rows
+        .iter()
+        .filter_map(|(id, from, ..)| from.as_deref().map(|f| (id.as_str(), f)))
+        .collect();
+    let exists: std::collections::HashSet<&str> = rows.iter().map(|r| r.0.as_str()).collect();
+    let root = |id: &str| -> String {
+        let mut cur = id;
+        // Bounded walk: a broken record that loops cannot hang the clean-up.
+        for _ in 0..rows.len() {
+            match parent.get(cur) {
+                Some(p) if exists.contains(p) && *p != id => cur = p,
+                _ => break,
+            }
+        }
+        cur.to_string()
+    };
+    // Per chat: its sessions, its last use, and whether anything in it must stay.
+    let mut chats: HashMap<String, (Vec<&str>, i64, bool)> = HashMap::new();
+    for (id, _, status, updated, saved) in &rows {
+        let stays = *saved
+            || plan.contains(id)
+            || matches!(status.as_str(), "running" | "waiting" | "idle")
+            || keep.iter().any(|k| k == id);
+        let chat = chats.entry(root(id)).or_insert((Vec::new(), 0, false));
+        chat.0.push(id.as_str());
+        chat.1 = chat.1.max(*updated);
+        chat.2 |= stays;
+    }
+    let mut removed = 0;
+    let mut events = 0i64;
+    for (ids, last, stays) in chats.values() {
+        if *stays || *last >= cutoff {
+            continue;
+        }
+        for id in ids {
+            events += tx
+                .execute("DELETE FROM session_events WHERE session_id = ?1", [id])
+                .map_err(|e| e.to_string())? as i64;
+            tx.execute("DELETE FROM sessions WHERE id = ?1", [id])
+                .map_err(|e| e.to_string())?;
+        }
+        removed += 1;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    if events >= VACUUM_AFTER_EVENTS {
+        let _ = conn.execute_batch("VACUUM");
+    }
+    Ok(removed)
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Usage {
     pub cost_usd: f64,
@@ -1543,6 +1658,60 @@ mod tests {
 
         delete(&db, "s1").unwrap();
         assert!(list_sessions(&db, &project.id).unwrap().is_empty());
+
+        // Chat clean-up (24t): old chats go whole; starred, plan-step, live and open chats stay.
+        let day = 86_400;
+        let add = |id: &str, status: &str, updated: i64| {
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, project_id, title, agent, model, mode, status, created_at, updated_at)
+                     VALUES (?1, ?2, 't', 'claude-code', 'm', 'default', ?3, 1, ?4)",
+                    params![id, &project.id, status, updated],
+                )
+                .unwrap();
+        };
+        let at = 100 * day;
+        add("old", "ended", at - 70 * day);
+        append_event(&db, "old", "{}");
+        add("chain-a", "ended", at - 90 * day);
+        add("chain-b", "ended", at - 10 * day); // newer part keeps the whole chain
+        link(&db, "chain-b", "chain-a").unwrap();
+        add("gone-a", "ended", at - 90 * day);
+        add("gone-b", "ended", at - 80 * day);
+        link(&db, "gone-b", "gone-a").unwrap();
+        add("star", "ended", at - 90 * day);
+        set_saved(&db, "star", true).unwrap();
+        add("step", "ended", at - 90 * day);
+        crate::runs::save(
+            &db,
+            &project.id,
+            "r1",
+            "PLAN.md",
+            "done",
+            "{\"steps\":[{\"attempts\":[{\"sessionId\":\"step\"}]}]}",
+        )
+        .unwrap();
+        add("live", "running", at - 90 * day);
+        add("open", "ended", at - 90 * day);
+        add("fresh", "ended", at - 5 * day);
+        assert_eq!(clean_up_chats(&db, 0, &[], at).unwrap(), 0);
+        assert_eq!(
+            clean_up_chats(&db, 60, &["open".to_string()], at).unwrap(),
+            2
+        );
+        for id in ["old", "gone-a", "gone-b"] {
+            assert!(get(&db, id).is_err(), "{id} should be removed");
+        }
+        assert!(session_events(&db, "old").unwrap().is_empty());
+        for id in [
+            "chain-a", "chain-b", "star", "step", "live", "open", "fresh",
+        ] {
+            assert!(get(&db, id).is_ok(), "{id} should stay");
+        }
+        assert_eq!(
+            clean_up_chats(&db, 60, &["open".to_string()], at).unwrap(),
+            0
+        );
         assert!(
             session_events(&db, "s1").unwrap().is_empty(),
             "events go with the session"
