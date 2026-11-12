@@ -27,9 +27,11 @@
     onclose: () => void;
     /** The plan file was changed here (the steps' models written in). */
     onchanged?: () => void;
+    /** Resume: show the run's settings (as they were) to change and start from the next open step. */
+    onresume?: () => void;
   }
 
-  let { project, file, plan, setup, onclose, onchanged }: Props = $props();
+  let { project, file, plan, setup, onclose, onchanged, onresume }: Props = $props();
 
   /** The agent for this run: any that works on this computer (Claude Code needs its command; Qanuvi's own, models). */
   let usable = $derived(
@@ -614,20 +616,39 @@
             Starting…
           {/if}
         </span>
-        <button type="button" class="stop" onclick={() => runner.stop()}><Square size={11} /> Stop</button>
+        <button
+          type="button"
+          class="pause"
+          disabled={runner.pausing}
+          title="Finish the step it is on, then pause; Resume lets you change the run's settings and go on"
+          onclick={() => runner.pause()}>{runner.pausing ? "Pausing after this step…" : "Pause"}</button
+        >
+        <button type="button" class="stop" title="Stop now (the step is left as it is)" onclick={() => runner.stop()}
+          ><Square size={11} /> Stop</button
+        >
       {:else}
         <span class="main">
           {run.status === "done"
             ? "Run finished"
             : run.status === "needs-you"
               ? "Run paused: it needs you"
-              : "Run stopped"}
+              : run.status === "paused"
+                ? "Run paused"
+                : "Run stopped"}
           · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
             {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
             {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}
           · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
           {#if run.message}<span class="dim"> · {run.message}</span>{/if}
         </span>
+        {#if run.status !== "done" && plan.steps.some((s) => s.status === " ")}
+          <button
+            type="button"
+            class="resume"
+            title="Change the run's settings if you like, then go on"
+            onclick={() => onresume?.()}>Resume</button
+          >
+        {/if}
       {/if}
     </div>
     {#if totals}
@@ -857,6 +878,30 @@
 
   .stop {
     background: var(--qx-status-failed);
+  }
+
+  .pause {
+    height: 28px;
+    padding: 0 var(--qx-space-3);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-bg-panel);
+    color: var(--qx-text);
+  }
+
+  .pause:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+
+  .resume {
+    height: 26px;
+    margin-left: var(--qx-space-2);
+    padding: 0 var(--qx-space-3);
+    border: 0;
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-accent);
+    color: #fff;
   }
 
   .totals {

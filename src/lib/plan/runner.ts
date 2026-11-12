@@ -116,7 +116,7 @@ export interface PlanRun {
   provider: string;
   options: RunOptions;
   steps: StepRun[];
-  status: "running" | "done" | "stopped" | "failed" | "needs-you";
+  status: "running" | "done" | "stopped" | "failed" | "needs-you" | "paused";
   message: string;
   startedAt: number;
   endedAt: number | null;

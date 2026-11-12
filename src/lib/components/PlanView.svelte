@@ -242,7 +242,15 @@
         {/if}
       </div>
     {:else if plan}
-      <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} onchanged={load} />
+      <RunPanel
+        {project}
+        {file}
+        {plan}
+        setup={showRun}
+        onclose={() => (showRun = false)}
+        onchanged={load}
+        onresume={() => (showRun = true)}
+      />
       {#each plan.sections.filter((s) => s.steps.length) as section (section.line)}
         {@const total = section.steps.length}
         {@const finished = done(section.steps)}

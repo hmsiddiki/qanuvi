@@ -134,6 +134,15 @@ class RunnerStore {
     }
   }
 
+  /** Pause asked for: the run stops after the step it is on (or at once while it waits for a usage limit). */
+  pausing = $state(false);
+
+  /** Pauses after the current step; Resume opens the run's settings to change and go on. */
+  pause(): void {
+    if (!this.running) return;
+    this.pausing = true;
+  }
+
   stop(): void {
     this.#stopRequested = true;
     if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
@@ -370,7 +379,7 @@ class RunnerStore {
   async #waitUntil(at: Date): Promise<boolean> {
     this.waitingUntil = at;
     while (Date.now() < at.getTime()) {
-      if (this.#stopRequested) {
+      if (this.#stopRequested || this.pausing) {
         this.waitingUntil = null;
         return false;
       }
@@ -420,6 +429,7 @@ class RunnerStore {
         .map((s) => s.number!),
     );
     this.#stopRequested = false;
+    this.pausing = false;
     this.run = {
       id: crypto.randomUUID(),
       projectId: project.id,
@@ -736,7 +746,9 @@ class RunnerStore {
               continue;
             }
             if (!(await this.#waitUntil(resetAt))) {
-              this.#finish(run, "stopped", "Stopped by you while waiting for the usage limit to reset.");
+              if (this.pausing)
+                this.#finish(run, "paused", "Paused while waiting for the usage limit. Resume when you want to go on.");
+              else this.#finish(run, "stopped", "Stopped by you while waiting for the usage limit to reset.");
               stepRun.status = "waiting";
               break;
             }
@@ -813,6 +825,14 @@ class RunnerStore {
         }
       }
       await this.#logResult(project, file, stepRun);
+      // Paused by the owner: the run stops here, after a whole step; Resume goes on from the next open one.
+      if (this.pausing && run.status === "running") {
+        this.#finish(
+          run,
+          "paused",
+          `Paused after step ${stepRun.number ?? stepRun.title}. Resume to go on (you can change the run's settings first).`,
+        );
+      }
       // Steps added while this one ran (the user asked for them mid-step) come next.
       await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
       await this.#collectNotes(run, stepRun);
