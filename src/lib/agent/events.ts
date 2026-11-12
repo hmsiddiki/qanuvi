@@ -17,7 +17,19 @@ export interface ShownImage {
 
 /** Every item may carry the time it arrived (seconds since 1970), for the timeline. */
 export type Item = (
-  | { kind: "user"; id: string; text: string; attachments?: string[]; images?: ShownImage[]; during?: boolean }
+  | {
+      kind: "user";
+      id: string;
+      text: string;
+      attachments?: string[];
+      images?: ShownImage[];
+      during?: boolean;
+      /**
+       * Sent while the agent worked and not taken in yet (24r): "sent" until the step in hand ends, "next" once it did;
+       * the agent's next answer has read it.
+       */
+      waiting?: "sent" | "next";
+    }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
   | {
@@ -190,10 +202,48 @@ export function resultImage(content: unknown): string {
   return "";
 }
 
+/**
+ * How long a running step has taken, for its card (24r): nothing for the first 10 seconds, then "42 s", "12 min",
+ * "1 h 05 min".
+ */
+export function elapsedLabel(seconds: number): string {
+  const s = Math.floor(seconds);
+  if (!(s >= 10)) return "";
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
 /** A tool's name without the MCP server prefix: "mcp__qanuvi-browser__browser_open" → "browser_open". */
 export function shortToolName(name: string): string {
   const m = /^mcp__[^_]+(?:_[^_]+)*?__(.+)$/.exec(name);
   return m ? m[1] : name;
+}
+
+/**
+ * Messages sent while the agent worked (24r): Claude Code reads them only once the step in hand ends. A tool's result
+ * or the turn's end marks that; the agent's next answer has then read the message, which moves to just before that
+ * answer (where it was read) and leaves the waiting area.
+ */
+function takeIn(items: Item[], type: string, msg: Json): Item[] {
+  if (!items.some((x) => x.kind === "user" && x.waiting)) return items;
+  const toolResult =
+    type === "user" &&
+    Array.isArray(obj(msg.message).content) &&
+    (obj(msg.message).content as unknown[]).some((b) => obj(b).type === "tool_result");
+  if (toolResult || type === "result" || type === "qanuvi_interrupted")
+    return items.map((x) => (x.kind === "user" && x.waiting === "sent" ? { ...x, waiting: "next" as const } : x));
+  if (type !== "assistant") return items;
+  const read = items.filter((x) => x.kind === "user" && x.waiting === "next");
+  if (!read.length) return items;
+  return [
+    ...items.filter((x) => !read.includes(x)),
+    ...read.map((x) => {
+      const { waiting: _, ...rest } = x as Extract<Item, { kind: "user" }>;
+      return rest;
+    }),
+  ];
 }
 
 /** Adds one message to the list of items. Returns a new array. */
@@ -230,7 +280,8 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     return [...items, { kind: "text", id: `live${seq}`, text: str(delta.text), live: true }];
   }
   // Anything else ends the live text: the whole message (or a handover, or the end) takes its place.
-  const out = items.filter((x) => !((x.kind === "text" || x.kind === "thinking") && x.live));
+  let out = items.filter((x) => !((x.kind === "text" || x.kind === "thinking") && x.live));
+  out = takeIn(out, type, msg);
   if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
     const images: ShownImage[] = Array.isArray(msg.images)
@@ -249,7 +300,20 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       text: withoutGuidance(withoutOverruleNote(str(msg.text))),
       ...(attachments.length ? { attachments } : {}),
       ...(images.length ? { images } : {}),
-      ...(msg.during === true ? { during: true } : {}),
+      ...(msg.during === true ? { during: true, waiting: "sent" as const } : {}),
+    });
+  } else if (type === "qanuvi_interrupted") {
+    // "Stop this command, read my message now": the steps still running were ended.
+    for (let i = 0; i < out.length; i++) {
+      const x = out[i];
+      if (x.kind === "tool" && x.state === "running")
+        out[i] = { ...x, state: "failed", result: x.result || "Stopped by you" };
+    }
+    out.push({
+      kind: "notice",
+      id: `int${seq}`,
+      text: "Stopped the command in hand; the agent reads your message next.",
+      tone: "info",
     });
   } else if (type === "qanuvi_permission") {
     const i = out.findIndex((x) => x.kind === "approval" && x.id === str(msg.request_id));
@@ -319,6 +383,10 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       state: "pending",
     });
   } else if (type === "result") {
+    // A turn the user interrupted ended as asked: no error line.
+    const last = out[out.length - 1];
+    const interrupted = last?.kind === "notice" && last.id.startsWith("int");
+    if (interrupted) msg = { ...msg, is_error: false };
     // Approvals still pending when a turn ends were never answered.
     for (let i = 0; i < out.length; i++) {
       const x = out[i];

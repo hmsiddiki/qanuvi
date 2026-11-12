@@ -10,7 +10,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Copy from "@lucide/svelte/icons/copy";
   import CopyCheck from "@lucide/svelte/icons/copy-check";
-  import type { Item } from "$lib/agent/events";
+  import { elapsedLabel, type Item } from "$lib/agent/events";
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import ChatImage from "./ChatImage.svelte";
   import { untrack } from "svelte";
@@ -76,6 +76,15 @@
   });
   let copied = $state("");
 
+  // A running step shows how long it has taken ("Bash · 12 min"), so a long command is plain to see (24r).
+  let now = $state(Date.now());
+  $effect(() => {
+    if (step.state !== "running" || !step.at) return;
+    const t = setInterval(() => (now = Date.now()), 1000);
+    return () => clearInterval(t);
+  });
+  const elapsed = $derived(step.state === "running" && step.at ? elapsedLabel(now / 1000 - step.at) : "");
+
   const lines = (t: string) => t.split("\n").length;
   const longIn = $derived(lines(step.input) > FOLDED_LINES || step.input.length > 600);
   const longOut = $derived(lines(step.output) > FOLDED_LINES || step.output.length > 600);
@@ -111,6 +120,7 @@
           />{:else if step.state === "done"}<CircleCheck size={13} />{:else}<CircleX size={13} />{/if}
       </span>
       <span class="name">{step.name}</span>
+      {#if elapsed}<span class="elapsed" title="Running for this long">· {elapsed}</span>{/if}
       <span class="summary">{step.summary}</span>
       {#if counts}<span class="counts"
           ><span class="plus">+{counts.added}</span> <span class="minus">−{counts.removed}</span></span
@@ -257,6 +267,12 @@
     flex: none;
     color: var(--qx-text);
     font-weight: 600;
+  }
+
+  .elapsed {
+    flex: none;
+    color: var(--qx-status-running);
+    font-variant-numeric: tabular-nums;
   }
 
   .summary {

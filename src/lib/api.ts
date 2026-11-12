@@ -437,6 +437,8 @@ export const api = {
     grants: (sessionId: string) => invoke<Grant[]>("agent_grants", { sessionId }),
     forgetGrants: (sessionId: string) => invoke<void>("agent_forget_grants", { sessionId }),
     stop: (sessionId: string) => invoke<void>("agent_stop", { sessionId }),
+    /** Ends the turn and its command, keeps the session: a waiting message is read next (24r). */
+    interrupt: (sessionId: string) => invoke<void>("agent_interrupt", { sessionId }),
     /** A project's secrets: only their names come back. */
     secretNames: (projectId: string) => invoke<string[]>("secrets_names", { projectId }),
     setSecret: (projectId: string, name: string, value: string) =>

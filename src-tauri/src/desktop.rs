@@ -1673,6 +1673,12 @@ fn agent_configure(
         .configure(&state.db, &session_id, model.as_deref(), mode.as_deref())
 }
 
+/// "Stop this command, read my message now": ends the agent's turn, keeps the session (24r).
+#[tauri::command]
+fn agent_interrupt(state: State<AppState>, session_id: String) -> Res<()> {
+    state.agents.interrupt(&state.db, &session_id)
+}
+
 #[tauri::command]
 fn agent_stop(state: State<AppState>, session_id: String) -> Res<()> {
     agent::mark_stopped(&state.db, &session_id);
@@ -1943,6 +1949,7 @@ pub fn run() {
             agent_config_read,
             agent_config_write,
             agent_stop,
+            agent_interrupt,
             agent_configure,
             secrets_names,
             secrets_set,

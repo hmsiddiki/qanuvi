@@ -361,6 +361,7 @@ impl Master {
                 self.agents.stop(&s(args, "sessionId"));
                 Ok(Value::Null)
             }
+            "agent_interrupt" => to(self.agents.interrupt(db, &s(args, "sessionId"))),
             "agent_rename" => to(agent::rename(db, &s(args, "sessionId"), &s(args, "title"))),
             "agent_delete" => {
                 self.agents.stop(&s(args, "sessionId"));

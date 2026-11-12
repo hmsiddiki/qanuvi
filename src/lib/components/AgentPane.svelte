@@ -39,6 +39,7 @@
     formatTokens,
     looksLikeCall,
     timelineRows,
+    type Item,
     type Row,
   } from "$lib/agent/events";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
@@ -252,8 +253,6 @@
 
   let scroller: HTMLDivElement;
 
-  /** The conversation as timeline rows: look-around steps grouped, long runs folded. */
-  let rows = $derived(timelineRows(agent.items));
   /** Groups and folds the user opened (by row id; a new session starts folded). */
   let opened = $state(new Set<string>());
   $effect(() => {
@@ -271,6 +270,16 @@
   let running = $derived(agent.busy || session?.status === "running" || session?.status === "waiting");
   /** The model at work, as the agent named it (Qanuvi's brain names each pick and handover). */
   let working = $derived(currentModel(agent.items));
+  /** Messages sent while the agent works that it has not read yet (24r): shown above the box, not in the timeline. */
+  let waitingMsgs = $derived(
+    running ? agent.items.filter((i): i is Extract<Item, { kind: "user" }> => i.kind === "user" && !!i.waiting) : [],
+  );
+  /** The conversation as timeline rows: look-around steps grouped, long runs folded. */
+  let rows = $derived(
+    timelineRows(
+      waitingMsgs.length ? agent.items.filter((i) => !(i.kind === "user" && waitingMsgs.includes(i))) : agent.items,
+    ),
+  );
 
   $effect(() => {
     void agent.items.length;
@@ -744,6 +753,24 @@
     </div>
   {/if}
 
+  {#if waitingMsgs.length}
+    <div class="waiting" aria-live="polite">
+      <div class="waiting-head">
+        <span>Waiting · the agent reads {waitingMsgs.length === 1 ? "it" : "them"} after the current step</span>
+        {#if session && session.agent !== "qanuvi"}
+          <button
+            type="button"
+            class="link"
+            disabled={agent.interrupting}
+            title="Ends the command in hand and the agent's turn (like Esc in Claude Code); the session stays and reads your message next"
+            onclick={() => agent.interrupt()}
+            >{agent.interrupting ? "Stopping…" : "Stop this command, read my message now"}</button
+          >
+        {/if}
+      </div>
+      {#each waitingMsgs as m (m.id)}<div class="waiting-msg" title={m.text}>{m.text}</div>{/each}
+    </div>
+  {/if}
   <form class="composer" class:dropping onsubmit={send} bind:this={composer}>
     {#if mention && project}
       <MentionPicker
@@ -1646,6 +1673,31 @@
     resize: none;
     outline: none;
     user-select: text;
+  }
+
+  .waiting {
+    margin: 0 var(--qx-space-2) var(--qx-space-1);
+    padding: var(--qx-space-1) var(--qx-space-2);
+    border: 1px dashed var(--qx-border);
+    border-radius: var(--qx-radius-input);
+    font-size: var(--qx-text-small);
+  }
+
+  .waiting-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--qx-space-2);
+    color: var(--qx-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .waiting-msg {
+    overflow: hidden;
+    color: var(--qx-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .user .during {

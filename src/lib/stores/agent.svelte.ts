@@ -192,6 +192,7 @@ ${text}`
       }
       if (id !== this.selectedId) return;
       if (event.kind === "line") {
+        if (event.line.includes('"qanuvi_interrupted"')) this.interrupting = false;
         this.items = reduce(this.items, event.line, ++this.#seq, Math.floor(Date.now() / 1000));
         // An approval answered by a standing one: the minutes left change.
         if (event.line.includes('"auto":true')) this.loadGrants();
@@ -488,6 +489,29 @@ ${text}`
     if (this.selectedId) await this.rename(this.selectedId, `${from.title} (branch)`).catch(() => {});
     return true;
   }
+
+  /** "Stop this command, read my message now" asked and not answered yet. */
+  interrupting = $state(false);
+
+  /**
+   * Ends the agent's turn and its command, keeps the session: the waiting message is read next (24r). A plan step
+   * hears it too, so the turn's end is not taken for the step's end.
+   */
+  async interrupt(): Promise<void> {
+    const id = this.selectedId;
+    if (!id || this.interrupting) return;
+    this.interrupting = true;
+    try {
+      if (id === this.planSessionId) this.onPlanInterrupt?.();
+      await api.agent.interrupt(id);
+    } catch (e) {
+      this.error = errorText(e);
+      this.interrupting = false;
+    }
+  }
+
+  /** The runner hears an interrupt on its step here. */
+  onPlanInterrupt: (() => void) | null = null;
 
   async stop(): Promise<void> {
     if (!this.selectedId) return;

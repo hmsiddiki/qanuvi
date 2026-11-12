@@ -250,9 +250,13 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-13 (later), committed, NOT published: 15i part 2 code (formatting, quick fixes, "Fix with agent";
     see 15i "Built (part 2)"). Verify green (273 + 156 tests; no Rust change). Checked against Intelephense and
     rust-analyzer with a probe script; not yet driven in the window.
-  - RESUME HERE (new conversation): owner said yes to 24r (2026-11-13): build 24r first, all three parts (waiting
-    area, timer on long commands, "Stop this command, read my message now" via Claude Code's interrupt control
-    request; in a plan run treated as paused by the user). Then drive 15i part 2 in the running app on a scratch
+  - Done 2026-11-13, committed, NOT published: 24r code (see 24r "Built"). Verify green (278 + 156 tests). Not yet
+    driven in the window, and Claude Code's exact timing of reading a queued message was not probed (a headless probe
+    was blocked on this PC); check it on a scratch project first.
+  - Owner's ideas 2026-11-13, answered, waiting for the owner's yes: 24s (below).
+  - RESUME HERE (new conversation): drive 24r in the running app on a scratch project (a long command such as
+    sleep 120, send a message, watch the waiting area and the timer, press "Stop this command, read my message now";
+    once in a plan step too). If the owner said yes to 24s, build it next. Then drive 15i part 2 in the running app on a scratch
     project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6,
     15i parts 1 and 2 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -266,7 +270,19 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
-- [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, next to build)**: a
+- [ ] **24s. Conversations as containers, bookmarks, and handover in the chat (owner, 2026-11-13; proposed, waiting
+  for the owner's yes)**: in plain chat the context also grows until each tool call re-reads 150k+ tokens.
+  - A conversation (container) keeps what lasts: title, bookmark (a "Saved" group on top of the session list,
+    rename, unpin, search), the running handover note (goal, done and checked, left, files and why, decisions) and its
+    sessions. Sessions inside it come and go.
+  - Handover in chat: the 24p parts (handoverDue, handoverRequest) watch each answer's context. Past a limit (setting,
+    default about 150k, 0 = off) a bar offers "Hand over to a fresh session"; an "always" option does it by itself.
+    Never mid-edit: the agent finishes the edit in hand and writes the note; the new session in the same
+    container starts from the note and the last request. One timeline, with a thin "new session · context carried
+    over" line.
+  - Opening a saved conversation later starts from its note, not a resume of the old heavy session.
+  - Every agent (Claude Code, Qanuvi's own, free models); suggests, never forces.
+- [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, built 2026-11-13)**: a
   message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
   the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the
   chat already shows it as part of the conversation.
@@ -277,6 +293,14 @@ runs on or off; with it off nothing is sent anywhere.
     run the runner treats it as paused by the user, not a failed try. Later, optional: end only the command's own
     process (must not hit the MCP helpers that are also Claude Code's children). Qanuvi's own agent: simpler, it runs
     the commands itself.
+  - Built: events.ts takeIn marks a message sent mid-work "waiting" until a tool result or the turn's end passes and
+    the agent answers; it then moves to where it was read. AgentPane shows waiting messages above the box (not in the
+    timeline) with "Stop this command, read my message now" (Claude Code only; Qanuvi's own agent reads between its
+    steps). agent.rs interrupt() sends the interrupt control request; the turn's result after it is stored after a
+    qanuvi_interrupted line (running steps show "Stopped by you", no error line, status idle not failed); an
+    answer while idle sets the session running again (the queued message's turn). Runner: an interrupt on a step does
+    not end the step's turn; nothing goes on within 30 s: paused by the owner (session kept for Resume). StepCard: a
+    running step shows "· 42 s" / "· 12 min" after 10 s.
 - [ ] **24q. No token bursts: smaller steps and pacing (owner, 2026-11-13)**: measured on PLAN-D (3 days, about 45
   steps, $218 at API prices): the cost is cache reads, not new input. Each tool call re-reads the whole context, so
   a step of about 180 turns at 100-150k context reads about 20M tokens (88b 20.7M / $8.53, 87c 19.0M, 93z 21.8M,

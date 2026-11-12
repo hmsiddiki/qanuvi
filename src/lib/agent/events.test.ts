@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clockTime,
+  elapsedLabel,
   timelineRows,
   currentModel,
   looksLikeCall,
@@ -188,6 +189,16 @@ describe("live text and the model at work", () => {
   });
 });
 
+describe("elapsedLabel", () => {
+  it("says nothing at first, then seconds, minutes and hours", () => {
+    expect(elapsedLabel(3)).toBe("");
+    expect(elapsedLabel(Number.NaN)).toBe("");
+    expect(elapsedLabel(42)).toBe("42 s");
+    expect(elapsedLabel(12 * 60 + 30)).toBe("12 min");
+    expect(elapsedLabel(65 * 60)).toBe("1 h 05 min");
+  });
+});
+
 describe("messages sent while the agent works", () => {
   it("keeps the mark, and only on those messages", () => {
     const items = reduceAll([
@@ -195,6 +206,74 @@ describe("messages sent while the agent works", () => {
       JSON.stringify({ type: "qanuvi_user", text: "Also the footer", during: true }),
     ]);
     expect(items.map((i) => i.kind === "user" && i.during)).toEqual([undefined, true]);
+  });
+
+  const tool = (id: string) =>
+    JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id, name: "Bash", input: { command: "sleep 600" } }] },
+    });
+  const done = (id: string) =>
+    JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content: "ok" }] } });
+  const answer = (text: string) =>
+    JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text }] } });
+  const waiting = (items: ReturnType<typeof reduceAll>) =>
+    items.filter((i) => i.kind === "user" && i.waiting).map((i) => (i.kind === "user" ? i.text : ""));
+
+  it("waits until the step in hand ends and the agent answers, then moves to where it was read", () => {
+    const sent = [
+      JSON.stringify({ type: "qanuvi_user", text: "Run the tests" }),
+      tool("a"),
+      JSON.stringify({ type: "qanuvi_user", text: "Skip the slow ones", during: true }),
+    ];
+    expect(waiting(reduceAll(sent))).toEqual(["Skip the slow ones"]);
+    // The command ended but the agent has not answered yet: still waiting.
+    expect(waiting(reduceAll([...sent, done("a")]))).toEqual(["Skip the slow ones"]);
+    // An answer that started before the step ended does not count.
+    expect(waiting(reduceAll([...sent, answer("still on it")]))).toEqual(["Skip the slow ones"]);
+    const read = reduceAll([...sent, done("a"), answer("Skipping them")]);
+    expect(waiting(read)).toEqual([]);
+    expect(read.map((i) => i.kind)).toEqual(["user", "tool", "user", "text"]);
+    expect(read[2].kind === "user" && read[2].during).toBe(true);
+  });
+
+  it("is read at the next turn when the turn ends first", () => {
+    const items = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "Hi" }),
+      JSON.stringify({ type: "qanuvi_user", text: "And then", during: true }),
+      JSON.stringify({ type: "result", duration_ms: 1000 }),
+      answer("Now the second"),
+    ]);
+    expect(waiting(items)).toEqual([]);
+    expect(items.map((i) => i.kind)).toEqual(["user", "result", "user", "text"]);
+  });
+
+  it("an interrupt stops the running step without an error and the message is read next", () => {
+    const items = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "Run the tests" }),
+      tool("a"),
+      JSON.stringify({ type: "qanuvi_user", text: "Stop, wrong folder", during: true }),
+      JSON.stringify({ type: "qanuvi_interrupted" }),
+      JSON.stringify({ type: "result", is_error: true, subtype: "error_during_execution", duration_ms: 5000 }),
+    ]);
+    const t = items.find((i) => i.kind === "tool");
+    expect(t?.kind === "tool" && t.state).toBe("failed");
+    const r = items.find((i) => i.kind === "result");
+    expect(r?.kind === "result" && r.ok).toBe(true);
+    expect(waiting(items)).toEqual(["Stop, wrong folder"]);
+    expect(items.some((i) => i.kind === "notice" && i.id.startsWith("int"))).toBe(true);
+  });
+
+  it("after an interrupt the next answer has read the message", () => {
+    const items = reduceAll([
+      tool("a"),
+      JSON.stringify({ type: "qanuvi_user", text: "Stop, wrong folder", during: true }),
+      JSON.stringify({ type: "qanuvi_interrupted" }),
+      JSON.stringify({ type: "result", is_error: true, duration_ms: 5000 }),
+      answer("Switching folders"),
+    ]);
+    expect(waiting(items)).toEqual([]);
+    expect(items.map((i) => i.kind).slice(-2)).toEqual(["user", "text"]);
   });
 });
 

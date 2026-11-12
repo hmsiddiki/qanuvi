@@ -113,6 +113,8 @@ import { projects } from "./projects.svelte";
 import { memoryContext } from "./memory.svelte";
 
 const FINISHED = ["idle", "failed", "ended", "stopped"];
+/** After "Stop this command, read my message now" on a step: how long the runner waits for the agent to go on. */
+const INTERRUPT_GRACE_MS = 30_000;
 
 class RunnerStore {
   run = $state<PlanRun | null>(null);
@@ -1627,9 +1629,16 @@ class RunnerStore {
       let last: Session | null = null;
       let settled = false;
       const show = agent.handler(() => id);
+      // "Stop this command, read my message now" on this step (24r): the turn that ends is not the step's end; the
+      // agent reads the message and goes on. Nothing goes on within half a minute: the step is paused by the owner.
+      let interrupted = false;
+      let interruptWait: ReturnType<typeof setTimeout> | null = null;
+      agent.onPlanInterrupt = () => (interrupted = true);
       const finish = (outcome: Turn["outcome"], note = "") => {
         if (settled) return;
         settled = true;
+        if (interruptWait) clearTimeout(interruptWait);
+        if (agent.onPlanInterrupt) agent.onPlanInterrupt = null;
         this.#endTurn = null;
         resolve({ sessionId: id, last, outcome, note });
       };
@@ -1688,6 +1697,19 @@ class RunnerStore {
           last = event.session;
           id = event.session.id;
           const st = event.session.status;
+          if (st === "running" && interruptWait) {
+            clearTimeout(interruptWait);
+            interruptWait = null;
+          }
+          if (st === "idle" && interrupted) {
+            interrupted = false;
+            interruptWait = setTimeout(() => {
+              interruptWait = null;
+              this.#pauseNow = true;
+              finish("stopped");
+            }, INTERRUPT_GRACE_MS);
+            return;
+          }
           if (FINISHED.includes(st))
             finish(st === "stopped" ? "stopped" : st === "failed" || st === "ended" ? "error" : "idle");
         } else if (event.kind === "exit") {

@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -180,7 +181,12 @@ struct Running {
     /// Permission requests waiting for an answer: request id -> the request (tool name and the input to pass back).
     pending: Arc<Mutex<HashMap<String, Value>>>,
     channel: Arc<Mutex<Sink<AgentEvent>>>,
+    /// "Stop this command, read my message now" was asked: the turn's end is no failure (24r).
+    interrupted: Arc<AtomicBool>,
 }
+
+/// The note stored in front of the result of a turn the user interrupted: the steps still running show as stopped.
+pub const INTERRUPTED_LINE: &str = r#"{"type":"qanuvi_interrupted"}"#;
 
 /// How long a "for a few minutes" approval lasts.
 pub const GRANT_MINUTES: u64 = 10;
@@ -920,6 +926,7 @@ impl Agents {
 
         let pending = Arc::new(Mutex::new(HashMap::new()));
         let channel = Arc::new(Mutex::new(channel));
+        let interrupted = Arc::new(AtomicBool::new(false));
         self.map.lock().unwrap_or_else(|e| e.into_inner()).insert(
             session.id.clone(),
             Running {
@@ -928,6 +935,7 @@ impl Agents {
                 project_id: project.id.clone(),
                 pending: pending.clone(),
                 channel: channel.clone(),
+                interrupted: interrupted.clone(),
             },
         );
 
@@ -971,7 +979,10 @@ impl Agents {
                 let noise = (kind == "system" && subtype == "thinking_tokens")
                     || kind == "rate_limit_event"
                     || (kind == "control_response"
-                        && msg["response"]["request_id"] == "qanuvi-init");
+                        && (msg["response"]["request_id"] == "qanuvi-init"
+                            || msg["response"]["request_id"]
+                                .as_str()
+                                .is_some_and(|r| r.starts_with("qanuvi-interrupt"))));
                 if noise {
                     continue;
                 }
@@ -979,6 +990,15 @@ impl Agents {
                 if kind == "stream_event" {
                     send(AgentEvent::Line { line });
                     continue;
+                }
+                // The end of a turn the user interrupted: noted first, so its running steps read as stopped.
+                let interrupted_turn =
+                    kind == "result" && interrupted.swap(false, Ordering::SeqCst);
+                if interrupted_turn {
+                    append_event(db, &session_id, INTERRUPTED_LINE);
+                    send(AgentEvent::Line {
+                        line: INTERRUPTED_LINE.to_string(),
+                    });
                 }
                 append_event(db, &session_id, &line);
                 let mut changed = false;
@@ -1011,11 +1031,12 @@ impl Agents {
                         got_result = true;
                         let t = totals_from_result(&msg, cost_in_process);
                         cost_in_process += t.turn_cost_usd;
-                        let status = if msg["is_error"].as_bool().unwrap_or(false) {
-                            "failed"
-                        } else {
-                            "idle"
-                        };
+                        let status =
+                            if !interrupted_turn && msg["is_error"].as_bool().unwrap_or(false) {
+                                "failed"
+                            } else {
+                                "idle"
+                            };
                         let _ = db.conn().execute(
                             "UPDATE sessions SET input_tokens = input_tokens + ?2, output_tokens = output_tokens + ?3,
                              cache_read_tokens = cache_read_tokens + ?4, cost_usd = cost_usd + ?5,
@@ -1039,6 +1060,13 @@ impl Agents {
                             .map(|s| s.status == "waiting")
                             .unwrap_or(false);
                         if waiting && pending.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
+                            set_status(db, &session_id, "running");
+                            changed = true;
+                        }
+                        // A message sent while it worked starts the next turn by itself (after an interrupt too).
+                        if kind == "assistant"
+                            && get(db, &session_id).is_ok_and(|s| s.status == "idle")
+                        {
                             set_status(db, &session_id, "running");
                             changed = true;
                         }
@@ -1218,6 +1246,23 @@ impl Agents {
             );
         }
         Ok(())
+    }
+
+    /// "Stop this command, read my message now" (24r): what Esc does in Claude Code's own terminal. The turn and its
+    /// command end, the session stays, and a message waiting in the agent's input is read next.
+    pub fn interrupt(&self, db: &Db, id: &str) -> Result<(), String> {
+        if get(db, id)?.agent == "qanuvi" {
+            return Err("Qanuvi's own agent reads your message before its next step.".into());
+        }
+        let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        let running = map.get_mut(id).ok_or("The session is not running.")?;
+        running.interrupted.store(true, Ordering::SeqCst);
+        send_line(
+            &mut running.stdin,
+            &json!({"type": "control_request", "request_id": format!("qanuvi-interrupt-{}", crate::llm::short_id()),
+                "request": {"subtype": "interrupt"}})
+            .to_string(),
+        )
     }
 
     /// Closes the agent process of sessions idle for longer than `secs`: they free their memory, and the next message
