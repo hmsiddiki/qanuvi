@@ -238,7 +238,9 @@ runs on or off; with it off nothing is sent anywhere.
     guidance.ts (modelSwitchRequest, SWITCH_RESUME), runner switchStepModel. Not yet driven live.
   - PUBLISHED 0.1.13 on the dev channel 2026-11-12 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24j plan
     housekeeping, the Plan view stale-file fix, and the model switch with handover. Nothing unpublished now.
-  - RESUME HERE (new conversation): next is (5) 24o finishing pass, then (6) 24n part 6 (edit and resend, rewind,
+  - Done 2026-11-12 (later), committed, NOT published (ask the owner first): (5) 24o finishing pass, with the two
+    open notes below folded in (archive numbers, footer switching text). Verify green (248 + 152 tests). Next: (6).
+  - RESUME HERE (new conversation): next is (6) 24n part 6 (edit and resend, rewind,
     search), then (7) 15i language servers and debugging. Open notes: drive 24j, the stale-file fix and the model
     switch live on the scratch plan (never on the owner's folders); the planner (PlannerDialog) does not yet avoid
     step numbers that are only in the plan's archive (fold into 24o); the chat footer shows the picked model while
@@ -268,13 +270,28 @@ runs on or off; with it off nothing is sent anywhere.
   - Fast with long sessions (virtual list) and light on memory, as the rest of Qanuvi.
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
-- [ ] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their
+- [x] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their
   instructions; before the run is called done, one smarter pass checks the whole. The final report offers it with its
   estimated cost and time (from the run's own step costs); the user runs it or ignores it (a project setting can run
   it by itself). Light: the project's full checks and a review of the whole run's diff (leftovers, debug code, steps
   that do not fit together). Full: also live tests on a scratch copy where the project defines them, a fix-up of what
   was found, and the task list notes checked against what was built. It ends with a short "still open" list. Runs on
   the paid decider (24e) while free or cheap workers do the steps: intelligence paid for once, where it catches most.
+  Done 2026-11-12, committed, NOT published (ask the owner first): a run that ends done with work in it shows a
+  "Finishing pass" card in the Run panel with Light and Full buttons and an estimate from the run's own finished steps
+  (light about half a typical paid step, full 1.5 steps growing with the run, at most 4; "cost not known yet" when only
+  free steps finished). A plan's run setting "At the end, the finishing pass" offers it (default) or runs light or
+  full by itself. Light: the project's test command, then the paid decider (agent.runProviderId, the planner model)
+  reviews the run's whole diff (a snapshot is taken at the run's start, so earlier uncommitted work is left out; after
+  a restart the changed files' diffs against the commit; the plan, its archive and logs left out) with the Done notes;
+  free models review if the paid agent cannot answer, and the report says so. Full: also a session on the decider that
+  fixes what was found, removes leftovers, checks Done notes against the code (corrects a note, never re-marks steps),
+  runs live tests only where the project or plan defines them and only on scratch copies, then the full checks with
+  Qanuvi's fix rounds; it ends with a "Still open:" list read from its answer. The card shows findings, still open,
+  cost, time and checks; Stop works; "Open its session". Its cost counts in the run (its own line), an entry goes to
+  the plan's FINISH.md log and the inbox. Also folded in: the planner and the rewrite of a failed step number new
+  steps after the plan's archive too; the chat footer says "switching after the edit in hand" while a picked model
+  waits. Code: plan/finishing.ts (+ tests), runner finishPass. Not driven live yet: try it on the scratch plan.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so

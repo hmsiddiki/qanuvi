@@ -18,6 +18,7 @@
   import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
   import { finishedCost, planHistory } from "$lib/plan/costs";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
+  import { finishEstimate, offersFinish, FINISHER, type FinishAuto, type FinishLevel } from "$lib/plan/finishing";
 
   interface Props {
     project: Project;
@@ -72,6 +73,8 @@
   let fullChecks = $state<"step" | "section">("section");
   /** The plan's private details are deleted once every step is done. */
   let forgetPrivate = $state(true);
+  /** At the end of a run that got done: offer the finishing pass, or run it by itself (24o). */
+  let finishAuto = $state<FinishAuto>("ask");
   let openSteps = $derived(plan.steps.filter((s) => s.status !== "x" && s.status !== "!"));
   let fromLine = $state(-1);
   let onlyOne = $state(false);
@@ -120,6 +123,7 @@
     onLimit: "wait" | "free";
     stepUsd: number;
     stepMin: number;
+    finishAuto: FinishAuto;
   }
   function restore(): boolean {
     try {
@@ -149,6 +153,7 @@
       if (k.onLimit === "wait" || k.onLimit === "free") onLimit = k.onLimit;
       if (typeof k.stepUsd === "number") stepUsd = k.stepUsd;
       if (typeof k.stepMin === "number") stepMin = k.stepMin;
+      if (k.finishAuto === "ask" || k.finishAuto === "light" || k.finishAuto === "full") finishAuto = k.finishAuto;
       return true;
     } catch {
       return false;
@@ -179,6 +184,7 @@
       onLimit,
       stepUsd,
       stepMin,
+      finishAuto,
     };
     localStorage.setItem(KEY(), JSON.stringify(k));
   }
@@ -220,6 +226,8 @@
   /** A model's name in the run's lines: the free agent's attempts read as Qanuvi core. */
   function label(model: string) {
     if (model.startsWith(DECIDER)) return `Decider (${modelLabel(provider, model.slice(DECIDER.length))})`;
+    if (model.startsWith(FINISHER))
+      return `Finishing pass (${modelLabel(deciderProvider, model.slice(FINISHER.length))})`;
     return isFree(model) ? "Qanuvi core (free)" : modelLabel(provider, model);
   }
   let error = $state("");
@@ -365,6 +373,7 @@
         onLimit,
         stepCostLimit: Math.max(0, Number(stepUsd) || 0),
         stepMinutes: Math.max(0, Number(stepMin) || 0),
+        finishPass: finishAuto,
         // Free decides, free works: the whole run goes to Qanuvi's own agent with the free models.
         ...(freeOnly && hasFree ? { providerId: "qanuvi", model: "" } : {}),
       });
@@ -409,6 +418,26 @@
   let saved = $derived(run ? freeSavings(run, runner.paidPerStep) : { steps: 0, estimateUsd: 0 });
   let deciderUsd = $derived((run?.deciderCalls ?? []).reduce((t, c) => t + c.costUsd, 0));
   let current = $derived(run?.steps.find((s) => s.status === "running") ?? null);
+
+  /** The finishing pass (24o) runs on the paid decider, whatever agent did the steps. */
+  let deciderProvider = $derived(providerById(agent.runProviderId));
+  let offer = $derived(!!run && !runner.finishing && offersFinish(run));
+  function estimate(level: FinishLevel): string {
+    if (!run) return "";
+    const e = finishEstimate(run, level);
+    const cost = e.costUsd === null ? "cost not known yet" : `about ${formatCost(e.costUsd)}`;
+    const time = e.seconds === null ? "" : `, about ${Math.max(1, Math.round(e.seconds / 60))} min`;
+    return cost + time;
+  }
+  async function finishNow(level: FinishLevel) {
+    error = "";
+    if (!layout.state.agentVisible && level === "full") layout.toggleAgent();
+    try {
+      await runner.finishPass(project, level);
+    } catch (e) {
+      error = errorText(e);
+    }
+  }
   let currentAttempt = $derived(current ? current.attempts.length + 1 : 0);
 </script>
 
@@ -604,6 +633,17 @@
     {#if mode === "default"}<p class="hint warn">In Manual mode the run waits for your approval at every edit.</p>{/if}
     <label
       class="check"
+      title="One smarter look at the whole run before it is called done, on the paid decider. Light: the project's full checks and a review of the run's whole diff (leftovers, debug code, steps that do not fit together). Full: also a session that fixes what was found, runs live tests where the project defines them (on a scratch copy only) and checks the Done notes against the code. Both end with a short still-open list."
+    >
+      At the end, the finishing pass
+      <select bind:value={finishAuto}>
+        <option value="ask">offer it, with its cost (I choose)</option>
+        <option value="light">light, by itself (checks and a review of the whole diff)</option>
+        <option value="full">full, by itself (also fix what is found, live tests, Done notes checked)</option>
+      </select>
+    </label>
+    <label
+      class="check"
       title="The agent reads the open steps once (read-only, a few cents) and lists what the run will need from you: logins, decisions, risky steps, things to set up. You answer once; then the run goes on alone."
     >
       <input type="checkbox" bind:checked={checkFirst} /> Check what the run needs from me first
@@ -753,10 +793,104 @@
         </ul>
       </details>
     {/if}
+    {#if offer}
+      <div class="finish">
+        <div>
+          <strong>Finishing pass</strong>
+          <span class="dim">
+            one look at the whole run on {deciderProvider.name} before it is called done; it ends with a still-open list.
+          </span>
+        </div>
+        <div class="row">
+          <button
+            type="button"
+            onclick={() => finishNow("light")}
+            title="The project's full checks and a review of the run's whole diff">Light · {estimate("light")}</button
+          >
+          <button
+            type="button"
+            onclick={() => finishNow("full")}
+            title="Also fixes what is found, runs live tests where the project defines them (scratch copies only) and checks the Done notes against the code"
+            >Full · {estimate("full")}</button
+          >
+          <span class="dim">or leave it</span>
+        </div>
+      </div>
+    {:else if run.finish}
+      {@const f = run.finish}
+      <div class="finish {f.status}">
+        <div class="row">
+          {#if f.status === "running"}<LoaderCircle size={13} class="spin" />{/if}
+          <strong
+            >Finishing pass ({f.level}){f.status === "running"
+              ? runner.checking
+                ? ": running the full checks"
+                : ": at work"
+              : f.status === "done"
+                ? ": done"
+                : f.status === "stopped"
+                  ? ": stopped"
+                  : ": did not finish"}</strong
+          >
+          {#if f.status !== "running"}
+            <span class="dim"
+              >{formatCost(f.costUsd)} · {Math.round(f.seconds)} s{f.checks
+                ? f.checks.ok
+                  ? " · checks pass"
+                  : " · checks fail"
+                : ""}</span
+            >
+          {/if}
+          <span class="spacer"></span>
+          {#if f.status === "running"}
+            <button type="button" onclick={() => runner.stop()}><Square size={11} /> Stop</button>
+          {:else if f.sessionId}
+            {@const sid = f.sessionId}
+            <button type="button" class="link" onclick={() => agent.watch(sid)}>Open its session</button>
+          {/if}
+        </div>
+        {#if f.note}<p class="dim">{f.note}</p>{/if}
+        {#if f.findings.length}
+          <details open={f.status !== "running"}>
+            <summary>Found ({f.findings.length})</summary>
+            <ul>
+              {#each f.findings as x, i (i)}<li>{x}</li>{/each}
+            </ul>
+          </details>
+        {/if}
+        {#if f.status !== "running"}
+          <p><strong>Still open</strong>{f.stillOpen.length ? "" : ": nothing"}</p>
+          {#if f.stillOpen.length}
+            <ul>
+              {#each f.stillOpen as x, i (i)}<li>{x}</li>{/each}
+            </ul>
+          {/if}
+        {/if}
+      </div>
+    {/if}
   </div>
 {/if}
 
 <style>
+  .finish {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .finish.failed {
+    border-color: var(--qx-status-failed);
+  }
+  .finish ul {
+    margin: 2px 0 0;
+    padding-left: 18px;
+  }
+  .finish p {
+    margin: 0;
+  }
   .decisions {
     margin-top: 6px;
     font-size: var(--qx-text-small, 11px);

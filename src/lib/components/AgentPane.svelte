@@ -589,6 +589,13 @@
       <span class="dim"
         >· {modelLabel(agent.provider, agent.model)}{agent.provider.efforts.length ? ` · ${agent.effort}` : ""}</span
       >
+      {#if runner.switchingTo && agent.onPlanStep}
+        <span
+          class="dim"
+          title="The agent at work finishes the edit in hand and writes a progress note; the picked model goes on from it"
+          >· switching after the edit in hand</span
+        >
+      {/if}
     </button>
     <button
       type="button"

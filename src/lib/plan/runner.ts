@@ -4,6 +4,7 @@
  */
 import type { AgentModel } from "$lib/agents/providers";
 import { parsePlan, type Step } from "./tasklist";
+import { FINISHER } from "./finishing";
 
 export interface RunOptions {
   /** Line of the first step to run; earlier steps are skipped. */
@@ -62,6 +63,8 @@ export interface RunOptions {
   team?: RunTeam;
   /** When the run stops for the user (24f); missing: "decisions", as before. */
   pause?: PauseMode;
+  /** At the end of a run that got done: offer the finishing pass, or run it by itself (24o); missing: offer it. */
+  finishPass?: import("./finishing").FinishAuto;
 }
 
 /**
@@ -135,6 +138,8 @@ export interface PlanRun {
   notes?: string[];
   /** The decider's own calls (assignment, reviews): they count in the run's cost (24e). */
   deciderCalls?: { model: string; costUsd: number }[];
+  /** The finishing pass over the whole run (24o), once it ran or runs. */
+  finish?: import("./finishing").FinishPass;
 }
 
 export type RunTeam = "settings" | "paid" | "free" | "free-only";
@@ -303,7 +308,7 @@ export function stepPrompt(file: string, step: Step, done: { number: string | nu
 }
 
 /** Totals for a run, per model and overall. */
-export function runTotals(run: Pick<PlanRun, "steps"> & Pick<Partial<PlanRun>, "deciderCalls">) {
+export function runTotals(run: Pick<PlanRun, "steps"> & Pick<Partial<PlanRun>, "deciderCalls" | "finish">) {
   const byModel = new Map<string, { attempts: number; costUsd: number; inputTokens: number; outputTokens: number }>();
   let costUsd = 0;
   let inputTokens = 0;
@@ -328,6 +333,16 @@ export function runTotals(run: Pick<PlanRun, "steps"> & Pick<Partial<PlanRun>, "
     const m = byModel.get(key) ?? { attempts: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 };
     m.attempts++;
     m.costUsd += c.costUsd;
+    byModel.set(key, m);
+  }
+  // The finishing pass (24o) counts in the run's cost, on its own line.
+  if (run.finish) {
+    costUsd += run.finish.costUsd;
+    seconds += run.finish.seconds;
+    const key = FINISHER + run.finish.model;
+    const m = byModel.get(key) ?? { attempts: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+    m.attempts++;
+    m.costUsd += run.finish.costUsd;
     byModel.set(key, m);
   }
   return { costUsd, inputTokens, outputTokens, seconds, byModel };

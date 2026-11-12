@@ -82,6 +82,19 @@ import { extractSteps, labelRange, lastNumber, renumber, replaceStep, replanProm
 import { defaultPlannerModel, planner } from "./planner.svelte";
 import { changesSince, snapshotChanges } from "./changes";
 import { failureSummary, fixPrompt, locationBlock, mentions, packetPrompt, type Location } from "$lib/plan/packet";
+import {
+  doneNotes,
+  finishEntry,
+  finishFullPrompt,
+  finishReviewPrompt,
+  isPlanFile,
+  offersFinish,
+  parseFinishReview,
+  stillOpenIn,
+  type DoneBrief,
+  type FinishLevel,
+  type FinishPass,
+} from "$lib/plan/finishing";
 
 /** Fix rounds in the same session when the test run Qanuvi does fails. */
 const MAX_FIX_ROUNDS = 2;
@@ -126,15 +139,27 @@ class RunnerStore {
     return this.run ? runTotals(this.run) : null;
   }
 
+  /** The finishing pass over a finished run is at work (24o). */
+  finishing = $state(false);
+  /** What differed from the last commit when the run started, so the pass sees only the run's own changes. */
+  #runBefore: { id: string; snap: Map<string, string> } | null = null;
+  /** The agent a turn goes to when it is not the run's own (the finishing pass runs on the paid decider). */
+  #agentOverride: string | null = null;
+
   /** The last run of a project, to show its summary. */
   async loadLast(projectId: string): Promise<void> {
-    if (this.running) return;
+    if (this.running || this.finishing) return;
     try {
       const list = await api.runs.list(projectId);
       // A run may have started while the list was loading; never replace it with an old record.
-      if (this.running) return;
+      if (this.running || this.finishing) return;
       this.run = list.length ? (JSON.parse(list[0].data) as PlanRun) : null;
       if (this.run && list[0].status !== this.run.status) this.run.status = list[0].status as PlanRun["status"];
+      // A pass that was at work when Qanuvi closed did not finish.
+      if (this.run?.finish?.status === "running") {
+        this.run.finish.status = "stopped";
+        this.run.finish.note = "Qanuvi closed while it ran.";
+      }
     } catch {
       if (!this.running) this.run = null;
     }
@@ -194,8 +219,11 @@ class RunnerStore {
    * a new session goes on with the step. Holds the context size that set it off.
    */
   #handover = 0;
-  /** The model the owner switched the running step to; the handover that follows is for that, not for size. */
-  #switchTo: string | null = null;
+  /**
+   * The model the owner switched the running step to; the handover that follows is for that, not for size. Shown in the
+   * chat footer ("switching after the edit in hand") until the new session starts.
+   */
+  switchingTo = $state<string | null>(null);
   /** Switches the running step to a model (chat picker or the step's model in the Plan view); set while a run goes. */
   #switchStep: ((model: string) => void) | null = null;
   /** Handovers in the current step. */
@@ -554,7 +582,7 @@ class RunnerStore {
   }
 
   async start(project: Project, file: string, options: RunOptions): Promise<void> {
-    if (this.running) return;
+    if (this.running || this.finishing) return;
     const provider = providerById(options.providerId || agent.runProviderId);
     const agentSettings = settings.agent(provider.id);
     let text: string;
@@ -604,6 +632,8 @@ class RunnerStore {
     };
     // Keep a reference to this run: the rest of the run works on it, whatever else is shown meanwhile.
     const run = this.run;
+    // The finishing pass compares with this, so changes from before the run are not taken for the run's (24o).
+    this.#runBefore = steps.length ? { id: run.id, snap: await snapshotChanges(project.id) } : null;
     // The plan's notes from earlier runs: the owner's instructions hold for every run of this plan.
     run.notes = [];
     {
@@ -625,7 +655,7 @@ class RunnerStore {
       live = { step: current, model, from: current.attempts.length + 1 };
       this.#liveModel = model;
       if (this.#sendMore && this.#stepLog && !this.#handover && !this.#pauseNow && !this.#stopRequested) {
-        this.#switchTo = model;
+        this.switchingTo = model;
         this.#handover = 1;
         this.#sendMore(modelSwitchRequest(this.#stepLog, modelLabel(provider, model)));
         agent.notice(
@@ -633,7 +663,7 @@ class RunnerStore {
         );
         // An agent that does not stop is stopped; the new session checks whatever it left.
         setTimeout(() => {
-          if (this.#switchTo === model && this.#handover && this.#endTurn) {
+          if (this.switchingTo === model && this.#handover && this.#endTurn) {
             if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
             this.#endTurn();
           }
@@ -967,9 +997,9 @@ class RunnerStore {
         // A step marked done goes through the usual checks below (tests, review) like any other.
         if (this.#handover && !this.#pauseNow && !this.#overLimit && !this.#stopRequested) {
           const size = this.#handover;
-          const switchTo = this.#switchTo;
+          const switchTo = this.switchingTo;
           this.#handover = 0;
-          this.#switchTo = null;
+          this.switchingTo = null;
           const now = await api.files.read(project.id, file).catch(() => null);
           if (now && stepOutcome(now.text, stepRun) === "open" && switchTo) {
             // The owner's switch: no failed try, and not counted against the handover limit.
@@ -1172,6 +1202,193 @@ class RunnerStore {
     this.#switchStep = null;
     agent.planSessionId = null;
     await this.#save(run);
+    // The owner chose to run the finishing pass by itself at the end (24o).
+    if (options.finishPass && options.finishPass !== "ask" && offersFinish(run))
+      await this.finishPass(project, options.finishPass);
+  }
+
+  /**
+   * The finishing pass over a finished run (24o): the project's full checks, then the paid decider's review of the
+   * whole run's diff; the full pass also has a session fix what was found, run live tests where the project defines
+   * them and check the Done notes, ending with a "still open" list. Its cost counts in the run's.
+   */
+  async finishPass(project: Project, level: FinishLevel): Promise<void> {
+    const run = this.run;
+    if (!run || this.running || this.finishing || run.projectId !== project.id) return;
+    // The paid agent on top decides and monitors (24e): intelligence paid for once, where it catches most.
+    const provider = providerById(agent.runProviderId);
+    const model = defaultPlannerModel(provider);
+    const pass: FinishPass = {
+      level,
+      status: "running",
+      model,
+      startedAt: Date.now(),
+      endedAt: null,
+      costUsd: 0,
+      seconds: 0,
+      checks: null,
+      findings: [],
+      stillOpen: [],
+    };
+    this.finishing = true;
+    this.#stopRequested = false;
+    this.stopping = false;
+    run.finish = pass;
+    this.changed++;
+    await this.#save(run);
+    try {
+      const command = project.settings.test_command.trim();
+      if (command) {
+        this.checking = true;
+        const c = await api.checks.run(project.id, command, CHECK_TIMEOUT_SECS).catch((e) => ({
+          ok: false,
+          exit_code: null,
+          timed_out: false,
+          duration_ms: 0,
+          output: errorText(e),
+        }));
+        this.checking = false;
+        pass.checks = {
+          command,
+          ok: c.ok,
+          summary: c.ok
+            ? ""
+            : c.timed_out
+              ? "The checks did not finish within the time limit."
+              : failureSummary(c.output),
+        };
+        await this.#save(run);
+      }
+      if (this.#stopRequested) throw new Error("stopped");
+      const { diff, files } = await this.#runDiff(project, run);
+      const briefs = await this.#doneBriefs(project, run);
+      const prompt = finishReviewPrompt(run.file, briefs, diff, pass.checks);
+      let review: { ok: boolean; findings: string[]; stillOpen: string[] };
+      try {
+        const r = await planner.ask(project, prompt, model, "Finishing pass: review the whole run", {
+          agentId: provider.id,
+          lean: true,
+        });
+        pass.costUsd += r.costUsd;
+        review = parseFinishReview(r.text);
+      } catch (e) {
+        // The paid agent cannot answer now: the free models review instead, and the report says so.
+        try {
+          const f = await freeDecide("You review code changes. Answer with JSON only.", prompt);
+          review = parseFinishReview(f.text);
+          review.findings.push(`(Reviewed by ${f.by}: ${provider.name} could not answer: ${errorText(e)})`);
+        } catch {
+          review = { ok: false, findings: [`The review did not answer (${errorText(e)}).`], stillOpen: [] };
+        }
+      }
+      if (pass.checks && !pass.checks.ok)
+        review.findings.unshift(`The full checks fail: ${pass.checks.summary.slice(0, 300)}`);
+      pass.findings = review.findings;
+      pass.stillOpen = review.stillOpen;
+      await this.#save(run);
+      if (level === "full" && !this.#stopRequested) {
+        // A session of its own: no handover, the run's own per-step limits.
+        this.#limits = { usd: run.options.stepCostLimit, minutes: run.options.stepMinutes };
+        this.#stepStartedAt = Date.now();
+        this.#stepSpentBefore = 0;
+        this.#attemptBase = 0;
+        this.#overLimit = null;
+        this.#handover = 0;
+        this.#handoverLimit = 0;
+        this.#stepLog = "";
+        this.#agentOverride = provider.id;
+        this.currentModel = model;
+        const a = await this.#attempt(
+          project,
+          finishFullPrompt(run.file, briefs, review, pass.checks, files),
+          model,
+          run.options.mode,
+          settings.agent(provider.id),
+          "Finishing pass",
+          run.options.lean,
+          run.options.indexTools,
+          command,
+        );
+        pass.sessionId = a.sessionId || undefined;
+        pass.costUsd += a.costUsd;
+        if (command && typeof a.testsPassed === "boolean")
+          pass.checks = { command, ok: a.testsPassed, summary: a.testsPassed ? "" : (a.failure ?? "") };
+        let answer = "";
+        if (a.sessionId) {
+          const lines = await api.agent.events(a.sessionId).catch(() => [] as string[]);
+          answer = reduceAll(lines)
+            .filter((i) => i.kind === "text")
+            .map((i) => (i as { text: string }).text)
+            .slice(-2)
+            .join("\n");
+          if (this.#lastIdle) await api.agent.stop(a.sessionId).catch(() => {});
+        }
+        const open = stillOpenIn(answer);
+        pass.findings = [
+          ...review.findings.map((f) => `Review: ${f}`),
+          command
+            ? `After the pass the full checks ${a.testsPassed === false ? "still fail" : "pass"}.`
+            : "No test command: the pass could not run the checks itself.",
+        ];
+        pass.stillOpen = open ?? [...review.stillOpen, "The pass's answer had no Still open list: read its session."];
+        if (a.outcome === "stopped" || this.#overLimit) {
+          pass.status = "stopped";
+          pass.note = this.#overLimit ?? "Stopped by you.";
+        } else if (a.outcome === "error") {
+          pass.status = "failed";
+          pass.note = a.note || "The session ended with an error.";
+        }
+      }
+      if (pass.status === "running") pass.status = this.#stopRequested ? "stopped" : "done";
+    } catch (e) {
+      pass.status = this.#stopRequested ? "stopped" : "failed";
+      pass.note = pass.status === "failed" ? errorText(e) : "Stopped by you.";
+    } finally {
+      this.finishing = false;
+      this.checking = false;
+      this.stopping = false;
+      this.#agentOverride = null;
+      this.#limits = {};
+      this.currentModel = "";
+      agent.planSessionId = null;
+      pass.endedAt = Date.now();
+      pass.seconds = (pass.endedAt - pass.startedAt) / 1000;
+      this.changed++;
+      await this.#save(run);
+      await api.files.logAppend(project.id, `${logDir(run.file)}/FINISH.md`, finishEntry(pass)).catch(() => {});
+      const name = run.file.split("/").pop() ?? run.file;
+      inbox.add({
+        kind: "run",
+        title: `${project.name ? `${project.name}: ` : ""}${name} finishing pass ${pass.status} · ${pass.stillOpen.length} still open`,
+        text: [...pass.findings.slice(0, 6), ...pass.stillOpen.map((x) => `Still open: ${x}`)].join("\n"),
+        open: { label: "Open the plan", view: "plan", projectId: run.projectId },
+      });
+    }
+  }
+
+  /** The run's own changes as one diff (the task list and its logs left out), and the files it changed. */
+  async #runDiff(project: Project, run: PlanRun): Promise<{ diff: string; files: string[] }> {
+    const dir = logDir(run.file);
+    const skip = (path: string) => isPlanFile(path, run.file, dir);
+    const files = [...new Set(run.steps.flatMap((s) => s.changed ?? []))].filter((f) => !skip(f));
+    const parts =
+      this.#runBefore?.id === run.id
+        ? await changesSince(project.id, this.#runBefore.snap, skip)
+        : // After a restart the run's start is not known: the files' diffs against the last commit.
+          await Promise.all(files.slice(0, 40).map((f) => api.git.diff(project.id, f).catch(() => "")));
+    return { diff: parts.filter(Boolean).join("\n"), files };
+  }
+
+  /** The steps the run finished, with the Done notes they left in the task list. */
+  async #doneBriefs(project: Project, run: PlanRun): Promise<DoneBrief[]> {
+    const now = await api.files.read(project.id, run.file).catch(() => null);
+    const steps = now ? parsePlan(now.text).steps : [];
+    return run.steps
+      .filter((s) => s.status === "done")
+      .map((s) => {
+        const found = steps.find((x) => x.number === s.number && x.title === s.title);
+        return { number: s.number, title: s.title, done: doneNotes(found?.details ?? []) };
+      });
   }
 
   /** The "Blocked: ..." line the agent wrote under a step it marked blocked, without the label. */
@@ -1319,7 +1536,13 @@ class RunnerStore {
       if (!block) return [];
       const numbered = step.number
         ? renumber(block, step.number.replace(/[a-z]$/, ""))
-        : renumber(block, lastNumber(current.text) + 1);
+        : renumber(
+            block,
+            Math.max(
+              lastNumber(current.text),
+              lastNumber((await api.files.read(project.id, archivePath(file)).catch(() => null))?.text ?? ""),
+            ) + 1,
+          );
       const labels = labelRange(numbered);
       const next = replaceStep(current.text, step, numbered, labels);
       await api.files.write(project.id, file, next, current.hash);
@@ -1473,7 +1696,7 @@ class RunnerStore {
       };
       if (!sessionId) agent.watch(null);
       // "qanuvi:auto": the step goes to Qanuvi's own agent, which lets Qanuvi core pick the free model.
-      const agentId = isFree(model) ? "qanuvi" : (this.run?.provider ?? agent.runProviderId);
+      const agentId = isFree(model) ? "qanuvi" : (this.#agentOverride ?? this.run?.provider ?? agent.runProviderId);
       const agentModel = isFree(model) ? model.slice("qanuvi:".length) : model;
       // A step's first turn gets the relevant part of the user's memory.
       (sessionId ? Promise.resolve(null) : memoryContext(project.id, prompt))
@@ -1565,7 +1788,7 @@ class RunnerStore {
     }
     this.#sessionId = null;
     this.#liveModel = null;
-    this.#switchTo = null;
+    this.switchingTo = null;
     agent.planSessionId = null;
     const last = turn.last as Session | null;
     // The session stays open: the runner decides whether the next step continues it (#settleCarry).

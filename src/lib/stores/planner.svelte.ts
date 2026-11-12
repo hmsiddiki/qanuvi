@@ -5,6 +5,7 @@
 import { api, errorText, type AgentEvent, type Project } from "$lib/api";
 import { providerById, type AgentProvider } from "$lib/agents/providers";
 import { setupFor } from "./brain.svelte";
+import { archivePath } from "$lib/plan/housekeeping";
 import { appendSection, extractSteps, lastNumber, plannerPrompt, renumber, sectionTitleFrom } from "$lib/plan/planner";
 import type { Step } from "$lib/plan/tasklist";
 import { agent } from "./agent.svelte";
@@ -137,7 +138,7 @@ class PlannerStore {
   }
 
   /**
-   * Writes the previewed steps into the task list as a new section, numbered after the existing steps. Returns the
+   * Writes the previewed steps into the task list as a new section, numbered after the existing steps (and the archived ones). Returns the
    * line of the first new step (to start a run there).
    */
   async accept(project: Project, file: string, sectionTitle: string): Promise<number> {
@@ -145,7 +146,9 @@ class PlannerStore {
     if (!p) throw new Error("Nothing to add.");
     const current = await api.files.read(project.id, file).catch(() => null);
     const text = current?.text ?? "";
-    const numbered = renumber(p.block, lastNumber(text) + 1);
+    // Numbers that are only in the plan's archive (24j) are taken too: a new step never repeats one.
+    const archived = (await api.files.read(project.id, archivePath(file)).catch(() => null))?.text ?? "";
+    const numbered = renumber(p.block, Math.max(lastNumber(text), lastNumber(archived)) + 1);
     const next = appendSection(text, sectionTitle || p.title, numbered);
     await api.files.write(project.id, file, next, current?.hash ?? null);
     this.preview = null;
