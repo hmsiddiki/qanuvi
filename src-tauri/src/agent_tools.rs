@@ -399,11 +399,7 @@ fn bash(root: &Path, command: &str) -> Result<Outcome, String> {
         }
         if start.elapsed() > BASH_TIMEOUT {
             #[cfg(unix)]
-            {
-                let _ = Command::new("kill")
-                    .args(["-9", &format!("-{}", child.id())])
-                    .status();
-            }
+            crate::checks::kill_group(child.id());
             let _ = child.kill();
             let _ = child.wait();
             break None;

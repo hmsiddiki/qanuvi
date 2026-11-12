@@ -57,12 +57,30 @@ fn kill_tree(child: &mut std::process::Child) {
         }
         let _ = k.status();
     } else {
-        let _ = Command::new("kill")
-            .args(["-9", &format!("-{pid}")])
-            .status();
+        #[cfg(unix)]
+        kill_group(child.id());
     }
     let _ = child.kill();
     let _ = child.wait();
+}
+
+/// Sends SIGKILL to the process group led by `pid` (a child started with `process_group(0)`), straight through the
+/// system call. Not the `kill` program: some versions read `kill -9 -<pid>` wrongly and signalled every process of
+/// the user, which ended the test run and the CI runner with it. Does nothing unless `pid` really leads its group.
+#[cfg(unix)]
+pub fn kill_group(pid: u32) {
+    let Ok(pid) = libc::pid_t::try_from(pid) else {
+        return;
+    };
+    if pid <= 1 {
+        return;
+    }
+    // SAFETY: plain system calls on a positive pid; a group that is gone gives an error that is ignored.
+    unsafe {
+        if libc::getpgid(pid) == pid && pid != libc::getpgrp() {
+            libc::killpg(pid, libc::SIGKILL);
+        }
+    }
 }
 
 /// Collects a stream on its own thread; the result is waited for only a short time after the command ends, since a

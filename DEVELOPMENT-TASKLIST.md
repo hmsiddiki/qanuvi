@@ -167,8 +167,10 @@ runs on or off; with it off nothing is sent anywhere.
     QCOMMERCE_TEST_* login in Project settings, Secrets, run on Opus 5.5 or Fable 5.2 with "Check what the run needs"
     on and a per-step limit.
   - Linux CI: the Ubuntu job twice ended with "the hosted runner lost communication" in the Rust tests (Windows and
-    macOS pass). A step that runs the Rust tests one at a time on Linux was added to .github/workflows/build.yml;
-    read the last test it started (Playwright on github.com/hmsiddiki/qanuvi/actions) and fix that test.
+    macOS pass). Found 2026-11-12 (scripts/ci-linux-tests.sh runs each test alone in a cgroup with limits):
+    checks::tests::stops_a_command_that_runs_too_long killed its own test process; the timeout ran the `kill`
+    program as `kill -9 -<pid>`, which some versions read wrongly and kill every process of the user (the runner
+    too). Fixed: checks::kill_group calls killpg directly, only for a real group leader (also used by agent_tools).
   - Committed after 0.1.11, not published yet: the Update Claude Code button also works for winget installs (runs
     winget upgrade). Publish it with the next batch, after asking the owner.
   - Next, in the order agreed: (1) the Linux culprit; (2) 1d automatic backups and restore; (3) 24j plan housekeeping
