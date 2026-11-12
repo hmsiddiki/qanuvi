@@ -29,6 +29,8 @@
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import LayoutPanelLeft from "@lucide/svelte/icons/layout-panel-left";
   import Palette from "@lucide/svelte/icons/palette";
+  import Code from "@lucide/svelte/icons/code";
+  import LanguagesSettings from "./LanguagesSettings.svelte";
 
   const TABS: { id: SettingsTab; label: string; icon: typeof Bot; words: string }[] = [
     {
@@ -75,6 +77,13 @@
       words: "layouts presets vs code coding side screen review sidebar conversation left right save",
     },
     { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale" },
+    {
+      id: "languages",
+      label: "Languages",
+      icon: Code,
+      words:
+        "language server lsp intelephense php typescript svelte rust analyzer python pyright errors problems completion",
+    },
     {
       id: "startup",
       label: "Start-up",
@@ -180,6 +189,8 @@
         <LayoutSettings />
       {:else if tab === "appearance"}
         <AppearanceSettings />
+      {:else if tab === "languages"}
+        <LanguagesSettings />
       {:else if tab === "startup"}
         <StartupSettings />
       {:else if tab === "updates"}

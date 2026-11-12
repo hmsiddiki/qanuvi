@@ -3,6 +3,7 @@ import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
 import { languageFor } from "$lib/editor/languages";
 import { settings } from "./settings.svelte";
+import { lsp } from "./lsp.svelte";
 
 export interface EditorTab {
   key: string;
@@ -158,6 +159,7 @@ class EditorStore {
     try {
       tab.hash = await writeTab(tab, text, force ? null : tab.hash);
       tab.savedText = text;
+      if (!tab.config) lsp.saved(tab, text);
       tab.dirty = false;
       tab.conflict = false;
       tab.saveError = "";

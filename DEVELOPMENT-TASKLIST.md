@@ -242,7 +242,12 @@ runs on or off; with it off nothing is sent anywhere.
     open notes below folded in (archive numbers, footer switching text). Verify green (248 + 152 tests). Next: (6).
   - Done 2026-11-12 (later), committed, NOT published (ask the owner first): (6) 24n part 6, edit and resend, rewind
     and search (see 24n). Verify green (257 + 152 tests). Unpublished since 0.1.13 in all: 24o and 24n part 6.
-  - RESUME HERE (new conversation): next is (7) 15i language servers and debugging. Open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13, committed, NOT published: 15i part 1 code (language servers; see 15i "Built"). Verify green
+    (262 + 156 tests). Not yet seen with a real server: no server is installed on this PC yet (rust-analyzer's
+    rustup component is missing too); installing one downloads from npm or rustup, so it waits for the owner's yes.
+  - RESUME HERE (new conversation): 15i part 1 live check on a scratch project (install Intelephense and
+    rust-analyzer from Settings, Languages, after the owner's yes; check errors, hover, completion, F12, Shift+F12,
+    F2, the Problems tab, idle stop), then 15i part 2. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -933,6 +938,17 @@ runs on or off; with it off nothing is sent anywhere.
     local models) and says so when short; each language can be turned off in Settings.
   - Order: 1. LSP for PHP, TypeScript / Svelte, Rust, with the Problems list. 2. Formatting, quick fixes, "Fix with
     agent". 3. Debugging (PHP / Xdebug and Node first). 4. Split editor, minimap.
+  - Built (part 1, 2026-11-13; live check open): src-tauri/src/lsp.rs starts a server per project and language
+    (Intelephense, typescript-language-server, svelte-language-server, rust-analyzer, Pyright), frames the messages,
+    below-normal priority, a job object, the free-memory check; stopped with its window, its project, or the last
+    window. Install on the user's click: npm servers go into the data folder's language-servers/<id> (nothing
+    global), rust-analyzer through rustup; a server already on PATH is used as it is. Window side: src/lib/lsp
+    (protocol helpers with tests, the JSON-RPC client, CodeMirror hover / completion / underlines, definition,
+    references, rename across files incl. unopened ones), stores/lsp.svelte.ts (start on first file, full-text sync
+    after a 250 ms pause, idle stop after Settings' minutes, problems per file), an install offer bar in the editor
+    (Install / Not now / Don't ask again), a Problems tab (count, filter, by file, errors first) and a References tab
+    in the bottom panel, F12 / Shift+F12 / F2 and the right-click menu (the code index stays the fallback for F12),
+    Settings, Languages (status, Install, on/off per language, idle minutes). Projects on a server get none yet.
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:

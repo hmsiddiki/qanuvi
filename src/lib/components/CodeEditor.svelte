@@ -6,7 +6,7 @@
   import { clipboardText, contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import { addToMessage } from "$lib/fileActions";
   import { ui } from "$lib/stores/ui.svelte";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { basicSetup } from "codemirror";
   import { EditorState, Compartment } from "@codemirror/state";
   import { EditorView, keymap } from "@codemirror/view";
@@ -18,6 +18,11 @@
   import { gitGutter, setGitBase } from "$lib/git/gutter";
   import { agent } from "$lib/stores/agent.svelte";
   import { ago, gitState } from "$lib/stores/git.svelte";
+  import { lintGutter, setDiagnostics } from "@codemirror/lint";
+  import { lsp, type Doc } from "$lib/stores/lsp.svelte";
+  import { lspExtensions, toDiagnostics } from "$lib/lsp/codemirror";
+  import { findReferences, goToDefinition as lspDefinition, renameSymbol } from "$lib/lsp/actions";
+  import { serverFor } from "$lib/lsp/protocol";
 
   interface Props {
     tab: EditorTab;
@@ -56,13 +61,20 @@
     const word = v.state.wordAt(s.head);
     const name = word ? v.state.sliceDoc(word.from, word.to) : "";
     const project = !t.global && !t.config;
+    const server = serverFor(t.path);
+    const lspFile = project && !!server && lsp.enabled(server);
     const lines = { from: v.state.doc.lineAt(s.from).number, to: v.state.doc.lineAt(s.to).number, text };
     const insert = (value: string) => {
       v.dispatch(v.state.replaceSelection(value));
       v.focus();
     };
     contextMenu.show(e, [
-      project && name && [{ label: `Go to definition of ${name}`, action: () => goToDefinition(name) }],
+      project &&
+        name && [
+          { label: `Go to definition of ${name}`, hint: "F12", action: () => goToDefinition(name) },
+          lspFile && { label: `Find references to ${name}`, hint: "Shift+F12", action: () => references() },
+          lspFile && { label: `Rename ${name}`, hint: "F2", action: () => rename() },
+        ],
       [
         {
           label: "Cut",
@@ -88,10 +100,64 @@
     ]);
   }
 
-  /** The symbol's definition from the code index: the only match opens; several open the "Go to" box. */
+  /** The shown file as the language servers know it; null for agent config files and files without text. */
+  function currentDoc(): Doc | null {
+    const t = editor.tabs.find((x) => x.key === shownKey);
+    if (!t || t.config || t.global || t.binary || t.tooLarge || t.error) return null;
+    return { key: t.key, projectId: t.projectId, path: t.path };
+  }
+
+  function note(text: string) {
+    blameText = text;
+    clearTimeout(blameTimer);
+    blameTimer = setTimeout(() => (blameText = ""), 8000);
+  }
+
+  /** The word at the cursor (for menus and keys). */
+  function wordAtCursor(): string {
+    if (!view) return "";
+    const w = view.state.wordAt(view.state.selection.main.head);
+    return w ? view.state.sliceDoc(w.from, w.to) : "";
+  }
+
+  function definitionKey() {
+    const name = wordAtCursor();
+    if (name) goToDefinition(name);
+    return true;
+  }
+
+  function references() {
+    const d = currentDoc();
+    const name = wordAtCursor();
+    if (view && d && name) findReferences(view, d, name).then((r) => r && note(r));
+    return true;
+  }
+
+  function rename() {
+    const v = view;
+    const d = currentDoc();
+    if (!v || !d) return true;
+    const w = v.state.wordAt(v.state.selection.main.head);
+    if (!w) return true;
+    const pos = w.from;
+    const old = v.state.sliceDoc(w.from, w.to);
+    contextMenu.ask(`Rename ${old} to`, old, "Rename", async (value: string) => {
+      const name = value.trim();
+      if (name && name !== old) note(await renameSymbol(v, d, pos, name));
+    });
+    return true;
+  }
+
+  /** Go to definition: the language server first (exact), else the code index: one match opens, several "Go to". */
   async function goToDefinition(name: string) {
     const t = tab;
     if (!t) return;
+    const d = currentDoc();
+    if (view && d) {
+      const r = await lspDefinition(view, d, name);
+      if (r === true) return;
+      if (r) note(r);
+    }
     try {
       const found = (await api.index.find(t.projectId, name)).filter((d) => d.name === name);
       if (found.length === 1) await editor.open(t.projectId, found[0].path, found[0].line);
@@ -134,8 +200,13 @@
         indentWithTab,
         { key: "Mod-s", run: save, preventDefault: true },
         { key: "Alt-b", run: blame, preventDefault: true },
+        { key: "F12", run: definitionKey, preventDefault: true },
+        { key: "Shift-F12", run: references, preventDefault: true },
+        { key: "F2", run: rename, preventDefault: true },
       ]),
       gitGutter(),
+      lintGutter(),
+      lspExtensions(currentDoc),
       qanuviTheme,
       qanuviHighlight,
       language.of([]),
@@ -149,6 +220,10 @@
             const doc = update.state.doc;
             const same = doc.length === t.savedText.length && doc.toString() === t.savedText;
             if (t.dirty === same) t.dirty = !same;
+            const d = currentDoc();
+            const key = shownKey;
+            const text = () => (shownKey === key && view ? view.state : editor.states.get(key))?.doc.toString() ?? "";
+            if (d) lsp.changed(d, text);
           }
         }
         if (update.selectionSet || update.docChanged) {
@@ -177,6 +252,7 @@
       loadBase(t);
       const ext = await loadLanguage(t.language);
       if (shownKey === t.key && view) view.dispatch({ effects: language.reconfigure(ext) });
+      reattach();
     }
     if (t.revealLine && view) {
       const n = Math.min(Math.max(1, t.revealLine), view.state.doc.lines);
@@ -214,6 +290,36 @@
     if (view && shownKey === tab.key) loadBase(tab);
   });
 
+  /** Opens the shown file in its language server (started if needed), then shows its problems. */
+  function reattach() {
+    const d = currentDoc();
+    if (!d) return;
+    const fallback = editor.tabs.find((x) => x.key === d.key)?.savedText ?? "";
+    lsp.attach(d, () => (view && shownKey === d.key ? view.state.doc.toString() : fallback)).then(showProblems);
+    showProblems();
+  }
+
+  /** The language server's problems for the shown file, as underlines and gutter marks. */
+  function showProblems() {
+    const d = currentDoc();
+    if (!view || !d) return;
+    view.dispatch(setDiagnostics(view.state, toDiagnostics(view.state, lsp.problemsFor(d.projectId, d.path))));
+  }
+
+  $effect(() => {
+    void lsp.problemsChanged;
+    void tab.key;
+    untrack(showProblems);
+  });
+
+  // Documents of closed tabs are closed in their servers too.
+  $effect(() => {
+    const keys = editor.tabs.map((t) => t.key);
+    untrack(() => lsp.sync(keys));
+  });
+
+  let offer = $derived(lsp.offer && !tab.config && serverFor(tab.path) === lsp.offer.server ? lsp.offer : null);
+
   /** The current text of the shown tab (for Save from the menu or before closing). */
   export function currentText(): string | null {
     return view ? view.state.doc.toString() : null;
@@ -228,6 +334,29 @@
 
 <div class="code-editor" bind:this={host} oncontextmenu={menu} role="presentation">
   {#if blameText}<div class="blame" role="status">{blameText}</div>{/if}
+  {#if offer}
+    {@const o = offer}
+    <div class="lsp-offer" role="status">
+      {#if o.status.install}
+        <span
+          ><strong>{o.status.serves}:</strong> errors, completion and exact go to definition need {o.status.label}.
+          {o.status.install}</span
+        >
+        <button
+          type="button"
+          class="primary"
+          disabled={lsp.installing !== null}
+          onclick={() => lsp.install(o.server).then((ok) => ok && reattach())}
+          >{lsp.installing === o.server ? "Installing…" : "Install"}</button
+        >
+      {:else}
+        <span><strong>{o.status.serves}:</strong> {o.status.missing}</span>
+      {/if}
+      <button type="button" onclick={() => lsp.notNow(o.server)}>Not now</button>
+      <button type="button" onclick={() => lsp.never(o.server)}>Don't ask again</button>
+      {#if lsp.installError}<span class="error">{lsp.installError}</span>{/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -252,6 +381,66 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .lsp-offer {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    z-index: 6;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-bg-panel);
+    font-size: var(--qx-text-small);
+  }
+
+  .lsp-offer span {
+    flex: 1 1 260px;
+  }
+
+  .lsp-offer button {
+    padding: 3px 10px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .lsp-offer button.primary {
+    border-color: var(--qx-accent);
+    background: var(--qx-accent);
+    color: var(--qx-bg-app, #fff);
+  }
+
+  .lsp-offer .error {
+    flex-basis: 100%;
+    color: var(--qx-danger, #e5534b);
+    white-space: pre-wrap;
+  }
+
+  .code-editor :global(.qx-lsp-hover) {
+    max-width: 560px;
+    max-height: 320px;
+    overflow: auto;
+    padding: 6px 10px;
+    font-size: var(--qx-text-small);
+  }
+
+  .code-editor :global(.qx-lsp-hover p) {
+    margin: 4px 0;
+  }
+
+  .code-editor :global(.qx-lsp-hover pre) {
+    margin: 4px 0;
+    white-space: pre-wrap;
   }
 
   .code-editor :global(.cm-editor) {

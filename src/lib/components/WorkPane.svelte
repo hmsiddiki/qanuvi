@@ -19,6 +19,10 @@
   import PlanView from "./PlanView.svelte";
   import SourceControl from "./SourceControl.svelte";
   import TerminalView from "./TerminalView.svelte";
+  import ProblemsPanel from "./ProblemsPanel.svelte";
+  import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import ListTree from "@lucide/svelte/icons/list-tree";
+  import { lsp } from "$lib/stores/lsp.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { platform } from "$lib/platform.svelte";
   import { shortcutLabel } from "$lib/shortcuts";
@@ -36,6 +40,8 @@
   let maximized = $derived(layout.state.terminalVisible && layout.state.terminalMaximized);
   let termTabs = $derived(terminals.forProject(project?.id ?? null));
   let activeTerm = $derived(terminals.active(project?.id ?? null));
+  let problemCount = $derived(lsp.counts(project?.id ?? null));
+  let bottom = $derived(lsp.bottom);
   let cursor = $state({ line: 1, column: 1 });
   let editorView: CodeEditor | undefined = $state();
 
@@ -287,9 +293,37 @@
     <div class="terminal" class:maximized style:height={maximized ? undefined : `${layout.state.terminalHeight}px`}>
       <div class="terminal-bar">
         <div class="terminal-tabs">
+          <div class="terminal-tab" class:active={bottom === "problems"}>
+            <button type="button" onclick={() => (lsp.bottom = "problems")}>
+              <CircleAlert size={13} />
+              <span>Problems</span>
+              {#if problemCount.errors + problemCount.warnings}
+                <span class="count">{problemCount.errors + problemCount.warnings}</span>
+              {/if}
+            </button>
+          </div>
+          {#if lsp.references}
+            <div class="terminal-tab" class:active={bottom === "references"}>
+              <button type="button" onclick={() => (lsp.bottom = "references")}>
+                <ListTree size={13} />
+                <span>References</span>
+              </button>
+              <button
+                type="button"
+                class="close"
+                aria-label="Close references"
+                onclick={() => ((lsp.references = null), (lsp.bottom = "terminal"))}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          {/if}
           {#each termTabs as t (t.key)}
-            <div class="terminal-tab" class:active={t.key === activeTerm}>
-              <button type="button" onclick={() => project && terminals.select(project.id, t.key)}>
+            <div class="terminal-tab" class:active={bottom === "terminal" && t.key === activeTerm}>
+              <button
+                type="button"
+                onclick={() => project && (terminals.select(project.id, t.key), (lsp.bottom = "terminal"))}
+              >
                 <SquareTerminal size={13} />
                 <span>{t.title}</span>
               </button>
@@ -309,7 +343,11 @@
               {#each terminals.shells as s (s.id)}<option value={s.id}>{s.label}</option>{/each}
             </select>
           {/if}
-          <IconButton label="New terminal" disabled={!project} onclick={() => project && terminals.open(project.id)}>
+          <IconButton
+            label="New terminal"
+            disabled={!project}
+            onclick={() => project && (terminals.open(project.id), (lsp.bottom = "terminal"))}
+          >
             <Plus size={14} />
           </IconButton>
           <IconButton
@@ -330,12 +368,14 @@
             projectId={t.projectId}
             shell={t.shell}
             dir={t.dir}
-            visible={t.projectId === project?.id && t.key === activeTerm}
+            visible={bottom === "terminal" && t.projectId === project?.id && t.key === activeTerm}
             ontitle={(title) => (t.title = title.length > 30 ? `${title.slice(0, 30)}…` : title || t.title)}
             onexit={() => (t.ended = true)}
           />
         {/each}
-        {#if termTabs.length === 0}
+        {#if bottom !== "terminal"}
+          <ProblemsPanel projectId={project?.id ?? null} view={bottom} />
+        {:else if termTabs.length === 0}
           <div class="terminal-empty">
             {#if project}
               <button type="button" onclick={() => terminals.open(project!.id)}
@@ -633,6 +673,13 @@
     font: inherit;
     font-size: var(--qx-text-small);
     cursor: pointer;
+  }
+
+  .terminal-tab .count {
+    padding: 0 5px;
+    border-radius: 8px;
+    background: var(--qx-bg-raised);
+    font-size: 11px;
   }
 
   .terminal-tab .close {

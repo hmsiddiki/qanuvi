@@ -17,6 +17,7 @@ export type SettingsTab =
   | "account"
   | "layout"
   | "appearance"
+  | "languages"
   | "startup"
   | "updates";
 

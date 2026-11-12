@@ -76,6 +76,23 @@ export interface Shell {
 
 export type TermEvent = { kind: "data"; data: string } | { kind: "exit"; code: number | null };
 
+/** What a language server sends (15i): whole protocol messages, lines of its log, its end. */
+export type LspEvent =
+  { kind: "message"; text: string } | { kind: "log"; text: string } | { kind: "exit"; code: number | null };
+
+/** A language server Qanuvi knows, and whether it is on this computer. */
+export interface LspStatus {
+  id: string;
+  label: string;
+  serves: string;
+  /** "qanuvi" (installed by Qanuvi), "path" (found on this computer), "" (not installed). */
+  found: "qanuvi" | "path" | "";
+  /** What installing does; empty when it cannot be installed here. */
+  install: string;
+  /** Why it cannot be installed here. */
+  missing: string;
+}
+
 export interface GitChange {
   path: string;
   status: string;
@@ -317,6 +334,19 @@ export const api = {
     kill: (id: string) => invoke<void>("term_kill", { id }),
     /** Stops this window's terminals (before the interface reloads). */
     killWindow: () => invoke<void>("term_kill_window"),
+  },
+  lsp: {
+    statuses: () => invoke<LspStatus[]>("lsp_statuses"),
+    install: (id: string) => invoke<LspStatus>("lsp_install", { id }),
+    start: (projectId: string, id: string, onEvent: (e: LspEvent) => void) => {
+      const channel = new Channel<LspEvent>();
+      channel.onmessage = onEvent;
+      return invoke<string>("lsp_start", { projectId, id, onEvent: channel });
+    },
+    send: (key: string, text: string) => invoke<void>("lsp_send", { key, text }),
+    stop: (key: string) => invoke<void>("lsp_stop", { key }),
+    /** Stops this window's servers (before the interface reloads). */
+    stopWindow: () => invoke<void>("lsp_stop_window"),
   },
   git: {
     status: (projectId: string) => invoke<GitStatus>("git_status", { projectId }),

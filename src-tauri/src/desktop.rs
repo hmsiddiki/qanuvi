@@ -32,6 +32,7 @@ impl AppInfo {
 pub struct AppState {
     db: store::Db,
     terminals: terminal::Terminals,
+    languages: crate::lsp::Servers,
     agents: agent::Agents,
     indexes: index::Indexes,
     inspector: preview::Inspector,
@@ -88,6 +89,7 @@ fn projects_add(state: State<AppState>, path: String) -> Res<projects::Project> 
 #[tauri::command]
 fn projects_remove(state: State<AppState>, id: String) -> Res<()> {
     state.terminals.kill_project(&id);
+    state.languages.stop_project(&id);
     state.agents.stop_project(&id);
     projects::remove(&state.db, &id)
 }
@@ -461,6 +463,50 @@ fn term_resize(state: State<AppState>, id: String, cols: u16, rows: u16) -> Res<
 #[tauri::command]
 fn term_kill(state: State<AppState>, id: String) {
     state.terminals.kill(&id);
+}
+
+// Language servers (15i) ------------------------------------------------------------------------------------
+
+#[tauri::command]
+async fn lsp_statuses() -> Res<Vec<crate::lsp::Status>> {
+    blocking(|| Ok(crate::lsp::statuses())).await
+}
+
+/// Installs a server; the window asked the user first.
+#[tauri::command]
+async fn lsp_install(id: String) -> Res<crate::lsp::Status> {
+    let spec = crate::lsp::spec(&id)?;
+    blocking(move || crate::lsp::install(spec)).await
+}
+
+#[tauri::command]
+async fn lsp_start(
+    window: tauri::Window,
+    state: State<'_, AppState>,
+    project_id: String,
+    id: String,
+    on_event: Channel<crate::lsp::LspEvent>,
+) -> Res<String> {
+    let root = project_root(&state, &project_id)?;
+    let servers = state.languages.clone();
+    let owner = window.label().to_string();
+    blocking(move || servers.start(&project_id, &owner, &root, &id, on_event.into())).await
+}
+
+#[tauri::command]
+fn lsp_send(state: State<AppState>, key: String, text: String) -> Res<()> {
+    state.languages.send(&key, &text)
+}
+
+#[tauri::command]
+fn lsp_stop(state: State<AppState>, key: String) {
+    state.languages.stop(&key);
+}
+
+/// Stops this window's servers (before its interface reloads).
+#[tauri::command]
+fn lsp_stop_window(window: tauri::Window, state: State<AppState>) {
+    state.languages.stop_owner(window.label());
 }
 
 // Git -------------------------------------------------------------------------------------------------------------
@@ -1694,6 +1740,7 @@ pub fn run() {
             app.manage(AppState {
                 db,
                 terminals: terminal::Terminals::default(),
+                languages: crate::lsp::Servers::default(),
                 agents: agent::Agents::default(),
                 indexes: index::Indexes::default(),
                 inspector: preview::Inspector::default(),
@@ -1749,9 +1796,11 @@ pub fn run() {
                     .any(|l| l != window.label());
                 if others {
                     state.terminals.kill_owner(window.label());
+                    state.languages.stop_owner(window.label());
                     return;
                 }
                 state.terminals.kill_all();
+                state.languages.stop_all();
                 state.agents.stop_all();
                 // Only what Qanuvi started at start-up (a proxy it found already running stays).
                 state.startup.stop_all();
@@ -1856,6 +1905,12 @@ pub fn run() {
             term_kill_window,
             term_resize,
             term_kill,
+            lsp_statuses,
+            lsp_install,
+            lsp_start,
+            lsp_send,
+            lsp_stop,
+            lsp_stop_window,
             git_status,
             git_diff,
             git_stage,

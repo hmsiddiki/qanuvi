@@ -122,6 +122,7 @@ class UpdatesStore {
   async reloadWindow(): Promise<void> {
     // The window's shells stop; the list of terminals is kept, so they open again after the reload.
     await api.term.killWindow().catch(() => {});
+    await api.lsp.stopWindow().catch(() => {});
     location.reload();
   }
 
