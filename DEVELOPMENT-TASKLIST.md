@@ -260,10 +260,11 @@ runs on or off; with it off nothing is sent anywhere.
     committed, NOT published.
   - Done 2026-11-13 (later), committed, NOT published: 24s part 2 code, bookmarks (see 24s "Built (part 2)").
     Verify green (293 + 156 tests). Not yet driven in the window.
-  - RESUME HERE (new conversation): 24s part 3 (reopen a starred chat from its handover note; note panel), then
-    drive 24s part 2 and 15i part 2 in the running app on a scratch project, then 15i part 3 (debugging, PHP /
-    Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2
-    (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
+  - PUBLISHED 0.1.14 on the dev channel 2026-11-13 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24o, 24n
+    part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2. Nothing unpublished now. Owner agreed 24t chat clean-up.
+  - RESUME HERE (new conversation): 24t chat clean-up (one session), then 24s part 3 (reopen a starred chat from its
+    handover note; note panel), then drive 24s part 2 and 15i part 2 in the running app on a scratch project, then
+    15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -275,6 +276,15 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
+- [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
+  every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
+  housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:
+  - Settings, Agents, Chat clean-up: "Delete chats not opened for N days" (Off, 30, 60 or 90; default 60).
+  - Never touches a starred chat (24s part 2), a plan-step session, a running or waiting session, or the chat open
+    now. A chat counts as a whole: its handover chain goes together, judged by its newest session's last use.
+  - Runs once at start-up (and from a "Clean up now" button), in Rust, in one transaction; events go with their
+    sessions. Says once how many chats it removed ("Removed 12 chats not opened for 60 days"), nothing when none.
+  - Then VACUUM only when much was removed (database file shrinks; skipped when small).
 - [ ] **24s. Handover in plain chat, bookmarks, reopening from the note (owner, 2026-11-13; agreed 2026-11-13,
   lean form chosen over a container layer)**: in plain chat the context grows until each tool call re-reads 150k+
   tokens. A separate container table under every chat was weighed and left out: edit and resend, rewind, branches,
