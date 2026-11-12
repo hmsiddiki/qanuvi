@@ -201,6 +201,15 @@ runs on or off; with it off nothing is sent anywhere.
     a screenshot opens its card), thinking shown folded, TodoWrite as one live checklist card. Still open in that
     step: part 2 (timeline dots, times on messages, "Read 5 files" grouping, long runs folded) and live thinking as it
     streams. Not yet looked at in the running app: check the cards on a scratch project first.
+  - Done 2026-11-12 (owner asked: "avoid heavy cost, but code quality first"), committed, NOT published: 24p handover
+    inside a step. Between steps a new session already started past carryLimit (150k) or 6 steps; inside one step
+    nothing watched the context. Now each streamed answer's context size is read (no extra reads); past the run's
+    "Hand a long step over" limit (Run panel, default 200k, 0 = off) the agent finishes the edit in hand, writes a
+    Progress note in the step's log (done and checked, left, files and why, decisions, facts learned), stops; a new
+    session checks the earlier work first and goes on. A handover is no failed try (outcome "stopped"); at most 4 per
+    step; Qanuvi's fix rounds skip the old session; a step marked done goes through the usual tests and review. Code:
+    plan/guidance.ts (handoverDue, handoverRequest, HANDOVER_RESUME), stores/runner.svelte.ts. To see live: a long step
+    on the scratch plan, then compare cost per step with earlier runs.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)

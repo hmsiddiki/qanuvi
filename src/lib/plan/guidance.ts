@@ -134,6 +134,39 @@ export function contextSize(lines: string[]): number {
   return 0;
 }
 
+/** Default context size at which a step hands over to a new session in the middle of its work (24p). */
+export const HANDOVER_DEFAULT = 200_000;
+/** At most this many handovers in one step: past that, the step goes on in its session (it may be stuck). */
+export const HANDOVER_MAX = 4;
+
+/**
+ * Whether a running step should hand over now: its context has grown past the limit (0 = never). Every further model
+ * call re-reads the whole context, so a long step gets dearer with each call, and a very long context also makes the
+ * model lose track of details; a new session that starts from a careful progress note is cheaper and keeps its focus.
+ */
+export function handoverDue(context: number, limit: number, handovers: number): boolean {
+  return limit > 0 && context >= limit && handovers < HANDOVER_MAX;
+}
+
+/**
+ * What the step's agent is told when its context is too big. Quality first: it finishes the edit in hand (nothing
+ * left half-written) and writes a note good enough for a new session to go on without guessing.
+ */
+export function handoverRequest(log: string, context: number): string {
+  return (
+    `(Qanuvi: this session's context is now about ${Math.round(context / 1000)}k tokens. A new session takes over ` +
+    `this step, so the work stays focused and the cost stays down. Finish the edit you are making so no file is left ` +
+    `half-written or broken; do not start anything new. Then add a "Progress" note to ${log} that a new session can ` +
+    `work from without guessing: what is done and checked, what is left (in order), the files you touched and why, ` +
+    `anything half-way, decisions you made and their reasons, and facts about the code you learned (names, places, ` +
+    `traps). Do not mark the step done unless it is. Then stop and answer "Handed over".)`
+  );
+}
+
+/** The first words of the new session that takes a step over. */
+export const HANDOVER_RESUME =
+  "An earlier session worked on this step until its context grew too big, and handed it over to you. Read its Progress note in the step's log first. Before you go on, read the files it names and check that what it calls done really is (fix it if not). Then finish what is left; do not redo what is done and correct.";
+
 /** At most this many steps share one session, whatever its size says. */
 export const CARRY_MAX_STEPS = 6;
 

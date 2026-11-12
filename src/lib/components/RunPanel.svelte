@@ -64,6 +64,9 @@
   /** Steps in a row on one model and section continue a session, up to a size (thousands of tokens). */
   let carryOn = $state(true);
   let carryK = $state(150);
+  /** A step in the middle of its work hands over to a new session past this size (thousands of tokens). */
+  let handoverOn = $state(true);
+  let handoverK = $state(200);
   /** Sessions also go on into the next section; full checks per step or per section. */
   let carryAcross = $state(true);
   let fullChecks = $state<"step" | "section">("section");
@@ -108,6 +111,8 @@
     replan: boolean;
     carryOn: boolean;
     carryK: number;
+    handoverOn: boolean;
+    handoverK: number;
     carryAcross: boolean;
     fullChecks: "step" | "section";
     forgetPrivate: boolean;
@@ -135,6 +140,8 @@
       if (typeof k.replan === "boolean") replan = k.replan;
       if (typeof k.carryOn === "boolean") carryOn = k.carryOn;
       if (typeof k.carryK === "number") carryK = k.carryK;
+      if (typeof k.handoverOn === "boolean") handoverOn = k.handoverOn;
+      if (typeof k.handoverK === "number") handoverK = k.handoverK;
       if (typeof k.carryAcross === "boolean") carryAcross = k.carryAcross;
       if (k.fullChecks === "step" || k.fullChecks === "section") fullChecks = k.fullChecks;
       if (typeof k.forgetPrivate === "boolean") forgetPrivate = k.forgetPrivate;
@@ -163,6 +170,8 @@
       replan,
       carryOn,
       carryK,
+      handoverOn,
+      handoverK,
       carryAcross,
       fullChecks,
       forgetPrivate,
@@ -351,6 +360,7 @@
         fullChecks,
         forgetPrivateWhenDone: forgetPrivate,
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 150)) * 1000,
+        handoverLimit: handoverOn ? Math.max(80, Math.min(800, Number(handoverK) || 200)) * 1000 : 0,
         waitBefore,
         onLimit,
         stepCostLimit: Math.max(0, Number(stepUsd) || 0),
@@ -534,6 +544,14 @@
     >
       <input type="checkbox" bind:checked={carryOn} /> Continue the session across steps, up to
       <input type="number" class="small" min="20" max="400" step="10" bind:value={carryK} disabled={!carryOn} />k tokens
+    </label>
+    <label
+      class="check"
+      title="A long step re-reads its whole context on every call, and a very long context makes the model lose track of details. Past this size the step's agent finishes the edit in hand, writes a careful progress note in the step's log, and a new session checks that work and goes on. The step's tests and review still decide when it is done."
+    >
+      <input type="checkbox" bind:checked={handoverOn} /> Hand a long step over to a new session at
+      <input type="number" class="small" min="80" max="800" step="10" bind:value={handoverK} disabled={!handoverOn} />k
+      tokens
     </label>
     <label class="check" title="Steps of a plan build on each other: the session goes on into the next section too.">
       <input type="checkbox" bind:checked={carryAcross} disabled={!carryOn} /> Also into the next section

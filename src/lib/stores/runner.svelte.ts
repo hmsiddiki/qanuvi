@@ -12,6 +12,10 @@ import {
   addedSteps,
   canCarry,
   contextSize,
+  HANDOVER_DEFAULT,
+  HANDOVER_RESUME,
+  handoverDue,
+  handoverRequest,
   needingCount,
   keepRunSetting,
   reopenedSteps,
@@ -168,6 +172,18 @@ class RunnerStore {
     }, 180_000);
   }
 
+  /**
+   * Handover (24p): the running step's context is too big; its agent was asked to write a progress note and stop, and
+   * a new session goes on with the step. Holds the context size that set it off.
+   */
+  #handover = 0;
+  /** Handovers in the current step. */
+  #handovers = 0;
+  /** The handover limit of the run going now (tokens; 0 = never). */
+  #handoverLimit = HANDOVER_DEFAULT;
+  /** The step log of the step running now (where its agent writes the progress note). */
+  #stepLog = "";
+
   /** The step's agent is pausing now (not at the end of the step). */
   #pauseNow = false;
   /** Sends a message to the step session running now (set while a turn runs). */
@@ -280,6 +296,9 @@ class RunnerStore {
 
   /** The step session is kept for Resume (the run was paused in the middle of a step). */
   #keepForResume = false;
+
+  /** The resume text is Qanuvi's handover note, not the owner's words. */
+  #resumeIsHandover = false;
 
   /** The owner's message that resumed the run (it goes first in the step's request). */
   #resumeText = "";
@@ -812,7 +831,9 @@ class RunnerStore {
         const ownLog = logPath(file, fresh);
         const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
         const resumedWith = this.#resumeText;
+        const handedOver = this.#resumeIsHandover;
         this.#resumeText = "";
+        this.#resumeIsHandover = false;
         // The plan's shared knowledge first (the same for steps in a row, so it is read from the cache), then the step.
         const read = async (p: string) => (await api.files.read(project.id, p).catch(() => null))?.text ?? "";
         let prompt =
@@ -827,9 +848,11 @@ class RunnerStore {
           ) +
           referencedBlock(planRefs) +
           "\n" +
-          (resumedWith
-            ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
-            : "") +
+          (handedOver
+            ? `${resumedWith}\n\n`
+            : resumedWith
+              ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
+              : "") +
           stepPrompt(file, fresh, done) +
           privateBlock(privateDetails) +
           logsBlock(file, ownLog, ownLogExists) +
@@ -847,7 +870,7 @@ class RunnerStore {
         // Same model, same section, still small: the step continues the last step's session (it knows the work).
         const section = fresh.section ?? "";
         const carryOn =
-          (!!resumedWith && !!this.#carry) ||
+          (!!resumedWith && !handedOver && !!this.#carry) ||
           canCarry(
             this.#carry,
             model,
@@ -859,7 +882,13 @@ class RunnerStore {
         const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
         const stepStarted = Date.now() - 2000;
         // The step's limits: what earlier attempts of it spent counts too.
-        if (!stepRun.attempts.length) this.#stepStartedAt = Date.now();
+        if (!stepRun.attempts.length) {
+          this.#stepStartedAt = Date.now();
+          this.#handovers = 0;
+        }
+        this.#handover = 0;
+        this.#stepLog = ownLog;
+        this.#handoverLimit = options.handoverLimit ?? HANDOVER_DEFAULT;
         this.#stepSpentBefore = stepRun.attempts.reduce((t, a) => t + a.costUsd, 0);
         this.#attemptBase = resume?.base.cost ?? 0;
         this.#limits = { usd: options.stepCostLimit, minutes: options.stepMinutes };
@@ -881,6 +910,27 @@ class RunnerStore {
         const changed = await api.files.changedSince(project.id, stepStarted).catch(() => [] as string[]);
         stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
         await this.#logAttempt(project, file, stepRun, attempt);
+        // Handed over (context too big): no failure; unless the step got done, a new session goes on from the note.
+        // A step marked done goes through the usual checks below (tests, review) like any other.
+        if (this.#handover && !this.#pauseNow && !this.#overLimit && !this.#stopRequested) {
+          const size = this.#handover;
+          this.#handover = 0;
+          const now = await api.files.read(project.id, file).catch(() => null);
+          if (now && stepOutcome(now.text, stepRun) === "open") {
+            this.#handovers++;
+            attempt.outcome = "stopped";
+            attempt.note = `handed over to a new session at about ${Math.round(size / 1000)}k tokens of context`;
+            stepRun.attempts.push(attempt);
+            await this.#dropCarry();
+            if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
+            this.#resumeText = HANDOVER_RESUME;
+            this.#resumeIsHandover = true;
+            agent.notice(
+              `Step ${stepRun.number ?? stepRun.title}: the context reached about ${Math.round(size / 1000)}k tokens, so a new session takes over from the progress note.`,
+            );
+            continue;
+          }
+        }
         // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
         // Paused now by the owner: the attempt is no failure, the session is kept, Resume goes on in it.
         if (this.#pauseNow) {
@@ -1334,6 +1384,21 @@ class RunnerStore {
       }, 15_000);
       const onEvent = (event: AgentEvent) => {
         show(event);
+        // The context of the call just made: too big, and the step hands over (once per attempt).
+        if (event.kind === "line" && !this.#handover && !this.#pauseNow && event.line.includes('"usage"')) {
+          const size = event.line.includes('"assistant"') ? contextSize([event.line]) : 0;
+          if (size && handoverDue(size, this.#handoverLimit, this.#handovers) && this.#sendMore && this.#stepLog) {
+            this.#handover = size;
+            this.#sendMore(handoverRequest(this.#stepLog, size));
+            // An agent that does not stop is stopped; the new session checks whatever it left.
+            setTimeout(() => {
+              if (this.#handover && this.#endTurn) {
+                if (id) api.agent.stop(id).catch(() => {});
+                this.#endTurn();
+              }
+            }, 180_000);
+          }
+        }
         if (event.kind === "session") {
           last = event.session;
           id = event.session.id;
@@ -1404,7 +1469,7 @@ class RunnerStore {
     let testsPassed: boolean | null = null;
     let failure = "";
     if (testCommand) {
-      for (let round = 0; turn.outcome === "idle" && !this.#stopRequested; round++) {
+      for (let round = 0; turn.outcome === "idle" && !this.#stopRequested && !this.#handover; round++) {
         this.checking = true;
         const check = await api.checks.run(project.id, testCommand, CHECK_TIMEOUT_SECS).catch((e) => ({
           ok: false,

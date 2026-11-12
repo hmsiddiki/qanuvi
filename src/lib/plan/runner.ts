@@ -56,6 +56,8 @@ export interface RunOptions {
   fullChecks?: "step" | "section";
   /** Past this many tokens of context the next step starts a new session (with the run's notes). */
   carryLimit?: number;
+  /** Past this many tokens of context a step in the middle of its work hands over to a new session; 0 = never. */
+  handoverLimit?: number;
   /** Who works: the Team settings, the paid agent only, or free models first (then the paid agent). */
   team?: RunTeam;
   /** When the run stops for the user (24f); missing: "decisions", as before. */
