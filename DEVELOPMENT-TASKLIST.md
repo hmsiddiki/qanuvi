@@ -236,6 +236,13 @@ runs on or off; with it off nothing is sent anywhere.
     applied from the next try or fix round. Each step now starts on its Model line as it is when it starts, so a
     later step's model changed during a run is used (before, the models read at the run's start were used). Code:
     guidance.ts (modelSwitchRequest, SWITCH_RESUME), runner switchStepModel. Not yet driven live.
+  - PUBLISHED 0.1.13 on the dev channel 2026-11-12 (owner: "publish anyway"; QANUVI_RELEASE_ANYWAY=1): 24j plan
+    housekeeping, the Plan view stale-file fix, and the model switch with handover. Nothing unpublished now.
+  - RESUME HERE (new conversation): next is (5) 24o finishing pass, then (6) 24n part 6 (edit and resend, rewind,
+    search), then (7) 15i language servers and debugging. Open notes: drive 24j, the stale-file fix and the model
+    switch live on the scratch plan (never on the owner's folders); the planner (PlannerDialog) does not yet avoid
+    step numbers that are only in the plan's archive (fold into 24o); the chat footer shows the picked model while
+    the old one is still finishing its edit (say "switching after the edit in hand" there, 24o).
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
