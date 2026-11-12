@@ -250,9 +250,11 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-13 (later), committed, NOT published: 15i part 2 code (formatting, quick fixes, "Fix with agent";
     see 15i "Built (part 2)"). Verify green (273 + 156 tests; no Rust change). Checked against Intelephense and
     rust-analyzer with a probe script; not yet driven in the window.
-  - RESUME HERE (new conversation): drive 15i part 2 in the running app on a scratch project, then 15i part 3
-    (debugging, PHP / Xdebug and Node first), unless the owner says yes to 24r first (asked 2026-11-13, no answer
-    yet). Unpublished since 0.1.13: 24o, 24n part 6, 15i parts 1 and 2. Older open notes: drive 24j, 24o, 24n
+  - RESUME HERE (new conversation): owner said yes to 24r (2026-11-13): build 24r first, all three parts (waiting
+    area, timer on long commands, "Stop this command, read my message now" via Claude Code's interrupt control
+    request; in a plan run treated as paused by the user). Then drive 15i part 2 in the running app on a scratch
+    project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6,
+    15i parts 1 and 2 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -264,7 +266,7 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
-- [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; proposed, waiting for the owner's yes)**: a
+- [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, next to build)**: a
   message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
   the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the
   chat already shows it as part of the conversation.
