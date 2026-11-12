@@ -258,9 +258,12 @@ runs on or off; with it off nothing is sent anywhere.
     24r on a release build of 46c2cb2 (copied out of target/release) with a scratch project (slow.sh, PLAN-CHECK.md).
   - Done 2026-11-13 (later): 24r and 24s part 1 driven live on a scratch project (see their "Live check"); fixes
     committed, NOT published.
-  - RESUME HERE (new conversation): 24s parts 2 and 3, then drive 15i part 2 in the running
-    app on a scratch project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13:
-    24o, 24n part 6, 15i parts 1 and 2, 24r, 24s part 1 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
+  - Done 2026-11-13 (later), committed, NOT published: 24s part 2 code, bookmarks (see 24s "Built (part 2)").
+    Verify green (293 + 156 tests). Not yet driven in the window.
+  - RESUME HERE (new conversation): 24s part 3 (reopen a starred chat from its handover note; note panel), then
+    drive 24s part 2 and 15i part 2 in the running app on a scratch project, then 15i part 3 (debugging, PHP /
+    Xdebug and Node first). Unpublished since 0.1.13: 24o, 24n part 6, 15i parts 1 and 2, 24r, 24s parts 1 and 2
+    (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -311,6 +314,14 @@ runs on or off; with it off nothing is sent anywhere.
     had the browser's light style. Verify green (291 + 156 tests).
   - (2) Bookmarks: a star on the chat and in the session list; starred chats in a "Saved" group on top (rename,
     unstar, search); housekeeping never deletes them; unbookmarked ones follow the usual clean-up.
+  - Built (part 2, 2026-11-13; not yet driven in the window): migration 6 (sessions.saved; agent::set_saved, command
+    agent_saved, also in master.rs). agent::delete refuses a starred session ("Unstar it first"), so nothing deletes a
+    starred chat; there is no automatic chat clean-up yet, so "usual clean-up" is the owner's own Delete. agent::link
+    moves the star to the new session at a handover (the newest session stands for the chat; the older parts are
+    deleted with it). Sidebar: a star on each row (shown on hover, always shown in yellow when on; right-click Star /
+    Unstar), Saved group on top and Recent below (handover.ts chatGroups), a "Find a chat" box once there are more
+    than 6 chats (every word of the title, any case; Esc clears); a starred row has no Delete. Chat footer: a star
+    beside the mode picker (not on plan steps). Rename stays as it was (right-click).
   - (3) Reopening a bookmark starts a fresh session from its last handover note, not a resume of the old heavy
     session; no note yet: written once at that moment (never on every leave: that spends tokens on chats never
     opened again). The note opens in a small panel, readable and editable; the next session works from the edited

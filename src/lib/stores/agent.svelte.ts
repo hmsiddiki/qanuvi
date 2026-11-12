@@ -213,7 +213,10 @@ class AgentStore {
     if (now) {
       now.continues_from = from.id;
       now.handover_off = from.handover_off;
+      // The star moves to the new session (agent::link does the same in the database).
+      now.saved = !!(now.saved || from.saved);
     }
+    from.saved = false;
     const queued = h.queued;
     this.handover = null;
     // Messages written during the handover go to the new session, in order (they join its first turn).
@@ -732,11 +735,26 @@ ${text}`
 
   /** Deletes a chat: the session and the earlier ones it goes on from (24s). */
   async remove(id: string): Promise<void> {
+    if (this.sessions.find((s) => s.id === id)?.saved) {
+      this.error = "This chat is starred. Unstar it first to delete it.";
+      return;
+    }
     const ids = chainOf(this.sessions, id).map((s) => s.id);
     if (!ids.includes(id)) ids.push(id);
     for (const x of ids) await api.agent.remove(x).catch((e) => (this.error = errorText(e)));
     this.sessions = this.sessions.filter((s) => !ids.includes(s.id));
     if (this.selectedId && ids.includes(this.selectedId)) this.newSession();
+  }
+
+  /** Stars or unstars a chat (24s part 2): starred chats sit under Saved and are not deleted while starred. */
+  async star(id: string, saved: boolean): Promise<void> {
+    try {
+      await api.agent.saved(id, saved);
+      const s = this.sessions.find((x) => x.id === id);
+      if (s) s.saved = saved;
+    } catch (e) {
+      this.error = errorText(e);
+    }
   }
 
   async rename(id: string, title: string): Promise<void> {

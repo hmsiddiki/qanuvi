@@ -104,3 +104,16 @@ export function chatsOnly<T extends { id: string; continues_from?: string | null
   const continued = new Set(sessions.map((s) => s.continues_from).filter((x): x is string => !!x));
   return sessions.filter((s) => !continued.has(s.id));
 }
+
+/**
+ * The session list's two groups (24s part 2): starred chats under Saved on top, the rest below, both in the order
+ * given. A filter keeps the chats whose title holds every word of it (any case).
+ */
+export function chatGroups<T extends { title: string; saved?: boolean }>(
+  chats: T[],
+  filter = "",
+): { saved: T[]; rest: T[] } {
+  const words = filter.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = chats.filter((c) => words.every((w) => c.title.toLowerCase().includes(w)));
+  return { saved: shown.filter((c) => c.saved), rest: shown.filter((c) => !c.saved) };
+}

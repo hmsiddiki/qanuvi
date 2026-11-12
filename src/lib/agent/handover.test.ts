@@ -5,6 +5,7 @@ import {
   chatHandoverDue,
   chatHandoverRequest,
   chatResumePrompt,
+  chatGroups,
   chatsOnly,
   lastRequest,
   noteAfter,
@@ -101,5 +102,29 @@ describe("chains", () => {
 
   it("lists only the newest session of each chat", () => {
     expect(chatsOnly(s).map((x) => x.id)).toEqual(["c", "x"]);
+  });
+});
+
+describe("chatGroups", () => {
+  const chats = [
+    { title: "Fix the login form", saved: false },
+    { title: "Cart totals", saved: true },
+    { title: "Login page styles", saved: true },
+    { title: "Readme" },
+  ];
+  const titles = (g: { title: string }[]) => g.map((c) => c.title);
+
+  it("puts starred chats under Saved, keeping the order", () => {
+    const g = chatGroups(chats);
+    expect(titles(g.saved)).toEqual(["Cart totals", "Login page styles"]);
+    expect(titles(g.rest)).toEqual(["Fix the login form", "Readme"]);
+  });
+
+  it("filters both groups by every word of the title, any case", () => {
+    const g = chatGroups(chats, "  LOGIN ");
+    expect(titles(g.saved)).toEqual(["Login page styles"]);
+    expect(titles(g.rest)).toEqual(["Fix the login form"]);
+    expect(titles(chatGroups(chats, "login form").rest)).toEqual(["Fix the login form"]);
+    expect(chatGroups(chats, "nothing").saved).toEqual([]);
   });
 });

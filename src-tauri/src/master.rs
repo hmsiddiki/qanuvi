@@ -369,6 +369,11 @@ impl Master {
                 &s(args, "sessionId"),
                 b(args, "off"),
             )),
+            "agent_saved" => to(agent::set_saved(
+                db,
+                &s(args, "sessionId"),
+                b(args, "saved"),
+            )),
             "agent_delete" => {
                 self.agents.stop(&s(args, "sessionId"));
                 to(agent::delete(db, &s(args, "sessionId")))

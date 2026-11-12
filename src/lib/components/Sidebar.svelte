@@ -28,6 +28,9 @@
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import X from "@lucide/svelte/icons/x";
+  import Star from "@lucide/svelte/icons/star";
+  import { chatGroups } from "$lib/agent/handover";
+  import type { Session } from "$lib/api";
   import { ask } from "$lib/stores/confirm.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { projects, kindStyle } from "$lib/stores/projects.svelte";
@@ -66,6 +69,11 @@
 
   let collapsed = $derived(layout.state.sidebarCollapsed);
   let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting").length + inbox.unread);
+
+  /** The session list (24s part 2): starred chats under Saved on top; a filter box once the list is long. */
+  let chatFilter = $state("");
+  let groups = $derived(chatGroups(agent.chats, chatFilter));
+  let showFilter = $derived(agent.chats.length > 6 || chatFilter !== "");
 
   function navigate(id: string) {
     ui.section = id;
@@ -288,7 +296,7 @@
               </button>
             {/if}
           </header>
-          {#each agent.chats as s (s.id)}
+          {#snippet chatRow(s: Session)}
             <div class="session" class:current={s.id === agent.selectedId}>
               <button
                 type="button"
@@ -298,11 +306,15 @@
                     [{ label: "Open", action: () => agent.select(s.id) }],
                     [
                       {
+                        label: s.saved ? "Unstar" : "Star (keep under Saved)",
+                        action: () => agent.star(s.id, !s.saved),
+                      },
+                      {
                         label: "Rename…",
                         action: () =>
                           contextMenu.ask("Rename the session", s.title, "Rename", (t) => agent.rename(s.id, t)),
                       },
-                      { label: "Delete", danger: true, action: () => agent.remove(s.id) },
+                      ...(s.saved ? [] : [{ label: "Delete", danger: true, action: () => agent.remove(s.id) }]),
                     ],
                   ])}
                 title="{s.title} · {s.model}"
@@ -313,16 +325,55 @@
               </button>
               <button
                 type="button"
-                class="mini"
-                title="Delete session"
-                aria-label="Delete session"
-                onclick={() => agent.remove(s.id)}
+                class="mini star"
+                class:on={s.saved}
+                title={s.saved ? "Unstar" : "Star: keep under Saved"}
+                aria-label={s.saved ? "Unstar the chat" : "Star the chat"}
+                aria-pressed={!!s.saved}
+                onclick={() => agent.star(s.id, !s.saved)}
               >
-                <X size={12} />
+                <Star size={12} fill={s.saved ? "currentColor" : "none"} />
               </button>
+              {#if !s.saved}
+                <button
+                  type="button"
+                  class="mini"
+                  title="Delete session"
+                  aria-label="Delete session"
+                  onclick={() => agent.remove(s.id)}
+                >
+                  <X size={12} />
+                </button>
+              {/if}
             </div>
+          {/snippet}
+          {#if showFilter}
+            <input
+              class="chat-filter"
+              type="search"
+              placeholder="Find a chat"
+              aria-label="Find a chat by its title"
+              bind:value={chatFilter}
+              onkeydown={(e) => e.key === "Escape" && (chatFilter = "")}
+            />
+          {/if}
+          {#if groups.saved.length}
+            <div class="subhead">Saved</div>
+            {#each groups.saved as s (s.id)}{@render chatRow(s)}{/each}
+            {#if groups.rest.length}<div class="subhead">Recent</div>{/if}
+          {/if}
+          {#each groups.rest as s (s.id)}
+            {@render chatRow(s)}
           {:else}
-            <p class="empty">{projects.current ? "Agent sessions appear here." : "Add a project to start."}</p>
+            {#if !groups.saved.length}
+              <p class="empty">
+                {chatFilter
+                  ? "No chat title matches."
+                  : projects.current
+                    ? "Agent sessions appear here."
+                    : "Add a project to start."}
+              </p>
+            {/if}
           {/each}
         </section>
       {:else}
@@ -575,6 +626,37 @@
 
   .mini:hover {
     color: var(--qx-text);
+  }
+
+  .mini.star.on {
+    visibility: visible;
+    color: var(--qx-status-waiting);
+  }
+
+  .chat-filter {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 var(--qx-space-1);
+    padding: 4px var(--qx-space-2);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: var(--qx-bg-window);
+    color: var(--qx-text);
+    font: inherit;
+    font-size: var(--qx-text-small);
+  }
+
+  .chat-filter:focus {
+    outline: none;
+    border-color: var(--qx-accent);
+  }
+
+  .subhead {
+    padding: var(--qx-space-1) var(--qx-space-2) 2px;
+    color: var(--qx-text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .dot {

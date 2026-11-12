@@ -156,6 +156,8 @@ pub struct Session {
     pub continues_from: Option<String>,
     /// This chat never hands over by itself (24s).
     pub handover_off: bool,
+    /// The chat is starred (24s part 2): listed under Saved and not deleted while starred.
+    pub saved: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -311,20 +313,41 @@ fn from_row(row: &Row) -> rusqlite::Result<Session> {
         updated_at: row.get("updated_at")?,
         continues_from: row.get("continues_from")?,
         handover_off: row.get::<_, i64>("handover_off")? != 0,
+        saved: row.get::<_, i64>("saved")? != 0,
     })
 }
 
-/// Records that `id` goes on from `from` after a chat handover (24s).
+/// Records that `id` goes on from `from` after a chat handover (24s). A star moves to the new session: the newest
+/// session stands for the chat, and the older parts are deleted with it, so they keep no star of their own.
 pub fn link(db: &Db, id: &str, from: &str) -> Result<(), String> {
     if id == from {
         return Err("A session cannot go on from itself.".into());
     }
-    db.conn()
+    let conn = db.conn();
+    conn.execute(
+        "UPDATE sessions SET continues_from = ?2,
+                saved = MAX(saved, COALESCE((SELECT saved FROM sessions WHERE id = ?2), 0))
+          WHERE id = ?1",
+        params![id, from],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute("UPDATE sessions SET saved = 0 WHERE id = ?1", [from])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Stars or unstars a chat (24s part 2).
+pub fn set_saved(db: &Db, id: &str, saved: bool) -> Result<(), String> {
+    let n = db
+        .conn()
         .execute(
-            "UPDATE sessions SET continues_from = ?2 WHERE id = ?1",
-            params![id, from],
+            "UPDATE sessions SET saved = ?2 WHERE id = ?1",
+            params![id, saved as i64],
         )
         .map_err(|e| e.to_string())?;
+    if n == 0 {
+        return Err("This session no longer exists.".into());
+    }
     Ok(())
 }
 
@@ -505,9 +528,20 @@ pub fn rename(db: &Db, id: &str, title: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Deletes a session. A starred chat is refused: unstar it first (24s part 2).
 pub fn delete(db: &Db, id: &str) -> Result<(), String> {
-    db.conn()
-        .execute("DELETE FROM sessions WHERE id = ?1", [id])
+    let conn = db.conn();
+    let saved: i64 = conn
+        .query_row("SELECT saved FROM sessions WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()
+        .map_err(|e| e.to_string())?
+        .unwrap_or(0);
+    if saved != 0 {
+        return Err("This chat is starred. Unstar it first to delete it.".into());
+    }
+    conn.execute("DELETE FROM sessions WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1482,6 +1516,27 @@ mod tests {
         let s = get(&db, "s1").unwrap();
         assert_eq!(s.continues_from.as_deref(), Some("s0"));
         assert!(s.handover_off);
+
+        // Bookmarks (24s part 2): a starred chat is not deleted; its star moves on with a handover.
+        assert!(!s.saved);
+        set_saved(&db, "s1", true).unwrap();
+        assert!(get(&db, "s1").unwrap().saved);
+        assert!(delete(&db, "s1").is_err());
+        assert!(get(&db, "s1").is_ok());
+        assert!(set_saved(&db, "nope", true).is_err());
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, project_id, title, agent, model, mode, status, created_at, updated_at)
+                 VALUES ('s2', ?1, 'Next', 'claude-code', 'm', 'default', 'idle', 2, 2)",
+                [&project.id],
+            )
+            .unwrap();
+        link(&db, "s2", "s1").unwrap();
+        assert!(get(&db, "s2").unwrap().saved);
+        assert!(!get(&db, "s1").unwrap().saved);
+        assert!(delete(&db, "s2").is_err());
+        set_saved(&db, "s2", false).unwrap();
+        delete(&db, "s2").unwrap();
 
         mark_interrupted(&db);
         assert_eq!(get(&db, "s1").unwrap().status, "ended");

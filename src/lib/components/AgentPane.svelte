@@ -7,6 +7,7 @@
   import { reviewFreeTurn } from "$lib/stores/chatReview";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import Square from "@lucide/svelte/icons/square";
+  import Star from "@lucide/svelte/icons/star";
   import Bot from "@lucide/svelte/icons/bot";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import CircleX from "@lucide/svelte/icons/circle-x";
@@ -860,6 +861,19 @@
       <AttachMenu disabled={!project} />
       <CommandMenu bind:open={commandsOpen} disabled={!project} />
       <span class="spacer"></span>
+      {#if session && !agent.onPlanStep}
+        <button
+          type="button"
+          class="star"
+          class:on={session.saved}
+          title={session.saved ? "Starred: kept under Saved. Click to unstar" : "Star: keep this chat under Saved"}
+          aria-label={session.saved ? "Unstar the chat" : "Star the chat"}
+          aria-pressed={!!session.saved}
+          onclick={() => session && agent.star(session.id, !session.saved)}
+        >
+          <Star size={13} fill={session.saved ? "currentColor" : "none"} />
+        </button>
+      {/if}
       <ModePicker disabled={running && !agent.onPlanStep} />
       {#if running}
         <button type="button" class="stop" title="Stop" aria-label="Stop" onclick={() => agent.stop()}>
@@ -1834,6 +1848,10 @@
     background: var(--qx-border);
     color: var(--qx-text-muted);
     cursor: default;
+  }
+
+  .tools .star.on {
+    color: var(--qx-status-waiting);
   }
 
   .tools .stop {

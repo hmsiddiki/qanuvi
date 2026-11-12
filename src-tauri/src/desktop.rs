@@ -1702,6 +1702,11 @@ fn agent_handover_off(state: State<AppState>, session_id: String, off: bool) -> 
 }
 
 #[tauri::command]
+fn agent_saved(state: State<AppState>, session_id: String, saved: bool) -> Res<()> {
+    agent::set_saved(&state.db, &session_id, saved)
+}
+
+#[tauri::command]
 fn agent_delete(state: State<AppState>, session_id: String) -> Res<()> {
     state.agents.stop(&session_id);
     agent::delete(&state.db, &session_id)
@@ -1981,6 +1986,7 @@ pub fn run() {
             agent_rename,
             agent_link,
             agent_handover_off,
+            agent_saved,
             agent_delete,
         ])
         .run(tauri::generate_context!())

@@ -135,6 +135,15 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 6 {
+        // Bookmarks (24s part 2): a starred chat sits in the Saved group and is not deleted while starred.
+        conn.execute_batch(
+            "BEGIN;
+             ALTER TABLE sessions ADD COLUMN saved INTEGER NOT NULL DEFAULT 0;
+             PRAGMA user_version = 6;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -157,7 +166,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

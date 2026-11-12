@@ -201,6 +201,8 @@ export interface Session {
   continues_from?: string | null;
   /** This chat never hands over by itself (24s). */
   handover_off?: boolean;
+  /** The chat is starred (24s part 2): listed under Saved and not deleted while starred. */
+  saved?: boolean;
 }
 
 export type AgentEvent =
@@ -460,6 +462,8 @@ export const api = {
     /** Records that a session goes on from an earlier one after a chat handover (24s). */
     link: (sessionId: string, from: string) => invoke<void>("agent_link", { sessionId, from }),
     handoverOff: (sessionId: string, off: boolean) => invoke<void>("agent_handover_off", { sessionId, off }),
+    /** Stars or unstars a chat (24s part 2). */
+    saved: (sessionId: string, saved: boolean) => invoke<void>("agent_saved", { sessionId, saved }),
     remove: (sessionId: string) => invoke<void>("agent_delete", { sessionId }),
   },
   browser: {
