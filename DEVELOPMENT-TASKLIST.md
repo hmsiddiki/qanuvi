@@ -210,6 +210,15 @@ runs on or off; with it off nothing is sent anywhere.
     step; Qanuvi's fix rounds skip the old session; a step marked done goes through the usual tests and review. Code:
     plan/guidance.ts (handoverDue, handoverRequest, HANDOVER_RESUME), stores/runner.svelte.ts. To see live: a long step
     on the scratch plan, then compare cost per step with earlier runs.
+  - Done 2026-11-12 (owner: "do 1 2 3 then publish"), verify green (219 + 152 tests):
+    (1) 24n part 2: timeline (dots on a thin line; times on messages, kept in session_events.at, migration 4; old
+    lines have none), 3+ look-around steps in a row as one "Read 5 files · searched 2 times" row, runs of more than 10
+    steps folded keeping the last 4, thinking shown live while written. (2) 24n part 5: @ mentions of files and
+    symbols (MentionPicker.svelte; ↑ ↓, Enter/Tab, Esc), files dropped onto the box (images attached, project files
+    mentioned, others attached; Tauri drag-drop event), right-click menu with Paste that takes images. (3) 24n part 3:
+    Edit/MultiEdit/Write steps show a diff (+N −M, folded past 14 lines) with Open and Revert (only when the edited
+    text is still in the file once; asks first; a whole-file Write has no Revert). Not driven in the running app yet:
+    the owner checks after the update. Next: (4) 24j plan housekeeping.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
