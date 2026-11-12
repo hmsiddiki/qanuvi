@@ -171,9 +171,11 @@ runs on or off; with it off nothing is sent anywhere.
     checks::tests::stops_a_command_that_runs_too_long killed its own test process; the timeout ran the `kill`
     program as `kill -9 -<pid>`, which some versions read wrongly and kill every process of the user (the runner
     too). Fixed: checks::kill_group calls killpg directly, only for a real group leader (also used by agent_tools).
+    Then the test browser took a read interrupted by a signal (EINTR) for a closed connection; now retried. DONE:
+    CI green on all three platforms (run 43146222756, commit 54cf0f5). Both fixes are unpublished, like the winget one.
   - Committed after 0.1.11, not published yet: the Update Claude Code button also works for winget installs (runs
     winget upgrade). Publish it with the next batch, after asking the owner.
-  - Next, in the order agreed: (1) the Linux culprit; (2) 1d automatic backups and restore; (3) 24j plan housekeeping
+  - Next, in the order agreed: (1) the Linux culprit (done); (2) 1d automatic backups and restore; (3) 24j plan housekeeping
     (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
     OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
