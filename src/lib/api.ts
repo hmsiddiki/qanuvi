@@ -360,6 +360,8 @@ export const api = {
     info: () => invoke<AgentInfo>("agent_info"),
     sessions: (projectId: string) => invoke<Session[]>("agent_sessions", { projectId }),
     events: (sessionId: string) => invoke<string[]>("agent_session_events", { sessionId }),
+    /** When each event line arrived (seconds; 0 for old lines), in the order of `events`. */
+    times: (sessionId: string) => invoke<number[]>("agent_session_times", { sessionId }),
     /** The sessions that changed a file, newest first (the project panel's Timeline). */
     fileHistory: (projectId: string, path: string) => invoke<FileTouch[]>("agent_file_history", { projectId, path }),
     start: (

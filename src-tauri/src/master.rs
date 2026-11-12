@@ -307,6 +307,7 @@ impl Master {
                 &s(args, "path"),
             )),
             "agent_session_events" => to(agent::session_events(db, &s(args, "sessionId"))),
+            "agent_session_times" => to(agent::session_event_times(db, &s(args, "sessionId"))),
             "agent_start" => {
                 let project = projects::get(db, &s(args, "projectId"))?;
                 let sink = stream(&s(args, "onEvent"));

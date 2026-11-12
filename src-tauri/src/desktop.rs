@@ -636,6 +636,11 @@ fn agent_session_events(state: State<AppState>, session_id: String) -> Res<Vec<S
 }
 
 #[tauri::command]
+fn agent_session_times(state: State<AppState>, session_id: String) -> Res<Vec<i64>> {
+    agent::session_event_times(&state.db, &session_id)
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 fn agent_start(
     state: State<AppState>,
@@ -1871,6 +1876,7 @@ pub fn run() {
             agent_info,
             agent_sessions,
             agent_session_events,
+            agent_session_times,
             agent_file_history,
             agent_start,
             agent_respond,

@@ -1,5 +1,7 @@
 import { api, errorText, type AgentEvent, type AgentInfo, type Attachment, type Grant, type Session } from "$lib/api";
 import { reduce, reduceAll, type Item } from "$lib/agent/events";
+
+const nowSeconds = () => Math.floor(Date.now() / 1000);
 import { settings } from "./settings.svelte";
 import { memoryContext } from "./memory.svelte";
 import { modelLabel, paidAgent, providerById, type AgentProvider } from "$lib/agents/providers";
@@ -126,9 +128,9 @@ ${text}`
       this.mode = s.mode;
     }
     try {
-      const lines = await api.agent.events(id);
+      const [lines, times] = await Promise.all([api.agent.events(id), api.agent.times(id).catch(() => [] as number[])]);
       if (this.selectedId === id) {
-        this.items = reduceAll(lines);
+        this.items = reduceAll(lines, times);
         this.#seq = lines.length;
       }
     } catch (e) {
@@ -189,7 +191,7 @@ ${text}`
       }
       if (id !== this.selectedId) return;
       if (event.kind === "line") {
-        this.items = reduce(this.items, event.line, ++this.#seq);
+        this.items = reduce(this.items, event.line, ++this.#seq, Math.floor(Date.now() / 1000));
         // An approval answered by a standing one: the minutes left change.
         if (event.line.includes('"auto":true')) this.loadGrants();
       } else if (event.kind === "error") {
@@ -232,6 +234,7 @@ ${text}`
         ...(during ? { during: true } : {}),
       }),
       ++this.#seq,
+      nowSeconds(),
     );
     try {
       // A new session gets the relevant part of the user's memory with its first message.
@@ -308,6 +311,7 @@ ${text}`
         this.items,
         JSON.stringify({ type: "system", subtype: "qanuvi_route", text: t, model }),
         ++this.#seq,
+        nowSeconds(),
       ));
     try {
       const { by, text: answer } = await freeDecide(
@@ -339,6 +343,7 @@ ${text}`
       this.items,
       JSON.stringify({ type: "system", subtype: "qanuvi_route", text, model }),
       ++this.#seq,
+      nowSeconds(),
     );
   }
 
@@ -365,6 +370,7 @@ ${text}`
         model,
       }),
       ++this.#seq,
+      nowSeconds(),
     );
     this.#forceModel = model;
     return this.send(projectId, picked.text);
@@ -449,6 +455,7 @@ ${text}`
         this.items,
         JSON.stringify({ type: "qanuvi_permission", request_id: requestId, allow }),
         ++this.#seq,
+        nowSeconds(),
       );
     } catch (e) {
       this.error = errorText(e);

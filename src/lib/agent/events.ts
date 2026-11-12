@@ -6,6 +6,7 @@
 
 import { withoutOverruleNote } from "$lib/core/decider";
 import { withoutGuidance } from "$lib/plan/guidance";
+import type { Edit } from "./diff";
 
 /** An image in a message: stored in the data folder (`file`), or still in hand (`src`, a data address). */
 export interface ShownImage {
@@ -14,7 +15,8 @@ export interface ShownImage {
   src?: string;
 }
 
-export type Item =
+/** Every item may carry the time it arrived (seconds since 1970), for the timeline. */
+export type Item = (
   | { kind: "user"; id: string; text: string; attachments?: string[]; images?: ShownImage[]; during?: boolean }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
@@ -32,6 +34,10 @@ export type Item =
       input: string;
       /** OUT: the whole result (cut at a length a card can show). */
       output: string;
+      /** A file change (Edit, MultiEdit, Write): what it replaced and put there, shown as a diff. */
+      edits?: Edit[];
+      /** The change wrote the whole file (its old text is not known: no Revert from the chat). */
+      whole?: boolean;
       /** A screenshot the tool answered with, as a data address. */
       image?: string;
     }
@@ -46,11 +52,12 @@ export type Item =
       auto?: boolean;
     }
   /** The model's thinking, shown folded. */
-  | { kind: "thinking"; id: string; text: string }
+  | { kind: "thinking"; id: string; text: string; live?: boolean }
   /** The agent's to-do list (TodoWrite): one card, updated in place each time the agent writes the list again. */
   | { kind: "todos"; id: string; todos: Todo[] }
   | { kind: "result"; id: string; ok: boolean; seconds: number; costUsd: number; text: string }
-  | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string };
+  | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string }
+) & { at?: number };
 
 export interface Todo {
   text: string;
@@ -83,6 +90,34 @@ export function toolInput(name: string, input: Json): string {
     return str(input.file_path) + range;
   }
   return cutAt(toolDetail(short, input), IN_MAX);
+}
+
+/** Longest text of one edit kept for the diff. */
+const EDIT_MAX = 20000;
+
+/** The changes a file tool makes, for the diff in its card. */
+export function editsOf(name: string, input: Json): { edits: Edit[]; whole?: boolean } | null {
+  const short = shortToolName(name);
+  const one = (e: Json): Edit | null =>
+    typeof e.new_string === "string" || typeof e.old_string === "string"
+      ? { old: str(e.old_string), new: str(e.new_string), ...(e.replace_all === true ? { all: true } : {}) }
+      : null;
+  if (short === "Edit") {
+    const e = one(input);
+    return e ? { edits: [e] } : null;
+  }
+  if (short === "MultiEdit" && Array.isArray(input.edits)) {
+    const edits = input.edits
+      .map(obj)
+      .map(one)
+      .filter((e): e is Edit => !!e);
+    return edits.length ? { edits } : null;
+  }
+  if (short === "Write" && typeof input.content === "string") {
+    const content = input.content.length > EDIT_MAX ? input.content.slice(0, EDIT_MAX) : input.content;
+    return { edits: [{ old: "", new: content }], whole: true };
+  }
+  return null;
 }
 
 /** The to-do list a TodoWrite call carries. */
@@ -162,7 +197,15 @@ export function shortToolName(name: string): string {
 }
 
 /** Adds one message to the list of items. Returns a new array. */
-export function reduce(items: Item[], line: string, seq: number): Item[] {
+export function reduce(items: Item[], line: string, seq: number, at = 0): Item[] {
+  const out = reduceLine(items, line, seq);
+  if (!at || out === items) return out;
+  // New items get the time; items updated in place keep the time they started.
+  const known = new Set(items.map((x) => x.id));
+  return out.map((x) => (known.has(x.id) || x.at ? x : { ...x, at }));
+}
+
+function reduceLine(items: Item[], line: string, seq: number): Item[] {
   let msg: Json;
   try {
     msg = obj(JSON.parse(line));
@@ -174,14 +217,20 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
   // Text as it is written: added to the live text at the end.
   if (type === "stream_event") {
     const delta = obj(obj(msg.event).delta);
-    if (delta.type !== "text_delta" || !str(delta.text)) return items;
     const last = items[items.length - 1];
+    // Thinking as it is written: shown folded, like the finished thinking that takes its place.
+    if (delta.type === "thinking_delta" && str(delta.thinking)) {
+      if (last?.kind === "thinking" && last.live)
+        return [...items.slice(0, -1), { ...last, text: last.text + str(delta.thinking) }];
+      return [...items, { kind: "thinking", id: `livethink${seq}`, text: str(delta.thinking), live: true }];
+    }
+    if (delta.type !== "text_delta" || !str(delta.text)) return items;
     if (last?.kind === "text" && last.live)
       return [...items.slice(0, -1), { ...last, text: last.text + str(delta.text) }];
     return [...items, { kind: "text", id: `live${seq}`, text: str(delta.text), live: true }];
   }
   // Anything else ends the live text: the whole message (or a handover, or the end) takes its place.
-  const out = items.filter((x) => !(x.kind === "text" && x.live));
+  const out = items.filter((x) => !((x.kind === "text" || x.kind === "thinking") && x.live));
   if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
     const images: ShownImage[] = Array.isArray(msg.images)
@@ -236,6 +285,7 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
           result: "",
           input: toolInput(str(b.name), input),
           output: "",
+          ...(editsOf(str(b.name), input) ?? {}),
         });
       }
     }
@@ -294,8 +344,104 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
   return out;
 }
 
-export function reduceAll(lines: string[]): Item[] {
-  return lines.reduce<Item[]>((items, line, i) => reduce(items, line, i), []);
+export function reduceAll(lines: string[], times: number[] = []): Item[] {
+  return lines.reduce<Item[]>((items, line, i) => reduce(items, line, i, times[i] ?? 0), []);
+}
+
+type Tool = Extract<Item, { kind: "tool" }>;
+
+/** A row of the timeline: an item, several look-around steps in a row as one, or a long run of steps folded. */
+export type Row =
+  | Item
+  | { kind: "group"; id: string; label: string; steps: Tool[]; state: Tool["state"]; at?: number }
+  | { kind: "fold"; id: string; count: number; rows: Row[] };
+
+const READING = /^(Read|read_lines|outline|NotebookRead)$/;
+const SEARCHING = /^(Grep|Glob|LS|search|find_symbol|project_map|memory_search|WebSearch)$/;
+const PAGE = /^(browser_read|browser_links|browser_fields|WebFetch)$/;
+
+/** Steps that only look around (read, search, read a page): several in a row read as one line. */
+export function isLook(step: Tool): boolean {
+  return READING.test(step.name) || SEARCHING.test(step.name) || PAGE.test(step.name);
+}
+
+/** "Read 5 files · searched 2 times". */
+export function lookLabel(steps: Tool[]): string {
+  const files = new Set(steps.filter((s) => READING.test(s.name)).map((s) => s.file ?? s.summary)).size;
+  const searches = steps.filter((s) => SEARCHING.test(s.name)).length;
+  const pages = steps.filter((s) => PAGE.test(s.name)).length;
+  const times = (n: number) => (n === 1 ? "once" : `${n} times`);
+  const parts = [
+    files ? `Read ${files} file${files === 1 ? "" : "s"}` : "",
+    searches ? `searched ${times(searches)}` : "",
+    pages ? `read the page ${times(pages)}` : "",
+  ].filter(Boolean);
+  const text = parts.join(" · ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Look-around steps in a row become one group from this many. */
+export const GROUP_FROM = 3;
+/** A run of steps longer than this (between messages) folds, keeping the last few in view. */
+export const FOLD_OVER = 10;
+export const FOLD_KEEP = 4;
+
+/**
+ * The items as timeline rows: look-around steps in a row grouped, and long runs of steps folded so the newest stay in
+ * view. A failed or running look step stays in its group (the group shows the state).
+ */
+export function timelineRows(items: Item[]): Row[] {
+  const grouped: Row[] = [];
+  let run: Tool[] = [];
+  const flush = () => {
+    if (run.length >= GROUP_FROM) {
+      const state = run.some((s) => s.state === "running")
+        ? "running"
+        : run.some((s) => s.state === "failed")
+          ? "failed"
+          : "done";
+      grouped.push({ kind: "group", id: `g${run[0].id}`, label: lookLabel(run), steps: run, state, at: run[0].at });
+    } else grouped.push(...run);
+    run = [];
+  };
+  for (const item of items) {
+    if (item.kind === "tool" && isLook(item)) run.push(item);
+    else {
+      flush();
+      grouped.push(item);
+    }
+  }
+  flush();
+  // Long runs of steps (and the quiet lines between them) fold, the last few stay.
+  const out: Row[] = [];
+  let steps: Row[] = [];
+  const isStep = (r: Row) => r.kind === "tool" || r.kind === "group" || r.kind === "thinking";
+  const end = () => {
+    if (steps.filter(isStep).length > FOLD_OVER) {
+      const hidden = steps.slice(0, steps.length - FOLD_KEEP);
+      out.push({ kind: "fold", id: `f${hidden[0].id}`, count: hidden.filter(isStep).length, rows: hidden });
+      out.push(...steps.slice(steps.length - FOLD_KEEP));
+    } else out.push(...steps);
+    steps = [];
+  };
+  for (const r of grouped) {
+    if (isStep(r) || r.kind === "notice" || (r.kind === "approval" && r.state !== "pending")) steps.push(r);
+    else {
+      end();
+      out.push(r);
+    }
+  }
+  end();
+  return out;
+}
+
+/** The time of a message: the clock time today, with the date on other days. */
+export function clockTime(at: number, now = Date.now()): string {
+  const d = new Date(at * 1000);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(now).toDateString() === d.toDateString()
+    ? time
+    : `${d.toLocaleDateString([], { day: "numeric", month: "short" })} ${time}`;
 }
 
 export function formatTokens(n: number): string {

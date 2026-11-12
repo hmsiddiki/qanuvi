@@ -116,6 +116,15 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 4 {
+        // The chat's timeline (24n): when each line arrived (seconds; 0 for lines from before).
+        conn.execute_batch(
+            "BEGIN;
+             ALTER TABLE session_events ADD COLUMN at INTEGER NOT NULL DEFAULT 0;
+             PRAGMA user_version = 4;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -138,7 +147,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

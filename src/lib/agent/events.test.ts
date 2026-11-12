@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  clockTime,
+  timelineRows,
   currentModel,
   looksLikeCall,
   formatCost,
@@ -292,5 +294,70 @@ describe("step cards, thinking and to-do lists", () => {
         { text: "Fixing", status: "in_progress" },
       ],
     });
+  });
+});
+
+describe("the timeline", () => {
+  const tool = (id: string, name: string, file: string | null = null, state: "done" | "failed" | "running" = "done") =>
+    ({ kind: "tool", id, name, summary: file ?? name, file, state, result: "", input: "", output: "" }) as const;
+  const text = (id: string) => ({ kind: "text", id, text: "ok" }) as const;
+
+  it("groups three or more look-around steps in a row and says what they did", () => {
+    const rows = timelineRows([
+      tool("a", "Read", "a.ts"),
+      tool("b", "Read", "b.ts"),
+      tool("c", "Grep"),
+      tool("d", "Read", "a.ts"),
+      tool("e", "Edit", "a.ts"),
+      tool("f", "Read", "c.ts"),
+    ]);
+    expect(rows.map((r) => r.kind)).toEqual(["group", "tool", "tool"]);
+    expect(rows[0]).toMatchObject({ label: "Read 2 files · searched once", state: "done" });
+  });
+
+  it("keeps fewer than three as single steps and shows a failure on the group", () => {
+    expect(timelineRows([tool("a", "Read", "a.ts"), tool("b", "Grep")]).map((r) => r.kind)).toEqual(["tool", "tool"]);
+    const [g] = timelineRows([tool("a", "Glob"), tool("b", "Grep", null, "failed"), tool("c", "Grep")]);
+    expect(g).toMatchObject({ kind: "group", label: "Searched 3 times", state: "failed" });
+  });
+
+  it("folds a long run of steps and keeps the newest in view", () => {
+    const steps = Array.from({ length: 14 }, (_, i) => tool(`s${i}`, "Bash"));
+    const rows = timelineRows([text("t0"), ...steps, text("t1")]);
+    expect(rows.map((r) => r.kind)).toEqual(["text", "fold", "tool", "tool", "tool", "tool", "text"]);
+    expect(rows[1]).toMatchObject({ count: 10 });
+  });
+
+  it("stamps new items with the time they arrived and keeps a step's start time", () => {
+    const call = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id: "x", name: "Bash", input: { command: "ls" } }] },
+    });
+    const done = JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "x", content: "a" }] },
+    });
+    const items = reduceAll([call, done], [100, 160]);
+    expect(items[0]).toMatchObject({ state: "done", at: 100 });
+  });
+
+  it("shows the clock time today and the date on other days", () => {
+    const at = new Date(2026, 10, 12, 9, 5).getTime() / 1000;
+    expect(clockTime(at, new Date(2026, 10, 12, 18).getTime())).not.toMatch(/Nov/);
+    expect(clockTime(at, new Date(2026, 10, 14).getTime())).toMatch(/12/);
+  });
+});
+
+describe("thinking as it is written", () => {
+  it("grows one live thinking item, replaced by the whole thinking when it arrives", () => {
+    const d = (thinking: string) =>
+      JSON.stringify({ type: "stream_event", event: { delta: { type: "thinking_delta", thinking } } });
+    let items = reduceAll([d("First "), d("the tests.")]);
+    expect(items).toEqual([{ kind: "thinking", id: "livethink0", text: "First the tests.", live: true }]);
+    items = reduceAll([
+      d("First "),
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "thinking", thinking: "First the tests." }] } }),
+    ]);
+    expect(items).toEqual([{ kind: "thinking", id: "th1.0", text: "First the tests." }]);
   });
 });

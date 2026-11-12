@@ -440,6 +440,19 @@ pub fn session_events(db: &Db, session_id: &str) -> Result<Vec<String>, String> 
         .map_err(|e| e.to_string())
 }
 
+/// When each line of a session arrived (seconds since 1970; 0 for lines stored before times were kept), in the same
+/// order as [session_events].
+pub fn session_event_times(db: &Db, session_id: &str) -> Result<Vec<i64>, String> {
+    let conn = db.conn();
+    let mut stmt = conn
+        .prepare("SELECT at FROM session_events WHERE session_id = ?1 ORDER BY seq")
+        .map_err(|e| e.to_string())?;
+    stmt.query_map([session_id], |r| r.get::<_, i64>(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
 pub fn rename(db: &Db, id: &str, title: &str) -> Result<(), String> {
     let title = title.trim();
     if title.is_empty() {
@@ -545,9 +558,9 @@ pub fn totals_from_result(msg: &Value, cost_so_far_in_process: f64) -> Totals {
 /// Adds a line to a session's history (agent output, or Qanuvi's own notes of the user's messages and answers).
 pub fn append_event(db: &Db, session_id: &str, line: &str) {
     let _ = db.conn().execute(
-        "INSERT INTO session_events (session_id, seq, line)
-         SELECT ?1, COALESCE(MAX(seq), 0) + 1, ?2 FROM session_events WHERE session_id = ?1",
-        params![session_id, line],
+        "INSERT INTO session_events (session_id, seq, line, at)
+         SELECT ?1, COALESCE(MAX(seq), 0) + 1, ?2, ?3 FROM session_events WHERE session_id = ?1",
+        params![session_id, line, crate::store::now()],
     );
 }
 
@@ -1430,6 +1443,9 @@ mod tests {
         append_event(&db, "s1", "b");
         append_event(&db, "s1", "c");
         assert_eq!(session_events(&db, "s1").unwrap(), vec!["a", "b", "c"]);
+        let times = session_event_times(&db, "s1").unwrap();
+        assert_eq!(times.len(), 3);
+        assert!(times.iter().all(|t| *t > 1_700_000_000));
     }
 
     #[test]
