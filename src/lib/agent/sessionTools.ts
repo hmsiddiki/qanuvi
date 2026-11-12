@@ -21,7 +21,7 @@ function transcriptLine(item: Item): string {
     case "text":
       return item.live ? "" : `Agent: ${item.text}`;
     case "tool":
-      return `(Agent step: ${item.name}${item.summary ? ` ${item.summary}` : ""}${item.state === "failed" ? ", failed" : ""})`;
+      return `(Agent step: ${item.name}${item.summary ? ` ${item.summary}` : ""}${item.state === "failed" ? ", failed" : item.state === "stopped" ? ", stopped" : ""})`;
     case "todos":
       return `(Agent to-do list: ${item.todos.map((t) => `${t.status === "completed" ? "[x]" : "[ ]"} ${t.text}`).join("; ")})`;
     default:
@@ -79,7 +79,7 @@ export function rewindFrom(items: Item[], from: number): Rewind {
   let steps = 0;
   for (const item of items.slice(from)) {
     if (item.kind !== "tool" || !item.edits?.length || !item.file) continue;
-    if (item.state === "failed") continue; // a failed edit changed nothing
+    if (item.state === "failed" || item.state === "stopped") continue; // a failed or stopped edit changed nothing
     steps++;
     if (item.whole) {
       cannot.set(item.file, "written whole by a step (its earlier text is not known)");

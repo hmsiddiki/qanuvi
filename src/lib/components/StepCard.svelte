@@ -6,6 +6,7 @@
    */
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import CircleX from "@lucide/svelte/icons/circle-x";
+  import CircleStop from "@lucide/svelte/icons/circle-stop";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Copy from "@lucide/svelte/icons/copy";
@@ -117,7 +118,9 @@
         {#if step.state === "running"}<LoaderCircle
             size={13}
             class="spin"
-          />{:else if step.state === "done"}<CircleCheck size={13} />{:else}<CircleX size={13} />{/if}
+          />{:else if step.state === "done"}<CircleCheck size={13} />{:else if step.state === "stopped"}<CircleStop
+            size={13}
+          />{:else}<CircleX size={13} />{/if}
       </span>
       <span class="name">{step.name}</span>
       {#if elapsed}<span class="elapsed" title="Running for this long">· {elapsed}</span>{/if}

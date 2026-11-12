@@ -256,9 +256,9 @@ runs on or off; with it off nothing is sent anywhere.
   - Owner agreed 2026-11-13: 24s in the lean form (below), next after the 24r check.
   - Done 2026-11-13 (later), committed, NOT published: 24s part 1 code (see 24s "Built (part 1)"). The owner drives
     24r on a release build of 46c2cb2 (copied out of target/release) with a scratch project (slow.sh, PLAN-CHECK.md).
-  - RESUME HERE (new conversation): get the owner's 24r results and fix what they found; then drive 24s part 1 on
-    a scratch project (set the limit low, for example 20k, to see the bar, a handover, the folded note, a message
-    sent during it, reopening the chat from the list). Then 24s parts 2 and 3, then drive 15i part 2 in the running
+  - Done 2026-11-13 (later): 24r and 24s part 1 driven live on a scratch project (see their "Live check"); fixes
+    committed, NOT published.
+  - RESUME HERE (new conversation): 24s parts 2 and 3, then drive 15i part 2 in the running
     app on a scratch project, then 15i part 3 (debugging, PHP / Xdebug and Node first). Unpublished since 0.1.13:
     24o, 24n part 6, 15i parts 1 and 2, 24r, 24s part 1 (publish only with the owner's yes). Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -301,6 +301,14 @@ runs on or off; with it off nothing is sent anywhere.
     rewind or waiting area); the sidebar lists only the newest session of a chat; deleting a chat deletes its chain.
     Settings, Agents, Chat handover card (When, Limit in thousands). Plan sessions skipped (runner has 24p). Not
     done: the /compact probe (headless probes are blocked on this PC). Verify green (289 + 156 tests).
+  - Live check (2026-11-13, same build, limit 20k; Claude Code starts at about 18.5k of context): the bar shows past
+    the limit; Hand over now: the agent writes the note, the new session starts with the folded "New session · context
+    carried over (was 20k) · the note" line, checks the note against the files, and a message sent during the
+    handover goes to the new session and is answered; after a restart the chat reopens with its whole chain, and the
+    sessions list shows it once (three linked sessions). Fixed from the check: (1) the new session started above a low
+    limit (its own start plus the note) and offered a handover again at once, a loop: it now counts from its first
+    measured size (offered again only after 50k more); (2) Settings search did not find "handover"; (3) the Limit field
+    had the browser's light style. Verify green (291 + 156 tests).
   - (2) Bookmarks: a star on the chat and in the session list; starred chats in a "Saved" group on top (rename,
     unstar, search); housekeeping never deletes them; unbookmarked ones follow the usual clean-up.
   - (3) Reopening a bookmark starts a fresh session from its last handover note, not a resume of the old heavy
@@ -326,6 +334,14 @@ runs on or off; with it off nothing is sent anywhere.
     answer while idle sets the session running again (the queued message's turn). Runner: an interrupt on a step does
     not end the step's turn; nothing goes on within 30 s: paused by the owner (session kept for Resume). StepCard: a
     running step shows "· 42 s" / "· 12 min" after 10 s.
+  - Live check (2026-11-13, release build of 35e7d13, scratch project, Claude Code on Sonnet 5.5): the timer counts
+    on the running Bash step; a message sent during `sh slow.sh` waits above the box with the Stop button and, without
+    Stop, moves in after the step ends and is answered ("Added while it worked"); Stop ends the command at once, keeps
+    the session, and the next turn reads the message. Claude Code reads a queued message right after the tool result
+    (the timing the headless probe could not see). Fixed from the check: the stopped step showed a red cross and
+    Claude Code's raw "The user doesn't want to proceed…" text and the turn said "Finished": now the step has a stop
+    icon and "Stopped by you" (either order of its result and Qanuvi's notice), the turn reads "Stopped by you · 26 s"
+    in a neutral colour (events.ts state "stopped", result.stopped; rewind and session tools skip stopped edits).
 - [ ] **24q. No token bursts: smaller steps and pacing (owner, 2026-11-13)**: measured on PLAN-D (3 days, about 45
   steps, $218 at API prices): the cost is cache reads, not new input. Each tool call re-reads the whole context, so
   a step of about 180 turns at 100-150k context reads about 20M tokens (88b 20.7M / $8.53, 87c 19.0M, 93z 21.8M,

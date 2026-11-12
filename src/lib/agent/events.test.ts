@@ -257,11 +257,52 @@ describe("messages sent while the agent works", () => {
       JSON.stringify({ type: "result", is_error: true, subtype: "error_during_execution", duration_ms: 5000 }),
     ]);
     const t = items.find((i) => i.kind === "tool");
-    expect(t?.kind === "tool" && t.state).toBe("failed");
+    expect(t).toMatchObject({ state: "stopped", result: "Stopped by you" });
     const r = items.find((i) => i.kind === "result");
-    expect(r?.kind === "result" && r.ok).toBe(true);
+    expect(r).toMatchObject({ ok: true, stopped: true });
     expect(waiting(items)).toEqual(["Stop, wrong folder"]);
     expect(items.some((i) => i.kind === "notice" && i.id.startsWith("int"))).toBe(true);
+  });
+
+  it("Claude Code's rejected text for the stopped step shows as stopped, before or after the notice", () => {
+    const rejected = (id: string) =>
+      JSON.stringify({
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: id,
+              is_error: true,
+              content: "The user doesn't want to proceed with this tool use. The tool use was rejected.",
+            },
+          ],
+        },
+      });
+    for (const order of [
+      [rejected("a"), JSON.stringify({ type: "qanuvi_interrupted" })],
+      [JSON.stringify({ type: "qanuvi_interrupted" }), rejected("a")],
+    ]) {
+      const items = reduceAll([
+        tool("a"),
+        ...order,
+        JSON.stringify({ type: "result", is_error: true, duration_ms: 89400 }),
+      ]);
+      expect(items.find((i) => i.kind === "tool")).toMatchObject({ state: "stopped", output: "" });
+      expect(items.find((i) => i.kind === "result")).toMatchObject({ ok: true, stopped: true });
+    }
+  });
+
+  it("a later turn's result is not marked stopped by an older interrupt", () => {
+    const items = reduceAll([
+      tool("a"),
+      JSON.stringify({ type: "qanuvi_interrupted" }),
+      JSON.stringify({ type: "result", duration_ms: 1000 }),
+      answer("Next"),
+      JSON.stringify({ type: "result", duration_ms: 2000 }),
+    ]);
+    const results = items.filter((i) => i.kind === "result");
+    expect(results.map((r) => r.kind === "result" && !!r.stopped)).toEqual([true, false]);
   });
 
   it("after an interrupt the next answer has read the message", () => {

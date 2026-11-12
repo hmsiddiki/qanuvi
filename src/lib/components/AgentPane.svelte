@@ -1091,8 +1091,10 @@
       {/if}
     </div>
   {:else if item.kind === "result"}
-    <div class="result" class:failed={!item.ok}>
-      {item.ok ? "Finished" : "Stopped with an error"} · {item.seconds.toFixed(1)} s{item.text ? ` · ${item.text}` : ""}
+    <div class="result" class:failed={!item.ok} class:stopped={item.stopped}>
+      {item.stopped ? "Stopped by you" : item.ok ? "Finished" : "Stopped with an error"} ·{item.seconds.toFixed(1)} s{item.text
+        ? ` · ${item.text}`
+        : ""}
       {#if !item.ok && agent.provider.id === "qanuvi" && agent.model === "auto" && agent.info?.available && project}
         <button type="button" class="to-auto" onclick={() => project && agent.handToPaid(project.id)}
           >Hand this to {paidAgent()?.name ?? "the paid agent"}</button
@@ -1662,6 +1664,10 @@
 
   .result.failed {
     color: var(--qx-status-failed);
+  }
+
+  .result.stopped {
+    color: var(--qx-text-muted);
   }
 
   .notice {

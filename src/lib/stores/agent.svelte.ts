@@ -77,12 +77,21 @@ class AgentStore {
   handover = $state<{ fromId: string; was: number; requestAt: number; queued: string[] } | null>(null);
   /** Per session: the context size at which the owner said "Not now". */
   #notNow = new Map<string, number>();
+  /**
+   * A session that just took a chat over: its first measured size (the agent's own start plus the note) is where it
+   * counts from, so a low limit does not offer a handover again at once, over and over.
+   */
+  #fromHandover = false;
   #handoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Whether to offer or start a handover now (after a model call's size is known, or a turn's end). */
   #checkHandover(): void {
     const s = this.selected;
     if (!s || this.handover || this.planSessionId === s.id || !this.#projectId) return;
+    if (this.#fromHandover && this.context > 0) {
+      this.#fromHandover = false;
+      this.#notNow.set(s.id, this.context);
+    }
     const setting = settings.value.chatHandover;
     if (!chatHandoverDue(this.context, setting, !!s.handover_off, this.#notNow.get(s.id) ?? 0)) {
       this.offer = false;
@@ -187,9 +196,11 @@ class AgentStore {
     this.model = from.model;
     this.mode = from.mode;
     this.context = 0;
+    this.#fromHandover = true;
     const ok = await this.send(projectId, prompt);
     const id = this.selectedId as string | null;
     if (!ok || !id) {
+      this.#fromHandover = false;
       this.handover = null;
       this.busy = false;
       await this.select(from.id);
@@ -268,6 +279,7 @@ ${text}`
     this.errors = [];
     this.context = 0;
     this.offer = false;
+    this.#fromHandover = false;
     // Read from settings, never back from this.providerId: an effect that calls this must not come to depend on
     // the session's agent (that made a loop between this and select(), 2026-11-11).
     const providerId = settings.value.agent;
@@ -280,6 +292,7 @@ ${text}`
 
   async select(id: string): Promise<void> {
     this.selectedId = id;
+    this.#fromHandover = false;
     this.loadGrants();
     this.errors = [];
     const s = this.selected;

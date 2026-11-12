@@ -443,7 +443,8 @@
   }
 
   select,
-  input:not([type]) {
+  input:not([type]),
+  input[type="number"] {
     height: 30px;
     padding: 0 var(--qx-space-2);
     border: 1px solid var(--qx-border);

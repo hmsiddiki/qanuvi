@@ -40,7 +40,8 @@ export type Item = (
       summary: string;
       /** File the tool works on, when there is one (to open it from the step). */
       file: string | null;
-      state: "running" | "done" | "failed";
+      /** stopped: ended by "Stop this command, read my message now" (24r), not a failure. */
+      state: "running" | "done" | "failed" | "stopped";
       /** The result's first line, for the folded card. */
       result: string;
       /** IN: the command or what the tool was given, as text. */
@@ -68,7 +69,16 @@ export type Item = (
   | { kind: "thinking"; id: string; text: string; live?: boolean }
   /** The agent's to-do list (TodoWrite): one card, updated in place each time the agent writes the list again. */
   | { kind: "todos"; id: string; todos: Todo[] }
-  | { kind: "result"; id: string; ok: boolean; seconds: number; costUsd: number; text: string }
+  | {
+      kind: "result";
+      id: string;
+      ok: boolean;
+      seconds: number;
+      costUsd: number;
+      text: string;
+      /** The turn ended because the user stopped the command in hand (24r). */
+      stopped?: boolean;
+    }
   /** note: a chat handover's note (24s), shown folded under the line. */
   | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string; note?: string }
 ) & {
@@ -222,6 +232,11 @@ export function elapsedLabel(seconds: number): string {
 }
 
 /** A tool's name without the MCP server prefix: "mcp__qanuvi-browser__browser_open" → "browser_open". */
+/** How a step ended by "Stop this command, read my message now" reads. */
+const STOPPED = "Stopped by you";
+/** Claude Code's result for the step in hand when a turn is interrupted. */
+const STOP_TEXT = /^The user doesn't want to proceed with this tool use/;
+
 export function shortToolName(name: string): string {
   const m = /^mcp__[^_]+(?:_[^_]+)*?__(.+)$/.exec(name);
   return m ? m[1] : name;
@@ -329,8 +344,7 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     // "Stop this command, read my message now": the steps still running were ended.
     for (let i = 0; i < out.length; i++) {
       const x = out[i];
-      if (x.kind === "tool" && x.state === "running")
-        out[i] = { ...x, state: "failed", result: x.result || "Stopped by you" };
+      if (x.kind === "tool" && x.state === "running") out[i] = { ...x, state: "stopped", result: STOPPED, output: "" };
     }
     out.push({
       kind: "notice",
@@ -385,6 +399,11 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       if (i >= 0) {
         const tool = out[i] as Extract<Item, { kind: "tool" }>;
         const image = resultImage(b.content);
+        // Claude Code answers an interrupt with its "rejected" text for the step in hand: show it as stopped.
+        if (b.is_error && STOP_TEXT.test(resultText(b.content))) {
+          out[i] = { ...tool, state: "stopped", result: STOPPED, output: "" };
+          continue;
+        }
         out[i] = {
           ...tool,
           state: b.is_error ? "failed" : "done",
@@ -407,8 +426,9 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     });
   } else if (type === "result") {
     // A turn the user interrupted ended as asked: no error line.
-    const last = out[out.length - 1];
-    const interrupted = last?.kind === "notice" && last.id.startsWith("int");
+    // (the stop notice comes after the turn's last result; the stopped step's own result may follow it)
+    const since = out.findLastIndex((x) => x.kind === "result") + 1;
+    const interrupted = out.slice(since).some((x) => x.kind === "notice" && x.id.startsWith("int"));
     if (interrupted) msg = { ...msg, is_error: false };
     // Approvals still pending when a turn ends were never answered.
     for (let i = 0; i < out.length; i++) {
@@ -422,6 +442,7 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       seconds: Number(msg.duration_ms ?? 0) / 1000,
       costUsd: Number(msg.total_cost_usd ?? 0),
       text: msg.is_error ? firstLine(str(msg.result) || str(msg.subtype), 300) : "",
+      ...(interrupted ? { stopped: true } : {}),
     });
   } else if (type === "system" && str(msg.subtype) === "qanuvi_route") {
     // Qanuvi's brain gave the turn to a model (first pick or a handover), with the reason.
@@ -554,7 +575,9 @@ export function itemsToMarkdown(title: string, items: Item[]): string {
     if (item.kind === "user") out.push(`**You:** ${item.text}`, "");
     else if (item.kind === "text") out.push(item.text, "");
     else if (item.kind === "tool")
-      out.push(`- ${item.name}: ${item.summary}${item.state === "failed" ? " (failed)" : ""}`);
+      out.push(
+        `- ${item.name}: ${item.summary}${item.state === "failed" ? " (failed)" : item.state === "stopped" ? " (stopped)" : ""}`,
+      );
     else if (item.kind === "approval")
       out.push(
         `- Approval for ${item.tool}: ${item.summary} (${item.state === "allowed" ? "approved" : item.state === "refused" ? "refused" : "not answered"})`,
@@ -562,7 +585,11 @@ export function itemsToMarkdown(title: string, items: Item[]): string {
     else if (item.kind === "todos")
       out.push(...item.todos.map((t) => `- [${t.status === "completed" ? "x" : " "}] ${t.text}`), "");
     else if (item.kind === "result")
-      out.push("", `_${item.ok ? "Finished" : "Stopped with an error"} in ${item.seconds.toFixed(1)} s_`, "");
+      out.push(
+        "",
+        `_${item.stopped ? "Stopped by you" : item.ok ? "Finished" : "Stopped with an error"} in ${item.seconds.toFixed(1)} s_`,
+        "",
+      );
   }
   return (
     out
