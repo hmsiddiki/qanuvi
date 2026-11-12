@@ -353,6 +353,9 @@ runs on or off; with it off nothing is sent anywhere.
     session's line count (keptNote / keepNote), so it is reused only while the session has no newer lines. Opening
     a chat never spends tokens by itself (start-up restore shows the bar only). Store: agent.reopened, handOver(true)
     (noteOnly), #goOnFresh (shared with the handover), editReopenNote, resumeAsItWas.
+    Follows Settings, Agents, Chat handover (owner, 2026-11-13): Automatic shows no bar, only a thin line, and the
+    first message does it all; Ask me first shows the bar and note panel; Off (or "Never in this chat") resumes as
+    it was.
 - [ ] **24r. Messages sent while the agent works (owner, 2026-11-13; agreed 2026-11-13, built 2026-11-13)**: a
   message typed mid-work is written to the running Claude Code session at once, but the agent reads it only after
   the command in hand ends; a long command (a browser test run three times) can hold it for many minutes while the

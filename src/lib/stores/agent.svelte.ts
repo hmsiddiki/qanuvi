@@ -403,7 +403,7 @@ ${text}`
         // A heavy starred chat goes on fresh from a note (24s part 3); otherwise the usual handover check.
         const now = this.selected;
         this.reopened =
-          now && reopenFresh(now, this.context, now.id === this.planSessionId)
+          now && reopenFresh(now, this.context, now.id === this.planSessionId, settings.value.chatHandover.when)
             ? { id, was: this.context, note: keptNote(localStorage, id, lines.length), lines: lines.length }
             : null;
         if (!this.reopened) this.#checkHandover();

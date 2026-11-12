@@ -123,10 +123,23 @@ export const REOPEN_FRESH_FROM = 40_000;
 
 /**
  * Reopening a starred chat (24s part 3): a heavy one that is no longer live goes on in a fresh session from a note,
- * not by re-reading its whole context. Plan steps and live sessions resume as they are.
+ * not by re-reading its whole context. Plan steps and live sessions resume as they are, and so does every chat when
+ * Chat handover is Off, or this chat when it was set to "Never in this chat".
  */
-export function reopenFresh(s: { saved?: boolean; status: string }, context: number, planStep: boolean): boolean {
-  return !!s.saved && !planStep && !["running", "waiting", "idle"].includes(s.status) && context >= REOPEN_FRESH_FROM;
+export function reopenFresh(
+  s: { saved?: boolean; status: string; handover_off?: boolean },
+  context: number,
+  planStep: boolean,
+  when: "ask" | "auto" | "off",
+): boolean {
+  return (
+    when !== "off" &&
+    !s.handover_off &&
+    !!s.saved &&
+    !planStep &&
+    !["running", "waiting", "idle"].includes(s.status) &&
+    context >= REOPEN_FRESH_FROM
+  );
 }
 
 /**

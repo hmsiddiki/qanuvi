@@ -137,11 +137,14 @@ describe("chatGroups", () => {
 describe("reopening a starred chat (24s part 3)", () => {
   it("goes on fresh only for a heavy starred chat that is not live and not a plan step", () => {
     const heavy = REOPEN_FRESH_FROM;
-    expect(reopenFresh({ saved: true, status: "ended" }, heavy, false)).toBe(true);
-    expect(reopenFresh({ saved: true, status: "stopped" }, heavy - 1, false)).toBe(false);
-    expect(reopenFresh({ saved: false, status: "ended" }, heavy, false)).toBe(false);
-    expect(reopenFresh({ saved: true, status: "idle" }, heavy, false)).toBe(false);
-    expect(reopenFresh({ saved: true, status: "ended" }, heavy, true)).toBe(false);
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, false, "ask")).toBe(true);
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, false, "auto")).toBe(true);
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, false, "off")).toBe(false);
+    expect(reopenFresh({ saved: true, status: "ended", handover_off: true }, heavy, false, "auto")).toBe(false);
+    expect(reopenFresh({ saved: true, status: "stopped" }, heavy - 1, false, "ask")).toBe(false);
+    expect(reopenFresh({ saved: false, status: "ended" }, heavy, false, "ask")).toBe(false);
+    expect(reopenFresh({ saved: true, status: "idle" }, heavy, false, "ask")).toBe(false);
+    expect(reopenFresh({ saved: true, status: "ended" }, heavy, true, "ask")).toBe(false);
   });
 
   it("keeps a written note only while the session has no newer lines", () => {

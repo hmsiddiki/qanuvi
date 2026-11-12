@@ -757,7 +757,12 @@
     </div>
   {/if}
 
-  {#if agent.reopened && agent.reopened.id === agent.selectedId && !agent.handover}
+  {#if agent.reopened && agent.reopened.id === agent.selectedId && !agent.handover && settings.value.chatHandover.when === "auto"}
+    <div class="reopen-line" role="status">
+      Starred chat, {tokensK(agent.reopened.was)} of context · your next message goes on in a fresh session from a
+      {agent.reopened.note === null ? "handover note" : "kept note"}
+    </div>
+  {:else if agent.reopened && agent.reopened.id === agent.selectedId && !agent.handover}
     {@const r = agent.reopened}
     <div class="handover-bar reopen" role="status">
       {#if r.note === null}
@@ -1815,6 +1820,14 @@
     color: var(--qx-text-secondary);
     font-family: var(--qx-font-mono);
     font-size: var(--qx-text-small);
+  }
+
+  .reopen-line {
+    margin: 0 var(--qx-space-2) var(--qx-space-1);
+    padding-top: var(--qx-space-1);
+    border-top: 1px solid var(--qx-border);
+    color: var(--qx-text-muted);
+    font-size: 11px;
   }
 
   .handover-line {

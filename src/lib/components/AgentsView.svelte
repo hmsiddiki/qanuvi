@@ -234,7 +234,9 @@
       </header>
       <p class="note">
         Each step re-reads the whole chat. Past the limit, the agent finishes the edit in hand and writes a note; a new
-        session goes on from it in the same chat. Plan steps keep their own limit (Run panel).
+        session goes on from it in the same chat. A heavy starred chat opened later goes on the same way when you send
+        (Ask me first shows a bar with the note to edit; Off resumes it as it was). Plan steps keep their own limit (Run
+        panel).
       </p>
       <div class="grid">
         <label>
