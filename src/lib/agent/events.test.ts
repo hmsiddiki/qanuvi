@@ -50,8 +50,8 @@ const lines = [
 describe("reduceAll", () => {
   const items = reduceAll(lines);
 
-  it("shows the conversation in order and skips thinking", () => {
-    expect(items.map((i) => i.kind)).toEqual(["user", "notice", "tool", "approval", "text", "result"]);
+  it("shows the conversation in order, thinking included", () => {
+    expect(items.map((i) => i.kind)).toEqual(["user", "notice", "thinking", "tool", "approval", "text", "result"]);
   });
 
   it("follows a tool from running to its result", () => {
@@ -217,6 +217,79 @@ describe("images in the user's messages", () => {
       images: [
         { name: "a.png", file: "0123abcd.png" },
         { name: "b.png", src: "data:image/png;base64,QUJD" },
+      ],
+    });
+  });
+});
+
+describe("step cards, thinking and to-do lists", () => {
+  const call = (id: string, name: string, input: object) =>
+    JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id, name, input }] } });
+  const answer = (id: string, content: unknown, is_error = false) =>
+    JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: id, content, is_error }] },
+    });
+
+  it("keeps a shell step's command as IN and its whole result as OUT", () => {
+    const items = reduceAll([
+      call("a", "Bash", { command: "npm test\n--run", description: "Run the tests" }),
+      answer("a", "line 1\nline 2\nline 3\n"),
+    ]);
+    expect(items[0]).toMatchObject({
+      kind: "tool",
+      summary: "Run the tests",
+      input: "npm test\n--run",
+      output: "line 1\nline 2\nline 3",
+      result: "line 1",
+      state: "done",
+    });
+  });
+
+  it("names a read's file and range, and a browser step's address or element", () => {
+    const items = reduceAll([
+      call("r", "Read", { file_path: "C:/p/a.ts", offset: 10, limit: 20 }),
+      call("b", "mcp__qanuvi-browser__browser_click", { selector: "#buy", number: 3 }),
+    ]);
+    expect(items[0]).toMatchObject({ input: "C:/p/a.ts (from line 10, 20 lines)" });
+    expect(items[1]).toMatchObject({ name: "browser_click", input: "selector: #buy\nnumber: 3" });
+  });
+
+  it("cuts a very long result", () => {
+    const items = reduceAll([call("a", "Bash", { command: "x" }), answer("a", "y".repeat(9000))]);
+    const out = (items[0] as { output: string }).output;
+    expect(out.length).toBeLessThan(8100);
+    expect(out).toContain("1000 more characters");
+  });
+
+  it("shows thinking as its own item", () => {
+    const items = reduceAll([
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "thinking", thinking: "First the tests." }] } }),
+    ]);
+    expect(items).toEqual([{ kind: "thinking", id: "th0.0", text: "First the tests." }]);
+  });
+
+  it("keeps one to-do card and updates it in place", () => {
+    const items = reduceAll([
+      call("t1", "TodoWrite", {
+        todos: [
+          { content: "Read", status: "in_progress", activeForm: "Reading" },
+          { content: "Fix", status: "pending" },
+        ],
+      }),
+      call("a", "Bash", { command: "ls" }),
+      call("t2", "TodoWrite", {
+        todos: [
+          { content: "Read", status: "completed" },
+          { content: "Fix", status: "in_progress", activeForm: "Fixing" },
+        ],
+      }),
+    ]);
+    expect(items.map((i) => i.kind)).toEqual(["todos", "tool"]);
+    expect(items[0]).toMatchObject({
+      todos: [
+        { text: "Read", status: "completed" },
+        { text: "Fixing", status: "in_progress" },
       ],
     });
   });

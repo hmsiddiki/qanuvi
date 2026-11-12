@@ -26,7 +26,12 @@ export type Item =
       /** File the tool works on, when there is one (to open it from the step). */
       file: string | null;
       state: "running" | "done" | "failed";
+      /** The result's first line, for the folded card. */
       result: string;
+      /** IN: the command or what the tool was given, as text. */
+      input: string;
+      /** OUT: the whole result (cut at a length a card can show). */
+      output: string;
       /** A screenshot the tool answered with, as a data address. */
       image?: string;
     }
@@ -40,10 +45,58 @@ export type Item =
       /** Allowed by an earlier "for this session" / "for 10 minutes". */
       auto?: boolean;
     }
+  /** The model's thinking, shown folded. */
+  | { kind: "thinking"; id: string; text: string }
+  /** The agent's to-do list (TodoWrite): one card, updated in place each time the agent writes the list again. */
+  | { kind: "todos"; id: string; todos: Todo[] }
   | { kind: "result"; id: string; ok: boolean; seconds: number; costUsd: number; text: string }
   | { kind: "notice"; id: string; text: string; tone: "info" | "error"; model?: string };
 
+export interface Todo {
+  text: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
 type Json = Record<string, unknown>;
+
+/** Longest IN and OUT a step card keeps (the whole conversation stays in the session log). */
+const IN_MAX = 4000;
+const OUT_MAX = 8000;
+
+const cutAt = (t: string, max: number) =>
+  t.length > max ? `${t.slice(0, max)}\n… (${t.length - max} more characters)` : t;
+
+/** IN for a step card: the command for shells, the edit for file changes, the address or element for the test browser. */
+export function toolInput(name: string, input: Json): string {
+  const short = shortToolName(name);
+  if (/^browser_/.test(short)) {
+    const parts = ["url", "selector", "number", "text", "value", "expression"]
+      .filter((k) => input[k] !== undefined && input[k] !== "")
+      .map((k) => `${k}: ${typeof input[k] === "string" ? input[k] : JSON.stringify(input[k])}`);
+    return cutAt(parts.join("\n"), IN_MAX);
+  }
+  if (str(input.file_path) && !str(input.old_string) && !str(input.content) && !str(input.new_string)) {
+    const range =
+      input.offset || input.limit
+        ? ` (from line ${Number(input.offset ?? 1)}${input.limit ? `, ${Number(input.limit)} lines` : ""})`
+        : "";
+    return str(input.file_path) + range;
+  }
+  return cutAt(toolDetail(short, input), IN_MAX);
+}
+
+/** The to-do list a TodoWrite call carries. */
+function todosOf(input: Json): Todo[] {
+  return (Array.isArray(input.todos) ? input.todos : [])
+    .map(obj)
+    .map((t) => ({
+      text: str(t.status) === "in_progress" && str(t.activeForm) ? str(t.activeForm) : str(t.content),
+      status: (["pending", "in_progress", "completed"].includes(str(t.status))
+        ? str(t.status)
+        : "pending") as Todo["status"],
+    }))
+    .filter((t) => t.text);
+}
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const obj = (v: unknown): Json => (v && typeof v === "object" ? (v as Json) : {});
@@ -163,6 +216,14 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
       const b = obj(block);
       if (b.type === "text" && str(b.text).trim()) {
         out.push({ kind: "text", id: `t${seq}.${n}`, text: str(b.text) });
+      } else if (b.type === "thinking" && str(b.thinking).trim()) {
+        out.push({ kind: "thinking", id: `th${seq}.${n}`, text: str(b.thinking) });
+      } else if (b.type === "tool_use" && shortToolName(str(b.name)) === "TodoWrite") {
+        // The list, not a step: the first card is kept and updated, so it reads as one live checklist.
+        const todos = todosOf(obj(b.input));
+        const i = out.findIndex((x) => x.kind === "todos");
+        if (i >= 0) out[i] = { ...(out[i] as Extract<Item, { kind: "todos" }>), todos };
+        else out.push({ kind: "todos", id: `todo${seq}.${n}`, todos });
       } else if (b.type === "tool_use") {
         const input = obj(b.input);
         out.push({
@@ -173,6 +234,8 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
           file: str(input.file_path) || str(input.notebook_path) || null,
           state: "running",
           result: "",
+          input: toolInput(str(b.name), input),
+          output: "",
         });
       }
     }
@@ -189,6 +252,7 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
           ...tool,
           state: b.is_error ? "failed" : "done",
           result: firstLine(resultText(b.content), 200),
+          output: cutAt(resultText(b.content).replace(/\s+$/, ""), OUT_MAX),
           ...(image ? { image } : {}),
         };
       }
@@ -258,6 +322,8 @@ export function itemsToMarkdown(title: string, items: Item[]): string {
       out.push(
         `- Approval for ${item.tool}: ${item.summary} (${item.state === "allowed" ? "approved" : item.state === "refused" ? "refused" : "not answered"})`,
       );
+    else if (item.kind === "todos")
+      out.push(...item.todos.map((t) => `- [${t.status === "completed" ? "x" : " "}] ${t.text}`), "");
     else if (item.kind === "result")
       out.push("", `_${item.ok ? "Finished" : "Stopped with an error"} in ${item.seconds.toFixed(1)} s_`, "");
   }

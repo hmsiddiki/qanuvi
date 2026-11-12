@@ -196,6 +196,11 @@ runs on or off; with it off nothing is sent anywhere.
   - Done 2026-11-12 after this checkpoint, committed and pushed, NOT published (ask the owner first): 1d backups,
     15n paste and see images in the chat. Unpublished since 0.1.11 in all: those two, the winget update fix and the two
     Linux fixes.
+  - Done 2026-11-12 (later), committed, NOT published: 24n parts 1 and 4 in part: steps as cards (StepCard.svelte)
+    with IN and OUT in mono blocks (fold after 6 lines, Show all, copy, Open the file; shell steps open by default,
+    a screenshot opens its card), thinking shown folded, TodoWrite as one live checklist card. Still open in that
+    step: part 2 (timeline dots, times on messages, "Read 5 files" grouping, long runs folded) and live thinking as it
+    streams. Not yet looked at in the running app: check the cards on a scratch project first.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)

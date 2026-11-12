@@ -12,6 +12,10 @@
   import CircleX from "@lucide/svelte/icons/circle-x";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import ShieldQuestion from "@lucide/svelte/icons/shield-question";
+  import Brain from "@lucide/svelte/icons/brain";
+  import Circle from "@lucide/svelte/icons/circle";
+  import ListChecks from "@lucide/svelte/icons/list-checks";
+  import StepCard from "./StepCard.svelte";
   import { tick, untrack } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { projects } from "$lib/stores/projects.svelte";
@@ -310,36 +314,32 @@
             </div>
           {/if}
         {:else if item.kind === "tool"}
-          <button
-            type="button"
-            class="step {item.state}"
-            disabled={!item.file}
-            onclick={() => openFile(item.file)}
-            oncontextmenu={(e) =>
-              contextMenu.show(e, [
-                [
-                  { label: "Open the file", disabled: !item.file, action: () => openFile(item.file) },
-                  { label: "Copy the file's path", disabled: !item.file, action: () => copyText(item.file ?? "") },
-                ],
-                [{ label: "Copy the result", disabled: !item.result, action: () => copyText(item.result) }],
-              ])}
-          >
-            <span class="step-icon">
-              {#if item.state === "running"}<LoaderCircle
-                  size={13}
-                  class="spin"
-                />{:else if item.state === "done"}<CircleCheck size={13} />{:else}<CircleX size={13} />{/if}
-            </span>
-            <span class="step-body">
-              <span class="step-title">{item.name} · {item.summary}</span>
-              {#if item.result}<span class="step-result">{item.result}</span>{/if}
-            </span>
-          </button>
-          {#if item.image}
-            <div class="shot">
-              <ChatImage image={{ name: "Screenshot from the test browser", src: item.image }} size={260} />
+          <StepCard step={item} onopen={openFile} />
+        {:else if item.kind === "thinking"}
+          <details class="thinking">
+            <summary><Brain size={12} /> Thinking</summary>
+            <div class="thinking-text">{item.text}</div>
+          </details>
+        {:else if item.kind === "todos"}
+          <div class="todos" aria-label="To-do list">
+            <div class="todos-head">
+              <ListChecks size={13} /> To-do · {item.todos.filter((t) => t.status === "completed").length} of {item
+                .todos.length} done
             </div>
-          {/if}
+            <ul>
+              {#each item.todos as t, i (i)}
+                <li class={t.status}>
+                  <span class="mark" aria-hidden="true"
+                    >{#if t.status === "completed"}<CircleCheck
+                        size={13}
+                      />{:else if t.status === "in_progress"}<LoaderCircle size={13} class="spin" />{:else}<Circle
+                        size={13}
+                      />{/if}</span
+                  >{t.text}
+                </li>
+              {/each}
+            </ul>
+          </div>
         {:else if item.kind === "approval"}
           <div class="approval {item.state}">
             <div class="approval-head">
@@ -701,58 +701,85 @@
     color: var(--qx-accent);
   }
 
-  .step {
-    display: flex;
-    gap: var(--qx-space-2);
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--qx-text-secondary);
-    font: inherit;
-    text-align: left;
+  .thinking {
+    color: var(--qx-text-muted);
+    font-size: var(--qx-text-small);
   }
 
-  .step:not(:disabled) {
+  .thinking summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     cursor: pointer;
+    list-style: none;
   }
 
-  .step:not(:disabled):hover .step-title {
-    color: var(--qx-text);
-    text-decoration: underline;
+  .thinking summary:hover {
+    color: var(--qx-text-secondary);
   }
 
-  .step-icon {
+  .thinking-text {
+    margin: 4px 0 0 6px;
+    padding-left: var(--qx-space-2);
+    border-left: 2px solid var(--qx-border);
+    font-style: italic;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .todos {
+    padding: var(--qx-space-2) var(--qx-space-3);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+    background: var(--qx-bg-panel);
+  }
+
+  .todos-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    color: var(--qx-text-secondary);
+    font-size: var(--qx-text-small);
+  }
+
+  .todos ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .todos li {
+    display: flex;
+    gap: 6px;
+    padding: 2px 0;
+    line-height: 1.4;
+  }
+
+  .todos .mark {
+    display: flex;
     flex: none;
     padding-top: 2px;
     color: var(--qx-text-muted);
   }
 
-  .step.done .step-icon {
+  .todos li.completed {
+    color: var(--qx-text-muted);
+    text-decoration: line-through;
+  }
+
+  .todos li.completed .mark {
     color: var(--qx-status-done);
   }
 
-  .step.failed .step-icon {
-    color: var(--qx-status-failed);
+  .todos li.in_progress {
+    color: var(--qx-text);
+    font-weight: 600;
   }
 
-  .step-body {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .step-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .step-result {
-    color: var(--qx-text-muted);
-    font-size: var(--qx-text-small);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .todos li.in_progress .mark {
+    color: var(--qx-status-running);
   }
 
   .approval {
@@ -1018,11 +1045,6 @@
     to {
       transform: rotate(360deg);
     }
-  }
-
-  .shot {
-    display: block;
-    margin: 2px 0 var(--qx-space-2) 22px;
   }
 
   .setup {
