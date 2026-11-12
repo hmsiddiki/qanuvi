@@ -193,9 +193,16 @@ runs on or off; with it off nothing is sent anywhere.
     CI green on all three platforms (run 43146222756, commit 54cf0f5). Both fixes are unpublished, like the winget one.
   - Committed after 0.1.11, not published yet: the Update Claude Code button also works for winget installs (runs
     winget upgrade). Publish it with the next batch, after asking the owner.
-  - Next, in the order agreed: (1) the Linux culprit (done); (2) 1d automatic backups and restore (done, unpublished); (3) 24j plan housekeeping
-    (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
-    OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
+  - Done 2026-11-12 after this checkpoint, committed and pushed, NOT published (ask the owner first): 1d backups,
+    15n paste and see images in the chat. Unpublished since 0.1.11 in all: those two, the winget update fix and the two
+    Linux fixes.
+  - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
+    cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
+    lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
+    24n part 3, edits as diffs in the chat; (4) 24j plan housekeeping; (5) 24o finishing pass; (6) 24n part 6 (edit
+    and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
+    when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
+    new conversation.
 - [ ] **24n. Chat view and abilities at the level of the best agent panels (owner, 2026-11-12, later; a big step)**:
   the conversation should read and work like a first-class agent panel, for every agent (Claude Code, Qanuvi's own,
   free models). Parts, to be planned in detail before building:
