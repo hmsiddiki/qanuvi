@@ -184,6 +184,11 @@ runs on or off; with it off nothing is sent anywhere.
   every Qanuvi knows it. Headroom can sit in front of it for the free models too (`--openai-api-url`), to be tested.
 - [x] **1f. Qanuvi's own resource use (done 2026-11-12)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
   WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
+- [ ] **15e3. Temp files follow the data folder (owner, 2026-11-12, later)**: measured on the owner's PC, Temp on C:
+  held about 0.9 GB of Claude Code working files plus Qanuvi leftovers (test browser profiles 58 MB, old updater
+  downloads 42 MB, test folders 21 MB). To do: start agents, plan runs, checks and the test browser with TMP/TEMP set
+  to a temp folder inside Qanuvi's data folder (movable, 15e), clean it at start-up (left-over browser profiles,
+  updater downloads after a finished update), and show its size on the Servers/data page with a Clean button.
 - [ ] **1g. Status bar memory: the app apart from agents (owner, 2026-11-12, later)**: the status bar showed 835 MB,
   which looked like Qanuvi alone. Measured: Qanuvi + WebView2 about 283 MB, a Claude Code agent 507 MB, a terminal
   PowerShell 56 MB. To do: show the app's own memory in the status bar, with a hover breakdown of app (qanuvi.exe +
