@@ -212,6 +212,15 @@ runs on or off; with it off nothing is sent anywhere.
   - Session abilities: edit and resend an earlier message (branching from there), rewind changes to a step, search
     in the conversation, export, and a compact "what changed" summary at the end of each task.
   - Fast with long sessions (virtual list) and light on memory, as the rest of Qanuvi.
+  - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
+    the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
+- [ ] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their
+  instructions; before the run is called done, one smarter pass checks the whole. The final report offers it with its
+  estimated cost and time (from the run's own step costs); the user runs it or ignores it (a project setting can run
+  it by itself). Light: the project's full checks and a review of the whole run's diff (leftovers, debug code, steps
+  that do not fit together). Full: also live tests on a scratch copy where the project defines them, a fix-up of what
+  was found, and the task list notes checked against what was built. It ends with a short "still open" list. Runs on
+  the paid decider (24e) while free or cheap workers do the steps: intelligence paid for once, where it catches most.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so
