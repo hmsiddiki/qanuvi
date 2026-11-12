@@ -16,12 +16,27 @@
   import Circle from "@lucide/svelte/icons/circle";
   import ListChecks from "@lucide/svelte/icons/list-checks";
   import StepCard from "./StepCard.svelte";
+  import MentionPicker, { type Choice } from "./MentionPicker.svelte";
+  import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
+  import { revertEdits, type Edit } from "$lib/agent/diff";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { api, errorText } from "$lib/api";
   import { tick, untrack } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import Settings2 from "@lucide/svelte/icons/settings-2";
-  import { currentModel, formatCost, formatTokens, looksLikeCall } from "$lib/agent/events";
+  import {
+    clockTime,
+    currentModel,
+    formatCost,
+    formatTokens,
+    looksLikeCall,
+    timelineRows,
+    type Row,
+  } from "$lib/agent/events";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import Search from "@lucide/svelte/icons/search";
   import { renderMarkdown } from "$lib/agent/markdown";
   import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -54,6 +69,129 @@
   import CommandMenu from "./CommandMenu.svelte";
 
   let commandsOpen = $state(false);
+
+  // @ mentions: the "@query" the caret is in, and the picker's choices.
+  let mention = $state<{ start: number; query: string } | null>(null);
+  let mentionChoices = $state<Choice[]>([]);
+  let mentionSelected = $state(0);
+  function findMention() {
+    const box = agent.input;
+    mention = box && box.selectionStart === box.selectionEnd ? mentionAt(agent.draft, box.selectionStart) : null;
+  }
+  async function pickMention(c: Choice) {
+    const box = agent.input;
+    if (!mention || !box) return;
+    const done = insertMention(agent.draft, mention.start, box.selectionStart, c.mention);
+    agent.draft = done.text;
+    mention = null;
+    await tick();
+    box.focus();
+    box.setSelectionRange(done.caret, done.caret);
+  }
+
+  // Files dropped onto the message box (from the file manager): images are attached, files of the project are
+  // mentioned (the agent reads them itself, only as much as it needs), other files are attached.
+  let composer = $state<HTMLFormElement>();
+  let dropping = $state(false);
+  function overComposer(x: number, y: number): boolean {
+    const r = composer?.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    return !!r && x / dpr >= r.left && x / dpr <= r.right && y / dpr >= r.top && y / dpr <= r.bottom;
+  }
+  async function dropped(paths: string[]) {
+    const p = projects.current;
+    if (!p) return;
+    const mentions: string[] = [];
+    const errors: string[] = [];
+    for (const path of paths) {
+      const rel = inProject(p.path, path);
+      if (rel && !isImagePath(path)) {
+        mentions.push(`@${rel}`);
+        continue;
+      }
+      try {
+        agent.attachments = [...agent.attachments, await api.attachments.file(path)];
+      } catch (e) {
+        errors.push(errorText(e));
+      }
+    }
+    if (mentions.length) {
+      const sep = agent.draft && !/\s$/.test(agent.draft) ? " " : "";
+      agent.draft = `${agent.draft}${sep}${mentions.join(" ")} `;
+    }
+    agent.error = errors.join(" ");
+    agent.input?.focus();
+  }
+  $effect(() => {
+    let stop: (() => void) | null = null;
+    let gone = false;
+    getCurrentWebview()
+      .onDragDropEvent((e) => {
+        const d = e.payload;
+        if (d.type === "leave") dropping = false;
+        else if (d.type === "enter" || d.type === "over")
+          dropping = !!projects.current && overComposer(d.position.x, d.position.y);
+        else if (d.type === "drop") {
+          const over = overComposer(d.position.x, d.position.y);
+          dropping = false;
+          if (over && d.paths.length) void dropped(d.paths);
+        }
+      })
+      .then((u) => (gone ? u() : (stop = u)))
+      .catch(() => {});
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  });
+
+  /** Right-click in the message box: cut, copy, and paste that also takes images (like Ctrl+V). */
+  function boxMenu(e: MouseEvent) {
+    const box = agent.input;
+    const picked = box ? agent.draft.slice(box.selectionStart, box.selectionEnd) : "";
+    contextMenu.show(e, [
+      [
+        {
+          label: "Cut",
+          hint: "Ctrl+X",
+          disabled: !picked,
+          action: () => {
+            copyText(picked);
+            if (box) agent.draft = agent.draft.slice(0, box.selectionStart) + agent.draft.slice(box.selectionEnd);
+          },
+        },
+        { label: "Copy", hint: "Ctrl+C", disabled: !picked, action: () => copyText(picked) },
+        { label: "Paste", hint: "Ctrl+V", action: () => pasteFromMenu() },
+      ],
+    ]);
+  }
+  async function pasteFromMenu() {
+    const box = agent.input;
+    try {
+      const items = await navigator.clipboard.read();
+      const files: File[] = [];
+      let text = "";
+      for (const item of items) {
+        const type = item.types.find((t) => /^image\/(png|jpeg|gif|webp)$/.test(t));
+        if (type) files.push(new File([await item.getType(type)], "image.png", { type }));
+        else if (item.types.includes("text/plain")) text += await (await item.getType("text/plain")).text();
+      }
+      if (files.length) {
+        const images = agent.attachments.filter((a) => a.kind === "image").length;
+        const got = await pastedAttachments(files, images);
+        agent.attachments = [...agent.attachments, ...got.attachments];
+        agent.error = got.errors.join(" ");
+      } else if (text && box) {
+        const at = box.selectionStart;
+        agent.draft = agent.draft.slice(0, at) + text + agent.draft.slice(box.selectionEnd);
+        await tick();
+        box.setSelectionRange(at + text.length, at + text.length);
+      }
+      box?.focus();
+    } catch {
+      agent.error = "The clipboard could not be read here; press Ctrl+V in the message box instead.";
+    }
+  }
 
   // Paid decides, free works (24b): when the free models fail a request (with Auto, not a model the user picked), the
   // paid agent takes it over by itself. Once per session.
@@ -107,6 +245,20 @@
   }
 
   let scroller: HTMLDivElement;
+
+  /** The conversation as timeline rows: look-around steps grouped, long runs folded. */
+  let rows = $derived(timelineRows(agent.items));
+  /** Groups and folds the user opened (by row id; a new session starts folded). */
+  let opened = $state(new Set<string>());
+  $effect(() => {
+    void agent.selectedId;
+    opened = new Set();
+  });
+  function toggle(id: string) {
+    const next = new Set(opened);
+    if (!next.delete(id)) next.add(id);
+    opened = next;
+  }
 
   let project = $derived(projects.current);
   let session = $derived(agent.selected);
@@ -166,6 +318,24 @@
   }
 
   function keydown(event: KeyboardEvent) {
+    if (mention && mentionChoices.length) {
+      const n = mentionChoices.length;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        mentionSelected = (mentionSelected + (event.key === "ArrowDown" ? 1 : n - 1)) % n;
+        return;
+      }
+      if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+        event.preventDefault();
+        void pickMention(mentionChoices[mentionSelected]);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        mention = null;
+        return;
+      }
+    }
     // Enter with the menu open puts it away; it never sends a lone "/".
     if (commandsOpen && event.key === "Enter") {
       event.preventDefault();
@@ -186,6 +356,7 @@
 
   /** "/" as the whole message opens the menu (read from the text, so every keyboard layout works). */
   function input() {
+    findMention();
     if (agent.draft === "/") commandsOpen = true;
   }
 
@@ -229,6 +400,26 @@
         },
       ],
     ]);
+  }
+
+  /** Revert from the chat: the step's edits undone in the file, when the file still has them as the step left them. */
+  async function revertStep(step: { file: string | null; edits?: Edit[]; whole?: boolean }): Promise<string | null> {
+    const p = projects.current;
+    if (!p || !step.file || !step.edits || step.whole) return "This change cannot be undone from the chat.";
+    const rel = inProject(p.path, step.file);
+    if (!rel) return "The file is outside the project.";
+    const now = await api.files.read(p.id, rel).catch(() => null);
+    if (!now) return "The file could not be read.";
+    const back = revertEdits(now.text, step.edits);
+    if (back === null)
+      return "The file has changed since this step (or the changed text is there more than once), so it is not undone here; Source control can undo it.";
+    if (!(await ask(`Undo this change in ${rel}?`, { title: "Revert the change", okLabel: "Revert" }))) return "";
+    try {
+      await api.files.write(p.id, rel, back, now.hash);
+    } catch (e) {
+      return errorText(e);
+    }
+    return null;
   }
 
   function openFile(file: string | null) {
@@ -279,126 +470,7 @@
         </p>
       </div>
     {:else}
-      {#each agent.items as item (item.id)}
-        {#if item.kind === "user"}
-          <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text)}>
-            {#if item.during}<span
-                class="during"
-                title="Sent while the agent was working; it reads it before its next step">Added while it worked</span
-              >{/if}
-            {item.text}
-            {#if item.images?.length}
-              <div class="chips">
-                {#each item.images as image, i (i)}<ChatImage {image} />{/each}
-              </div>
-            {/if}
-            {#if otherFiles(item).length}
-              <div class="chips">
-                {#each otherFiles(item) as name, i (i)}<span class="chip" title={name}>📎 {name}</span>{/each}
-              </div>
-            {/if}
-          </div>
-        {:else if item.kind === "text"}
-          {#if item.live}
-            {#if !looksLikeCall(item.text)}<div class="text live">{item.text}</div>{/if}
-          {:else}
-            <!-- Escaped first, then formatted (agent/markdown.ts): the text cannot add HTML of its own. -->
-            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-            <div
-              class="text md"
-              onclick={openLink}
-              oncontextmenu={(e) => messageMenu(e, item.text)}
-              role="presentation"
-            >
-              {@html renderMarkdown(item.text)}
-            </div>
-          {/if}
-        {:else if item.kind === "tool"}
-          <StepCard step={item} onopen={openFile} />
-        {:else if item.kind === "thinking"}
-          <details class="thinking">
-            <summary><Brain size={12} /> Thinking</summary>
-            <div class="thinking-text">{item.text}</div>
-          </details>
-        {:else if item.kind === "todos"}
-          <div class="todos" aria-label="To-do list">
-            <div class="todos-head">
-              <ListChecks size={13} /> To-do · {item.todos.filter((t) => t.status === "completed").length} of {item
-                .todos.length} done
-            </div>
-            <ul>
-              {#each item.todos as t, i (i)}
-                <li class={t.status}>
-                  <span class="mark" aria-hidden="true"
-                    >{#if t.status === "completed"}<CircleCheck
-                        size={13}
-                      />{:else if t.status === "in_progress"}<LoaderCircle size={13} class="spin" />{:else}<Circle
-                        size={13}
-                      />{/if}</span
-                  >{t.text}
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {:else if item.kind === "approval"}
-          <div class="approval {item.state}">
-            <div class="approval-head">
-              <ShieldQuestion size={15} />
-              <span><strong>{item.tool}</strong> · {item.summary}</span>
-            </div>
-            <pre>{item.detail}</pre>
-            {#if item.state === "pending"}
-              <div class="approval-actions">
-                <button type="button" class="allow" onclick={() => agent.respond(item.id, true)}>Approve</button>
-                {#if session?.agent === "qanuvi"}
-                  <!-- Free and local models: a while at a time. -->
-                  <button
-                    type="button"
-                    title="Also allow {kindOf(item.tool)} without asking for {settings.value.approveMinutes} minutes"
-                    onclick={() => agent.respond(item.id, true, `minutes:${settings.value.approveMinutes}`)}
-                    >Allow for {settings.value.approveMinutes} min</button
-                  >
-                {:else}
-                  <!-- A paid agent: for the session. -->
-                  <button
-                    type="button"
-                    title="Also allow {kindOf(item.tool)} without asking until this session ends"
-                    onclick={() => agent.respond(item.id, true, "session")}>Allow for this session</button
-                  >
-                {/if}
-                <button type="button" class="decline" onclick={() => agent.respond(item.id, false)}>Decline</button>
-              </div>
-            {:else}
-              <div class="decision">
-                {item.state === "allowed" ? (item.auto ? "Approved (allowed earlier)" : "Approved") : "Declined"}
-              </div>
-            {/if}
-          </div>
-        {:else if item.kind === "result"}
-          <div class="result" class:failed={!item.ok}>
-            {item.ok ? "Finished" : "Stopped with an error"} · {item.seconds.toFixed(1)} s{item.text
-              ? ` · ${item.text}`
-              : ""}
-            {#if !item.ok && agent.provider.id === "qanuvi" && agent.model === "auto" && agent.info?.available && project}
-              <button type="button" class="to-auto" onclick={() => project && agent.handToPaid(project.id)}
-                >Hand this to {paidAgent()?.name ?? "the paid agent"}</button
-              >
-            {/if}
-            {#if !item.ok && isLimit(item.text) && agent.provider.id !== "qanuvi" && settings.value.brain.models.length && project}
-              <!-- The paid agent hit its limit: the free models can go on now. -->
-              <button type="button" class="to-auto" onclick={() => project && agent.handToFree(project.id)}
-                >Continue with free models</button
-              >
-            {/if}
-            {#if !item.ok && item.text.includes("Switch to Auto") && agent.model !== "auto"}
-              <!-- The chosen model is the only one used; when it fails, Qanuvi core offers to choose again. -->
-              <button type="button" class="to-auto" onclick={() => (agent.model = "auto")}>Switch to Auto</button>
-            {/if}
-          </div>
-        {:else if item.kind === "notice"}
-          <div class="notice {item.tone}">{item.text}</div>
-        {/if}
-      {/each}
+      {#each rows as item (item.id)}{@render row(item)}{/each}
       {#if running}<div class="notice info working">
           <LoaderCircle size={12} class="spin" /> Working…{working ? ` · ${working}` : ""}
         </div>{/if}
@@ -427,7 +499,17 @@
     </div>
   {/if}
 
-  <form class="composer" onsubmit={send}>
+  <form class="composer" class:dropping onsubmit={send} bind:this={composer}>
+    {#if mention && project}
+      <MentionPicker
+        projectId={project.id}
+        query={mention.query}
+        bind:selected={mentionSelected}
+        bind:choices={mentionChoices}
+        onpick={pickMention}
+      />
+    {/if}
+    {#if dropping}<div class="drop-hint">Drop to add: images are attached, project files mentioned</div>{/if}
     {#if agent.attachments.length}
       <div class="chips pending">
         {#each agent.attachments as f, i (i)}
@@ -468,7 +550,11 @@
       disabled={!project}
       onkeydown={keydown}
       oninput={input}
-      onpaste={paste}></textarea>
+      onpaste={paste}
+      oncontextmenu={boxMenu}
+      onclick={findMention}
+      onkeyup={(e) => ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) && findMention()}
+      onblur={() => (mention = null)}></textarea>
     <div class="tools">
       <AttachMenu disabled={!project} />
       <CommandMenu bind:open={commandsOpen} disabled={!project} />
@@ -515,6 +601,153 @@
     </button>
   </div>
 </section>
+
+{#snippet row(item: Row)}
+  {#if item.kind === "group"}
+    <div class="tl">
+      <button
+        type="button"
+        class="group {item.state}"
+        aria-expanded={opened.has(item.id)}
+        onclick={() => toggle(item.id)}
+      >
+        <span class="chev" class:open={opened.has(item.id)}><ChevronRight size={12} /></span>
+        {#if item.state === "running"}<LoaderCircle size={13} class="spin" />{:else if item.state === "failed"}<CircleX
+            size={13}
+          />{:else}<Search size={13} />{/if}
+        <span>{item.label}</span>
+      </button>
+      {#if opened.has(item.id)}
+        <div class="group-steps">
+          {#each item.steps as step (step.id)}<StepCard {step} onopen={openFile} onrevert={revertStep} />{/each}
+        </div>
+      {/if}
+    </div>
+  {:else if item.kind === "fold"}
+    {#if opened.has(item.id)}
+      {#each item.rows as inner (inner.id)}{@render row(inner)}{/each}
+    {:else}
+      <button type="button" class="tl fold" onclick={() => toggle(item.id)}
+        >{item.count} earlier step{item.count === 1 ? "" : "s"} · show</button
+      >
+    {/if}
+  {:else if item.kind === "user"}
+    <div class="user" role="presentation" oncontextmenu={(e) => messageMenu(e, item.text)}>
+      {#if item.during}<span class="during" title="Sent while the agent was working; it reads it before its next step"
+          >Added while it worked</span
+        >{/if}
+      {item.text}
+      {#if item.images?.length}
+        <div class="chips">
+          {#each item.images as image, i (i)}<ChatImage {image} />{/each}
+        </div>
+      {/if}
+      {#if otherFiles(item).length}
+        <div class="chips">
+          {#each otherFiles(item) as name, i (i)}<span class="chip" title={name}>📎 {name}</span>{/each}
+        </div>
+      {/if}
+      {#if item.at}<span class="time">{clockTime(item.at)}</span>{/if}
+    </div>
+  {:else if item.kind === "text"}
+    {#if item.live}
+      {#if !looksLikeCall(item.text)}<div class="text live">{item.text}</div>{/if}
+    {:else}
+      <!-- Escaped first, then formatted (agent/markdown.ts): the text cannot add HTML of its own. -->
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+      <div class="text md" onclick={openLink} oncontextmenu={(e) => messageMenu(e, item.text)} role="presentation">
+        {@html renderMarkdown(item.text)}
+      </div>
+      {#if item.at}<span class="time agent">{clockTime(item.at)}</span>{/if}
+    {/if}
+  {:else if item.kind === "tool"}
+    <div class="tl" class:fail={item.state === "failed"}>
+      <StepCard step={item} onopen={openFile} onrevert={revertStep} />
+    </div>
+  {:else if item.kind === "thinking"}
+    <details class="thinking tl">
+      <summary
+        ><Brain size={12} />
+        {#if item.live}Thinking…{:else}Thinking{/if}</summary
+      >
+      <div class="thinking-text">{item.text}</div>
+    </details>
+  {:else if item.kind === "todos"}
+    <div class="todos tl" aria-label="To-do list">
+      <div class="todos-head">
+        <ListChecks size={13} /> To-do · {item.todos.filter((t) => t.status === "completed").length} of {item.todos
+          .length} done
+      </div>
+      <ul>
+        {#each item.todos as t, i (i)}
+          <li class={t.status}>
+            <span class="mark" aria-hidden="true"
+              >{#if t.status === "completed"}<CircleCheck size={13} />{:else if t.status === "in_progress"}<LoaderCircle
+                  size={13}
+                  class="spin"
+                />{:else}<Circle size={13} />{/if}</span
+            >{t.text}
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {:else if item.kind === "approval"}
+    <div class="approval {item.state}">
+      <div class="approval-head">
+        <ShieldQuestion size={15} />
+        <span><strong>{item.tool}</strong> · {item.summary}</span>
+      </div>
+      <pre>{item.detail}</pre>
+      {#if item.state === "pending"}
+        <div class="approval-actions">
+          <button type="button" class="allow" onclick={() => agent.respond(item.id, true)}>Approve</button>
+          {#if session?.agent === "qanuvi"}
+            <!-- Free and local models: a while at a time. -->
+            <button
+              type="button"
+              title="Also allow {kindOf(item.tool)} without asking for {settings.value.approveMinutes} minutes"
+              onclick={() => agent.respond(item.id, true, `minutes:${settings.value.approveMinutes}`)}
+              >Allow for {settings.value.approveMinutes} min</button
+            >
+          {:else}
+            <!-- A paid agent: for the session. -->
+            <button
+              type="button"
+              title="Also allow {kindOf(item.tool)} without asking until this session ends"
+              onclick={() => agent.respond(item.id, true, "session")}>Allow for this session</button
+            >
+          {/if}
+          <button type="button" class="decline" onclick={() => agent.respond(item.id, false)}>Decline</button>
+        </div>
+      {:else}
+        <div class="decision">
+          {item.state === "allowed" ? (item.auto ? "Approved (allowed earlier)" : "Approved") : "Declined"}
+        </div>
+      {/if}
+    </div>
+  {:else if item.kind === "result"}
+    <div class="result" class:failed={!item.ok}>
+      {item.ok ? "Finished" : "Stopped with an error"} · {item.seconds.toFixed(1)} s{item.text ? ` · ${item.text}` : ""}
+      {#if !item.ok && agent.provider.id === "qanuvi" && agent.model === "auto" && agent.info?.available && project}
+        <button type="button" class="to-auto" onclick={() => project && agent.handToPaid(project.id)}
+          >Hand this to {paidAgent()?.name ?? "the paid agent"}</button
+        >
+      {/if}
+      {#if !item.ok && isLimit(item.text) && agent.provider.id !== "qanuvi" && settings.value.brain.models.length && project}
+        <!-- The paid agent hit its limit: the free models can go on now. -->
+        <button type="button" class="to-auto" onclick={() => project && agent.handToFree(project.id)}
+          >Continue with free models</button
+        >
+      {/if}
+      {#if !item.ok && item.text.includes("Switch to Auto") && agent.model !== "auto"}
+        <!-- The chosen model is the only one used; when it fails, Qanuvi core offers to choose again. -->
+        <button type="button" class="to-auto" onclick={() => (agent.model = "auto")}>Switch to Auto</button>
+      {/if}
+    </div>
+  {:else if item.kind === "notice"}
+    <div class="notice {item.tone}">{item.text}</div>
+  {/if}
+{/snippet}
 
 <style>
   .agent-pane {
@@ -699,6 +932,115 @@
 
   .text.md :global(a) {
     color: var(--qx-accent);
+  }
+
+  /* The timeline: steps sit on a thin line, each with a dot. */
+  .tl {
+    position: relative;
+    margin-left: 16px;
+  }
+
+  .tl::before {
+    content: "";
+    position: absolute;
+    top: calc(-1 * var(--qx-space-3));
+    bottom: calc(-1 * var(--qx-space-3));
+    left: -11px;
+    width: 1px;
+    background: var(--qx-border);
+  }
+
+  .tl::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    left: -14px;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--qx-text-muted);
+    border-radius: 50%;
+    background: var(--qx-bg-panel);
+  }
+
+  .tl.fail::after {
+    border-color: var(--qx-status-failed);
+  }
+
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
+    color: var(--qx-text-secondary);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .group:hover {
+    color: var(--qx-text);
+  }
+
+  .group.done :global(svg:not(.chev svg)) {
+    color: var(--qx-text-muted);
+  }
+
+  .group.failed {
+    color: var(--qx-status-failed);
+  }
+
+  .chev {
+    display: flex;
+    color: var(--qx-text-muted);
+    transition: transform 0.12s;
+  }
+
+  .chev.open {
+    transform: rotate(90deg);
+  }
+
+  .group-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--qx-space-1);
+    margin-top: var(--qx-space-1);
+  }
+
+  .fold {
+    align-self: flex-start;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--qx-accent);
+    font: inherit;
+    font-size: var(--qx-text-small);
+    cursor: pointer;
+  }
+
+  .time {
+    display: block;
+    margin-top: 2px;
+    color: var(--qx-text-muted);
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .time.agent {
+    margin-top: calc(-1 * var(--qx-space-2));
+    text-align: left;
+  }
+
+  .composer.dropping {
+    border-color: var(--qx-accent);
+    border-style: dashed;
+  }
+
+  .drop-hint {
+    padding: 2px 4px 6px;
+    color: var(--qx-accent);
+    font-size: var(--qx-text-small);
   }
 
   .thinking {
@@ -896,6 +1238,7 @@
   }
 
   .composer {
+    position: relative;
     margin: 0 var(--qx-space-2) var(--qx-space-2);
     padding: var(--qx-space-2) var(--qx-space-2) var(--qx-space-1);
     background: var(--qx-bg-raised);

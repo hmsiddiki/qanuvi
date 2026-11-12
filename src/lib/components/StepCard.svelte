@@ -14,9 +14,35 @@
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import ChatImage from "./ChatImage.svelte";
   import { untrack } from "svelte";
+  import { diffCounts, editDiff } from "$lib/agent/diff";
 
   type Tool = Extract<Item, { kind: "tool" }>;
-  let { step, onopen }: { step: Tool; onopen: (file: string | null) => void } = $props();
+  let {
+    step,
+    onopen,
+    onrevert,
+  }: {
+    step: Tool;
+    onopen: (file: string | null) => void;
+    /** Undoes the step's edits in the file; answers why not when it cannot. */
+    onrevert?: (step: Tool) => Promise<string | null>;
+  } = $props();
+
+  // A file change shows as a diff (open from the start: the change is the point of the step).
+  const diffs = $derived(step.edits?.map((e) => editDiff(e.old, e.new)) ?? []);
+  const counts = $derived(step.edits ? diffCounts(step.edits) : null);
+  /** Lines a folded diff shows. */
+  const DIFF_FOLDED = 14;
+  let diffAll = $state(false);
+  const diffLong = $derived(diffs.reduce((n, d) => n + d.length, 0) > DIFF_FOLDED);
+  let reverted = $state(false);
+  let revertNote = $state("");
+  async function revert() {
+    if (!onrevert) return;
+    const why = await onrevert(step);
+    if (why === null) reverted = true;
+    else revertNote = why;
+  }
 
   /** Lines a folded IN or OUT block shows. */
   const FOLDED_LINES = 6;
@@ -26,7 +52,7 @@
   const browser = $derived(step.name.startsWith("browser_"));
   // Shell commands are worth seeing as they run: open at first; the rest open on a click (a screenshot opens its card
   // when it arrives, below).
-  let open = $state(untrack(() => SHELL.test(step.name)));
+  let open = $state(untrack(() => SHELL.test(step.name) || !!step.edits?.length));
   let shotSeen = false;
   $effect(() => {
     if (step.image && !shotSeen) {
@@ -75,7 +101,19 @@
       </span>
       <span class="name">{step.name}</span>
       <span class="summary">{step.summary}</span>
+      {#if counts}<span class="counts"
+          ><span class="plus">+{counts.added}</span> <span class="minus">−{counts.removed}</span></span
+        >{/if}
     </button>
+    {#if step.edits && !step.whole && step.state === "done" && onrevert}
+      <button
+        type="button"
+        class="file"
+        disabled={reverted}
+        title={reverted ? "This change was undone" : "Undo this change in the file"}
+        onclick={revert}>{reverted ? "Reverted" : "Revert"}</button
+      >
+    {/if}
     {#if step.file}
       <button type="button" class="file" title="Open {step.file}" onclick={() => onopen(step.file)}>Open</button>
     {/if}
@@ -85,7 +123,28 @@
   {/if}
   {#if open}
     <div class="body">
-      {#if step.input}
+      {#if diffs.length}
+        <div class="diff" class:folded={diffLong && !diffAll}>
+          {#each diffs as lines, n (n)}
+            {#if n > 0}<div class="sep"></div>{/if}
+            {#each lines as l, i (i)}
+              <div class="dl {l.type}">
+                <span class="sign"
+                  >{l.type === "add" ? "+" : l.type === "del" ? "−" : l.type === "gap" ? "⋯" : " "}</span
+                >{l.type === "gap" ? l.text : l.text || " "}
+              </div>
+            {/each}
+          {/each}
+        </div>
+        {#if diffLong}<button type="button" class="more" onclick={() => (diffAll = !diffAll)}
+            >{diffAll ? "Show less" : "Show the whole change"}</button
+          >{/if}
+        {#if step.whole}<div class="waiting">
+            The whole file was written; Source control shows what it replaced.
+          </div>{/if}
+        {#if revertNote}<div class="waiting">{revertNote}</div>{/if}
+      {/if}
+      {#if step.input && !diffs.length}
         <div class="block">
           <span class="label">IN</span>
           <pre class:folded={longIn && !inAll}>{step.input}</pre>
@@ -97,7 +156,7 @@
             >{/if}
         </div>
       {/if}
-      {#if step.output}
+      {#if step.output && (!diffs.length || step.state === "failed")}
         <div class="block" class:fail={step.state === "failed"}>
           <span class="label">OUT</span>
           <pre class:folded={longOut && !outAll}>{step.output}</pre>
@@ -298,6 +357,78 @@
     color: var(--qx-accent);
     font-size: var(--qx-text-small);
     cursor: pointer;
+  }
+
+  .counts {
+    flex: none;
+    font-family: var(--qx-font-mono, monospace);
+    font-size: 11px;
+  }
+
+  .plus {
+    color: var(--qx-status-done);
+  }
+
+  .minus {
+    color: var(--qx-status-failed);
+  }
+
+  .file:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .diff {
+    overflow-x: auto;
+    padding: 4px 0;
+    border-radius: 6px;
+    background: var(--qx-bg-raised);
+    font-family: var(--qx-font-mono, monospace);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .diff.folded {
+    max-height: calc(1.45em * 14 + 8px);
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
+
+  .dl {
+    padding: 0 8px 0 0;
+    color: var(--qx-text);
+    white-space: pre;
+  }
+
+  .dl.add {
+    background: color-mix(in srgb, var(--qx-status-done) 16%, transparent);
+  }
+
+  .dl.del {
+    background: color-mix(in srgb, var(--qx-status-failed) 16%, transparent);
+  }
+
+  .dl.ctx {
+    color: var(--qx-text-secondary);
+  }
+
+  .dl.gap {
+    color: var(--qx-text-muted);
+    font-size: 11px;
+  }
+
+  .sign {
+    display: inline-block;
+    width: 22px;
+    color: var(--qx-text-muted);
+    text-align: center;
+    user-select: none;
+  }
+
+  .sep {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--qx-border);
   }
 
   .waiting {
