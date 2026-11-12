@@ -259,6 +259,18 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
+- [ ] **24q. No token bursts: smaller steps and pacing (owner, 2026-11-13)**: measured on PLAN-D (3 days, about 45
+  steps, $218 at API prices): the cost is cache reads, not new input. Each tool call re-reads the whole context, so
+  a step of about 180 turns at 100-150k context reads about 20M tokens (88b 20.7M / $8.53, 87c 19.0M, 93z 21.8M,
+  92c 18.8M). Fable 5.2 cost about the same per step as Opus 5.5 but about 1.1-1.8 times more per token (2 steps
+  only); the owner moved runs to Opus on purpose.
+  - (a) Smaller steps (agreed): the planner aims at one feature and at most 4-5 files per step; a step still too big
+    is split before it runs (replan), so no step runs 150+ turns.
+  - (b) Pace (agreed, optional, Claude paid plans only): a setting such as "stop plan runs at N% of my 5-hour
+    window"; the run waits for the reset instead of using the window up, leaving room for the user's own work.
+  - (c) Browser steps light (optional): screenshots off by default, only the changed pages checked.
+  - Not done (owner): docs steps are NOT forced onto a cheap model; the user already picks models per step and not
+    every user runs Claude. The Run panel's handover limit (200k) and step cost/minute limits stay the user's choice.
 - [ ] **24n. Chat view and abilities at the level of the best agent panels (owner, 2026-11-12, later; a big step)**:
   the conversation should read and work like a first-class agent panel, for every agent (Claude Code, Qanuvi's own,
   free models). Parts, to be planned in detail before building:
