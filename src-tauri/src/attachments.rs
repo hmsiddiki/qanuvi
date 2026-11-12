@@ -170,9 +170,90 @@ pub fn page_text(html: &str) -> (String, String) {
     (title, text)
 }
 
+/// Sent images are kept so the conversation can show them again: `attachments/<content hash>.<ext>` in the data
+/// folder (the same image sent twice is stored once). Answers the stored file's name.
+pub fn store_image(dir: &Path, a: &Attachment) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    if a.kind != "image" {
+        return None;
+    }
+    let ext = match a.media_type.as_str() {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => return None,
+    };
+    let bytes = B64.decode(a.data.as_bytes()).ok()?;
+    let hash = Sha256::digest(&bytes);
+    let hex: String = hash[..16].iter().map(|b| format!("{b:02x}")).collect();
+    let name = format!("{hex}.{ext}");
+    let file = dir.join(&name);
+    if !file.exists() {
+        std::fs::create_dir_all(dir).ok()?;
+        // Written under another name first: a half-written image is never shown.
+        let part = dir.join(format!("{name}.part"));
+        std::fs::write(&part, &bytes).ok()?;
+        std::fs::rename(&part, &file).ok()?;
+    }
+    Some(name)
+}
+
+/// A stored image as a data address for the window. Only a plain file name from the attachments folder.
+pub fn stored_image(dir: &Path, name: &str) -> Result<String, String> {
+    let (stem, ext) = name.rsplit_once('.').ok_or("Not a stored image.")?;
+    let media = image_type(Path::new(name)).ok_or("Not a stored image.")?;
+    if stem.is_empty() || !stem.chars().all(|c| c.is_ascii_hexdigit()) || ext.len() > 4 {
+        return Err("Not a stored image.".into());
+    }
+    let bytes =
+        std::fs::read(dir.join(name)).map_err(|_| "The image is no longer stored.".to_string())?;
+    Ok(format!("data:{media};base64,{}", B64.encode(bytes)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sent_images_are_kept_once_and_read_back_safely() {
+        let dir = tempfile::tempdir().unwrap();
+        let shot = Attachment {
+            name: "Pasted image 1.png".into(),
+            kind: "image".into(),
+            media_type: "image/png".into(),
+            data: B64.encode(b"png bytes"),
+        };
+        let name = store_image(dir.path(), &shot).unwrap();
+        assert!(name.ends_with(".png") && name.len() == 36);
+        assert_eq!(
+            store_image(dir.path(), &shot).unwrap(),
+            name,
+            "same image, same file"
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert_eq!(
+            stored_image(dir.path(), &name).unwrap(),
+            format!("data:image/png;base64,{}", B64.encode(b"png bytes"))
+        );
+        // Only plain stored names: nothing else on the computer can be read this way.
+        for bad in [
+            "../secret.png",
+            r"C:\x.png",
+            "a/b.png",
+            "notes.txt",
+            "abc.exe",
+            ".png",
+        ] {
+            assert!(stored_image(dir.path(), bad).is_err(), "{bad}");
+        }
+        let text = Attachment {
+            kind: "text".into(),
+            media_type: String::new(),
+            ..shot
+        };
+        assert!(store_image(dir.path(), &text).is_none());
+    }
 
     #[test]
     fn pages_become_readable_text() {

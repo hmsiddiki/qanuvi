@@ -1314,6 +1314,15 @@ async fn attachment_file(path: String) -> Res<agent::Attachment> {
     blocking(move || crate::attachments::read_file(std::path::Path::new(&path))).await
 }
 
+/// An image sent earlier in a conversation (by its stored name), for the window to show.
+#[tauri::command]
+async fn attachment_image(file: String) -> Res<String> {
+    blocking(move || {
+        crate::attachments::stored_image(&crate::paths::data_dir().join("attachments"), &file)
+    })
+    .await
+}
+
 /// A web page as text for the next message.
 #[tauri::command]
 async fn attachment_page(url: String) -> Res<agent::Attachment> {
@@ -1775,6 +1784,7 @@ pub fn run() {
             knowledge_fetch,
             attachment_file,
             attachment_page,
+            attachment_image,
             data_location_info,
             data_test_build,
             data_location_move,

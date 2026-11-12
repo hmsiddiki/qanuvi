@@ -98,11 +98,16 @@ runs on or off; with it off nothing is sent anywhere.
   backed up first as a "before restore" backup, which can be restored back. A move and a restore cannot both be
   booked. Live on the test build: the daily backup ran on time (20 files, window settings in), and the restore across
   a restart brought it back and kept the data from before. For the owner's review: the Backups page by mouse.
-- [x] **15n. Paste images into the message box (owner, 2026-11-12)**: Ctrl+V with a screenshot or a copied image did
-  nothing; only the + menu attached images. Now a pasted image (PNG, JPEG, GIF, WebP, up to 5 MB) or files copied in
-  the file manager (images, or text up to 200 KB) become attachments ("Pasted image 1.png"); plain text pastes as
-  before. Live on the test build: a screenshot pasted with Ctrl+V showed as an attachment chip. Not done yet: the
-  right-click menu's Paste is still text only, and dropping files onto the box.
+- [x] **15n. Paste and see images in the chat (owner, 2026-11-12)**: Ctrl+V with a screenshot or a copied image did
+  nothing; only the + menu attached images, and the chat showed only their names. Now a pasted image (PNG, JPEG, GIF,
+  WebP, up to 5 MB) or files copied in the file manager (images, or text up to 200 KB) become attachments; plain text
+  pastes as before. Images show as pictures: small ones in the box before sending (x removes), thumbnails in the sent
+  message, and the test browser's screenshots; a click shows one whole over the window (Esc or a click closes it).
+  Sent images are kept in the data folder's attachments/ (named by their content, so one copy per image) and come
+  back when the conversation is opened again. Live on the test build: an image pasted with Ctrl+V showed in the box
+  and in the message, Claude Code read it correctly ("orange, QX-42"), and after a restart it showed again and opened
+  whole. Not done yet (in 24n): the right-click menu's Paste is text only; dropping files onto the box; removing
+  stored images no conversation uses any more.
 - [x] **15j. Messages while the agent works (owner, 2026-11-12)**: the box sends while a task runs (Send beside Stop);
   the message joins the task and the agent reads it before its next step (Claude Code takes it mid-turn, Qanuvi's own
   agent adds it to the conversation before each step). It shows "Added while it worked". Live: Claude Code followed a
@@ -191,6 +196,22 @@ runs on or off; with it off nothing is sent anywhere.
   - Next, in the order agreed: (1) the Linux culprit (done); (2) 1d automatic backups and restore (done, unpublished); (3) 24j plan housekeeping
     (archive finished sections, merge plans, with confirmation); (4) 15i language servers and debugging. Later: 24k
     OmniRoute (only when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer.
+- [ ] **24n. Chat view and abilities at the level of the best agent panels (owner, 2026-11-12, later; a big step)**:
+  the conversation should read and work like a first-class agent panel, for every agent (Claude Code, Qanuvi's own,
+  free models). Parts, to be planned in detail before building:
+  - Steps as cards: tool name and its description on top; IN (the command or input) and OUT (the result) in mono
+    blocks, a few lines shown with a fade and click to expand; shell commands open by default, others on a click;
+    copy buttons; the file a step touched opens from it. The test browser's steps (navigate, click, type, screenshot)
+    show the address or element and the screenshot inline (15n images are the start).
+  - A timeline: a dot per step on a thin line, the time on each message, steps that belong together grouped
+    (several reads in a row become "Read 5 files"), long runs folded.
+  - Edits as diffs inside the chat (added and removed lines, per file, with Open and Revert), not only the summary.
+  - Thinking shown folded; plans and to-do lists the agent writes shown as a checklist that updates live.
+  - The box: images by paste (done), drop files and images onto it, @ mentions of files and symbols with a picker,
+    / commands, the model, mode and effort in reach, a queue of messages while it works (15j), and stop.
+  - Session abilities: edit and resend an earlier message (branching from there), rewind changes to a step, search
+    in the conversation, export, and a compact "what changed" summary at the end of each task.
+  - Fast with long sessions (virtual list) and light on memory, as the rest of Qanuvi.
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so

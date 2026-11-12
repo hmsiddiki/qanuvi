@@ -2,6 +2,7 @@
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import AttachMenu from "./AttachMenu.svelte";
   import { clipboardFiles, pastedAttachments } from "$lib/agent/paste";
+  import ChatImage from "./ChatImage.svelte";
   import { overruleIn } from "$lib/core/decider";
   import { reviewFreeTurn } from "$lib/stores/chatReview";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
@@ -184,6 +185,11 @@
     if (agent.draft === "/") commandsOpen = true;
   }
 
+  /** What a message attached besides its images (those show as pictures). */
+  function otherFiles(item: { attachments?: string[]; images?: { name: string }[] }): string[] {
+    return (item.attachments ?? []).filter((n) => !item.images?.some((im) => im.name === n));
+  }
+
   /** Ctrl+V with an image (a screenshot) or copied files: they become attachments; plain text pastes as usual. */
   async function paste(event: ClipboardEvent) {
     const files = clipboardFiles(event.clipboardData);
@@ -277,9 +283,14 @@
                 title="Sent while the agent was working; it reads it before its next step">Added while it worked</span
               >{/if}
             {item.text}
-            {#if item.attachments?.length}
+            {#if item.images?.length}
               <div class="chips">
-                {#each item.attachments as name (name)}<span class="chip" title={name}>📎 {name}</span>{/each}
+                {#each item.images as image, i (i)}<ChatImage {image} />{/each}
+              </div>
+            {/if}
+            {#if otherFiles(item).length}
+              <div class="chips">
+                {#each otherFiles(item) as name, i (i)}<span class="chip" title={name}>📎 {name}</span>{/each}
               </div>
             {/if}
           </div>
@@ -325,9 +336,9 @@
             </span>
           </button>
           {#if item.image}
-            <a class="shot" href={item.image} target="_blank" rel="noreferrer" title="Screenshot (open full size)">
-              <img src={item.image} alt="Screenshot from the test browser" loading="lazy" />
-            </a>
+            <div class="shot">
+              <ChatImage image={{ name: "Screenshot from the test browser", src: item.image }} size={260} />
+            </div>
           {/if}
         {:else if item.kind === "approval"}
           <div class="approval {item.state}">
@@ -420,14 +431,27 @@
     {#if agent.attachments.length}
       <div class="chips pending">
         {#each agent.attachments as f, i (i)}
-          <span class="chip" title={f.name}
-            >{f.kind === "image" ? "🖼" : f.kind === "page" ? "🌐" : "📄"}
-            {f.name}<button
-              type="button"
-              aria-label="Remove {f.name}"
-              onclick={() => (agent.attachments = agent.attachments.filter((_, j) => j !== i))}>×</button
-            ></span
-          >
+          {#if f.kind === "image"}
+            <span class="pic">
+              <ChatImage image={{ name: f.name, src: `data:${f.mediaType};base64,${f.data}` }} size={64} />
+              <button
+                type="button"
+                class="drop"
+                title="Remove {f.name}"
+                aria-label="Remove {f.name}"
+                onclick={() => (agent.attachments = agent.attachments.filter((_, j) => j !== i))}>×</button
+              >
+            </span>
+          {:else}
+            <span class="chip" title={f.name}
+              >{f.kind === "page" ? "🌐" : "📄"}
+              {f.name}<button
+                type="button"
+                aria-label="Remove {f.name}"
+                onclick={() => (agent.attachments = agent.attachments.filter((_, j) => j !== i))}>×</button
+              ></span
+            >
+          {/if}
         {/each}
       </div>
     {/if}
@@ -555,7 +579,31 @@
   }
 
   .chips.pending {
+    align-items: center;
     margin: 0 0 6px;
+  }
+
+  .pic {
+    position: relative;
+    display: inline-block;
+  }
+
+  .pic .drop {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--qx-border);
+    border-radius: 50%;
+    background: var(--qx-bg-raised);
+    color: var(--qx-text);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
   }
 
   .chip {
@@ -975,14 +1023,6 @@
   .shot {
     display: block;
     margin: 2px 0 var(--qx-space-2) 22px;
-  }
-
-  .shot img {
-    display: block;
-    max-width: 100%;
-    max-height: 220px;
-    border-radius: var(--qx-radius-card);
-    box-shadow: 0 0 0 1px var(--qx-border);
   }
 
   .setup {

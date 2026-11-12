@@ -195,3 +195,29 @@ describe("messages sent while the agent works", () => {
     expect(items.map((i) => i.kind === "user" && i.during)).toEqual([undefined, true]);
   });
 });
+
+describe("images in the user's messages", () => {
+  it("shows stored and in-hand images, and leaves out anything else", () => {
+    const items = reduceAll([
+      JSON.stringify({
+        type: "qanuvi_user",
+        text: "Look",
+        attachments: ["a.png", "notes.txt"],
+        images: [
+          { name: "a.png", file: "0123abcd.png" },
+          { name: "b.png", src: "data:image/png;base64,QUJD" },
+          { name: "bad", src: "javascript:alert(1)" },
+          { name: "none" },
+        ],
+      }),
+    ]);
+    expect(items[0]).toMatchObject({
+      kind: "user",
+      attachments: ["a.png", "notes.txt"],
+      images: [
+        { name: "a.png", file: "0123abcd.png" },
+        { name: "b.png", src: "data:image/png;base64,QUJD" },
+      ],
+    });
+  });
+});

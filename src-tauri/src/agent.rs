@@ -603,11 +603,23 @@ fn context_with(context: Option<&str>, files: &[Attachment]) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("\n\n"))
 }
 
-/// The user's line as stored and shown: their words and the names of what they attached.
+/// The user's line as stored and shown: their words, the names of what they attached, and the images (kept in the
+/// data folder's `attachments`, so the conversation shows them again).
 fn user_line(prompt: &str, files: &[Attachment]) -> String {
     let mut v = json!({"type": "qanuvi_user", "text": prompt});
     if !files.is_empty() {
         v["attachments"] = json!(files.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+        let dir = crate::paths::data_dir().join("attachments");
+        let images: Vec<Value> = files
+            .iter()
+            .filter_map(|f| {
+                crate::attachments::store_image(&dir, f)
+                    .map(|file| json!({"name": f.name, "file": file}))
+            })
+            .collect();
+        if !images.is_empty() {
+            v["images"] = Value::Array(images);
+        }
     }
     v.to_string()
 }
@@ -1527,6 +1539,15 @@ mod attachment_tests {
         );
         let line: Value = serde_json::from_str(&user_line("Look", &files)).unwrap();
         assert_eq!(line["attachments"], json!(["shot.png", "notes.txt"]));
+        // The image is kept for the conversation to show; the text file is not.
+        assert_eq!(line["images"].as_array().map(Vec::len), Some(1));
+        assert_eq!(line["images"][0]["name"], "shot.png");
+        assert!(
+            line["images"][0]["file"]
+                .as_str()
+                .unwrap()
+                .ends_with(".png")
+        );
     }
 
     #[test]

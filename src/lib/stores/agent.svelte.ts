@@ -221,6 +221,14 @@ ${text}`
         type: "qanuvi_user",
         text,
         ...(files.length ? { attachments: files.map((f) => f.name) } : {}),
+        // Images show straight away from the data in hand; the stored line names the kept copies.
+        ...(files.some((f) => f.kind === "image")
+          ? {
+              images: files
+                .filter((f) => f.kind === "image")
+                .map((f) => ({ name: f.name, src: `data:${f.mediaType};base64,${f.data}` })),
+            }
+          : {}),
         ...(during ? { during: true } : {}),
       }),
       ++this.#seq,

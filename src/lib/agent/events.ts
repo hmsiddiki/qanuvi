@@ -7,8 +7,15 @@
 import { withoutOverruleNote } from "$lib/core/decider";
 import { withoutGuidance } from "$lib/plan/guidance";
 
+/** An image in a message: stored in the data folder (`file`), or still in hand (`src`, a data address). */
+export interface ShownImage {
+  name: string;
+  file?: string;
+  src?: string;
+}
+
 export type Item =
-  | { kind: "user"; id: string; text: string; attachments?: string[]; during?: boolean }
+  | { kind: "user"; id: string; text: string; attachments?: string[]; images?: ShownImage[]; during?: boolean }
   /** live: text still being written (replaced by the whole message when it arrives). */
   | { kind: "text"; id: string; text: string; live?: boolean }
   | {
@@ -124,11 +131,22 @@ export function reduce(items: Item[], line: string, seq: number): Item[] {
   const out = items.filter((x) => !(x.kind === "text" && x.live));
   if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
+    const images: ShownImage[] = Array.isArray(msg.images)
+      ? msg.images
+          .map(obj)
+          .map((i) => ({
+            name: str(i.name),
+            ...(str(i.file) ? { file: str(i.file) } : {}),
+            ...(str(i.src).startsWith("data:image/") ? { src: str(i.src) } : {}),
+          }))
+          .filter((i) => i.file || i.src)
+      : [];
     out.push({
       kind: "user",
       id: `u${seq}`,
       text: withoutGuidance(withoutOverruleNote(str(msg.text))),
       ...(attachments.length ? { attachments } : {}),
+      ...(images.length ? { images } : {}),
       ...(msg.during === true ? { during: true } : {}),
     });
   } else if (type === "qanuvi_permission") {
