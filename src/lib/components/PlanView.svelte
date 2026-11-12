@@ -145,7 +145,7 @@
       ))
     )
       return;
-    apply((t) => setStepStatus(t, step.line, next, step.title));
+    void applyToStep(step, (t, line, title) => setStepStatus(t, line, next, title));
   }
 
   async function load() {
@@ -163,18 +163,54 @@
     }
   }
 
-  /** Applies an edit to the file on disk, refusing if it changed since it was read. */
-  async function apply(change: (current: string) => string) {
-    try {
-      const next = change(text);
-      hash = await api.files.write(project.id, file, next, hash);
-      text = next;
-      error = "";
-    } catch (e) {
-      error = errorText(e);
-      await load();
-    }
+  /** The step in freshly read steps: by number and title, else by number, else by title at the same line. */
+  function findStep(steps: Step[], step: Step): Step | undefined {
+    return (
+      steps.find((s) => s.number === step.number && s.title === step.title) ??
+      (step.number ? steps.find((s) => s.number === step.number) : undefined) ??
+      steps.find((s) => s.line === step.line && s.title === step.title)
+    );
   }
+
+  /**
+   * Applies an edit to one step of the file as it is on disk now, not as it was shown: an agent may have added or
+   * moved steps since (there is no file watcher). Tries twice in case the file changes between reading and writing;
+   * returns whether the edit was saved. A failure stays on screen and the list shows the file as it is.
+   */
+  async function applyToStep(step: Step, edit: (current: string, line: number, title: string) => string) {
+    let failure = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const now = await api.files.read(project.id, file);
+        const found = findStep(parsePlan(now.text).steps, step);
+        if (!found) throw new Error(`Step ${step.number ?? step.title} is no longer in ${file}.`);
+        const next = edit(now.text, found.line, found.title);
+        hash = await api.files.write(project.id, file, next, now.hash);
+        text = next;
+        error = "";
+        return true;
+      } catch (e) {
+        failure = errorText(e);
+      }
+    }
+    await load();
+    error = `Not saved: ${failure}`;
+    return false;
+  }
+
+  // The list follows changes made outside the view (an agent adding steps), so it never shows an old file.
+  $effect(() => {
+    if (!file) return;
+    const timer = setInterval(async () => {
+      if (document.hidden || editing !== null) return;
+      const now = await api.files.read(project.id, file).catch(() => null);
+      if (now && now.hash !== hash) {
+        text = now.text;
+        hash = now.hash;
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  });
 
   $effect(() => {
     void project.id;
@@ -205,8 +241,9 @@
   }
 
   function finishEdit(step: Step, save: boolean) {
-    if (save && editText.trim() && editText.trim() !== step.title)
-      apply((t) => setStepTitle(t, step.line, editText, step.title));
+    const newTitle = editText;
+    if (save && newTitle.trim() && newTitle.trim() !== step.title)
+      void applyToStep(step, (t, line, title) => setStepTitle(t, line, newTitle, title));
     editing = null;
   }
 
@@ -437,10 +474,14 @@
                     class="model"
                     value={step.model ?? ""}
                     title="Model for this step"
-                    onchange={(e) =>
-                      apply((t) =>
-                        setStepModel(t, step.line, (e.target as HTMLSelectElement).value || null, step.title),
-                      )}
+                    onchange={async (e) => {
+                      const el = e.target as HTMLSelectElement;
+                      const saved = await applyToStep(step, (t, line, title) =>
+                        setStepModel(t, line, el.value || null, title),
+                      );
+                      // Not saved: show what the file says, not the choice that did not stick.
+                      if (!saved) el.value = findStep(plan?.steps ?? [], step)?.model ?? "";
+                    }}
                   >
                     <option value="">Default model</option>
                     {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
