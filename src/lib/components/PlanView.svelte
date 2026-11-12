@@ -31,8 +31,13 @@
   import RunPanel from "./RunPanel.svelte";
   import PlannerDialog from "./PlannerDialog.svelte";
   import WandSparkles from "@lucide/svelte/icons/wand-sparkles";
+  import Archive from "@lucide/svelte/icons/archive";
+  import ListPlus from "@lucide/svelte/icons/list-plus";
+  import HousekeepingPanel from "./HousekeepingPanel.svelte";
 
   let showPlanner = $state(false);
+  /** The housekeeping panel that is open (24j): archive finished sections, or add another plan's steps. */
+  let housekeeping = $state<"archive" | "merge" | null>(null);
 
   async function plannedInto(path: string) {
     if (path !== file) {
@@ -274,6 +279,26 @@
         <Sparkles size={13} />
       </IconButton>
     {/if}
+    {#if file}
+      <IconButton
+        label={thisRunning
+          ? "Archive finished sections (not while a run of this plan is going)"
+          : "Archive finished sections: move them to a file next to the plan"}
+        disabled={thisRunning}
+        onclick={() => (housekeeping = housekeeping === "archive" ? null : "archive")}
+      >
+        <Archive size={13} />
+      </IconButton>
+      <IconButton
+        label={thisRunning
+          ? "Add steps from another plan (not while a run of this plan is going)"
+          : "Add steps from another plan"}
+        disabled={thisRunning}
+        onclick={() => (housekeeping = housekeeping === "merge" ? null : "merge")}
+      >
+        <ListPlus size={13} />
+      </IconButton>
+    {/if}
     <IconButton label="Reload" onclick={load}><RefreshCw size={13} /></IconButton>
   </header>
 
@@ -286,6 +311,19 @@
         file={file || "TASKLIST.md"}
         onclose={() => (showPlanner = false)}
         onadded={plannedInto}
+      />
+    {/if}
+    {#if housekeeping && file && !thisRunning}
+      <HousekeepingPanel
+        {project}
+        {file}
+        {candidates}
+        mode={housekeeping}
+        onclose={() => (housekeeping = null)}
+        ondone={() => {
+          open.clear();
+          void load();
+        }}
       />
     {/if}
     {#if !file}

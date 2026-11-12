@@ -64,6 +64,7 @@ import {
   runSummary,
 } from "$lib/plan/runner";
 import { clearStaleSkips, parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
+import { archivePath, doneNumbers as doneIn } from "$lib/plan/housekeeping";
 import { budgetState, chooseModel, jobType, learn, monthStart, type ModelStats } from "$lib/plan/routing";
 import {
   assignPrompt,
@@ -547,9 +548,10 @@ class RunnerStore {
     if (rangeError) throw new Error(rangeError);
     const pause = options.pause ?? "decisions";
     const steps = stepsToRun(parsePlan(text).steps, options.fromLine, options.onlyOne, ranges);
-    // What is done already, to check each step's "- Needs:" line (24f).
+    // What is done already, to check each step's "- Needs:" line (24f); steps moved to the plan's archive (24j) count.
+    const archived = doneIn((await api.files.read(project.id, archivePath(file)).catch(() => null))?.text);
     // Skip lines from earlier runs whose needed steps are done now go first (they would say the wrong thing).
-    const cleared = clearStaleSkips(text);
+    const cleared = clearStaleSkips(text, archived);
     if (cleared !== text) {
       const now = await api.files.read(project.id, file).catch(() => null);
       if (now?.text === text) {
@@ -558,11 +560,12 @@ class RunnerStore {
         this.changed++;
       }
     }
-    const doneNumbers = new Set(
-      parsePlan(text)
+    const doneNumbers = new Set([
+      ...archived,
+      ...parsePlan(text)
         .steps.filter((s) => s.status === "x" && s.number)
         .map((s) => s.number!),
-    );
+    ]);
     this.#stopRequested = false;
     this.pausing = false;
     this.stopping = false;
@@ -1140,15 +1143,10 @@ class RunnerStore {
       const other = need.slice(0, hash);
       if (out.has(other)) continue;
       const f = await api.files.read(project.id, other).catch(() => null);
-      if (f)
-        out.set(
-          other,
-          new Set(
-            parsePlan(f.text)
-              .steps.filter((s) => s.status === "x" && s.number)
-              .map((s) => s.number!),
-          ),
-        );
+      if (f) {
+        const a = await api.files.read(project.id, archivePath(other)).catch(() => null);
+        out.set(other, doneIn(f.text, a?.text));
+      }
     }
     return out;
   }

@@ -221,6 +221,8 @@ runs on or off; with it off nothing is sent anywhere.
     the owner checks after the update. Next: (4) 24j plan housekeeping.
   - PUBLISHED 0.1.12 on the dev channel 2026-11-12 (owner: "release anyway"; QANUVI_RELEASE_ANYWAY=1, Claude Code
     here 2.1.318, 2.1.322 out): everything listed above since 0.1.11. Nothing unpublished now. Next: (4) 24j.
+  - Done 2026-11-12 (later), committed, NOT published (ask the owner first): (4) 24j plan housekeeping (archive and
+    add steps, see 24j). Verify green (231 + 152 tests). Next: (5) 24o finishing pass.
   - Next, in the order agreed (owner, 2026-11-12: "do it as you order"): (1) 24n parts 1, 2 and 4 as one step: step
     cards with IN/OUT, test-browser steps with screenshots, a timeline with grouping, folded thinking and live to-do
     lists (about 2-3 sessions); (2) 24n part 5, the message box (drop files, @ mentions, right-click image paste); (3)
@@ -268,8 +270,18 @@ runs on or off; with it off nothing is sent anywhere.
   which looked like Qanuvi alone. Measured: Qanuvi + WebView2 about 283 MB, a Claude Code agent 507 MB, a terminal
   PowerShell 56 MB. To do: show the app's own memory in the status bar, with a hover breakdown of app (qanuvi.exe +
   WebView2), each agent and terminals, plus the total.
-- [ ] **24j. Plan housekeeping (next)**: move finished sections to an archive file next to the plan, and add another
+- [x] **24j. Plan housekeeping**: move finished sections to an archive file next to the plan, and add another
   plan's steps into the current one, both with a preview and the owner's confirmation.
+  Done 2026-11-12: two buttons in the Plan view header (Archive, Add steps), each opening a preview panel; nothing is
+  written before its button is pressed, and the change is worked out again from the files as they are then. Archive:
+  every section whose steps are all done (heading, steps and text under it) goes to PLAN.archive.md next to the plan
+  (made or added to; written first, so a failure never loses steps). Plan runs read the archive: its done steps
+  satisfy Needs (also "OTHER.md#n" needs, from that plan's archive) and clear stale Skipped lines. Archives are not
+  offered as task lists. Add steps: pick another task list, "Only steps not done" (on by default); its sections go to
+  the end under their headings, numbers in use here or in the archive get the next free ones ("45e" keeps its
+  letter), Needs lines follow (renumbered; a need on a left-out step becomes "OTHER.md#n"; "THIS.md#n" becomes "n");
+  the source file stays as it is. Both buttons are off while a run of this plan is going. The agent brief mentions the
+  archive. Code: plan/housekeeping.ts (+ tests), HousekeepingPanel.svelte. Not yet driven in the running app.
 - [x] **15k. Search like VS Code (owner, 2026-11-12)**: the search panel found 0 results for a word that
   is in the project. To do: results grouped per file with the line and the match highlighted, case, whole word and
   regex toggles, files to include and exclude, gitignore respected, results while typing, replace and replace all,

@@ -21,7 +21,8 @@ shows the file in its Plan view and runs it step by step, each step in its own a
 
 Status marks: [ ] not started, [-] in progress, [x] done, [!] blocked. Step numbers are unique in the file and may \
 have a letter (12, 12a, 12b). Needs (optional) lists steps that must be done first; Qanuvi skips a step whose needs \
-are not done and writes the reason on a '- Skipped:' line. Model (optional) picks the model for that step: the \
+are not done and writes the reason on a '- Skipped:' line. Finished sections may have been moved to an archive \
+next to the plan (PLAN.archive.md for PLAN.md); their steps count as done, so new numbers must not reuse them. Model (optional) picks the model for that step: the \
 strongest for money, security and hard design, a mid one for normal coding, the smallest for docs and small edits. \
 Make each step small enough for one focused session, leaving the project working, with its tests in the same step. \
 Write the plan; do not start doing the steps unless the user asks. Do not read Qanuvi's source to learn this.";

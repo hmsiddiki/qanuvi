@@ -216,17 +216,18 @@ const NOT_PLANS = /(^|\/)(node_modules|vendor|backups?|\.history)\//i;
 export function findTaskLists(paths: string[]): string[] {
   const re = /(^|\/)[^/]*(task[-_ ]?list|todo|plan|roadmap)[^/]*\.md$/i;
   return paths
-    .filter((p) => re.test(p) && !NOT_PLANS.test(p))
+    .filter((p) => re.test(p) && !NOT_PLANS.test(p) && !/\.archive\.md$/i.test(p))
     .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
 }
 
 /**
  * Removes "- Skipped:" lines that no longer hold: the step's needs (in this plan) are all done now. A run does this
- * before it starts, so the plan never says a step waits for one that is finished.
+ * before it starts, so the plan never says a step waits for one that is finished. `alsoDone`: numbers done in the
+ * plan's archive.
  */
-export function clearStaleSkips(text: string): string {
+export function clearStaleSkips(text: string, alsoDone: Iterable<string> = []): string {
   const plan = parsePlan(text);
-  const done = new Set(plan.steps.filter((s) => s.status === "x" && s.number).map((s) => s.number!));
+  const done = new Set([...alsoDone, ...plan.steps.filter((s) => s.status === "x" && s.number).map((s) => s.number!)]);
   let out = text;
   // From the bottom up: removing a line moves the ones below it.
   for (const s of [...plan.steps].reverse()) {
