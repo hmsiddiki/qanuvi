@@ -319,8 +319,20 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation, checkpoint 2026-11-14 night): 24u part 4 session A BUILT (f523130, verify green
-    338 + 162, NOT driven live yet): Inbox table (migration 8, src-tauri/src/inbox.rs, "qanuvi-inbox" event to every
+    RESUME HERE (new conversation, checkpoint 2026-11-14 night, later): 24u part 4 session A DRIVEN LIVE on a
+    scratch project (test build, Haiku 5.5, $0.01), no fixes needed. PLAN-I: 1a set to "Wait for me" in the check,
+    the run waited ("Needs your answer (1)", 1b waits as the same step number), the Inbox showed the question with
+    Go ahead / Let Qanuvi decide / Skip / Open the plan; answered "Go ahead" + a note from the Inbox: the DB row went
+    answered (answered_by main), the run panel card closed at once, 1a ran with the note (math.js deleted), 1b ran,
+    run finished 2/2 and a "finished" info item came in. PLAN-J: the check held 1a by itself ("needs you"); Skip in
+    the run panel closed the Inbox question ("You answered: Skip this step"), run ended 0/1, 1 skipped, file kept.
+    Not checked live: a second window, the import of old items, closing at the next run start. NEXT: session B
+    (owner agreed 2026-11-14 the order: probe first, then build): desktop notifications on Windows, macOS and Linux;
+    first a small probe of show + click per system (tauri-plugin-notification on desktop may not report clicks:
+    Windows toast activated event, Linux notify-rust action, macOS weakest); fallback when a click cannot be read:
+    the notification still shows and a click brings Qanuvi to the front with the Inbox open. Windows is checked live
+    here, macOS and Linux by build and code review only (say so). Earlier text of this checkpoint: 24u part 4
+    session A BUILT (f523130, verify green 338 + 162): Inbox table (migration 8, src-tauri/src/inbox.rs, "qanuvi-inbox" event to every
     window), held steps become questions with forms (src/lib/plan/holdask.ts: Go ahead / Let Qanuvi decide / Skip;
     logins answered in the run panel only), the first answer anywhere closes it and reaches the running run
     (runner #fromInbox), run panel answers close it too, questions of a plan close at the next run start when the hold
