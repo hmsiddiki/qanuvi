@@ -319,10 +319,8 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation): 24u part 3 (sorted asks) is built (2026-11-14, verify green 328 + 156, NOT driven
-    live; see Part 3 below): drive it on a scratch project first (a fresh plan file with a naming question, a
-    migration on a local file and a push, so all three sorts show), then part 4. The Team fix before it is built too
-    (verify green 320 + 156, not driven live; helper `freeWantedButMissing` in plan/runner.ts). The fix: with no free models set
+    RESUME HERE (new conversation): 24u part 3 and 24x are built and driven live (2026-11-14, see them below); the
+    Team label fix was seen live too. Next: 24u part 4 (central Inbox). Nothing published since 0.1.18. The fix: with no free models set
     up, the Run panel's Team option reads "As in Settings: Paid decides, free works (no free models yet: paid only)"
     and the run logs one decision "No free models set up: every step on <agent>" (found because the test build's
     data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
@@ -410,6 +408,14 @@ runs on or off; with it off nothing is sent anywhere.
       panel says to open it again. Extra-check steps (options.extraChecks, kept per plan as `checks`) always run
       the full tests, are told so in their prompt, and their "done" goes through the decider's diff review also on
       the paid agent (before only free models' work was reviewed).
+    - Driven live 2026-11-14 on the scratch project (PLAN-F, Haiku 5.5, about $0.03): the check sorted 1a date
+      format and 1b empty-email rule "Qanuvi decides", 1b migration of local test data "goes ahead with extra checks",
+      1c push (no remote) "needs you"; the run did 1a (format kept as settings at the top of util.js, as the decided
+      note asks), 1b (the decider's review accepted it), 1z, held 1c and waited; "Decided for you (3)" listed with
+      Change; the Team label read "no free models yet". Found and fixed: (a) the first decision of EVERY run was lost
+      (`(run.decisions ??= []).push` pushes into the plain array, not the reactive copy; same for deciderCalls, so
+      the first decider call's cost was missing from run totals); (b) Change saved an unchanged answer as a change
+      (Save now ignores and is disabled for the same answer). Both fixes verified by tests, not driven again.
   - Part 4, one notification centre: the Inbox moves into Qanuvi's database (Rust side), seen by every window, the
     runner and later the phone. Types: for your information, needs an answer, problem. Answer items carry their form
     (options, text, "Let Qanuvi decide", "Skip this step"); the first answer anywhere closes it everywhere. Settings,
@@ -431,7 +437,11 @@ runs on or off; with it off nothing is sent anywhere.
     step...) or a plain yes (`isYes`) right after that question (`askedToResume`); a message with images is always
     chat. A step finished in the chat counts as done and the run starts at the next one. The resumed step's request
     now starts with the owner's words. A password-like message is kept as a plan private detail and not sent to the
-    chat. Not driven live.
+    chat. Driven live 2026-11-14 (PLAN-G, Haiku 5.5, about $0.03): 1a blocked (no GREETING_TEXT), run stopped; a
+    question in 1a's chat showed as its own bubble, got a short answer, the run stayed stopped; giving the value
+    made the agent finish 1a there, mark it [x] and ask "Should I resume the plan run from step 1a? (yes/no)"; "yes"
+    resumed in the same session, skipped the done 1a, ran 1b, "2 of 2 done". After "Finish without them" a run
+    counts as done, so its step chats are plain chats (no resume question).
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for

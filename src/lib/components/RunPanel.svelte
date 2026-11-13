@@ -286,7 +286,11 @@
   });
   function saveChange(d: KeptDecided) {
     const text = changeText.trim();
-    if (!text) return;
+    // The same answer again is no change.
+    if (!text || text === (d.changed ?? d.answer)) {
+      changing = null;
+      return;
+    }
     savePlanState(project.id, file, changeDecided(loadPlanState(project.id, file), d.step, d.what, text));
     const done = run?.steps.find((s) => (s.number ?? s.title) === d.step)?.status === "done";
     // Every later step and model reads it (the plan's FACTS.md).
@@ -964,7 +968,11 @@
                     bind:value={changeText}
                     onkeydown={(e) => e.key === "Enter" && (e.preventDefault(), saveChange(d))}
                   />
-                  <button type="button" onclick={() => saveChange(d)} disabled={!changeText.trim()}>Save</button>
+                  <button
+                    type="button"
+                    onclick={() => saveChange(d)}
+                    disabled={!changeText.trim() || changeText.trim() === (d.changed ?? d.answer)}>Save</button
+                  >
                   <button type="button" class="link" onclick={() => (changing = null)}>Cancel</button>
                 </span>
               {:else}

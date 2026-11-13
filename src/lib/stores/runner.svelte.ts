@@ -1767,7 +1767,9 @@ class RunnerStore {
   }
 
   #decide(run: PlanRun, d: Omit<DecisionRecord, "at">): void {
-    (run.decisions ??= []).push({ at: Date.now(), ...d });
+    // Not `(run.decisions ??= []).push(...)`: on a reactive object that pushes into the plain array, not the kept one,
+    // so the first entry was lost.
+    run.decisions = [...(run.decisions ?? []), { at: Date.now(), ...d }];
   }
 
   /**
@@ -1840,7 +1842,7 @@ class RunnerStore {
           lean: true,
           quiet: true,
         });
-        (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
+        run.deciderCalls = [...(run.deciderCalls ?? []), { model, costUsd: r.costUsd }];
         text = r.text;
       } catch {
         try {
@@ -1897,7 +1899,7 @@ class RunnerStore {
         `Decider: review step ${stepRun.number ?? stepRun.title}`,
         { agentId: provider.id, lean: true },
       );
-      if (this.run) (this.run.deciderCalls ??= []).push({ model, costUsd });
+      if (this.run) this.run.deciderCalls = [...(this.run.deciderCalls ?? []), { model, costUsd }];
       return parseReview(text);
     } catch (e) {
       // The paid agent cannot answer now: the free models review instead (24e).
@@ -2083,7 +2085,7 @@ class RunnerStore {
         },
       );
       answer = r.text;
-      if (run) (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
+      if (run) run.deciderCalls = [...(run.deciderCalls ?? []), { model, costUsd: r.costUsd }];
     } catch {
       // The paid agent cannot answer now (limit, sign-in, offline): the free models take the seat (24e).
       try {
