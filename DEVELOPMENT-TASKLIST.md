@@ -325,6 +325,7 @@ runs on or off; with it off nothing is sent anywhere.
     data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
     Then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Test plans: the
     scratch project's plan state is kept per plan file (localStorage), so use a fresh plan file name per test. Each part in a short session; drive it live on a scratch project only. After 24u:
+    24v parts 1 and 2 (Qanuvi's own compression, owner agreed 2026-11-14) with a 24w measurement after each, then
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -400,6 +401,36 @@ runs on or off; with it off nothing is sent anywhere.
     hours. Clicking a Windows notification brings Qanuvi forward and opens the same answer window used in the
     Inbox. Secrets are answered in the main app only. The phone is a delivery target in the design and settings;
     the phone app itself (through the Milestone 20 relay) is its own later step.
+- [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14)**: the
+  owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
+  Claude Code; measured 2026-11-14: 4 python processes, 544 MB (the proxy worker alone 513 MB), all counted in
+  Qanuvi's status-bar total because it was started from Qanuvi's terminal. If that terminal closes, every Claude
+  Code session (and plan steps) fails, because ~/.claude/settings.json points at it. What Headroom does: compresses
+  only the new parts of a request (fresh tool output, latest turn) so the cached prefix stays byte-identical;
+  routes by content type (logs: repeats dropped, errors/FATAL kept; JSON arrays crushed; code by syntax tree;
+  diffs, search results, HTML trimmed; prose through its ML model Kompress via ONNX); keeps originals locally with
+  a retrieve tool for the model; appends a "be terse" note at the end of the system prompt. Most of its memory is
+  Python plus the ML parts. Qanuvi does it in Rust, own code (Headroom's ideas studied, its code not copied):
+  - Part 1, inside Qanuvi's own agent (llm.rs, every provider: OpenRouter, OmniRoute, Ollama, paid APIs): a
+    content router and compressors for tool results before they are sent, live part only, never the cached prefix;
+    errors and failing lines always kept byte for byte; originals kept in the data folder with a
+    `qanuvi_retrieve` tool (MCP, like the index tools); savings logged per step. No new process.
+  - Part 2, outside agents (Claude Code, Codex, any OpenAI- or Anthropic-style API): a small Rust proxy inside
+    qanuvi.exe (or its own small binary), started per run or session and handed to that agent through the existing
+    "agent address" setting / `ANTHROPIC_BASE_URL` (OpenAI base URL for others), never the global settings.json; it
+    ends with its owner (job object), so a closed terminal cannot break other sessions. Streaming passes through.
+  - Part 3, later and optional: prose compression with a small model (ONNX from Rust, or the local Ollama model),
+    only if the machine has room (machine::room/fits) and only if 24w shows heuristics are not enough.
+  - Aim: tens of MB, not hundreds (estimate, to be measured). Headroom stays the owner's setup until part 2 works
+    and 24w shows Qanuvi is close enough. On a Max plan the saving is room in the 5-hour window, not dollars.
+- [ ] **24w. Keep measuring Qanuvi's compression against Headroom (owner, 2026-11-14; repeats, not one-off)**: Headroom
+  has been tuned for a long time, so 24v starts behind it. After each 24v part and after each tuning change: run the
+  same scratch plan (same model, fresh plan file name) once through Headroom and once through Qanuvi's compressor;
+  record input tokens, cache reads, output tokens, steps passed, retrieve calls, memory and time per request, in a
+  table kept here (date, Qanuvi version, Headroom version, results). Look at what Headroom saved that Qanuvi did not
+  (by content type) and turn the biggest gap into the next tuning task. Check Headroom's changelog for new tricks
+  now and then. Done when Qanuvi is within about 10% of Headroom's saving with no drop in steps passed, and the
+  owner agrees to switch Headroom off; until then this stays open.
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:
