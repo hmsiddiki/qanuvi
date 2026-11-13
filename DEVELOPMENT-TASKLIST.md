@@ -331,7 +331,19 @@ runs on or off; with it off nothing is sent anywhere.
     first a small probe of show + click per system (tauri-plugin-notification on desktop may not report clicks:
     Windows toast activated event, Linux notify-rust action, macOS weakest); fallback when a click cannot be read:
     the notification still shows and a click brings Qanuvi to the front with the Inbox open. Windows is checked live
-    here, macOS and Linux by build and code review only (say so). Earlier text of this checkpoint: 24u part 4
+    here, macOS and Linux by build and code review only (say so). PROBE DONE 2026-11-14 (throwaway crate, not in
+    the repo): Windows with tauri-winrt-notification 0.7: the toast shows (owner saw it); the default banner hides in
+    seconds and reports "dismissed, timed out" (reason 2) then sits in the notification centre, so use
+    Duration::Long (about 25 s) and do not treat that dismissal as an answer; a click on the banner while the sender
+    runs reaches on_activated (owner clicked, probe printed "activated"); a click on the notification-centre copy
+    after the time-out did NOT reach the process (sent under PowerShell's app id, so Windows routes it there).
+    Build plan from it: send as Qanuvi's own app id (the NSIS Start-menu shortcut) and give the toast a protocol
+    launch "qanuvi://inbox/<id>" so banner, notification-centre and closed-app clicks all come in through the deep
+    link (single instance forwards it); check that with an installed build. Linux: notify-rust 4 with
+    wait_for_action cross-builds with zigbuild (zig is at E:/DevTools/zig/zig-windows-x86_64-0.13.0); click not
+    tested (no desktop on the VPS; Zorin laptop needed). macOS: notify-rust uses mac-notification-sys, clicks only by
+    waiting on the response; not buildable here, code review only. Do Not Disturb is the user's choice; the Inbox
+    still holds every item. Earlier text of this checkpoint: 24u part 4
     session A BUILT (f523130, verify green 338 + 162): Inbox table (migration 8, src-tauri/src/inbox.rs, "qanuvi-inbox" event to every
     window), held steps become questions with forms (src/lib/plan/holdask.ts: Go ahead / Let Qanuvi decide / Skip;
     logins answered in the run panel only), the first answer anywhere closes it and reaches the running run
