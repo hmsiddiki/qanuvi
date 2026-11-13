@@ -105,4 +105,17 @@ describe("saved picks", () => {
     expect(pickFor(back, { number: "95a", title: "Erasure" }, "codex")).toBeNull();
     expect(loadPicks(store, "p", "OTHER.md")).toBeNull();
   });
+
+  it("follow a step without a number when its line moves, by its title, only while that title is unique", () => {
+    const pick = (title: string) => ({ title, worker: "paid" as const, model: O, why: "x" });
+    const saved: SavedPicks = {
+      at: 1,
+      providerId: "claude-code",
+      freeFirst: false,
+      picks: { "5": pick("Add tests"), "6": pick("Write docs"), "7": pick("Write docs") },
+    };
+    expect(pickFor(saved, { number: "9", title: "Add tests" }, "claude-code")?.model).toBe(O);
+    expect(pickFor(saved, { number: "9", title: "Write docs" }, "claude-code")).toBeNull();
+    expect(pickFor(saved, { number: "9", title: "Something else" }, "claude-code")).toBeNull();
+  });
 });

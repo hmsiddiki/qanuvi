@@ -146,7 +146,7 @@
     pickNote = await runner.pickModels(project, file);
   }
 
-  function autoPick(step: Step): { label: string; why: string } {
+  function autoPick(step: Step): { label: string; why: string; picked: boolean } {
     const p = pickFor(picks, { number: step.number ?? String(step.line), title: step.title }, runProvider.id);
     const c = chooseModel({
       picked: p?.model ? { model: p.model, why: p.why } : null,
@@ -159,7 +159,9 @@
       budget: { monthlyUsd: settings.value.monthlyBudgetUsd, spentUsd: spent },
     });
     const why = c.reason === "default model" ? "the agent's default model (Settings, Agents)" : c.reason;
-    return { label: modelLabel(runProvider, c.model), why };
+    // The decider's pick is what the run will use (unless a project rule comes first): say so, not "Auto".
+    const picked = !!p?.model && c.model === p.model;
+    return { label: modelLabel(runProvider, c.model), why, picked };
   }
 
   async function discover() {
@@ -548,7 +550,9 @@
                     class="model"
                     value={step.model ?? ""}
                     title={!step.model
-                      ? `Auto: picked when the step runs. Now that would be ${autoPick(step).label}: ${autoPick(step).why}. Choose a model to pin this step to it.`
+                      ? autoPick(step).picked
+                        ? `Picked by the decider (Pick models): ${autoPick(step).label}: ${autoPick(step).why}. The run uses it. Choose a model to pin this step to another one.`
+                        : `Auto: picked when the step runs. Now that would be ${autoPick(step).label}: ${autoPick(step).why}. Choose a model to pin this step to it.`
                       : "Model for this step (Auto lets the run pick)"}
                     onchange={async (e) => {
                       const el = e.target as HTMLSelectElement;
@@ -562,7 +566,11 @@
                       else if (el.value) runner.switchStepModel(project.id, file, step.number, step.title, el.value);
                     }}
                   >
-                    <option value="">{step.model ? "Auto" : `Auto · ${autoPick(step).label}`}</option>
+                    <option value=""
+                      >{step.model
+                        ? "Auto"
+                        : `${autoPick(step).picked ? "Picked" : "Auto"} · ${autoPick(step).label}`}</option
+                    >
                     {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
                     {#if step.model && !agent.provider.models.some((m) => m.id === step.model)}
                       <option value={step.model}>{step.model}</option>

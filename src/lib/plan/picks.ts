@@ -41,5 +41,9 @@ export function pickFor(
 ): StepPick | null {
   if (!saved || saved.providerId !== providerId) return null;
   const p = saved.picks[step.number];
-  return p && p.title === step.title ? p : null;
+  if (p && p.title === step.title) return p;
+  // A step without a number is kept by its line, and lines move when a run writes into the plan ("Done" lines):
+  // the same title, on one pick only, is still that step.
+  const same = Object.values(saved.picks).filter((x) => x.title === step.title);
+  return same.length === 1 ? same[0] : null;
 }
