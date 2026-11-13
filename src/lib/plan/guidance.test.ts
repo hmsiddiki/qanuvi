@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { privateBlock } from "./guidance";
 import { addedSteps, guidanceNote, isStopOrder, stepKey, withoutGuidance } from "./guidance";
 import { parsePlan } from "./tasklist";
 
@@ -88,8 +89,6 @@ describe("continuing a session across steps", () => {
     expect(needingCount("82b", steps, new Set(["82c", "82d", "82e", "83a"]))).toBe(2);
   });
 });
-
-import { privateBlock } from "./guidance";
 
 describe("a plan's private details", () => {
   it("reach later steps with the rule to keep them out of everything written", () => {
@@ -242,5 +241,13 @@ describe("chat in a step the run stopped at", () => {
     for (const t of ["yes but first explain", "no", "1"]) expect(isYes(t)).toBe(false);
     expect(askedToResume(`Done.\n${RESUME_ASK} 53z? (yes/no)`)).toBe(true);
     expect(askedToResume("Should I use option 1? (yes/no)")).toBe(false);
+  });
+});
+
+describe("the plan's private details", () => {
+  it("keeps each detail on one line, so the stored copy can mask all of it", () => {
+    const b = privateBlock(["db user: test\npassword: x1"]);
+    expect(b.split("\n").filter((l) => l.startsWith("- "))).toEqual(["- db user: test password: x1"]);
+    expect(privateBlock([])).toBe("");
   });
 });

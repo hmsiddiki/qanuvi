@@ -462,6 +462,18 @@ class RunnerStore {
   }
 
   /**
+   * The plan's private details (logins) for a chat in one of the last run's step sessions, as the hidden block steps
+   * get; empty for other chats. A new session of the chat (a handover) would else not know them and ask again.
+   */
+  async privateFor(projectId: string, sessionId: string): Promise<string> {
+    const last = this.run;
+    if (!last || last.projectId !== projectId) return "";
+    const number = agent.sessions.find((x) => x.id === sessionId)?.title.match(/^Step ([^:\s]+):/)?.[1];
+    if (!number || !last.steps.some((s) => s.number === number)) return "";
+    return privateBlock(await api.agent.planPrivate(projectId, last.file).catch(() => [] as string[]));
+  }
+
+  /**
    * The owner said to go on (a yes to the agent's question, or "continue") in the session of a step the last run
    * stopped at: the run goes on from that step, in the same session (which has the chat), then carries on with the
    * next steps as it was set. A step finished in the chat counts as done and the run starts at the next one. Answers
@@ -2379,6 +2391,7 @@ class RunnerStore {
 }
 
 export const runner = new RunnerStore();
+agent.privateNote = (projectId, sessionId) => runner.privateFor(projectId, sessionId);
 
 /** A session's running totals, to count each step's own share when steps continue one session. */
 interface Base {

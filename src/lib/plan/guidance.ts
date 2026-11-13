@@ -270,7 +270,8 @@ export function privateBlock(details: string[]): string {
     "",
     "Private details the owner gave earlier in this plan (logins, passwords). Use them where the work needs them; " +
       "never write them into files, notes, commits, plans or your answers:",
-    ...details.map((d) => `- ${d}`),
+    // One line each: the stored copy masks each "- " line, so a detail must not run on to a next line.
+    ...details.map((d) => `- ${d.replace(/\s*\n\s*/g, " ")}`),
   ].join("\n");
 }
 

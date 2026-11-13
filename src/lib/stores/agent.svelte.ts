@@ -252,7 +252,8 @@ class AgentStore {
   ): Promise<void> {
     const projectId = this.#projectId;
     if (!projectId) return;
-    const prompt = chatResumePrompt(note, request, was);
+    // A plan step's chat keeps the plan's logins in its new session (at the end: not part of the shown note).
+    const prompt = chatResumePrompt(note, request, was) + ((await this.privateNote?.(projectId, from.id)) ?? "");
     // The earlier part stays on screen, read only; the new session's lines follow it. Messages held for the new
     // session leave the old part: they are sent again below.
     const held = new Set(queued);
@@ -425,6 +426,8 @@ ${text}`
   planSessionId = $state<string | null>(null);
   /** The runner hears picker changes on its step here (the mode for the rest of the run, the step's model). */
   onPlanChange: ((change: { model?: string; mode?: string }) => void) | null = null;
+  /** A plan step's chat: the plan's private details (logins) for a new session of it, hidden in its first message. */
+  privateNote: ((projectId: string, sessionId: string) => Promise<string>) | null = null;
 
   /** Whether the pickers now act on a running plan step. */
   get onPlanStep(): boolean {

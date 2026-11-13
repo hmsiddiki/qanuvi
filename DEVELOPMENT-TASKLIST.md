@@ -453,6 +453,16 @@ runs on or off; with it off nothing is sent anywhere.
     pill at the bottom edge goes back down (another chat or a sent message goes to the bottom too). AgentPane
     `follow`/`newBelow`. Driven live: a reply arrived while scrolled up, the place held, the pill showed and
     took the view to the end.
+  - Owner (2026-11-14): PLAN-E 53z asked for the MySQL login again although it was kept for the plan. Cause: the
+    step's chat was handed over twice (heavy chat); a chat handover's new session got only the note, never the
+    plan's private details. Now a chat in one of the last run's step sessions (runner `privateFor`) gets them as
+    the hidden block steps get: with a handover's first message (agent `privateNote`, at the end so not part of
+    the shown note) and with messages in a stopped step's chat. Owner, on plain-text logins: plan notes do not
+    ship, but secure it if cheap. Done: the stored copy of every request masks the private block's "- " lines
+    (agent.rs `mask_private` in `user_line`; details kept to one line each); migration 7 masks copies already in
+    the database (driven on the test build with a fake value: masked); a login typed during a running step is kept
+    for the plan and the chat stores a placeholder, the agent gets it in the private block. Not covered: Claude
+    Code's own transcript files keep what was sent (outside Qanuvi). Published in: not yet (0.1.19 is before it).
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for

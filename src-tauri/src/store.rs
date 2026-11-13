@@ -144,6 +144,33 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 7 {
+        // Plan logins were stored in plain inside step requests: mask the copies already kept.
+        let rows: Vec<(String, i64, String)> = conn
+            .prepare("SELECT session_id, seq, line FROM session_events WHERE line LIKE ?1")?
+            .query_map([format!("%{}%", crate::agent::PRIVATE_HEAD)], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })?
+            .collect::<Result<_, _>>()?;
+        conn.execute_batch("BEGIN;")?;
+        for (session, seq, line) in rows {
+            let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&line) else {
+                continue;
+            };
+            let Some(text) = v["text"].as_str() else {
+                continue;
+            };
+            let masked = crate::agent::mask_private(text);
+            if masked != text {
+                v["text"] = serde_json::Value::String(masked);
+                conn.execute(
+                    "UPDATE session_events SET line = ?1 WHERE session_id = ?2 AND seq = ?3",
+                    rusqlite::params![v.to_string(), session, seq],
+                )?;
+            }
+        }
+        conn.execute_batch("PRAGMA user_version = 7; COMMIT;")?;
+    }
     Ok(())
 }
 
@@ -166,7 +193,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 6);
+        assert_eq!(version, 7);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

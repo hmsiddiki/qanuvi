@@ -360,7 +360,9 @@
         agent.notice(`The plan run goes on from step ${stopped.number}, in this session.`);
         return;
       }
-      if (!(await agent.send(project.id, text, stoppedChatNote(stopped.number, stopped.file)))) agent.draft = text;
+      // The plan's logins come along (hidden; masked where stored): this chat may be a new session that lacks them.
+      const note = stoppedChatNote(stopped.number, stopped.file) + (await runner.privateFor(project.id, session.id));
+      if (!(await agent.send(project.id, text, note))) agent.draft = text;
       return;
     }
     if (step && isStopOrder(text)) {
@@ -383,7 +385,23 @@
         ui.settingsFor = project.id;
         return;
       }
-      if (runner.run) await runner.addPrivate(project.id, runner.run.file, text);
+      if (runner.run) {
+        await runner.addPrivate(project.id, runner.run.file, text);
+        // The chat and the database get a placeholder; the agent gets the detail in the plan's private block (masked
+        // where stored), never as a plain message.
+        const note =
+          guidanceNote(step.number ?? step.title, runner.run.file) +
+          (await runner.privateFor(project.id, session?.id ?? ""));
+        if (
+          !(await agent.send(
+            project.id,
+            "(I gave a private detail for this plan: it is in the private details below.)",
+            note,
+          ))
+        )
+          agent.draft = text;
+        return;
+      }
     } else if (step) runner.addNote(text);
     const note = step && runner.run ? guidanceNote(step.number ?? step.title, runner.run.file) : "";
     if (!(await agent.send(project.id, text, note))) agent.draft = text;

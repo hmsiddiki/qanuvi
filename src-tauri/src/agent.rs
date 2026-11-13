@@ -802,10 +802,34 @@ fn context_with(context: Option<&str>, files: &[Attachment]) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("\n\n"))
 }
 
-/// The user's line as stored and shown: their words, the names of what they attached, and the images (kept in the
-/// data folder's `attachments`, so the conversation shows them again).
+/// The header of a plan's private details in a request (plan/guidance.ts `privateBlock`): one "- " line each.
+pub const PRIVATE_HEAD: &str = "Private details the owner gave earlier in this plan";
+/// What a masked private detail reads as in the database and the chat.
+const PRIVATE_MASK: &str = "(private: kept in the credential store)";
+
+/// A request as stored: the plan's private details are masked. The model got them; the database keeps none.
+pub fn mask_private(text: &str) -> String {
+    let masked = format!("- {PRIVATE_MASK}");
+    let mut out: Vec<&str> = Vec::new();
+    let mut in_block = false;
+    for line in text.split('\n') {
+        if line.starts_with(PRIVATE_HEAD) {
+            in_block = true;
+            out.push(line);
+        } else if in_block && line.starts_with("- ") {
+            out.push(&masked);
+        } else {
+            in_block = false;
+            out.push(line);
+        }
+    }
+    out.join("\n")
+}
+
+/// The user's line as stored and shown: their words (private details masked), the names of what they attached, and
+/// the images (kept in the data folder's `attachments`, so the conversation shows them again).
 fn user_line(prompt: &str, files: &[Attachment]) -> String {
-    let mut v = json!({"type": "qanuvi_user", "text": prompt});
+    let mut v = json!({"type": "qanuvi_user", "text": mask_private(prompt)});
     if !files.is_empty() {
         v["attachments"] = json!(files.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
         let dir = crate::paths::data_dir().join("attachments");
@@ -1877,6 +1901,32 @@ mod attachment_tests {
                 .as_str()
                 .unwrap()
                 .ends_with(".png")
+        );
+    }
+
+    #[test]
+    fn stored_requests_keep_no_plan_logins() {
+        let prompt = format!(
+            "Step 1a
+
+{PRIVATE_HEAD} (logins, passwords). Use them:
+- db user test, password secret123
+- api key abc
+
+The step text."
+        );
+        let line: Value = serde_json::from_str(&user_line(&prompt, &[])).unwrap();
+        let text = line["text"].as_str().unwrap();
+        assert!(!text.contains("secret123") && !text.contains("abc"));
+        assert!(text.contains(PRIVATE_HEAD) && text.ends_with("The step text."));
+        assert_eq!(text.matches(PRIVATE_MASK).count(), 2);
+        assert_eq!(
+            mask_private(
+                "- a list line
+no block"
+            ),
+            "- a list line
+no block"
         );
     }
 
