@@ -265,6 +265,14 @@ export function unmetNeed(
   return null;
 }
 
+/**
+ * How a run that went through its steps ends: "needs-you" while steps are still held or set aside (the owner ended it
+ * without answering), else "done".
+ */
+export function endStatus(run: Pick<PlanRun, "steps">): "done" | "needs-you" {
+  return run.steps.some((s) => s.status === "held" || s.status === "set-aside") ? "needs-you" : "done";
+}
+
 /** The end-of-run report (24f): what was done, and what was skipped or left, with why. */
 export function runSummary(run: Pick<PlanRun, "steps">): string {
   const done = run.steps.filter((s) => s.status === "done").length;

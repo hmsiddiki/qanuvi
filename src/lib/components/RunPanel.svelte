@@ -868,8 +868,10 @@
           {/if}
         </span>
         {#if runner.waitingAnswers}
-          <button type="button" onclick={() => runner.finishWithout()} title="End the run; what is set aside stays open"
-            >Finish without them</button
+          <button
+            type="button"
+            onclick={() => runner.finishWithout()}
+            title="Held steps stay open: answer them later in their chat or with Run">End the run here</button
           >
         {/if}
       {:else}
@@ -877,7 +879,7 @@
           {run.status === "done"
             ? "Run finished"
             : run.status === "needs-you"
-              ? "Run paused: it needs you"
+              ? "Run ended: it needs you"
               : run.status === "paused"
                 ? "Run paused"
                 : "Run stopped"}

@@ -83,6 +83,7 @@ import {
   type StepRun,
   parseRanges,
   unmetNeed,
+  endStatus,
   runSummary,
 } from "$lib/plan/runner";
 import { clearStaleSkips, parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
@@ -173,7 +174,7 @@ class RunnerStore {
 
   /** Only set-aside steps are left: the run waits (spending nothing) for this many answers (24u). */
   waitingAnswers = $state(0);
-  /** Wakes a run waiting for answers (an answer, Finish without them, Pause or Stop). */
+  /** Wakes a run waiting for answers (an answer, End the run here, Pause or Stop). */
   #wake: (() => void) | null = null;
   /** The owner answered while the run went on: it goes back to the released steps after the step in hand. */
   #answered = false;
@@ -928,7 +929,7 @@ class RunnerStore {
     // Held and failed steps are set aside, not the end of the run (24u): the run goes on with the rest, then waits for
     // the owner's answers and goes back to the steps they release.
     let waitedOnce = false;
-    // Finish without them was chosen: what is left to do before the run ends is the closing steps' catch-up.
+    // End the run here was chosen: what is left to do before the run ends is the closing steps' catch-up.
     let ending = false;
     for (;;) {
       let again = false;
@@ -1453,7 +1454,17 @@ class RunnerStore {
         ending = true;
       }
     }
-    if (run.status === "running") this.#finish(run, "done", runSummary(run));
+    if (run.status === "running") {
+      // Steps still held or set aside (the owner ended the run without answering): the run is not done, it needs
+      // them. Their chats stay chats with a stopped run, so settling one there can resume it.
+      if (endStatus(run) === "needs-you")
+        this.#finish(
+          run,
+          "needs-you",
+          `Ended here: ${runSummary(run)}. Held steps stay open: answer them in their chat or with Run. The end-of-run review comes once they are done.`,
+        );
+      else this.#finish(run, "done", runSummary(run));
+    }
     this.#sendMore = null;
     this.stopping = false;
     // A run paused in a step keeps that step's session for Resume.

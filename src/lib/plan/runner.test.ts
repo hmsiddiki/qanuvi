@@ -19,6 +19,7 @@ import {
   parseRanges,
   unmetNeed,
   runSummary,
+  endStatus,
   type StepRun,
 } from "./runner";
 
@@ -277,5 +278,14 @@ describe("run settings: one model, Team per run", () => {
     expect(freeWantedButMissing("paid", "paid-decides", false, false)).toBe(false);
     expect(freeWantedButMissing("settings", "paid-decides", true, false)).toBe(false);
     expect(freeWantedButMissing("settings", "paid-decides", false, true)).toBe(false);
+  });
+});
+
+describe("how a run ends", () => {
+  const step = (status: StepRun["status"]): StepRun => ({ line: 0, number: "1a", title: "t", attempts: [], status });
+  it("needs you while steps are held or set aside, done otherwise", () => {
+    expect(endStatus({ steps: [step("done"), step("held")] })).toBe("needs-you");
+    expect(endStatus({ steps: [step("done"), step("set-aside")] })).toBe("needs-you");
+    expect(endStatus({ steps: [step("done"), step("skipped")] })).toBe("done");
   });
 });

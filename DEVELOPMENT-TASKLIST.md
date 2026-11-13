@@ -440,8 +440,14 @@ runs on or off; with it off nothing is sent anywhere.
     chat. Driven live 2026-11-14 (PLAN-G, Haiku 5.5, about $0.03): 1a blocked (no GREETING_TEXT), run stopped; a
     question in 1a's chat showed as its own bubble, got a short answer, the run stayed stopped; giving the value
     made the agent finish 1a there, mark it [x] and ask "Should I resume the plan run from step 1a? (yes/no)"; "yes"
-    resumed in the same session, skipped the done 1a, ran 1b, "2 of 2 done". After "Finish without them" a run
-    counts as done, so its step chats are plain chats (no resume question).
+    resumed in the same session, skipped the done 1a, ran 1b, "2 of 2 done".
+  - Owner (2026-11-14): "Finish without them" ended a run as done although steps were still held, so the end-of-run
+    review was offered and the held step's chat became a plain chat. Now the button reads "End the run here"; a run
+    that ends with held or set-aside steps ends as needs-you ("Run ended: it needs you", plan/runner `endStatus`),
+    with "Held steps stay open: answer them in their chat or with Run. The end-of-run review comes once they are
+    done."; the review is offered only once nothing is held. Driven live (PLAN-H, Haiku, under $0.02): 1a blocked,
+    End the run here gave needs-you with no review offer; in 1a's chat the value finished 1a and the agent asked to
+    resume; "yes" ran 1b, "1 of 1 done", review offered; the run kept its first decision (the earlier fix).
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
