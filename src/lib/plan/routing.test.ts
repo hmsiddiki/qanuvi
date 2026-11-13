@@ -74,7 +74,7 @@ describe("learn and learnedModel", () => {
     expect(stats.get(`feature|${H}`)).toMatchObject({ tries: 1, successes: 0, costUsd: 0.01 });
   });
 
-  it("picks the cheapest model that kept succeeding, once there are enough tries", () => {
+  it("picks the most reliable model that kept succeeding, once there are enough tries", () => {
     expect(learnedModel(stats, "docs", models)?.model).toBe(H);
     expect(learnedModel(stats, "feature", models)).toBeNull();
   });
@@ -100,7 +100,7 @@ describe("chooseModel", () => {
     );
     expect(chooseModel({ ...base, stepModel: null, type: "docs" })).toEqual({
       model: H,
-      reason: "learned: 3/3 done on docs and wording",
+      reason: "learned: most reliable on docs and wording (3/3 done)",
     });
     expect(chooseModel({ ...base, stepModel: null, type: "feature" })).toEqual({ model: S, reason: "default model" });
   });

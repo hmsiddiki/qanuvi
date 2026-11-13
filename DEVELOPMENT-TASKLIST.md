@@ -300,8 +300,9 @@ runs on or off; with it off nothing is sent anywhere.
     line, project rule, the pick, learned, default. The dropdown shows "Auto · <model>" with the reason. Owner's real
     record (2026-11-13, security work): Fable 5.2 2/5 done at about 337k tokens per finished step (HEAVY), Opus 5.5
     33/34 at 220k, Sonnet 5.5 5/5 at 198k. Verify green (305 + 156). Not driven live yet.
-  - Open question for the owner: with no pick, the learned rule takes the cheapest proven model by cost (on security
-    work that is Sonnet 5.5 over Opus 5.5); "quality first" may want the most reliable one instead. Not changed.
+  - Owner answered ("of course the most reliable"): with no pick, the learned rule now takes the most reliable proven
+    model (routing reliability: Wilson lower bound, so 33/34 beats 5/5), cost only as a tie-break. Verify green
+    (305 + 156). Published as 0.1.16 with Revert/Redo and Pick models (owner: "publish anyway").
   - RESUME HERE (new conversation): drive Pick models, Revert / Rewind to here / Redo and the waiting-message hold, 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
     project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's

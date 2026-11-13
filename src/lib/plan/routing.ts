@@ -77,16 +77,32 @@ export const MIN_TRIES = 3;
 export const MIN_SUCCESS = 0.8;
 
 /**
- * The cheapest model (by cost per success) that succeeded at least 80% of the time on this kind of job, with at least
- * three tries. Null when nothing qualifies yet.
+ * How sure the record makes us that a model finishes this kind of work: the lower end of the 95% range around its
+ * success rate (Wilson). Many good tries count for more than a few: 33 of 34 is surer than 5 of 5.
+ */
+export function reliability(s: Pick<ModelStats, "tries" | "successes">): number {
+  if (!s.tries) return 0;
+  const z = 1.96;
+  const n = s.tries;
+  const p = s.successes / n;
+  const z2 = z * z;
+  return (p + z2 / (2 * n) - z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n)) / (1 + z2 / n);
+}
+
+/**
+ * The most reliable model on this kind of job (quality first: code quality before saving), among those that succeeded
+ * at least 80% of the time with at least three tries; cost per success only breaks a tie. Null when nothing qualifies.
  */
 export function learnedModel(stats: Map<string, ModelStats>, type: JobType, models: AgentModel[]) {
-  let best: { model: string; perSuccess: number; s: ModelStats } | null = null;
+  let best: { model: string; sure: number; perSuccess: number; s: ModelStats } | null = null;
   for (const m of models) {
     const s = stats.get(`${type}|${m.id}`);
     if (!s || s.tries < MIN_TRIES || s.successes / s.tries < MIN_SUCCESS) continue;
+    const sure = reliability(s);
     const perSuccess = s.costUsd / Math.max(1, s.successes);
-    if (!best || perSuccess < best.perSuccess) best = { model: m.id, perSuccess, s };
+    const better =
+      !best || sure > best.sure + 1e-9 || (Math.abs(sure - best.sure) <= 1e-9 && perSuccess < best.perSuccess);
+    if (better) best = { model: m.id, sure, perSuccess, s };
   }
   return best;
 }
@@ -176,7 +192,7 @@ export function chooseModel(opts: {
   else if (learned)
     choice = {
       model: learned.model,
-      reason: `learned: ${learned.s.successes}/${learned.s.tries} done on ${JOB_LABELS[type].toLowerCase()}`,
+      reason: `learned: most reliable on ${JOB_LABELS[type].toLowerCase()} (${learned.s.successes}/${learned.s.tries} done)`,
     };
   else choice = { model: defaultModel, reason: "default model" };
 

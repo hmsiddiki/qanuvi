@@ -80,7 +80,11 @@ describe("chooseModel with a pick", () => {
   it("a project rule wins over the pick; the pick wins over what was learned", () => {
     expect(chooseModel({ ...base, stepModel: null, rules: { security: S } }).model).toBe(S);
     expect(chooseModel({ ...base, stepModel: null })).toEqual({ model: O, reason: "decider: money logic" });
-    expect(chooseModel({ ...base, stepModel: null, picked: null }).model).toBe(S); // learned: cheapest proven
+    // Learned, quality first: 33 of 34 is surer than 5 of 5, though Sonnet costs less per step.
+    expect(chooseModel({ ...base, stepModel: null, picked: null })).toEqual({
+      model: O,
+      reason: "learned: most reliable on money and security (33/34 done)",
+    });
   });
 });
 
