@@ -6,6 +6,7 @@
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { reduceAll } from "$lib/agent/events";
 import { waitsBefore } from "$lib/plan/preflight";
+import { holdWording, keepAnswer, loadPlanState, pruneState, savePlanState } from "$lib/plan/planstate";
 import {
   closingRerunNote,
   dependencePrompt,
@@ -183,6 +184,12 @@ class RunnerStore {
     if (!run || !this.running || step.status !== "held") return;
     const key = this.#key(step);
     const waiting = run.steps.filter((x) => x.status === "set-aside" && x.waitsFor?.step === key);
+    // Kept for this plan: a run started again later does not ask again (24u part 2).
+    savePlanState(
+      run.projectId,
+      run.file,
+      keepAnswer(loadPlanState(run.projectId, run.file), key, choice, text.trim()),
+    );
     if (choice === "skip") {
       step.status = "skipped";
       step.reason = "you chose to skip it";
@@ -725,6 +732,31 @@ class RunnerStore {
         savePlanNotes(project.id, file, []);
       }
     }
+    // What this plan kept from earlier runs (24u part 2): holds come back with who set them, answered steps run with
+    // the owner's answer, skipped ones stay skipped. Entries of steps no longer open go.
+    const waitList = [...(options.waitBefore ?? [])];
+    {
+      const open = new Set(
+        parsePlan(text)
+          .steps.filter((s) => s.status !== "x")
+          .map((s) => s.number ?? s.title),
+      );
+      const kept = pruneState(loadPlanState(project.id, file), open);
+      savePlanState(project.id, file, kept);
+      for (const h of kept.holds)
+        if (!waitList.some((w) => w.step === h.step)) waitList.push({ step: h.step, why: holdWording(h) });
+      for (const a of kept.answers) {
+        const stepRun = run.steps.find((x) => this.#key(x) === a.step);
+        if (!stepRun) continue;
+        if (a.choice === "skip") {
+          stepRun.status = "skipped";
+          stepRun.reason = "you chose to skip it (in an earlier run)";
+        } else {
+          stepRun.answer = a.text;
+          stepRun.held = { kind: "hold", why: "it was held in an earlier run" };
+        }
+      }
+    }
     // The user watching a step can change its mode (for the rest of the run, kept for this plan) and its model (this
     // step, written into its Model line) from the chat pickers.
     let live = null as { step: StepRun; model: string; from: number } | null;
@@ -890,7 +922,7 @@ class RunnerStore {
         }
         // A step the owner chose to see first (risky, or a question left open in the check before the run). The step
         // the run starts at is held too: the owner left that answer open just before pressing Start.
-        const holdWhy = waitsBefore(stepRun.number, options.waitBefore);
+        const holdWhy = waitsBefore(stepRun.number, waitList);
         if (holdWhy && stepRun.answer === undefined) {
           await this.#setAside(project, file, run, stepRun, "hold", holdWhy, provider, steps);
           continue;

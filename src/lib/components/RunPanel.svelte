@@ -24,6 +24,7 @@
   } from "$lib/plan/runner";
   import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
+  import { holdWording, keepHolds, loadPlanState, savePlanState, type KeptHold } from "$lib/plan/planstate";
   import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
   import { finishedCost, planHistory } from "$lib/plan/costs";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
@@ -273,6 +274,8 @@
   let secretValues = $state<Record<string, string>>({});
   let answers = $state<Record<number, string>>({});
   let riskyChoice = $state<Record<number, "wait" | "go">>({});
+  /** Risky steps whose choice the owner set (a hold left at the default is Qanuvi's, not theirs). */
+  let riskyTouched = $state<Record<number, boolean>>({});
 
   /** The open steps the run would cover, for the check. */
   function coveredSteps() {
@@ -309,6 +312,7 @@
       found.secrets = found.secrets.filter((s) => !known.secrets.includes(s.name));
       check = found;
       riskyChoice = Object.fromEntries(found.risky.map((_, i) => [i, "wait"]));
+      riskyTouched = {};
       if (!found.secrets.length && !found.questions.length && !found.risky.length && !found.setup.length) {
         check = null;
         await go();
@@ -329,18 +333,29 @@
       if (v) await api.agent.setSecret(project.id, s.name, v).catch(() => {});
     }
     const notes = loadPlanNotes(project.id, file);
-    const wait: { step: string; why: string }[] = [];
+    // Holds are kept per plan (24u part 2): a later run holds the same steps, saying who set each hold.
+    const holds: Omit<KeptHold, "at">[] = [];
+    const cleared = new Set<string>();
     c.questions.forEach((q, i) => {
       const a = answers[i]?.trim();
-      if (a) notes.push(`The owner's answer for step ${q.step}: ${q.question} → ${a}`);
-      else if (q.step) wait.push({ step: q.step, why: `a question was left open (${q.question})` });
+      if (a) {
+        notes.push(`The owner's answer for step ${q.step}: ${q.question} → ${a}`);
+        if (q.step) cleared.add(q.step);
+      } else if (q.step) holds.push({ step: q.step, why: `a question was left open (${q.question})`, by: "default" });
     });
     c.risky.forEach((x, i) => {
-      if (riskyChoice[i] !== "go") wait.push({ step: x.step, why: `you asked to see it first (${x.why})` });
+      if (riskyChoice[i] === "go") cleared.add(x.step);
+      else holds.push({ step: x.step, why: x.why, by: riskyTouched[i] ? "you" : "default" });
     });
     savePlanNotes(project.id, file, notes);
+    let state = loadPlanState(project.id, file);
+    state = {
+      ...state,
+      holds: state.holds.filter((h) => !cleared.has(h.step) || holds.some((n) => n.step === h.step)),
+    };
+    savePlanState(project.id, file, keepHolds(state, holds));
     check = null;
-    await go(wait);
+    await go(holds.map((h) => ({ step: h.step, why: holdWording(h) })));
   }
 
   async function start(event: SubmitEvent) {
@@ -706,7 +721,7 @@
           {#each check.risky as x, i (i)}
             <div class="row-input">
               <span><strong>{x.step}</strong> {x.why}</span>
-              <select bind:value={riskyChoice[i]}>
+              <select bind:value={riskyChoice[i]} onchange={() => (riskyTouched[i] = true)}>
                 <option value="wait">Wait for me before it</option>
                 <option value="go">Go ahead</option>
               </select>

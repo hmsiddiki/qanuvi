@@ -318,8 +318,9 @@ runs on or off; with it off nothing is sent anywhere.
     (runner `#reopenClosing`, StepRun `rerunAfter`, note `closingRerunNote`): 1z ran again after 1a and after 1b and
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
-  - RESUME HERE (new conversation, after 2026-11-13): 24u part 2
-    (holds and answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
+  - 24u part 2 built and driven live 2026-11-14 (see Part 2 below). RESUME HERE (new conversation): ask the owner
+    about the part 2 finding (a closing step done in an earlier run is not run again when a later run finishes the
+    steps it had set aside), then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
     notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
@@ -361,6 +362,19 @@ runs on or off; with it off nothing is sent anywhere.
       3).
   - Part 2, kept per plan: answers, holds and "decided for you" choices are stored per plan, so a restarted run
     keeps them. Hold wording says who set it ("you asked" / "Qanuvi's default").
+    - Built 2026-11-14 (verify green, 317 + 156): src/lib/plan/planstate.ts keeps per plan (localStorage, next to
+      the plan notes) the check's holds with who set them (a risky step left on its default and a question left
+      open are "Qanuvi's default"; Wait chosen by hand is "you asked to see it first") and the owner's Go ahead /
+      Skip answers from the Needs-your-answer card. A run (with or without the check) holds kept steps again, runs
+      answered ones with the answer, keeps skips skipped; entries of steps no longer open go at the next start; a
+      later check does not hold an answered step again. Check answers already carry over as plan notes (FACTS.md).
+      "Decided for you" choices come with part 3. Driven live on the scratch plan ($0.08): run 1 left the 1a
+      question open (held, "Qanuvi's default: a question was left open (...)"), Finish without them; run 2 without
+      the check held 1a again at once with the same wording; answered "underscore", stopped before 1a worked; run 3
+      ran 1a with underscore without asking, 1b after it, 2 of 2 done.
+    - Finding for the owner (not changed): 1z was done in run 1, so run 3 did not run it again after 1a/1b and the
+      README still lists only add. Proposal: keep "closing step ran while X was set aside" per plan, and a later run
+      that finishes X opens that closing step again (the same re-run as within one run).
   - Part 3, sorted asks: the check sorts each risk and question into (a) decides itself: a sensible default that
     can be changed later (a setting, not hard-coded), logged "Decided for you: X, because Y. Change?"; (b) goes ahead
     with extra checks: the paid decider reviews the diff and tests must pass before the step counts as done; (c)
