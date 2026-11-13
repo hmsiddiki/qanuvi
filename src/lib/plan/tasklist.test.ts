@@ -100,6 +100,16 @@ describe("editing", () => {
     expect(() => setStepTitle(SAMPLE, 13, "  ")).toThrow();
   });
 
+  it("reads the number of a step written without bold, and keeps it on rename", () => {
+    const text = "# P\n\n- [ ] 1a. Add `slugify` to util.js\n- [x] 12-2. Docs\n- [ ] Plain step";
+    expect(parsePlan(text).steps.map((s) => [s.number, s.title])).toEqual([
+      ["1a", "Add `slugify` to util.js"],
+      ["12-2", "Docs"],
+      [null, "Plain step"],
+    ]);
+    expect(setStepTitle(text, 2, "Add slugify").split("\n")[2]).toBe("- [ ] 1a. Add slugify");
+  });
+
   it("adds, changes and removes the model line", () => {
     const added = setStepModel(SAMPLE, 13, "claude-haiku-5-5");
     expect(added.split("\n").slice(13, 15)).toEqual([

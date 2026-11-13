@@ -61,6 +61,8 @@ const MODEL_RE = /^\s+- Model:\s*(\S+)\s*$/i;
 const NEEDS_RE = /^- Needs:\s*(.+)$/i;
 const SKIPPED_RE = /^\s+- Skipped:/i;
 const TITLE_RE = /^\*\*(?:(\d+[a-z]?(?:-\d+)?)\.\s+)?(.+?)\*\*\s*(.*)$/;
+/** A step written without bold: "1a. Title". */
+const PLAIN_NUMBER_RE = /^(\d+[a-z]?(?:-\d+)?)\.\s+(.+)$/;
 
 export function splitLines(text: string): { lines: string[]; eol: "\n" | "\r\n" } {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
@@ -96,6 +98,12 @@ export function parsePlan(text: string): Plan {
       number = t[1] ?? null;
       title = t[2].trim();
       note = t[3].trim();
+    } else {
+      const p = PLAIN_NUMBER_RE.exec(title);
+      if (p) {
+        number = p[1];
+        title = p[2].trim();
+      }
     }
 
     // Continuation of the step's own line, then details, until an unindented line or a heading.
@@ -164,7 +172,7 @@ export function setStepTitle(text: string, line: number, title: string, expectTi
     const after = TITLE_RE.exec(rest)![3];
     lines[line] = `${prefix}**${num}${clean}**${after ? ` ${after}` : ""}`;
   } else {
-    lines[line] = `${prefix}${clean}`;
+    lines[line] = `${prefix}${step.number ? `${step.number}. ` : ""}${clean}`;
   }
   return join(lines, plan.eol);
 }

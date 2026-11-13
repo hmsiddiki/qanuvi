@@ -48,7 +48,13 @@ class PlannerStore {
       let text = "";
       let cost = 0;
       let settled = false;
-      const show = opts.quiet ? () => {} : agent.handler(() => id);
+      // Quiet: nothing shown, but the session's status still reaches the list (else it stays "running" after it
+      // answered and was stopped, and the status bar keeps counting it as working).
+      const show = opts.quiet
+        ? (event: AgentEvent) => {
+            if (event.kind === "session") agent.track(event.session);
+          }
+        : agent.handler(() => id);
       const done = (err?: string) => {
         if (settled) return;
         settled = true;
