@@ -304,9 +304,10 @@ runs on or off; with it off nothing is sent anywhere.
     model (routing reliability: Wilson lower bound, so 33/34 beats 5/5), cost only as a tie-break. Verify green
     (305 + 156). Published as 0.1.16 with Revert/Redo and Pick models (owner: "publish anyway").
   - Driven live 2026-11-13 on a scratch project (test build): Pick models (3 steps picked, run used them, $0.01), Revert and Redo, Rewind to here (preview lists files left alone) and its Redo (files back byte for byte), bookmarks (star moves the chat under Saved), the waiting-message hold (Send now / Don't send, held message read after the turn), the heavy-chat bar at 37k. Fixed: picked steps say "Picked · <model>", not "Auto"; picks of steps without a number follow their title when a run moves lines; the result line "Finished · 4.9 s" had no space and read as a minus. Then fixed (driven live): steps written "1a. ..." without bold are read as numbered (one log per step, renames keep the number); quiet asks (the check before the run, chat review) now pass their session status on, so the status bar no longer keeps "1 working" after they answered. Published as 0.1.18. Published as 0.1.17 (owner: "release anyway"). Still to drive: 24t clean-up, 24s part 3 reopen, 15i part 2.
-  - RESUME HERE (new conversation, 2026-11-13): build 24u (below), in its order: part 1 (set aside, not stop; wait,
-    not end), part 2 (holds and answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer
-    forms, Windows notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
+  - RESUME HERE (new conversation, 2026-11-13): 24u part 1 is built (verify green, 312 + 156), not driven live yet:
+    drive it first on a scratch project (a plan with a held step, a step that needs it, an unrelated step and a z
+    step: the run goes on, waits, Go ahead releases both, Finish without them ends it). Then 24u part 2 (holds and
+    answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -333,6 +334,18 @@ runs on or off; with it off nothing is sent anywhere.
     are left, the run does not end: "Waiting for you (N answers)", nothing spent, and it carries on by itself when
     answered; "Finish without them" ends it. Answers given while it runs are picked up after each step. Final
     summary: done, decided for you, set aside, waiting for answers.
+    - Built 2026-11-13 (not driven live): step states "held" (a hold, blocked, or not finished by any model) and
+      "set-aside" (waits for a held step); src/lib/plan/setaside.ts reads dependence from the plan (Needs line, same
+      step number such as 95a/95b, a file both name or the held step changed) and asks the decider once for the other
+      open steps (logged as set-aside decisions; free models answer when the paid agent cannot; no answer: only the
+      plan's word holds). MAP.md is not read for this (step text and changed files only). Closing "z" steps are never
+      set aside and are told what is. The run panel lists "Needs your answer" with a reply box, Go ahead / Try again
+      (the model ladder starts again) and Skip this step (its waiting steps skip too); answers given while the run
+      goes on are picked up after the step in hand. When only set-aside steps are left the run waits ("Waiting for you
+      (N answers)", one Inbox item per run), with Finish without them; Pause and Stop work while it waits. The old
+      "stop at 3 steps needing it" rule and the "Only where a decision is needed" stop choice are gone (saved
+      settings with it read as Never). Not done here: answers kept after a restart (part 2); "decided for you" (part
+      3).
   - Part 2, kept per plan: answers, holds and "decided for you" choices are stored per plan, so a restarted run
     keeps them. Hold wording says who set it ("you asked" / "Qanuvi's default").
   - Part 3, sorted asks: the check sorts each risk and question into (a) decides itself: a sensible default that

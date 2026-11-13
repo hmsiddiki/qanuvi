@@ -12,7 +12,16 @@
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { layout } from "$lib/layout/layout.svelte";
-  import { costRatio, freeSavings, isFree, DECIDER, parseRanges, inRanges, type PauseMode } from "$lib/plan/runner";
+  import {
+    costRatio,
+    freeSavings,
+    isFree,
+    DECIDER,
+    parseRanges,
+    inRanges,
+    type PauseMode,
+    type StepRun,
+  } from "$lib/plan/runner";
   import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
   import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
@@ -136,7 +145,8 @@
       if (k.team === "settings" || (typeof k.team === "string" && k.team in TEAM_LABELS)) team = k.team;
       if (typeof k.budget === "number") budget = k.budget;
       if (typeof k.perModel === "number") perModel = k.perModel;
-      if (k.pause) pause = k.pause;
+      // "Only where a decision is needed" is gone (24u): held steps are set aside and asked about, the run goes on.
+      if (k.pause) pause = k.pause === "decisions" ? "never" : k.pause;
       if (k.mode && p.modes.some((m) => m.id === k.mode)) mode = k.mode;
       if (typeof k.lean === "boolean") lean = k.lean;
       if (typeof k.indexTools === "boolean") indexTools = k.indexTools;
@@ -439,6 +449,17 @@
     }
   }
   let currentAttempt = $derived(current ? current.attempts.length + 1 : 0);
+  /** Steps set aside for the owner's answer (24u), and the steps waiting for each. */
+  let heldSteps = $derived(run?.status === "running" ? run.steps.filter((s) => s.status === "held") : []);
+  let replies = $state<Record<string, string>>({});
+  const heldKey = (s: StepRun) => s.number ?? s.title;
+  function waitingFor(s: StepRun): StepRun[] {
+    return (run?.steps ?? []).filter((x) => x.status === "set-aside" && x.waitsFor?.step === heldKey(s));
+  }
+  function reply(s: StepRun, choice: "go" | "skip") {
+    runner.answer(s, choice, replies[heldKey(s)] ?? "");
+    delete replies[heldKey(s)];
+  }
 </script>
 
 {#if setup}
@@ -528,8 +549,9 @@
       <label>
         Stop for me
         <select bind:value={pause}>
-          <option value="never">Never: run to the end, skip what cannot be done (with why)</option>
-          <option value="decisions">Only where a decision or my input is needed</option>
+          <option value="never"
+            >Never: set aside what needs me and go on; wait for my answers only when nothing else is left</option
+          >
           <option value="step">After every step</option>
         </select>
       </label>
@@ -727,10 +749,17 @@
                   minute: "2-digit",
                 })}</span
               >{/if}
+          {:else if runner.waitingAnswers}
+            {run.message}
           {:else}
             Starting…
           {/if}
         </span>
+        {#if runner.waitingAnswers}
+          <button type="button" onclick={() => runner.finishWithout()} title="End the run; what is set aside stays open"
+            >Finish without them</button
+          >
+        {/if}
       {:else}
         <span class="main">
           {run.status === "done"
@@ -742,12 +771,46 @@
                 : "Run stopped"}
           · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
             {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
-            {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}
+            {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}{#if run.steps.some((s) => s.status === "held" || s.status === "set-aside")},
+            {run.steps.filter((s) => s.status === "held" || s.status === "set-aside").length} set aside{/if}
           · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
           {#if run.message}<span class="dim"> · {run.message}</span>{/if}
         </span>
       {/if}
     </div>
+    {#if heldSteps.length}
+      <!-- Set aside for an answer (24u): answer while the run goes on; it goes back to them after the step in hand. -->
+      <div class="asks">
+        <strong>Needs your answer ({heldSteps.length})</strong>
+        {#each heldSteps as s (heldKey(s))}
+          {@const others = waitingFor(s)}
+          <div class="ask">
+            <div>
+              Step {s.number ? `${s.number}. ` : ""}{s.title}
+              <span class="dim"
+                >· {s.held?.kind === "hold" ? "held" : s.held?.kind === "blocked" ? "blocked" : "not finished"}: {s.held
+                  ?.why}{others.length
+                  ? ` · ${others.length} step${others.length === 1 ? "" : "s"} wait for it (${others.map(heldKey).join(", ")})`
+                  : ""}</span
+              >
+            </div>
+            <div class="row">
+              <input
+                type="text"
+                placeholder={s.held?.kind === "hold" ? "Your answer (optional)" : "What to do differently (optional)"}
+                bind:value={replies[heldKey(s)]}
+              />
+              <button type="button" class="primary" onclick={() => reply(s, "go")}
+                >{s.held?.kind === "hold" ? "Go ahead" : "Try again"}</button
+              >
+              <button type="button" onclick={() => reply(s, "skip")} title="Leave it, and the steps waiting for it"
+                >Skip this step</button
+              >
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
     {#if totals}
       <div class="totals">
         {formatCost(totals.costUsd)} · in {formatTokens(totals.inputTokens)} · out {formatTokens(totals.outputTokens)} ·
@@ -872,6 +935,19 @@
 {/if}
 
 <style>
+  .asks {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px solid var(--qx-status-waiting, var(--qx-border));
+    border-radius: var(--qx-radius-card);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ask .row input {
+    flex: 1;
+    min-width: 0;
+  }
   .finish {
     margin-top: 6px;
     padding: 6px 8px;

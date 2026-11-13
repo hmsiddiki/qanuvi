@@ -270,7 +270,7 @@ export function parseChatModel(answer: string, models: { id: string }[]): { mode
 /** A decision kept for later (shown in the run, and what a personal model will learn from). */
 export interface DecisionRecord {
   at: number;
-  kind: "assign" | "review" | "chat-model" | "handover";
+  kind: "assign" | "review" | "chat-model" | "handover" | "set-aside";
   by: string;
   subject: string;
   decision: string;

@@ -6,6 +6,15 @@
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { reduceAll } from "$lib/agent/events";
 import { waitsBefore } from "$lib/plan/preflight";
+import {
+  dependencePrompt,
+  isClosingStep,
+  parseDependence,
+  planDependence,
+  setAsideBlock,
+  waitingLine,
+  type HeldKind,
+} from "$lib/plan/setaside";
 import { isLimit, limitResetAt } from "$lib/plan/limits";
 import { overLimit, toolKinds } from "$lib/plan/costs";
 import {
@@ -18,7 +27,6 @@ import {
   handoverDue,
   handoverRequest,
   modelSwitchRequest,
-  needingCount,
   keepRunSetting,
   reopenedSteps,
   looksSecret,
@@ -151,6 +159,57 @@ class RunnerStore {
     return this.run?.status === "running";
   }
 
+  /** Only set-aside steps are left: the run waits (spending nothing) for this many answers (24u). */
+  waitingAnswers = $state(0);
+  /** Wakes a run waiting for answers (an answer, Finish without them, Pause or Stop). */
+  #wake: (() => void) | null = null;
+  /** The owner answered while the run went on: it goes back to the released steps after the step in hand. */
+  #answered = false;
+  /** The owner chose to end a waiting run without the answers. */
+  #finishWithout = false;
+
+  /** The step's key in set-aside notes: its number, else its title. */
+  #key(s: StepRun): string {
+    return s.number ?? s.title;
+  }
+
+  /**
+   * The owner answers a held step: "go" lets it run (with the answer, if any, told to it), "skip" leaves it and the
+   * steps waiting for it. Works while the run goes on (picked up after the step in hand) and while it waits.
+   */
+  answer(step: StepRun, choice: "go" | "skip", text = ""): void {
+    const run = this.run;
+    if (!run || !this.running || step.status !== "held") return;
+    const key = this.#key(step);
+    const waiting = run.steps.filter((x) => x.status === "set-aside" && x.waitsFor?.step === key);
+    if (choice === "skip") {
+      step.status = "skipped";
+      step.reason = "you chose to skip it";
+      for (const x of waiting) {
+        x.status = "skipped";
+        x.reason = `needs ${key}, which you skipped`;
+      }
+    } else {
+      step.status = "waiting";
+      step.answer = text.trim();
+      step.retryFrom = step.attempts.length;
+      for (const x of waiting) {
+        x.status = "waiting";
+        x.waitsFor = undefined;
+      }
+    }
+    this.#answered = true;
+    this.changed++;
+    this.#wake?.();
+  }
+
+  /** Ends a run that waits for answers: what is set aside stays open, the summary lists it. */
+  finishWithout(): void {
+    if (!this.waitingAnswers) return;
+    this.#finishWithout = true;
+    this.#wake?.();
+  }
+
   get totals() {
     return this.run ? runTotals(this.run) : null;
   }
@@ -212,6 +271,8 @@ class RunnerStore {
   pause(): void {
     if (!this.running || this.pausing) return;
     this.pausing = true;
+    // Waiting for answers: it pauses at once (nothing is running).
+    this.#wake?.();
     const run = this.run;
     const step = run?.steps.find((s) => s.status === "running");
     if (!run || !step || !this.#sendMore) return;
@@ -277,6 +338,7 @@ class RunnerStore {
   #stopNow(): void {
     this.#stopRequested = true;
     this.stopping = false;
+    this.#wake?.();
     if (this.#sessionId) api.agent.stop(this.#sessionId).catch(() => {});
     // Stop always works, also when the turn's own end never arrives (a lost event, an agent that hangs).
     this.#endTurn?.();
@@ -634,6 +696,9 @@ class RunnerStore {
     this.pausing = false;
     this.stopping = false;
     this.#pauseNow = false;
+    this.#answered = false;
+    this.#finishWithout = false;
+    this.waitingAnswers = 0;
     this.run = {
       id: crypto.randomUUID(),
       projectId: project.id,
@@ -782,423 +847,512 @@ class RunnerStore {
       );
       if (has) planRefs.push(p);
     }
-    for (const stepRun of run.steps) {
-      if (run.status !== "running") break;
-      // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
-      let freshModel: string | null | undefined;
-      {
-        const now = await api.files.read(project.id, file).catch(() => null);
-        const nowStep = now
-          ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
-          : undefined;
-        if (now) for (const x of parsePlan(now.text).steps) if (x.status === "x" && x.number) doneNumbers.add(x.number);
-        // The step's Model line as it is now: the owner may have changed it while earlier steps ran.
-        if (nowStep) freshModel = nowStep.model;
-        const unmet = unmetNeed(nowStep?.needs, doneNumbers, await this.#otherPlans(project, nowStep?.needs));
-        if (unmet) {
-          stepRun.status = "skipped";
-          stepRun.reason = unmet;
-          await this.#noteSkipped(project, file, stepRun, unmet);
-          await this.#logResult(project, file, stepRun);
-          await this.#save(run);
+    // Held and failed steps are set aside, not the end of the run (24u): the run goes on with the rest, then waits for
+    // the owner's answers and goes back to the steps they release.
+    let waitedOnce = false;
+    for (;;) {
+      let again = false;
+      for (const stepRun of run.steps) {
+        if (run.status !== "running") break;
+        if (stepRun.status !== "waiting") continue;
+        // A step whose needs are not done is skipped with the reason, and the run carries on (24f).
+        let freshModel: string | null | undefined;
+        {
+          const now = await api.files.read(project.id, file).catch(() => null);
+          const nowStep = now
+            ? parsePlan(now.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
+            : undefined;
+          if (now)
+            for (const x of parsePlan(now.text).steps) if (x.status === "x" && x.number) doneNumbers.add(x.number);
+          // The step's Model line as it is now: the owner may have changed it while earlier steps ran.
+          if (nowStep) freshModel = nowStep.model;
+          const unmet = unmetNeed(nowStep?.needs, doneNumbers, await this.#otherPlans(project, nowStep?.needs));
+          const asideNeed = run.steps.find(
+            (x) => (x.status === "held" || x.status === "set-aside") && x.number && nowStep?.needs?.includes(x.number),
+          );
+          if (unmet && asideNeed) {
+            stepRun.status = "set-aside";
+            stepRun.waitsFor = {
+              step:
+                asideNeed.status === "set-aside" && asideNeed.waitsFor ? asideNeed.waitsFor.step : this.#key(asideNeed),
+              why: `its Needs line names step ${asideNeed.number}`,
+            };
+            await this.#save(run);
+            continue;
+          }
+          if (unmet) {
+            stepRun.status = "skipped";
+            stepRun.reason = unmet;
+            await this.#noteSkipped(project, file, stepRun, unmet);
+            await this.#logResult(project, file, stepRun);
+            await this.#save(run);
+            continue;
+          }
+        }
+        // A step the owner chose to see first (risky, or a question left open in the check before the run).
+        const holdWhy = waitsBefore(stepRun.number, options.waitBefore);
+        if (holdWhy && !firstStep && stepRun.answer === undefined) {
+          await this.#setAside(project, file, run, stepRun, "hold", holdWhy, provider, steps);
           continue;
         }
-      }
-      // A step the owner chose to see first (risky, or a question left open in the check before the run).
-      const holdWhy = waitsBefore(stepRun.number, options.waitBefore);
-      if (holdWhy && !firstStep) {
-        this.#finish(
-          run,
-          "needs-you",
-          `Step ${stepRun.number} waits for you: ${holdWhy}. Start the run from it when you are ready.`,
-        );
-        break;
-      }
-      firstStep = false;
-      stepRun.status = "running";
-      const planned = steps.find((s) => s.line === stepRun.line);
-      const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
-      const assigned = assignment.get(stepRun.number ?? String(stepRun.line));
-      const choice = chooseModel({
-        picked: assigned?.model ? { model: assigned.model, why: assigned.why } : null,
-        stepModel: oneModel || (freshModel !== undefined ? freshModel : (planned?.model ?? null)),
-        type,
-        rules,
-        stats,
-        models: provider.models,
-        defaultModel: agentSettings.model,
-        budget: budget(),
-      });
-      if (oneModel) choice.reason = "one model for the whole run (your choice)";
-      stepRun.jobType = type;
-      const first = choice.model;
-      // Free first, except money and security work and steps that name their model.
-      const free =
-        freeFirst &&
-        type !== "security" &&
-        !(freshModel !== undefined ? freshModel : planned?.model) &&
-        (assigned?.worker ?? "free") === "free";
-      stepRun.choice = free
-        ? `free first (decider: ${assigned?.why || "free models can do it"}); then ${first}: ${choice.reason}`
-        : freeFirst && assigned?.worker === "paid"
-          ? choice.reason.startsWith("decider:")
-            ? `paid; ${choice.reason}`
-            : `paid (decider: ${assigned.why}); ${choice.reason}`
-          : choice.reason;
-      for (;;) {
-        if (this.#stopRequested) {
-          this.#finish(run, "stopped", "Stopped by you.");
-          stepRun.status = "waiting";
-          break;
+        firstStep = false;
+        stepRun.status = "running";
+        // Released by the owner's answer: what it was held for and what they said go into its next try (24u).
+        const released = stepRun.held;
+        let answerNote = "";
+        if (released) {
+          stepRun.held = undefined;
+          const said = stepRun.answer ? ` The owner answered: "${stepRun.answer}".` : "";
+          answerNote =
+            released.kind === "hold"
+              ? `\n\nThis step was held for the owner (${released.why}); they said go ahead.${said}`
+              : `\n\nEarlier tries did not finish this step (${released.why}).${said} Try it again with that in mind.`;
+          // A blocked step is open again in the plan, so its next try can mark it done.
+          if (released.kind === "blocked") {
+            const now = await api.files.read(project.id, file).catch(() => null);
+            const s = now
+              ? parsePlan(now.text).steps.find((x) => x.line === stepRun.line && x.title === stepRun.title)
+              : null;
+            if (now && s?.status === "!")
+              await api.files
+                .write(project.id, file, setStepStatus(now.text, s.line, " ", s.title), now.hash)
+                .catch(() => {});
+          }
         }
-        if (budgetState(budget()) === "over") {
-          this.#finish(
-            run,
-            "needs-you",
-            `The monthly budget of $${settings.value.monthlyBudgetUsd.toFixed(2)} is used up.`,
-          );
-          stepRun.status = "waiting";
-          break;
-        }
-        const spent = runTotals(run).costUsd;
-        if (options.budgetUsd > 0 && spent >= options.budgetUsd) {
-          this.#finish(run, "stopped", `The run reached its budget of $${options.budgetUsd.toFixed(2)}.`);
-          stepRun.status = "waiting";
-          break;
-        }
-        const chosen = live && live.step === stepRun ? live : null;
-        // The paid agent's limit is not reset yet and the owner chose free models meanwhile.
-        const freeNow = !!this.#freeUntil && Date.now() < this.#freeUntil.getTime() && canFree && !isFree(first);
-        const model = freeNow
-          ? FREE_MODEL
-          : chosen
-            ? nextModel(models, stepRun.attempts.slice(chosen.from), chosen.model, options.attemptsPerModel)
-            : free
-              ? nextModelFreeFirst(models, stepRun.attempts, FREE_MODEL, first, options.attemptsPerModel)
-              : nextModel(models, stepRun.attempts, first, options.attemptsPerModel);
-        if (model === null && options.replan && !stepRun.replacedBy) {
-          // Back to the planner, once: rewrite the step into smaller ones and carry on with those.
-          const added = await this.#replan(project, file, run, stepRun, provider);
-          if (added.length) {
-            steps.push(...added);
+        // A section's closing step hears what is set aside, does what it can and writes what is still open.
+        const asideNote = isClosingStep(stepRun.number)
+          ? setAsideBlock(
+              run.steps
+                .filter((x) => x.status === "held" || x.status === "set-aside")
+                .map((x) => ({
+                  label: this.#key(x),
+                  why: x.status === "held" ? (x.held?.why ?? "it needs the owner") : `waits for ${x.waitsFor?.step}`,
+                })),
+            )
+          : "";
+        const planned = steps.find((s) => s.line === stepRun.line);
+        const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
+        const assigned = assignment.get(stepRun.number ?? String(stepRun.line));
+        const choice = chooseModel({
+          picked: assigned?.model ? { model: assigned.model, why: assigned.why } : null,
+          stepModel: oneModel || (freshModel !== undefined ? freshModel : (planned?.model ?? null)),
+          type,
+          rules,
+          stats,
+          models: provider.models,
+          defaultModel: agentSettings.model,
+          budget: budget(),
+        });
+        if (oneModel) choice.reason = "one model for the whole run (your choice)";
+        stepRun.jobType = type;
+        const first = choice.model;
+        // Free first, except money and security work and steps that name their model.
+        const free =
+          freeFirst &&
+          type !== "security" &&
+          !(freshModel !== undefined ? freshModel : planned?.model) &&
+          (assigned?.worker ?? "free") === "free";
+        stepRun.choice = free
+          ? `free first (decider: ${assigned?.why || "free models can do it"}); then ${first}: ${choice.reason}`
+          : freeFirst && assigned?.worker === "paid"
+            ? choice.reason.startsWith("decider:")
+              ? `paid; ${choice.reason}`
+              : `paid (decider: ${assigned.why}); ${choice.reason}`
+            : choice.reason;
+        for (;;) {
+          if (this.#stopRequested) {
+            this.#finish(run, "stopped", "Stopped by you.");
+            stepRun.status = "waiting";
             break;
           }
-        }
-        if (model === null) {
-          stepRun.status = "failed";
-          stepRun.reason = "not finished even by the strongest model";
-          if (pause === "never") {
-            // Runs to the end: this step is left with its reason; steps that need it skip themselves.
-            await this.#noteSkipped(project, file, stepRun, stepRun.reason);
-            break;
-          }
-          this.#finish(
-            run,
-            "needs-you",
-            `Step ${stepRun.number ?? stepRun.title} was not finished even by the strongest model. It needs you.`,
-          );
-          break;
-        }
-        // Read the list again: earlier steps or the user may have changed it.
-        const current = await api.files.read(project.id, file).catch(() => null);
-        const fresh = current
-          ? parsePlan(current.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
-          : undefined;
-        if (!fresh || !current) {
-          stepRun.status = "skipped";
-          break;
-        }
-        // Done by hand (or by an agent in the chat) since the run started: it counts as done, nobody runs it again.
-        if (fresh.status === "x" && !stepRun.attempts.length) {
-          stepRun.status = "done";
-          stepRun.reason = "marked done outside the run";
-          done.push({ number: stepRun.number, title: stepRun.title });
-          if (stepRun.number) doneNumbers.add(stepRun.number);
-          break;
-        }
-        this.currentModel = model;
-        const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
-        // The full suite after every step, or only at the last step of a section (the others test what they changed).
-        const lastOfSection = !run.steps
-          .slice(run.steps.indexOf(stepRun) + 1)
-          .some((x) => x.status === "waiting" && steps.find((s) => s.line === x.line)?.section === fresh.section);
-        const fullNow = options.fullChecks !== "section" || lastOfSection;
-        const testCommand = options.packets && fullNow ? project.settings.test_command.trim() : "";
-        // The plan's private details (read each step: one given during the last step counts at once).
-        const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
-        const ownLog = logPath(file, fresh);
-        const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
-        const resumedWith = this.#resumeText;
-        const handedOver = this.#resumeIsHandover;
-        this.#resumeText = "";
-        this.#resumeIsHandover = false;
-        // The plan's shared knowledge first (the same for steps in a row, so it is read from the cache), then the step.
-        const read = async (p: string) => (await api.files.read(project.id, p).catch(() => null))?.text ?? "";
-        let prompt =
-          knowledgeBlock(
-            file,
-            await read(mapPath(file)),
-            await read(factsPath(file)),
-            run.steps
-              .filter((x) => x !== stepRun && x.changed?.length)
-              .map((x) => ({ number: x.number, files: x.changed ?? [] })),
-            options.indexTools,
-          ) +
-          referencedBlock(planRefs) +
-          "\n" +
-          (handedOver
-            ? `${resumedWith}\n\n`
-            : resumedWith
-              ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
-              : "") +
-          stepPrompt(file, fresh, done) +
-          privateBlock(privateDetails) +
-          logsBlock(file, ownLog, ownLogExists) +
-          (fullNow
-            ? ""
-            : "\n\nChecks: run only the tests for what this step changes (and lint the files you touch). The full suite " +
-              "and the plan's other whole-project checks run once, at the last step of this section; skip them here, " +
-              "even where the plan's rules ask for them after every step.");
-        // The reviewer turned down a free model's work: the next model hears why.
-        const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
-        if (rejected)
-          prompt += `\n\nA free model already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
-        const before = isFree(model) ? await this.#snapshot(project) : null;
-        if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh, file), testCommand);
-        // Same model, same section, still small: the step continues the last step's session (it knows the work).
-        const section = fresh.section ?? "";
-        const carryOn =
-          (!!resumedWith && !handedOver && !!this.#carry) ||
-          canCarry(
-            this.#carry,
-            model,
-            // Across sections too (steps of a plan build on each other), unless the owner chose per section.
-            options.carryAcrossSections === false ? section : (this.#carry?.section ?? section),
-            options.carryLimit ?? 150_000,
-          );
-        if (!carryOn) await this.#dropCarry();
-        const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
-        const stepStarted = Date.now() - 2000;
-        // The step's limits: what earlier attempts of it spent counts too.
-        if (!stepRun.attempts.length) {
-          this.#stepStartedAt = Date.now();
-          this.#handovers = 0;
-        }
-        this.#handover = 0;
-        this.#stepLog = ownLog;
-        this.#handoverLimit = options.handoverLimit ?? HANDOVER_DEFAULT;
-        this.#stepSpentBefore = stepRun.attempts.reduce((t, a) => t + a.costUsd, 0);
-        this.#attemptBase = resume?.base.cost ?? 0;
-        this.#limits = { usd: options.stepCostLimit, minutes: options.stepMinutes };
-        this.#overLimit = null;
-        const attempt = await this.#attempt(
-          project,
-          prompt,
-          model,
-          options.mode,
-          agentSettings,
-          title,
-          options.lean,
-          options.indexTools,
-          testCommand,
-          resume,
-        );
-        await this.#settleCarry(attempt, section, options, carryOn);
-        // What the step changed, for the next steps (and its log).
-        const changed = await api.files.changedSince(project.id, stepStarted).catch(() => [] as string[]);
-        stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
-        await this.#logAttempt(project, file, stepRun, attempt);
-        // Handed over (context too big): no failure; unless the step got done, a new session goes on from the note.
-        // A step marked done goes through the usual checks below (tests, review) like any other.
-        if (this.#handover && !this.#pauseNow && !this.#overLimit && !this.#stopRequested) {
-          const size = this.#handover;
-          const switchTo = this.switchingTo;
-          this.#handover = 0;
-          this.switchingTo = null;
-          const now = await api.files.read(project.id, file).catch(() => null);
-          if (now && stepOutcome(now.text, stepRun) === "open" && switchTo) {
-            // The owner's switch: no failed try, and not counted against the handover limit.
-            attempt.outcome = "stopped";
-            attempt.note = `handed over to ${switchTo} (the owner's choice)`;
-            stepRun.attempts.push(attempt);
-            await this.#dropCarry();
-            if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
-            this.#resumeText = SWITCH_RESUME;
-            this.#resumeIsHandover = true;
-            continue;
-          }
-          if (now && stepOutcome(now.text, stepRun) === "open" && !switchTo) {
-            this.#handovers++;
-            attempt.outcome = "stopped";
-            attempt.note = `handed over to a new session at about ${Math.round(size / 1000)}k tokens of context`;
-            stepRun.attempts.push(attempt);
-            await this.#dropCarry();
-            if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
-            this.#resumeText = HANDOVER_RESUME;
-            this.#resumeIsHandover = true;
-            agent.notice(
-              `Step ${stepRun.number ?? stepRun.title}: the context reached about ${Math.round(size / 1000)}k tokens, so a new session takes over from the progress note.`,
+          if (budgetState(budget()) === "over") {
+            this.#finish(
+              run,
+              "needs-you",
+              `The monthly budget of $${settings.value.monthlyBudgetUsd.toFixed(2)} is used up.`,
             );
-            continue;
+            stepRun.status = "waiting";
+            break;
           }
-        }
-        // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
-        // Paused now by the owner: the attempt is no failure, the session is kept, Resume goes on in it.
-        if (this.#pauseNow) {
-          this.#pauseNow = false;
-          attempt.outcome = "stopped";
-          attempt.note = "paused by the owner";
-          stepRun.attempts.push(attempt);
-          stepRun.status = "waiting";
-          if (attempt.sessionId && (!this.#carry || this.#carry.sessionId !== attempt.sessionId))
-            this.#carry = {
-              sessionId: attempt.sessionId,
-              model: attempt.model,
-              section,
-              tokens: 0,
-              steps: 1,
-              base: this.#lastTotals,
-            };
-          this.#keepForResume = true;
-          // Saved with the run, so Resume finds the session after a restart (or a new one reads the progress note).
-          if (attempt.sessionId)
-            run.pausedSession = { sessionId: attempt.sessionId, model: attempt.model, section, number: stepRun.number };
-          this.#resumeText =
-            "You paused this step at the owner's request and the run now resumes: go on from where you stopped (your Progress note is in the step's log).";
-          this.#finish(
-            run,
-            "paused",
-            `Paused in step ${stepRun.number ?? stepRun.title}. Resume goes on in the same session (you can change the run's settings first).`,
-          );
-          break;
-        }
-        // Over the step's limits: the run pauses and says so (Resume to go on, maybe with other limits or a model).
-        if (this.#overLimit) {
-          const why = this.#overLimit;
+          const spent = runTotals(run).costUsd;
+          if (options.budgetUsd > 0 && spent >= options.budgetUsd) {
+            this.#finish(run, "stopped", `The run reached its budget of $${options.budgetUsd.toFixed(2)}.`);
+            stepRun.status = "waiting";
+            break;
+          }
+          const chosen = live && live.step === stepRun ? live : null;
+          const tries = stepRun.attempts.slice(stepRun.retryFrom ?? 0);
+          // The paid agent's limit is not reset yet and the owner chose free models meanwhile.
+          const freeNow = !!this.#freeUntil && Date.now() < this.#freeUntil.getTime() && canFree && !isFree(first);
+          const model = freeNow
+            ? FREE_MODEL
+            : chosen
+              ? nextModel(models, stepRun.attempts.slice(chosen.from), chosen.model, options.attemptsPerModel)
+              : free
+                ? nextModelFreeFirst(models, tries, FREE_MODEL, first, options.attemptsPerModel)
+                : nextModel(models, tries, first, options.attemptsPerModel);
+          if (model === null && options.replan && !stepRun.replacedBy && stepRun.retryFrom === undefined) {
+            // Back to the planner, once: rewrite the step into smaller ones and carry on with those.
+            const added = await this.#replan(project, file, run, stepRun, provider);
+            if (added.length) {
+              steps.push(...added);
+              break;
+            }
+          }
+          if (model === null) {
+            stepRun.status = "failed";
+            stepRun.reason = "not finished even by the strongest model";
+            // Set aside after its result is logged; the run goes on with the steps that do not need it (24u).
+            break;
+          }
+          // Read the list again: earlier steps or the user may have changed it.
+          const current = await api.files.read(project.id, file).catch(() => null);
+          const fresh = current
+            ? parsePlan(current.text).steps.find((s) => s.number === stepRun.number && s.title === stepRun.title)
+            : undefined;
+          if (!fresh || !current) {
+            stepRun.status = "skipped";
+            break;
+          }
+          // Done by hand (or by an agent in the chat) since the run started: it counts as done, nobody runs it again.
+          if (fresh.status === "x" && !stepRun.attempts.length) {
+            stepRun.status = "done";
+            stepRun.reason = "marked done outside the run";
+            done.push({ number: stepRun.number, title: stepRun.title });
+            if (stepRun.number) doneNumbers.add(stepRun.number);
+            break;
+          }
+          this.currentModel = model;
+          const title = `Step ${stepRun.number ? `${stepRun.number}: ` : ""}${stepRun.title}${stepRun.attempts.length ? ` (try ${stepRun.attempts.length + 1})` : ""}`;
+          // The full suite after every step, or only at the last step of a section (the others test what they changed).
+          const lastOfSection = !run.steps
+            .slice(run.steps.indexOf(stepRun) + 1)
+            .some((x) => x.status === "waiting" && steps.find((s) => s.line === x.line)?.section === fresh.section);
+          const fullNow = options.fullChecks !== "section" || lastOfSection;
+          const testCommand = options.packets && fullNow ? project.settings.test_command.trim() : "";
+          // The plan's private details (read each step: one given during the last step counts at once).
+          const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
+          const ownLog = logPath(file, fresh);
+          const ownLogExists = !!(await api.files.read(project.id, ownLog).catch(() => null));
+          const resumedWith = this.#resumeText;
+          const handedOver = this.#resumeIsHandover;
+          this.#resumeText = "";
+          this.#resumeIsHandover = false;
+          // The plan's shared knowledge first (the same for steps in a row, so it is read from the cache), then the step.
+          const read = async (p: string) => (await api.files.read(project.id, p).catch(() => null))?.text ?? "";
+          let prompt =
+            knowledgeBlock(
+              file,
+              await read(mapPath(file)),
+              await read(factsPath(file)),
+              run.steps
+                .filter((x) => x !== stepRun && x.changed?.length)
+                .map((x) => ({ number: x.number, files: x.changed ?? [] })),
+              options.indexTools,
+            ) +
+            referencedBlock(planRefs) +
+            "\n" +
+            (handedOver
+              ? `${resumedWith}\n\n`
+              : resumedWith
+                ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
+                : "") +
+            stepPrompt(file, fresh, done) +
+            answerNote +
+            asideNote +
+            privateBlock(privateDetails) +
+            logsBlock(file, ownLog, ownLogExists) +
+            (fullNow
+              ? ""
+              : "\n\nChecks: run only the tests for what this step changes (and lint the files you touch). The full suite " +
+                "and the plan's other whole-project checks run once, at the last step of this section; skip them here, " +
+                "even where the plan's rules ask for them after every step.");
+          // The reviewer turned down a free model's work: the next model hears why.
+          const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
+          if (rejected)
+            prompt += `\n\nA free model already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
+          const before = isFree(model) ? await this.#snapshot(project) : null;
+          if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh, file), testCommand);
+          // Same model, same section, still small: the step continues the last step's session (it knows the work).
+          const section = fresh.section ?? "";
+          const carryOn =
+            (!!resumedWith && !handedOver && !!this.#carry) ||
+            canCarry(
+              this.#carry,
+              model,
+              // Across sections too (steps of a plan build on each other), unless the owner chose per section.
+              options.carryAcrossSections === false ? section : (this.#carry?.section ?? section),
+              options.carryLimit ?? 150_000,
+            );
+          if (!carryOn) await this.#dropCarry();
+          const resume = carryOn && this.#carry ? { sessionId: this.#carry.sessionId, base: this.#carry.base } : null;
+          const stepStarted = Date.now() - 2000;
+          // The step's limits: what earlier attempts of it spent counts too.
+          if (!stepRun.attempts.length) {
+            this.#stepStartedAt = Date.now();
+            this.#handovers = 0;
+          }
+          this.#handover = 0;
+          this.#stepLog = ownLog;
+          this.#handoverLimit = options.handoverLimit ?? HANDOVER_DEFAULT;
+          this.#stepSpentBefore = stepRun.attempts.reduce((t, a) => t + a.costUsd, 0);
+          this.#attemptBase = resume?.base.cost ?? 0;
+          this.#limits = { usd: options.stepCostLimit, minutes: options.stepMinutes };
           this.#overLimit = null;
-          await this.#dropCarry();
-          stepRun.attempts.push(attempt);
-          stepRun.status = "waiting";
-          this.#finish(
-            run,
-            "paused",
-            `Step ${stepRun.number ?? stepRun.title} was paused: ${why}. Resume to go on (raise the limit or choose another model).`,
+          const attempt = await this.#attempt(
+            project,
+            prompt,
+            model,
+            options.mode,
+            agentSettings,
+            title,
+            options.lean,
+            options.indexTools,
+            testCommand,
+            resume,
           );
-          break;
-        }
-        if (attempt.outcome === "error" || attempt.outcome === "open") {
-          const resetAt = await this.#limitReset(attempt);
-          if (resetAt) {
-            await this.#dropCarry();
-            if (options.onLimit === "free" && canFree) {
-              this.#freeUntil = resetAt;
+          await this.#settleCarry(attempt, section, options, carryOn);
+          // What the step changed, for the next steps (and its log).
+          const changed = await api.files.changedSince(project.id, stepStarted).catch(() => [] as string[]);
+          stepRun.changed = [...new Set([...(stepRun.changed ?? []), ...changed])];
+          await this.#logAttempt(project, file, stepRun, attempt);
+          // Handed over (context too big): no failure; unless the step got done, a new session goes on from the note.
+          // A step marked done goes through the usual checks below (tests, review) like any other.
+          if (this.#handover && !this.#pauseNow && !this.#overLimit && !this.#stopRequested) {
+            const size = this.#handover;
+            const switchTo = this.switchingTo;
+            this.#handover = 0;
+            this.switchingTo = null;
+            const now = await api.files.read(project.id, file).catch(() => null);
+            if (now && stepOutcome(now.text, stepRun) === "open" && switchTo) {
+              // The owner's switch: no failed try, and not counted against the handover limit.
+              attempt.outcome = "stopped";
+              attempt.note = `handed over to ${switchTo} (the owner's choice)`;
+              stepRun.attempts.push(attempt);
+              await this.#dropCarry();
+              if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
+              this.#resumeText = SWITCH_RESUME;
+              this.#resumeIsHandover = true;
+              continue;
+            }
+            if (now && stepOutcome(now.text, stepRun) === "open" && !switchTo) {
+              this.#handovers++;
+              attempt.outcome = "stopped";
+              attempt.note = `handed over to a new session at about ${Math.round(size / 1000)}k tokens of context`;
+              stepRun.attempts.push(attempt);
+              await this.#dropCarry();
+              if (attempt.sessionId) await api.agent.stop(attempt.sessionId).catch(() => {});
+              this.#resumeText = HANDOVER_RESUME;
+              this.#resumeIsHandover = true;
               agent.notice(
-                `The paid agent hit its limit (resets ${resetAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}): free models work until then.`,
+                `Step ${stepRun.number ?? stepRun.title}: the context reached about ${Math.round(size / 1000)}k tokens, so a new session takes over from the progress note.`,
               );
               continue;
             }
-            if (!(await this.#waitUntil(resetAt))) {
-              if (this.pausing)
-                this.#finish(run, "paused", "Paused while waiting for the usage limit. Resume when you want to go on.");
-              else this.#finish(run, "stopped", "Stopped by you while waiting for the usage limit to reset.");
-              stepRun.status = "waiting";
-              break;
-            }
-            continue;
           }
-        }
-        const after = await api.files.read(project.id, file).catch(() => null);
-        if (attempt.outcome === "open" && after) {
-          const outcome = stepOutcome(after.text, stepRun);
-          attempt.outcome = outcome === "missing" ? "open" : outcome;
-          // With Qanuvi running the tests, "done" also needs them to pass.
-          if (attempt.outcome === "done" && testCommand && attempt.testsPassed === false) {
-            attempt.outcome = "open";
-            attempt.note = "Marked done, but the tests still fail.";
+          // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
+          // Paused now by the owner: the attempt is no failure, the session is kept, Resume goes on in it.
+          if (this.#pauseNow) {
+            this.#pauseNow = false;
+            attempt.outcome = "stopped";
+            attempt.note = "paused by the owner";
+            stepRun.attempts.push(attempt);
+            stepRun.status = "waiting";
+            if (attempt.sessionId && (!this.#carry || this.#carry.sessionId !== attempt.sessionId))
+              this.#carry = {
+                sessionId: attempt.sessionId,
+                model: attempt.model,
+                section,
+                tokens: 0,
+                steps: 1,
+                base: this.#lastTotals,
+              };
+            this.#keepForResume = true;
+            // Saved with the run, so Resume finds the session after a restart (or a new one reads the progress note).
+            if (attempt.sessionId)
+              run.pausedSession = {
+                sessionId: attempt.sessionId,
+                model: attempt.model,
+                section,
+                number: stepRun.number,
+              };
+            this.#resumeText =
+              "You paused this step at the owner's request and the run now resumes: go on from where you stopped (your Progress note is in the step's log).";
+            this.#finish(
+              run,
+              "paused",
+              `Paused in step ${stepRun.number ?? stepRun.title}. Resume goes on in the same session (you can change the run's settings first).`,
+            );
+            break;
           }
-        }
-        // Quality first: a free model's "done" is checked by the decider before it counts.
-        if (attempt.outcome === "done" && before && freeFirst) {
-          const review = await this.#review(project, provider, stepRun, fresh, before, attempt.testsPassed);
-          this.#decide(run, {
-            kind: "review",
-            by: provider.id,
-            subject: `Step ${stepRun.number ?? stepRun.title}`,
-            decision: review.ok ? "accepted" : "rejected",
-            why: review.why,
-          });
-          if (!review.ok) {
-            attempt.outcome = "open";
-            attempt.note = `Review: ${review.why}`;
-            const now = await api.files.read(project.id, file).catch(() => null);
-            if (now) {
-              try {
-                await api.files.write(
-                  project.id,
-                  file,
-                  setStepStatus(now.text, fresh.line, " ", fresh.title),
-                  now.hash,
+          // Over the step's limits: the run pauses and says so (Resume to go on, maybe with other limits or a model).
+          if (this.#overLimit) {
+            const why = this.#overLimit;
+            this.#overLimit = null;
+            await this.#dropCarry();
+            stepRun.attempts.push(attempt);
+            stepRun.status = "waiting";
+            this.#finish(
+              run,
+              "paused",
+              `Step ${stepRun.number ?? stepRun.title} was paused: ${why}. Resume to go on (raise the limit or choose another model).`,
+            );
+            break;
+          }
+          if (attempt.outcome === "error" || attempt.outcome === "open") {
+            const resetAt = await this.#limitReset(attempt);
+            if (resetAt) {
+              await this.#dropCarry();
+              if (options.onLimit === "free" && canFree) {
+                this.#freeUntil = resetAt;
+                agent.notice(
+                  `The paid agent hit its limit (resets ${resetAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}): free models work until then.`,
                 );
-              } catch {
-                // The list changed meanwhile: the next attempt reads it again.
+                continue;
+              }
+              if (!(await this.#waitUntil(resetAt))) {
+                if (this.pausing)
+                  this.#finish(
+                    run,
+                    "paused",
+                    "Paused while waiting for the usage limit. Resume when you want to go on.",
+                  );
+                else this.#finish(run, "stopped", "Stopped by you while waiting for the usage limit to reset.");
+                stepRun.status = "waiting";
+                break;
+              }
+              continue;
+            }
+          }
+          const after = await api.files.read(project.id, file).catch(() => null);
+          if (attempt.outcome === "open" && after) {
+            const outcome = stepOutcome(after.text, stepRun);
+            attempt.outcome = outcome === "missing" ? "open" : outcome;
+            // With Qanuvi running the tests, "done" also needs them to pass.
+            if (attempt.outcome === "done" && testCommand && attempt.testsPassed === false) {
+              attempt.outcome = "open";
+              attempt.note = "Marked done, but the tests still fail.";
+            }
+          }
+          // Quality first: a free model's "done" is checked by the decider before it counts.
+          if (attempt.outcome === "done" && before && freeFirst) {
+            const review = await this.#review(project, provider, stepRun, fresh, before, attempt.testsPassed);
+            this.#decide(run, {
+              kind: "review",
+              by: provider.id,
+              subject: `Step ${stepRun.number ?? stepRun.title}`,
+              decision: review.ok ? "accepted" : "rejected",
+              why: review.why,
+            });
+            if (!review.ok) {
+              attempt.outcome = "open";
+              attempt.note = `Review: ${review.why}`;
+              const now = await api.files.read(project.id, file).catch(() => null);
+              if (now) {
+                try {
+                  await api.files.write(
+                    project.id,
+                    file,
+                    setStepStatus(now.text, fresh.line, " ", fresh.title),
+                    now.hash,
+                  );
+                } catch {
+                  // The list changed meanwhile: the next attempt reads it again.
+                }
               }
             }
           }
+          stepRun.attempts.push(attempt);
+          this.changed++;
+          await this.#save(run);
+          if (attempt.outcome === "done") {
+            stepRun.status = "done";
+            done.push({ number: stepRun.number, title: stepRun.title });
+            if (stepRun.number) doneNumbers.add(stepRun.number);
+            // An earlier run's "Skipped:" line no longer applies.
+            await this.#noteSkipped(project, file, stepRun, null);
+            if (pause === "step" && run.steps.some((s) => s.status === "waiting"))
+              this.#finish(
+                run,
+                "stopped",
+                `Paused after step ${stepRun.number ?? stepRun.title}, as chosen. Run again to go on.`,
+              );
+            break;
+          }
+          if (attempt.outcome === "blocked") {
+            stepRun.status = "blocked";
+            stepRun.reason = attempt.note || (await this.#blockedReason(project, file, stepRun)) || "it needs you";
+            // Set aside after its result is logged; the run carries on (24u).
+            break;
+          }
+          if (attempt.outcome === "stopped") {
+            this.#finish(run, "stopped", "Stopped by you.");
+            stepRun.status = "waiting";
+            break;
+          }
         }
-        stepRun.attempts.push(attempt);
-        this.changed++;
-        await this.#save(run);
-        if (attempt.outcome === "done") {
-          stepRun.status = "done";
-          done.push({ number: stepRun.number, title: stepRun.title });
-          if (stepRun.number) doneNumbers.add(stepRun.number);
-          // An earlier run's "Skipped:" line no longer applies.
-          await this.#noteSkipped(project, file, stepRun, null);
-          if (pause === "step" && run.steps.some((s) => s.status === "waiting"))
-            this.#finish(
-              run,
-              "stopped",
-              `Paused after step ${stepRun.number ?? stepRun.title}, as chosen. Run again to go on.`,
-            );
-          break;
-        }
-        if (attempt.outcome === "blocked") {
-          stepRun.status = "blocked";
-          stepRun.reason = attempt.note || (await this.#blockedReason(project, file, stepRun)) || "it needs you";
-          // Runs to the end: the agent marked it blocked with its reason; the run carries on.
-          if (pause === "never") break;
-          this.#finish(run, "needs-you", `Step ${stepRun.number ?? stepRun.title} is blocked and needs you.`);
-          break;
-        }
-        if (attempt.outcome === "stopped") {
-          this.#finish(run, "stopped", "Stopped by you.");
-          stepRun.status = "waiting";
-          break;
-        }
-      }
-      await this.#logResult(project, file, stepRun);
-      // Paused by the owner: the run stops here, after a whole step; Resume goes on from the next open one.
-      if (this.pausing && run.status === "running") {
-        this.#finish(
-          run,
-          "paused",
-          `Paused after step ${stepRun.number ?? stepRun.title}. Resume to go on (you can change the run's settings first).`,
-        );
-      }
-      // Steps added while this one ran (the user asked for them mid-step) come next.
-      await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
-      await this.#collectNotes(run, stepRun);
-      await this.#updateApi(project, file, stepRun);
-      if (run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed") && stepRun.number) {
-        const now = await api.files.read(project.id, file).catch(() => null);
-        const waiting = new Set(run.steps.filter((x) => x.status === "waiting" && x.number).map((x) => x.number!));
-        const held = now ? needingCount(stepRun.number, parsePlan(now.text).steps, waiting) : 0;
-        if (held >= 3 && held * 2 >= waiting.size)
+        await this.#logResult(project, file, stepRun);
+        // Paused by the owner: the run stops here, after a whole step; Resume goes on from the next open one.
+        if (this.pausing && run.status === "running") {
           this.#finish(
             run,
-            "needs-you",
-            `Step ${stepRun.number} is ${stepRun.status === "blocked" ? "blocked" : "not finished"} (${stepRun.reason ?? "it needs you"}). ${held} of the ${waiting.size} steps left need it, so the run stops here instead of skipping them. Sort it out (a missing login goes into Project settings, Secrets), then press Run.`,
+            "paused",
+            `Paused after step ${stepRun.number ?? stepRun.title}. Resume to go on (you can change the run's settings first).`,
           );
+        }
+        // Steps added while this one ran (the user asked for them mid-step) come next.
+        await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
+        await this.#collectNotes(run, stepRun);
+        await this.#updateApi(project, file, stepRun);
+        if (run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed")) {
+          const kind = stepRun.status;
+          await this.#setAside(project, file, run, stepRun, kind, stepRun.reason ?? "it needs you", provider, steps);
+        }
+        // Answered while the run went on: back to the released steps first (they come earlier in the plan).
+        if (this.#answered && run.status === "running") {
+          this.#answered = false;
+          again = true;
+          break;
+        }
+      }
+      if (again) continue;
+      if (run.status !== "running") break;
+      const asks = run.steps.filter((x) => x.status === "held").length;
+      if (!asks) break;
+      // Only set-aside steps are left: wait for the owner, spending nothing, and go on by itself once answered.
+      this.waitingAnswers = asks;
+      run.message = waitingLine(asks);
+      if (!waitedOnce) {
+        waitedOnce = true;
+        const name = file.split("/").pop() ?? file;
+        inbox.add({
+          kind: "run",
+          title: `${project.name}: ${name} waits for you · ${asks} answer${asks === 1 ? "" : "s"}`,
+          text: run.steps
+            .filter((x) => x.status === "held")
+            .map((x) => `Step ${this.#key(x)}: ${x.held?.why ?? "it needs you"}`)
+            .join("\n"),
+          open: { label: "Open the plan", view: "plan", projectId: project.id },
+        });
+      }
+      this.changed++;
+      await this.#save(run);
+      if (!this.#answered && !this.#finishWithout && !this.#stopRequested && !this.pausing)
+        await new Promise<void>((resolve) => (this.#wake = resolve));
+      this.#wake = null;
+      this.waitingAnswers = 0;
+      this.#answered = false;
+      if (this.#stopRequested) {
+        this.#finish(run, "stopped", "Stopped by you.");
+        break;
+      }
+      if (this.pausing) {
+        this.#finish(run, "paused", "Paused while waiting for your answers. Resume to go on.");
+        break;
+      }
+      if (this.#finishWithout) {
+        this.#finishWithout = false;
+        break;
       }
     }
     if (run.status === "running") this.#finish(run, "done", runSummary(run));
@@ -1449,6 +1603,103 @@ class RunnerStore {
 
   #decide(run: PlanRun, d: Omit<DecisionRecord, "at">): void {
     (run.decisions ??= []).push({ at: Date.now(), ...d });
+  }
+
+  /**
+   * Sets a step aside for the owner's answer (24u), and the open steps that need it: the plan says so first (Needs,
+   * same step number, shared files), then one short decider call for the rest, logged in Decisions. A section's
+   * closing step is never set aside. The run then goes on with what is left.
+   */
+  async #setAside(
+    project: Project,
+    file: string,
+    run: PlanRun,
+    stepRun: StepRun,
+    kind: HeldKind,
+    why: string,
+    provider: AgentProvider,
+    steps: Step[],
+  ): Promise<void> {
+    stepRun.status = "held";
+    stepRun.held = { kind, why };
+    stepRun.answer = undefined;
+    const key = this.#key(stepRun);
+    const now = await api.files.read(project.id, file).catch(() => null);
+    const planSteps = now ? parsePlan(now.text).steps : steps;
+    const info = (s: StepRun) => {
+      const p =
+        planSteps.find((x) => x.number === s.number && x.title === s.title) ?? steps.find((x) => x.line === s.line);
+      return { number: s.number, title: s.title, details: p?.details ?? [], needs: p?.needs, changed: s.changed };
+    };
+    const open = () => run.steps.filter((x) => x.status === "waiting" && !isClosingStep(x.number));
+    const aside = (x: StepRun, by: string, reason: string) => {
+      x.status = "set-aside";
+      x.waitsFor = { step: key, why: reason };
+      this.#decide(run, {
+        kind: "set-aside",
+        by,
+        subject: `Step ${this.#key(x)}`,
+        decision: `waits for ${key}`,
+        why: reason,
+      });
+    };
+    // The plan first, also for steps that need a step set aside just now (72b needs 72a, which needs 95b).
+    const outs = [stepRun];
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const x of open()) {
+        const later = info(x);
+        for (const h of outs) {
+          const reason = planDependence(info(h), later);
+          if (!reason) continue;
+          aside(x, "the plan", h === stepRun ? reason : `${reason} (step ${this.#key(h)}, which waits for ${key})`);
+          outs.push(x);
+          grew = true;
+          break;
+        }
+      }
+    }
+    // Then the decider, once, for the open steps the plan says nothing about.
+    const rest = open().slice(0, 30);
+    if (rest.length) {
+      const heldList = outs.map((h) => ({ ...info(h), why: h === stepRun ? why : `waits for ${key}` }));
+      const prompt = dependencePrompt(heldList, rest.map(info));
+      const keys = rest.map((x) => this.#key(x));
+      const heldKeys = outs.map((h) => this.#key(h));
+      let text = "";
+      let by: string = provider.id;
+      try {
+        const model = settings.agent(provider.id).model || defaultPlannerModel(provider);
+        const r = await planner.ask(project, prompt, model, `Decider: what waits for step ${key}`, {
+          agentId: provider.id,
+          lean: true,
+          quiet: true,
+        });
+        (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
+        text = r.text;
+      } catch {
+        try {
+          const f = await freeDecide("You read plan steps. Answer with JSON only.", prompt);
+          text = f.text;
+          by = f.by;
+        } catch {
+          // Nobody could answer: the plan's own word stands, the other steps go on.
+          this.#decide(run, {
+            kind: "set-aside",
+            by: "Qanuvi",
+            subject: `Step ${key}`,
+            decision: "other steps go on",
+            why: "the decider could not answer; only what the plan says waits",
+          });
+        }
+      }
+      for (const [step, d] of parseDependence(text, keys, heldKeys)) {
+        const x = rest.find((r) => this.#key(r) === step);
+        if (x) aside(x, `decider (${by})`, d.why || `needs step ${d.on}`);
+      }
+    }
+    this.changed++;
+    await this.#save(run);
   }
 
   /**

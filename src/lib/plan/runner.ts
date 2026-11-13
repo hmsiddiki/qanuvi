@@ -106,7 +106,19 @@ export interface StepRun {
   number: string | null;
   title: string;
   attempts: Attempt[];
-  status: "waiting" | "running" | "done" | "blocked" | "failed" | "skipped";
+  /**
+   * held: set aside, waiting for the owner's answer (24u); set-aside: waits for a held step (`waitsFor`). Both come
+   * back as "waiting" once the owner answers.
+   */
+  status: "waiting" | "running" | "done" | "blocked" | "failed" | "skipped" | "held" | "set-aside";
+  /** Why a held step waits for the owner: a hold from the check before the run, blocked, or not finished. */
+  held?: { kind: import("./setaside").HeldKind; why: string };
+  /** The held step (number, else title) a set-aside step needs, and why it needs it. */
+  waitsFor?: { step: string; why: string };
+  /** The owner's answer to a held step: the next try is told it. */
+  answer?: string;
+  /** Tries before this index were before the owner's answer: the model ladder starts again after it. */
+  retryFrom?: number;
   /** Kind of work, for learned routing (Milestone 13). */
   jobType?: import("./routing").JobType;
   /** Why the step started on its model. */
@@ -234,14 +246,26 @@ export function unmetNeed(
 /** The end-of-run report (24f): what was done, and what was skipped or left, with why. */
 export function runSummary(run: Pick<PlanRun, "steps">): string {
   const done = run.steps.filter((s) => s.status === "done").length;
-  const left = run.steps.filter((s) => s.status === "skipped" || s.status === "blocked" || s.status === "failed");
   const name = (s: StepRun) => (s.number ? `step ${s.number}` : s.title);
   const parts = [`${done} done`];
-  for (const kind of ["skipped", "blocked", "failed"] as const) {
-    const these = left.filter((s) => s.status === kind);
+  const why = (s: StepRun) =>
+    s.status === "held"
+      ? s.held?.why
+      : s.status === "set-aside" && s.waitsFor
+        ? `waits for ${s.waitsFor.step}`
+        : s.reason;
+  const kinds = [
+    ["skipped", "skipped"],
+    ["blocked", "blocked"],
+    ["failed", "failed"],
+    ["held", "waiting for your answer"],
+    ["set-aside", "set aside"],
+  ] as const;
+  for (const [kind, word] of kinds) {
+    const these = run.steps.filter((s) => s.status === kind);
     if (these.length)
       parts.push(
-        `${these.length} ${kind}: ${these.map((s) => `${name(s)}${s.reason ? ` (${s.reason})` : ""}`).join("; ")}`,
+        `${these.length} ${word}: ${these.map((s) => `${name(s)}${why(s) ? ` (${why(s)})` : ""}`).join("; ")}`,
       );
   }
   return parts.join(" · ");
