@@ -304,8 +304,11 @@ runs on or off; with it off nothing is sent anywhere.
     model (routing reliability: Wilson lower bound, so 33/34 beats 5/5), cost only as a tie-break. Verify green
     (305 + 156). Published as 0.1.16 with Revert/Redo and Pick models (owner: "publish anyway").
   - Driven live 2026-11-13 on a scratch project (test build): Pick models (3 steps picked, run used them, $0.01), Revert and Redo, Rewind to here (preview lists files left alone) and its Redo (files back byte for byte), bookmarks (star moves the chat under Saved), the waiting-message hold (Send now / Don't send, held message read after the turn), the heavy-chat bar at 37k. Fixed: picked steps say "Picked · <model>", not "Auto"; picks of steps without a number follow their title when a run moves lines; the result line "Finished · 4.9 s" had no space and read as a minus. Then fixed (driven live): steps written "1a. ..." without bold are read as numbered (one log per step, renames keep the number); quiet asks (the check before the run, chat review) now pass their session status on, so the status bar no longer keeps "1 working" after they answered. Published as 0.1.18. Published as 0.1.17 (owner: "release anyway"). Still to drive: 24t clean-up, 24s part 3 reopen, 15i part 2.
-  - RESUME HERE (new conversation): drive Pick models, Revert / Rewind to here / Redo and the waiting-message hold, 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
-    project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
+  - RESUME HERE (new conversation, 2026-11-13): build 24u (below), in its order: part 1 (set aside, not stop; wait,
+    not end), part 2 (holds and answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer
+    forms, Windows notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
+    drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
+    driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
     plan (the runner already takes ranges; needs a parser and a plan lookup, then a prefilled Run panel or a start
@@ -317,6 +320,34 @@ runs on or off; with it off nothing is sent anywhere.
     and resend, rewind, search) as its own step; (7) 15i language servers and debugging. Later: 24k OmniRoute (only
     when the owner asks), 1e Task Manager grouping, 15e2 terminal list, the custom installer. Each part starts in a
     new conversation.
+- [ ] **24u. Runs that keep going, asks that are hard to miss (owner, 2026-11-13; agreed 2026-11-13)**: the owner
+  left PLAN-E running and came back 8 hours later: 95a finished at 10:54, then the run ended "needs-you" before 95b
+  and sat for over 6 hours. The check before the run sets every risky step to "Wait for me" by default and turns
+  every unanswered question into a hold; one hold ends the whole run (runner `waitsBefore` then `break`), and the
+  message says "you asked to see it first" although nobody chose it. A run restarted later starts with no holds and
+  no answers. Owner: the run must be self-sufficient and stop only when absolutely nothing can be done without them.
+  - Part 1, set aside, not stop: a held or failed step is set aside and the run goes on with the steps that do not
+    need it. Dependence from the plan first (Needs lines, same step number, files from MAP.md and the step text),
+    then one short decider call ("does 72a depend on 95b?") logged in Decisions. Dependent steps are set aside with
+    "waits for 95b". A section's z step does what it can and writes what is still open. When only set-aside steps
+    are left, the run does not end: "Waiting for you (N answers)", nothing spent, and it carries on by itself when
+    answered; "Finish without them" ends it. Answers given while it runs are picked up after each step. Final
+    summary: done, decided for you, set aside, waiting for answers.
+  - Part 2, kept per plan: answers, holds and "decided for you" choices are stored per plan, so a restarted run
+    keeps them. Hold wording says who set it ("you asked" / "Qanuvi's default").
+  - Part 3, sorted asks: the check sorts each risk and question into (a) decides itself: a sensible default that
+    can be changed later (a setting, not hard-coded), logged "Decided for you: X, because Y. Change?"; (b) goes ahead
+    with extra checks: the paid decider reviews the diff and tests must pass before the step counts as done; (c)
+    truly needs you: secrets, actions on outside accounts or anything leaving this computer. Risk is judged by where
+    the step runs (money on a test database is not real money). Each item comes with the recommended answer chosen,
+    plus "Accept all recommended"; holds only where the owner chose one or (c).
+  - Part 4, one notification centre: the Inbox moves into Qanuvi's database (Rust side), seen by every window, the
+    runner and later the phone. Types: for your information, needs an answer, problem. Answer items carry their form
+    (options, text, "Let Qanuvi decide", "Skip this step"); the first answer anywhere closes it everywhere. Settings,
+    Notifications: per type, Inbox (always), Windows notification, phone; bundled ("5 things need you"); quiet
+    hours. Clicking a Windows notification brings Qanuvi forward and opens the same answer window used in the
+    Inbox. Secrets are answered in the main app only. The phone is a delivery target in the design and settings;
+    the phone app itself (through the Milestone 20 relay) is its own later step.
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:
