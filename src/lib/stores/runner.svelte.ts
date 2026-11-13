@@ -6,7 +6,16 @@
 import { api, errorText, type AgentEvent, type Project, type Session } from "$lib/api";
 import { reduceAll } from "$lib/agent/events";
 import { waitsBefore } from "$lib/plan/preflight";
-import { holdWording, keepAnswer, loadPlanState, pruneState, savePlanState } from "$lib/plan/planstate";
+import {
+  closingRan,
+  closingsDue,
+  holdWording,
+  keepAnswer,
+  loadPlanState,
+  markLate,
+  pruneState,
+  savePlanState,
+} from "$lib/plan/planstate";
 import {
   closingRerunNote,
   dependencePrompt,
@@ -736,12 +745,9 @@ class RunnerStore {
     // the owner's answer, skipped ones stay skipped. Entries of steps no longer open go.
     const waitList = [...(options.waitBefore ?? [])];
     {
-      const open = new Set(
-        parsePlan(text)
-          .steps.filter((s) => s.status !== "x")
-          .map((s) => s.number ?? s.title),
-      );
-      const kept = pruneState(loadPlanState(project.id, file), open);
+      const planned = parsePlan(text).steps;
+      const open = new Set(planned.filter((s) => s.status !== "x").map((s) => s.number ?? s.title));
+      const kept = pruneState(loadPlanState(project.id, file), open, new Set(planned.map((s) => s.number ?? s.title)));
       savePlanState(project.id, file, kept);
       for (const h of kept.holds)
         if (!waitList.some((w) => w.step === h.step)) waitList.push({ step: h.step, why: holdWording(h) });
@@ -881,6 +887,8 @@ class RunnerStore {
     // Held and failed steps are set aside, not the end of the run (24u): the run goes on with the rest, then waits for
     // the owner's answers and goes back to the steps they release.
     let waitedOnce = false;
+    // Finish without them was chosen: what is left to do before the run ends is the closing steps' catch-up.
+    let ending = false;
     for (;;) {
       let again = false;
       for (const stepRun of run.steps) {
@@ -1342,9 +1350,9 @@ class RunnerStore {
           const kind = stepRun.status;
           await this.#setAside(project, file, run, stepRun, kind, stepRun.reason ?? "it needs you", provider, steps);
         }
-        // Finished after its section's closing step already ran (it was set aside): the closing step runs once more.
-        if (stepRun.status === "done" && run.status === "running")
-          await this.#reopenClosing(project, file, run, stepRun, steps);
+        // Finished after its section's closing step already ran (it was set aside): the closing step runs once more,
+        // once the rest of the section is through.
+        if (stepRun.status === "done" && run.status === "running") await this.#afterDone(project, file, run, stepRun);
         // Answered while the run went on: back to the released steps first (they come earlier in the plan).
         if (this.#answered && run.status === "running") {
           this.#answered = false;
@@ -1354,8 +1362,14 @@ class RunnerStore {
       }
       if (again) continue;
       if (run.status !== "running") break;
+      // A step opened again behind the pass (a closing step's catch-up) gets its turn first.
+      if (run.steps.some((x) => x.status === "waiting")) continue;
       const asks = run.steps.filter((x) => x.status === "held").length;
-      if (!asks) break;
+      if (!asks || ending) {
+        // About to end: closing steps that missed late steps run once now, then the run ends.
+        if (await this.#runClosings(project, file, run, true)) continue;
+        break;
+      }
       // Only set-aside steps are left: wait for the owner, spending nothing, and go on by itself once answered.
       this.waitingAnswers = asks;
       run.message = waitingLine(asks);
@@ -1389,7 +1403,7 @@ class RunnerStore {
       }
       if (this.#finishWithout) {
         this.#finishWithout = false;
-        break;
+        ending = true;
       }
     }
     if (run.status === "running") this.#finish(run, "done", runSummary(run));
@@ -1639,41 +1653,70 @@ class RunnerStore {
   }
 
   /**
-   * A step finished after its section's closing step had already run without it (it was set aside, 24u): the closing
-   * step is opened again so it runs once more, after the rest of the section, and is told which steps came in late.
+   * After a step is done (24u): a closing step records what of its section is still set aside; any other step is
+   * noted as late for the closing steps that ran without it. Kept per plan, so a later run catches up too.
    */
-  async #reopenClosing(project: Project, file: string, run: PlanRun, stepRun: StepRun, steps: Step[]): Promise<void> {
-    const sectionOf = (x: StepRun) => steps.find((s) => s.line === x.line)?.section;
-    const section = sectionOf(stepRun);
-    if (section === undefined) return;
-    const closing = run.steps
-      .slice(run.steps.indexOf(stepRun) + 1)
-      .find((x) => isClosingStep(x.number) && sectionOf(x) === section);
-    if (!closing) return;
-    const late = this.#key(stepRun);
-    // Already opened again by an earlier late step: it hears about this one too.
-    if (closing.status === "waiting" && closing.rerunAfter) {
-      if (!closing.rerunAfter.includes(late)) closing.rerunAfter.push(late);
-      return;
-    }
-    if (closing.status !== "done" || !closing.attempts.length) return;
-    const now = await api.files.read(project.id, file).catch(() => null);
-    const s = now
-      ? parsePlan(now.text).steps.find((x) => x.number === closing.number && x.title === closing.title)
-      : null;
-    if (!now || !s) return;
-    if (s.status === "x") {
-      try {
-        await api.files.write(project.id, file, setStepStatus(now.text, s.line, " ", s.title), now.hash);
-      } catch {
-        return; // The plan changed meanwhile: the closing step's earlier note stands.
+  async #afterDone(project: Project, file: string, run: PlanRun, stepRun: StepRun): Promise<void> {
+    const key = this.#key(stepRun);
+    let state = loadPlanState(project.id, file);
+    if (isClosingStep(stepRun.number)) {
+      const plan = await api.files.read(project.id, file).catch(() => null);
+      const parsed = plan ? parsePlan(plan.text).steps : [];
+      const section = parsed.find((x) => x.number === stepRun.number && x.title === stepRun.title)?.section;
+      const inSection = new Set(parsed.filter((x) => x.section === section).map((x) => x.number ?? x.title));
+      const pending = run.steps
+        .filter(
+          (x) => x !== stepRun && (x.status === "held" || x.status === "set-aside") && inSection.has(this.#key(x)),
+        )
+        .map((x) => this.#key(x));
+      state = closingRan(state, key, pending);
+    } else state = markLate(state, key);
+    savePlanState(project.id, file, state);
+    await this.#runClosings(project, file, run, false);
+  }
+
+  /**
+   * Opens closing steps again that missed steps done since they ran: once per section, when nothing they wait for is
+   * still pending in this run, or when the run is about to end (`ending`). A closing step done in an earlier run is
+   * added to this one. Says whether one was opened.
+   */
+  async #runClosings(project: Project, file: string, run: PlanRun, ending: boolean): Promise<boolean> {
+    const state = loadPlanState(project.id, file);
+    const pending = (step: string) =>
+      run.steps.some(
+        (x) =>
+          this.#key(x) === step &&
+          (x.status === "held" || x.status === "set-aside" || x.status === "waiting" || x.status === "running"),
+      );
+    let opened = false;
+    for (const due of closingsDue(state, pending, ending)) {
+      let closing = run.steps.find((x) => this.#key(x) === due.closing);
+      if (closing && closing.status !== "done") continue; // Waiting, running, or failed in this run: not again.
+      const now = await api.files.read(project.id, file).catch(() => null);
+      const s = now ? parsePlan(now.text).steps.find((x) => (x.number ?? x.title) === due.closing) : null;
+      if (!now || !s) continue;
+      if (s.status === "x") {
+        try {
+          await api.files.write(project.id, file, setStepStatus(now.text, s.line, " ", s.title), now.hash);
+        } catch {
+          continue; // The plan changed meanwhile: the next look tries again.
+        }
       }
+      if (!closing) {
+        closing = { line: s.line, number: s.number, title: s.title, attempts: [], status: "waiting" };
+        const at = run.steps.findIndex((x) => x.line > s.line);
+        run.steps.splice(at < 0 ? run.steps.length : at, 0, closing);
+      }
+      closing.status = "waiting";
+      closing.retryFrom = closing.attempts.length;
+      closing.rerunAfter = [...due.late];
+      opened = true;
     }
-    closing.status = "waiting";
-    closing.retryFrom = closing.attempts.length;
-    closing.rerunAfter = [late];
-    this.changed++;
-    await this.#save(run);
+    if (opened) {
+      this.changed++;
+      await this.#save(run);
+    }
+    return opened;
   }
 
   #decide(run: PlanRun, d: Omit<DecisionRecord, "at">): void {

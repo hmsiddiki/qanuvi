@@ -21,12 +21,23 @@ export interface KeptAnswer {
   at: number;
 }
 
+/**
+ * A section's closing step ran while some of its steps were set aside: it runs once more after they are done, in
+ * this run or a later one. `late`: those done since, not yet seen by the closing step.
+ */
+export interface KeptClosing {
+  closing: string;
+  waiting: string[];
+  late: string[];
+}
+
 export interface PlanState {
   holds: KeptHold[];
   answers: KeptAnswer[];
+  closings: KeptClosing[];
 }
 
-export const emptyPlanState = (): PlanState => ({ holds: [], answers: [] });
+export const emptyPlanState = (): PlanState => ({ holds: [], answers: [], closings: [] });
 
 function planStateKey(projectId: string, file: string): string {
   return `qanuvi.planstate.${projectId}.${file}`;
@@ -38,6 +49,9 @@ export function loadPlanState(projectId: string, file: string): PlanState {
     return {
       holds: Array.isArray(v?.holds) ? v.holds.filter((h) => typeof h?.step === "string") : [],
       answers: Array.isArray(v?.answers) ? v.answers.filter((a) => typeof a?.step === "string") : [],
+      closings: Array.isArray(v?.closings)
+        ? v.closings.filter((c) => typeof c?.closing === "string" && Array.isArray(c.waiting) && Array.isArray(c.late))
+        : [],
     };
   } catch {
     return emptyPlanState();
@@ -47,7 +61,7 @@ export function loadPlanState(projectId: string, file: string): PlanState {
 export function savePlanState(projectId: string, file: string, state: PlanState): void {
   try {
     const key = planStateKey(projectId, file);
-    if (!state.holds.length && !state.answers.length) localStorage.removeItem(key);
+    if (!state.holds.length && !state.answers.length && !state.closings.length) localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(state));
   } catch {
     // A help only: without it a later run asks again.
@@ -68,8 +82,8 @@ export function keepHolds(state: PlanState, holds: Omit<KeptHold, "at">[], now =
   const fresh = holds.filter((h) => !answered.has(h.step));
   const steps = new Set(fresh.map((h) => h.step));
   return {
+    ...state,
     holds: [...state.holds.filter((h) => !steps.has(h.step)), ...fresh.map((h) => ({ ...h, at: now }))],
-    answers: state.answers,
   };
 }
 
@@ -82,15 +96,54 @@ export function keepAnswer(
   now = Date.now(),
 ): PlanState {
   return {
+    ...state,
     holds: state.holds.filter((h) => h.step !== step),
     answers: [...state.answers.filter((a) => a.step !== step), { step, choice, text, at: now }],
   };
 }
 
-/** Drops what belongs to steps no longer open (done, or gone from the plan). */
-export function pruneState(state: PlanState, open: Set<string>): PlanState {
+/**
+ * Drops what belongs to steps no longer open (done, or gone from the plan); a closing record stays while its closing
+ * step is in the plan and something is still waiting or done late.
+ */
+export function pruneState(state: PlanState, open: Set<string>, all: Set<string> = open): PlanState {
   return {
     holds: state.holds.filter((h) => open.has(h.step)),
     answers: state.answers.filter((a) => open.has(a.step)),
+    closings: state.closings
+      .filter((c) => all.has(c.closing))
+      // A waited-for step done meanwhile (by hand, or outside a run) counts as late; one gone from the plan drops.
+      .map((c) => ({
+        ...c,
+        waiting: c.waiting.filter((w) => open.has(w)),
+        late: [...c.late, ...c.waiting.filter((w) => all.has(w) && !open.has(w) && !c.late.includes(w))],
+      }))
+      .filter((c) => c.waiting.length || c.late.length),
   };
+}
+
+/** A closing step finished: what of its section is still set aside is what it waits for now; late ones are seen. */
+export function closingRan(state: PlanState, closing: string, waiting: string[]): PlanState {
+  const rest = state.closings.filter((c) => c.closing !== closing);
+  return { ...state, closings: waiting.length ? [...rest, { closing, waiting, late: [] }] : rest };
+}
+
+/** A step finished: closing steps that ran without it note it as late. */
+export function markLate(state: PlanState, step: string): PlanState {
+  return {
+    ...state,
+    closings: state.closings.map((c) =>
+      c.waiting.includes(step)
+        ? { ...c, waiting: c.waiting.filter((w) => w !== step), late: [...c.late.filter((l) => l !== step), step] }
+        : c,
+    ),
+  };
+}
+
+/**
+ * The closing steps to run again now: something came in late and nothing they wait for is still pending (once for
+ * the whole section, not once per late step). `ending`: the run is about to end, so pending steps no longer count.
+ */
+export function closingsDue(state: PlanState, pending: (step: string) => boolean, ending: boolean): KeptClosing[] {
+  return state.closings.filter((c) => c.late.length && (ending || !c.waiting.some(pending)));
 }

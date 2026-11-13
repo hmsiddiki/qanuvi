@@ -318,9 +318,8 @@ runs on or off; with it off nothing is sent anywhere.
     (runner `#reopenClosing`, StepRun `rerunAfter`, note `closingRerunNote`): 1z ran again after 1a and after 1b and
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
-  - 24u part 2 built and driven live 2026-11-14 (see Part 2 below). RESUME HERE (new conversation): ask the owner
-    about the part 2 finding (a closing step done in an earlier run is not run again when a later run finishes the
-    steps it had set aside), then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
+  - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
+    RESUME HERE (new conversation): part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
     notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
@@ -372,9 +371,18 @@ runs on or off; with it off nothing is sent anywhere.
       question open (held, "Qanuvi's default: a question was left open (...)"), Finish without them; run 2 without
       the check held 1a again at once with the same wording; answered "underscore", stopped before 1a worked; run 3
       ran 1a with underscore without asking, 1b after it, 2 of 2 done.
-    - Finding for the owner (not changed): 1z was done in run 1, so run 3 did not run it again after 1a/1b and the
-      README still lists only add. Proposal: keep "closing step ran while X was set aside" per plan, and a later run
-      that finishes X opens that closing step again (the same re-run as within one run).
+    - Finding: 1z was done in run 1, so run 3 did not run it again after 1a/1b (README listed only add). Fixed
+      (owner: "yes", 2026-11-14), also cheaper: the plan state keeps "closing step ran while X was set aside"
+      (closingRan / markLate / closingsDue); a closing step runs again ONCE per section, when nothing it waits for is
+      still pending in the run, or once when the run ends (Finish without them included); never while the run
+      waits for answers. A closing step done in an earlier run is added to the run that finishes its steps (runner
+      `#afterDone` / `#runClosings`, replacing `#reopenClosing`); a waited-for step done by hand counts as late. The
+      closing step's set-aside note now says mark it done for what it did, not blocked (live, a 1z marked itself
+      [!] over slugify without it). Verify green (319 + 156). Driven live on PLAN-C ($0.1 or so): run 1 held 1a, 1z
+      did the add line and was done, Finish without them; run 2 without the check held 1a ("Qanuvi's default"),
+      answer "dash", 1a, 1b, then 1z added back and run once (2 attempts in its log over both runs), README names
+      slugify, "3 of 3 done". Cost of the re-run: one short closing session (about 11k in, 49k cached, 5k out; $0.005
+      on Haiku); before the batching it ran once per late step.
   - Part 3, sorted asks: the check sorts each risk and question into (a) decides itself: a sensible default that
     can be changed later (a setting, not hard-coded), logged "Decided for you: X, because Y. Change?"; (b) goes ahead
     with extra checks: the paid decider reviews the diff and tests must pass before the step counts as done; (c)

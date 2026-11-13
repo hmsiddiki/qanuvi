@@ -118,6 +118,7 @@ export function setAsideBlock(aside: { label: string; why: string }[]): string {
     "",
     "",
     "Set aside in this run (they wait for the owner): " + aside.map((a) => `${a.label} (${a.why})`).join("; ") + ".",
-    "Do what you can without them, and write in your log what is still open because of them.",
+    "Do what you can without them, write in your log what is still open because of them, and mark this step done",
+    "([x]) for what you did: do not mark it blocked for them. Qanuvi runs this step again once they are done.",
   ].join("\n");
 }
