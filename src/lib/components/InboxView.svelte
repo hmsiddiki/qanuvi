@@ -2,13 +2,25 @@
   /** The Inbox (24f, 15f): sessions waiting for the user, plan run reports, sign-ins to renew, newer knowledge. */
   import { onMount } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
-  import { inbox, type InboxItem } from "$lib/stores/inbox.svelte";
+  import { inbox, isOpenQuestion, type InboxItem } from "$lib/stores/inbox.svelte";
+  import InboxQuestion from "./InboxQuestion.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { ui } from "$lib/stores/ui.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { ago } from "$lib/stores/git.svelte";
 
   let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting"));
+  let questions = $derived(inbox.items.filter(isOpenQuestion));
+  let happened = $derived(inbox.items.filter((i) => !isOpenQuestion(i)));
+
+  /** How an answered or closed question ended, in a few words. */
+  function outcome(item: InboxItem): string {
+    if (item.status === "closed") return "No longer asked.";
+    const label = item.form?.choices.find((c) => c.id === item.answer?.choice)?.label ?? item.answer?.choice ?? "";
+    const said = item.answer?.text?.trim();
+    const where = item.answeredBy && item.answeredBy !== "main" ? ` (in window ${item.answeredBy})` : "";
+    return `You answered: ${label}${said ? ` · "${said}"` : ""}${where}`;
+  }
 
   const KIND: Record<InboxItem["kind"], string> = {
     run: "Plan run",
@@ -42,10 +54,24 @@
 <div class="inbox">
   <header>
     <h2>Inbox</h2>
-    {#if inbox.items.length}
+    {#if happened.length}
       <button type="button" class="link" onclick={() => inbox.clear()}>Clear all</button>
     {/if}
   </header>
+
+  {#if questions.length}
+    <h3>Needs your answer</h3>
+    {#each questions as item (item.id)}
+      <div class="item unread">
+        <div class="line">
+          <span class="kind">{KIND[item.kind]}</span>
+          <strong class="title">{item.title}</strong>
+          <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
+        </div>
+        <InboxQuestion {item} onopen={open} />
+      </div>
+    {/each}
+  {/if}
 
   {#if waiting.length}
     <h3>Waiting for you</h3>
@@ -58,9 +84,9 @@
     {/each}
   {/if}
 
-  {#if inbox.items.length}
+  {#if happened.length}
     <h3>What happened</h3>
-    {#each inbox.items as item (item.id)}
+    {#each happened as item (item.id)}
       <div class="item" class:unread={!item.read}>
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
@@ -68,14 +94,18 @@
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
         {#if item.text}<p class="text">{item.text}</p>{/if}
+        {#if item.type === "answer"}<p class="text">{outcome(item)}</p>{/if}
         <div class="actions">
           {#if item.open}<button type="button" class="btn" onclick={() => open(item)}>{item.open.label}</button>{/if}
           <button type="button" class="link" onclick={() => inbox.remove(item.id)}>Remove</button>
         </div>
       </div>
     {/each}
-  {:else if !waiting.length}
-    <p class="muted">Nothing here. Plan run reports, sign-ins that need renewing and newer knowledge show up here.</p>
+  {:else if !waiting.length && !questions.length}
+    <p class="muted">
+      Nothing here. Questions a plan run waits on, run reports, sign-ins that need renewing and newer knowledge show up
+      here.
+    </p>
   {/if}
 </div>
 

@@ -15,6 +15,7 @@ pub mod claude_update;
 pub mod data_location;
 pub mod files;
 pub mod git;
+pub mod inbox;
 pub mod index;
 pub mod knowledge;
 pub mod llm;

@@ -144,6 +144,7 @@ interface Turn {
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
 import { inbox } from "./inbox.svelte";
+import { holdForm, holdKey, holdReply } from "$lib/plan/holdask";
 import { projects } from "./projects.svelte";
 import { memoryContext } from "./memory.svelte";
 
@@ -201,6 +202,8 @@ class RunnerStore {
       run.file,
       keepAnswer(loadPlanState(run.projectId, run.file), key, choice, text.trim()),
     );
+    // Its Inbox question closes everywhere (a no-op when the answer came from the Inbox).
+    inbox.answerKey(holdKey(run.projectId, run.file, key), { choice, text: text.trim() });
     if (choice === "skip") {
       step.status = "skipped";
       step.reason = "you chose to skip it";
@@ -221,6 +224,34 @@ class RunnerStore {
     this.changed++;
     this.#wake?.();
   }
+
+  /** A held step becomes a question in the Inbox with its answer form (24u part 4), seen in every window. */
+  #ask(project: Project, run: PlanRun, stepRun: StepRun, kind: HeldKind, why: string): void {
+    const key = this.#key(stepRun);
+    const name = run.file.split("/").pop() ?? run.file;
+    const what = kind === "hold" ? "needs your answer" : kind === "blocked" ? "is blocked" : "did not finish";
+    inbox.add({
+      type: "answer",
+      kind: "run",
+      title: `${project.name}: ${name} step ${stepRun.number ? `${stepRun.number}. ` : ""}${stepRun.title} ${what}`,
+      text: why,
+      key: holdKey(run.projectId, run.file, key),
+      form: holdForm(kind, why),
+      source: { kind: "hold", projectId: run.projectId, file: run.file, runId: run.id, step: key, held: kind },
+      open: { label: "Open the plan", view: "plan", projectId: run.projectId },
+    });
+  }
+
+  /** An Inbox answer from any window reaches the run it belongs to while it runs here. */
+  #fromInbox = inbox.onAnswer((item) => {
+    const s = item.source;
+    const run = this.run;
+    if (s?.kind !== "hold" || !item.answer || !run || !this.running || run.id !== s.runId) return;
+    const step = run.steps.find((x) => this.#key(x) === s.step && x.status === "held");
+    if (!step) return;
+    const { choice, text } = holdReply(item.answer);
+    this.answer(step, choice, text);
+  });
 
   /** Ends a run that waits for answers: what is set aside stays open, the summary lists it. */
   finishWithout(): void {
@@ -778,6 +809,11 @@ class RunnerStore {
       const open = new Set(planned.filter((s) => s.status !== "x").map((s) => s.number ?? s.title));
       const kept = pruneState(loadPlanState(project.id, file), open, new Set(planned.map((s) => s.number ?? s.title)));
       savePlanState(project.id, file, kept);
+      // Questions of this plan whose hold is gone (the step got done, or it is tried again now) close everywhere.
+      const stillHeld = new Set(kept.holds.map((h) => h.step));
+      for (const q of inbox.questions)
+        if (q.source?.kind === "hold" && q.source.projectId === project.id && q.source.file === file)
+          if (!stillHeld.has(q.source.step)) inbox.close(q.id);
       for (const h of kept.holds)
         if (!waitList.some((w) => w.step === h.step)) waitList.push({ step: h.step, why: holdWording(h) });
       for (const c of kept.checks) if (!extraChecks.has(c.step)) extraChecks.set(c.step, c.why);
@@ -940,7 +976,6 @@ class RunnerStore {
     }
     // Held and failed steps are set aside, not the end of the run (24u): the run goes on with the rest, then waits for
     // the owner's answers and goes back to the steps they release.
-    let waitedOnce = false;
     // End the run here was chosen: what is left to do before the run ends is the closing steps' catch-up.
     let ending = false;
     for (;;) {
@@ -1433,19 +1468,7 @@ class RunnerStore {
       // Only set-aside steps are left: wait for the owner, spending nothing, and go on by itself once answered.
       this.waitingAnswers = asks;
       run.message = waitingLine(asks);
-      if (!waitedOnce) {
-        waitedOnce = true;
-        const name = file.split("/").pop() ?? file;
-        inbox.add({
-          kind: "run",
-          title: `${project.name}: ${name} waits for you · ${asks} answer${asks === 1 ? "" : "s"}`,
-          text: run.steps
-            .filter((x) => x.status === "held")
-            .map((x) => `Step ${this.#key(x)}: ${x.held?.why ?? "it needs you"}`)
-            .join("\n"),
-          open: { label: "Open the plan", view: "plan", projectId: project.id },
-        });
-      }
+      // Each held step is already a question in the Inbox (asked when it was set aside), answerable from any window.
       this.changed++;
       await this.#save(run);
       if (!this.#answered && !this.#finishWithout && !this.#stopRequested && !this.pausing)
@@ -1814,6 +1837,7 @@ class RunnerStore {
     stepRun.held = { kind, why };
     stepRun.answer = undefined;
     const key = this.#key(stepRun);
+    this.#ask(project, run, stepRun, kind, why);
     const now = await api.files.read(project.id, file).catch(() => null);
     const planSteps = now ? parsePlan(now.text).steps : steps;
     const info = (s: StepRun) => {

@@ -1,7 +1,8 @@
 //! The desktop app (Tauri): the commands its window calls, registered in [`run`]. The core modules are in lib.rs.
 
 use crate::{
-    agent, agent_config, checks, files, git, index, paths, preview, projects, runs, store, terminal,
+    agent, agent_config, checks, files, git, inbox, index, paths, preview, projects, runs, store,
+    terminal,
 };
 
 use serde::Serialize;
@@ -1618,6 +1619,110 @@ fn runs_save(
     runs::save(&state.db, &project_id, &id, &file, &status, &data)
 }
 
+// The Inbox (24u part 4): every change is told to every window ("qanuvi-inbox"), so they all show the same list.
+fn inbox_changed(app: &tauri::AppHandle, change: &str, item: Option<&inbox::InboxItem>) {
+    let _ = tauri::Emitter::emit(
+        app,
+        "qanuvi-inbox",
+        serde_json::json!({"change": change, "item": item}),
+    );
+}
+
+#[tauri::command]
+fn inbox_list(state: State<AppState>) -> Res<Vec<inbox::InboxItem>> {
+    inbox::list(&state.db)
+}
+
+#[tauri::command]
+fn inbox_add(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    item: inbox::NewItem,
+) -> Res<inbox::InboxItem> {
+    let added = inbox::add(&state.db, &item)?;
+    inbox_changed(&app, "add", Some(&added));
+    Ok(added)
+}
+
+#[tauri::command]
+fn inbox_answer(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    state: State<AppState>,
+    id: Option<String>,
+    key: Option<String>,
+    answer: serde_json::Value,
+) -> Res<Option<inbox::InboxItem>> {
+    let by = window.label().to_string();
+    let done = match (id, key) {
+        (Some(id), _) => inbox::answer(&state.db, &id, &answer, &by)?,
+        (None, Some(key)) => inbox::answer_key(&state.db, &key, &answer, &by)?,
+        _ => return Err("Which question?".into()),
+    };
+    if let Some(item) = &done {
+        inbox_changed(&app, "answer", Some(item));
+    }
+    Ok(done)
+}
+
+#[tauri::command]
+fn inbox_close(app: tauri::AppHandle, state: State<AppState>, id: String) -> Res<bool> {
+    let closed = inbox::close(&state.db, &id)?;
+    if closed {
+        inbox_changed(&app, "close", inbox::get(&state.db, &id)?.as_ref());
+    }
+    Ok(closed)
+}
+
+#[tauri::command]
+fn inbox_resolve(app: tauri::AppHandle, state: State<AppState>, key: String) -> Res<bool> {
+    let gone = inbox::resolve(&state.db, &key)?;
+    if gone {
+        inbox_changed(&app, "remove", None);
+    }
+    Ok(gone)
+}
+
+#[tauri::command]
+fn inbox_mark_read(app: tauri::AppHandle, state: State<AppState>, id: Option<String>) -> Res<bool> {
+    let changed = inbox::mark_read(&state.db, id.as_deref())?;
+    if changed {
+        inbox_changed(&app, "read", None);
+    }
+    Ok(changed)
+}
+
+#[tauri::command]
+fn inbox_remove(app: tauri::AppHandle, state: State<AppState>, id: String) -> Res<bool> {
+    let gone = inbox::remove(&state.db, &id)?;
+    if gone {
+        inbox_changed(&app, "remove", None);
+    }
+    Ok(gone)
+}
+
+#[tauri::command]
+fn inbox_clear(app: tauri::AppHandle, state: State<AppState>) -> Res<bool> {
+    let gone = inbox::clear(&state.db)?;
+    if gone {
+        inbox_changed(&app, "remove", None);
+    }
+    Ok(gone)
+}
+
+#[tauri::command]
+fn inbox_import(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    items: Vec<inbox::OldItem>,
+) -> Res<usize> {
+    let n = inbox::import(&state.db, &items)?;
+    if n > 0 {
+        inbox_changed(&app, "add", None);
+    }
+    Ok(n)
+}
+
 #[tauri::command]
 fn runs_list_all(state: State<AppState>, limit: usize) -> Res<Vec<runs::RunRecord>> {
     runs::list_all(&state.db, limit)
@@ -1965,6 +2070,15 @@ pub fn run() {
             runs_save,
             runs_list,
             runs_list_all,
+            inbox_list,
+            inbox_add,
+            inbox_answer,
+            inbox_close,
+            inbox_resolve,
+            inbox_mark_read,
+            inbox_remove,
+            inbox_clear,
+            inbox_import,
             agent_usage_since,
             agent_config_list,
             agent_config_read,

@@ -75,6 +75,7 @@
         .catch(() => {});
     knowledge.check().catch(() => {});
     startWatch();
+    inbox.start().catch(() => {});
     updates.start();
     startup.start().catch(() => {});
     claudeUpdate.start();

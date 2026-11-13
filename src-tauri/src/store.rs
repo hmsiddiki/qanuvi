@@ -171,6 +171,33 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         }
         conn.execute_batch("PRAGMA user_version = 7; COMMIT;")?;
     }
+    if version < 8 {
+        // The Inbox (24u part 4): one list for every window, the runner and later the phone; questions carry their form.
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE inbox (
+                 id TEXT PRIMARY KEY,
+                 at INTEGER NOT NULL,
+                 type TEXT NOT NULL,
+                 kind TEXT NOT NULL,
+                 title TEXT NOT NULL,
+                 text TEXT NOT NULL DEFAULT '',
+                 read INTEGER NOT NULL DEFAULT 0,
+                 key TEXT,
+                 open TEXT,
+                 form TEXT,
+                 source TEXT,
+                 status TEXT NOT NULL DEFAULT 'open',
+                 answer TEXT,
+                 answered_by TEXT,
+                 answered_at INTEGER
+             );
+             CREATE INDEX inbox_by_key ON inbox(key);
+             CREATE INDEX inbox_by_at ON inbox(at);
+             PRAGMA user_version = 8;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -193,7 +220,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 7);
+        assert_eq!(version, 8);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(
