@@ -295,9 +295,38 @@
     ),
   );
 
+  /**
+   * The chat follows new activity only while the reader is at the bottom; scrolled up to read, the place is kept while
+   * the agent goes on, and "New activity" brings them back down. Another chat, or a message sent, goes to the bottom.
+   */
+  let follow = $state(true);
+  let newBelow = $state(false);
+  let shownChat: string | null | undefined = undefined;
+  function onScroll() {
+    if (!scroller) return;
+    const atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48;
+    follow = atBottom;
+    if (atBottom) newBelow = false;
+  }
+  function toBottom() {
+    follow = true;
+    newBelow = false;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  }
   $effect(() => {
     void agent.items.length;
-    tick().then(() => scroller && (scroller.scrollTop = scroller.scrollHeight));
+    // Text streaming into the last message grows it without a new item.
+    void (agent.items[agent.items.length - 1] as { text?: string } | undefined)?.text?.length;
+    if (agent.selectedId !== shownChat) {
+      shownChat = agent.selectedId;
+      follow = true;
+      newBelow = false;
+    }
+    tick().then(() => {
+      if (!scroller) return;
+      if (follow) scroller.scrollTop = scroller.scrollHeight;
+      else newBelow = true;
+    });
   });
 
   async function send(event?: SubmitEvent) {
@@ -306,6 +335,7 @@
     if (!project || !agent.draft.trim()) return;
     const text = agent.draft;
     agent.draft = "";
+    toBottom();
     // The step a plan run is working on now: the user is watching and guides it.
     const step =
       runner.sessionId && runner.sessionId === session?.id
@@ -783,7 +813,7 @@
       >
     </div>
   {/if}
-  <div class="conversation" bind:this={scroller}>
+  <div class="conversation" bind:this={scroller} onscroll={onScroll}>
     {#if !project}
       <div class="empty">
         <div class="badge" aria-hidden="true"><Bot size={18} /></div>
@@ -822,6 +852,9 @@
     {/if}
     {#each agent.errors.slice(-3) as e, i (i)}<div class="notice error">{e}</div>{/each}
     {#if agent.error}<div class="notice error">{agent.error}</div>{/if}
+    {#if newBelow && !follow}
+      <button type="button" class="new-below" onclick={toBottom} title="Go down to the latest">↓ New activity</button>
+    {/if}
   </div>
 
   {#if session && agent.grants.length}
@@ -1424,6 +1457,20 @@ With the agent now: a message it has cannot be taken back.`}
     z-index: 2;
   }
 
+  .new-below {
+    position: sticky;
+    bottom: 0;
+    align-self: center;
+    margin-top: auto;
+    padding: var(--qx-space-1) var(--qx-space-3);
+    border-radius: 999px;
+    border: 1px solid var(--qx-border);
+    background: var(--qx-bg-panel);
+    color: var(--qx-text);
+    font-size: var(--qx-text-small);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  }
   .conversation {
     border-radius: var(--qx-radius-panel) var(--qx-radius-panel) 0 0;
     flex: 1;

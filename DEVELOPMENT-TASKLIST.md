@@ -448,6 +448,11 @@ runs on or off; with it off nothing is sent anywhere.
     done."; the review is offered only once nothing is held. Driven live (PLAN-H, Haiku, under $0.02): 1a blocked,
     End the run here gave needs-you with no review offer; in 1a's chat the value finished 1a and the agent asked to
     resume; "yes" ran 1b, "1 of 1 done", review offered; the run kept its first decision (the earlier fix).
+  - Owner (2026-11-14): scrolling up to read while the agent works was pulled back down by every new message. Now
+    the chat follows new activity only while at the bottom; scrolled up, the place is kept and a "↓ New activity"
+    pill at the bottom edge goes back down (another chat or a sent message goes to the bottom too). AgentPane
+    `follow`/`newBelow`. Driven live: a reply arrived while scrolled up, the place held, the pill showed and
+    took the view to the end.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
