@@ -312,7 +312,13 @@ runs on or off; with it off nothing is sent anywhere.
     open on the run's FIRST step does not hold it (runner `!firstStep` rule), so 1a ran and blocked itself ($0.004)
     instead of waiting unrun; (b) the z step ran before the released steps and is not run again after them, so the
     README missed slugify (the 1b agent noted it as still open).
-  - RESUME HERE (new conversation, after 2026-11-13): ask the owner about findings (a) and (b) above, then 24u part 2
+  - Both fixed (owner: "yes", 2026-11-13), verify green (313 + 156), driven live on the same scratch plan ($0.12):
+    (a) a hold from the check applies to the run's first step too (the `firstStep` exemption is gone): 1a waited
+    unrun with Go ahead; (b) a step that finishes after its section's closing step ran opens that closing step again
+    (runner `#reopenClosing`, StepRun `rerunAfter`, note `closingRerunNote`): 1z ran again after 1a and after 1b and
+    the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
+    wondered who changed its [x]); that wording change is not driven live.
+  - RESUME HERE (new conversation, after 2026-11-13): 24u part 2
     (holds and answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
     notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were

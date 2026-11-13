@@ -98,6 +98,19 @@ export function waitingLine(answers: number): string {
   return `Waiting for you (${answers} answer${answers === 1 ? "" : "s"}). Nothing is spent meanwhile; the run goes on by itself once you answer.`;
 }
 
+/** What a closing step that runs again is told: these steps were set aside when it ran and are done now. */
+export function closingRerunNote(late: string[]): string {
+  return [
+    "",
+    "",
+    `You already ran once in this run while ${late.length === 1 ? "step" : "steps"} ${late.join(", ")} ` +
+      `${late.length === 1 ? "was" : "were"} set aside; ${late.length === 1 ? "it is" : "they are"} done now.`,
+    "Qanuvi opened this step again in the plan on purpose (it shows [ ] instead of [x]); mark it done again when",
+    "finished. Bring your step's work up to date with them (and take them off your log's still-open list); do not",
+    "redo the rest.",
+  ].join("\n");
+}
+
 /** What a section's closing step is told about the steps set aside in this run. */
 export function setAsideBlock(aside: { label: string; why: string }[]): string {
   if (!aside.length) return "";

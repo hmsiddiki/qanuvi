@@ -119,6 +119,8 @@ export interface StepRun {
   answer?: string;
   /** Tries before this index were before the owner's answer: the model ladder starts again after it. */
   retryFrom?: number;
+  /** A closing step opened again: the set-aside steps that finished after it first ran (24u). */
+  rerunAfter?: string[];
   /** Kind of work, for learned routing (Milestone 13). */
   jobType?: import("./routing").JobType;
   /** Why the step started on its model. */

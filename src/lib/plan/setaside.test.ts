@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  closingRerunNote,
   dependencePrompt,
   isClosingStep,
   mentionedFiles,
@@ -57,5 +58,10 @@ describe("set aside (24u part 1)", () => {
     expect(waitingLine(3)).toMatch(/3 answers/);
     expect(setAsideBlock([])).toBe("");
     expect(setAsideBlock([{ label: "95b", why: "waits for you" }])).toContain("95b (waits for you)");
+  });
+
+  it("tells a closing step that runs again which steps came in late", () => {
+    expect(closingRerunNote(["1a"])).toContain("step 1a was set aside; it is done now");
+    expect(closingRerunNote(["1a", "1b"])).toContain("steps 1a, 1b were set aside; they are done now");
   });
 });
