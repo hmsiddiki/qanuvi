@@ -319,12 +319,13 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation): 24u part 3 and 24x are built and driven live (2026-11-14, see them below); the
-    Team label fix was seen live too. Next: 24u part 4 (central Inbox). Nothing published since 0.1.18. The fix: with no free models set
-    up, the Run panel's Team option reads "As in Settings: Paid decides, free works (no free models yet: paid only)"
-    and the run logs one decision "No free models set up: every step on <agent>" (found because the test build's
-    data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
-    Then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Test plans: the
+    RESUME HERE (new conversation, checkpoint 2026-11-14 late): PUBLISHED 0.1.19 (24u parts 1-3, 24x stopped-step
+    chat is a chat and resumes only on yes/continue, End the run here = needs-you, chat keeps its place when
+    scrolled up, first-decision-lost fix, Team label). Unpublished since 0.1.19: 779bf51 (plan logins reach
+    handed-over step chats; stored requests mask private details; migration 7 masks old copies; a login typed during
+    a step stored as a placeholder; handover part not driven live) and the 24z design notes. NEXT: 24u part 4
+    (central Inbox in the database with answer forms, Windows notifications), see 24u below; design it to be the
+    answer channel of the later headless queue (24z step A). Publishing needs the owner's yes. Test plans: the
     scratch project's plan state is kept per plan file (localStorage), so use a fresh plan file name per test. Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
