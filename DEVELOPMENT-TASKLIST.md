@@ -319,8 +319,12 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation): part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
-    notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
+    RESUME HERE (new conversation): first the small Team fix the owner agreed (2026-11-14): with no free models set
+    up, the Run panel's Team option reads "As in Settings: Paid decides, free works (no free models yet: paid only)"
+    and the run logs one decision "No free models set up: every step on <agent>" (found because the test build's
+    data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
+    Then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Test plans: the
+    scratch project's plan state is kept per plan file (localStorage), so use a fresh plan file name per test. Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
