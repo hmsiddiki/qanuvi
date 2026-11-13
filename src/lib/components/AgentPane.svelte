@@ -72,7 +72,15 @@
   }
   import ModePicker from "./ModePicker.svelte";
   import { ask } from "$lib/stores/confirm.svelte";
-  import { guidanceNote, isStopOrder, looksSecret } from "$lib/plan/guidance";
+  import {
+    askedToResume,
+    guidanceNote,
+    isGoOnOrder,
+    isStopOrder,
+    isYes,
+    looksSecret,
+    stoppedChatNote,
+  } from "$lib/plan/guidance";
   import { isLimit } from "$lib/plan/limits";
   import { runner } from "$lib/stores/runner.svelte";
   import CommandMenu from "./CommandMenu.svelte";
@@ -303,14 +311,27 @@
       runner.sessionId && runner.sessionId === session?.id
         ? runner.run?.steps.find((s) => s.status === "running")
         : null;
-    // A step the last run stopped at: writing in its session resumes the run from it (not a plain chat message).
-    if (!step && session && !running && /^Step [^:\s]+:/.test(session.title) && !isStopOrder(text)) {
-      if (looksSecret(text) && runner.run) await runner.addPrivate(project.id, runner.run.file, text);
-      else runner.addNote(text);
-      if (await runner.resumeFrom(project, session.id, text)) {
-        agent.notice("The plan run goes on from this step, in this session, with your message first.");
+    // A step the last run stopped at: writing in its session is a chat with the agent (questions, decisions, fixes);
+    // the run goes on only on the owner's word: "continue" and the like, or a yes to the agent's resume question.
+    const stopped = !step && session && !running ? runner.stoppedAt(project.id, session.id) : null;
+    if (stopped && session) {
+      if (looksSecret(text)) {
+        await runner.addPrivate(project.id, stopped.file, text);
+        agent.notice(
+          'Kept as a private detail for this plan (Windows\' credential store, not sent to the chat): every later step gets it. Say "continue" when the run should go on.',
+        );
         return;
       }
+      const lastReply = [...agent.items].reverse().find((i): i is Extract<Item, { kind: "text" }> => i.kind === "text");
+      const goOn =
+        !agent.attachments.length &&
+        (isGoOnOrder(text) || (isYes(text) && !!lastReply && askedToResume(lastReply.text)));
+      if (goOn && (await runner.resumeFrom(project, session.id, text.trim()))) {
+        agent.notice(`The plan run goes on from step ${stopped.number}, in this session.`);
+        return;
+      }
+      if (!(await agent.send(project.id, text, stoppedChatNote(stopped.number, stopped.file)))) agent.draft = text;
+      return;
     }
     if (step && isStopOrder(text)) {
       runner.stop();

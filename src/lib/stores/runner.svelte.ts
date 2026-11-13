@@ -449,9 +449,22 @@ class RunnerStore {
   #resumeText = "";
 
   /**
-   * The owner wrote in the session of a step the last run stopped at (blocked, failed or stopped): the run goes on from
-   * that step, in the same session, with the owner's words first, then carries on with the next steps as it was set.
-   * Answers false when there is no such run, and the message goes to the chat as usual.
+   * The step of the last run whose session this is, when that run stopped short (blocked, failed, stopped, waiting
+   * for the owner): writing there is a chat with the owner, and the run goes on only when they say so (24x).
+   */
+  stoppedAt(projectId: string, sessionId: string): { number: string; file: string } | null {
+    const last = this.run;
+    if (!last || this.running || last.projectId !== projectId || last.status === "done") return null;
+    const number = agent.sessions.find((x) => x.id === sessionId)?.title.match(/^Step ([^:\s]+):/)?.[1];
+    if (!number || !last.steps.some((s) => s.number === number)) return null;
+    return { number, file: last.file };
+  }
+
+  /**
+   * The owner said to go on (a yes to the agent's question, or "continue") in the session of a step the last run
+   * stopped at: the run goes on from that step, in the same session (which has the chat), then carries on with the
+   * next steps as it was set. A step finished in the chat counts as done and the run starts at the next one. Answers
+   * false when there is no such run.
    */
   async resumeFrom(project: Project, sessionId: string, text: string): Promise<boolean> {
     const last = this.run;
@@ -461,7 +474,7 @@ class RunnerStore {
     if (!number) return false;
     const now = await api.files.read(project.id, last.file).catch(() => null);
     const step = now ? parsePlan(now.text).steps.find((x) => x.number === number) : undefined;
-    if (!step || step.status === "x") return false;
+    if (!step) return false;
     this.#carry = {
       sessionId,
       model: session?.model ?? "",
@@ -1114,6 +1127,10 @@ class RunnerStore {
           // The plan's shared knowledge first (the same for steps in a row, so it is read from the cache), then the step.
           const read = async (p: string) => (await api.files.read(project.id, p).catch(() => null))?.text ?? "";
           let prompt =
+            // The owner's go-ahead from the chat comes first, so it is the first thing read.
+            (resumedWith && !handedOver
+              ? `The owner said in this session's chat: "${resumedWith}". Go on as agreed in the chat above (do first what was decided there), then finish the step.\n\n`
+              : "") +
             knowledgeBlock(
               file,
               await read(mapPath(file)),
@@ -1125,11 +1142,7 @@ class RunnerStore {
             ) +
             referencedBlock(planRefs) +
             "\n" +
-            (handedOver
-              ? `${resumedWith}\n\n`
-              : resumedWith
-                ? `The owner continued this step in the chat and wrote: "${resumedWith}". Take it into account first.\n\n`
-                : "") +
+            (handedOver ? `${resumedWith}\n\n` : "") +
             stepPrompt(file, fresh, done) +
             answerNote +
             asideNote +

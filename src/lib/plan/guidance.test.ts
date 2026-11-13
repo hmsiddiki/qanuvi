@@ -206,3 +206,41 @@ describe("plans that build on other plans", () => {
     expect(referencedBlock([])).toBe("");
   });
 });
+
+import { askedToResume, isGoOnOrder, isYes, stoppedChatNote, RESUME_ASK } from "./guidance";
+
+describe("chat in a step the run stopped at", () => {
+  it("is a chat: the note is hidden from the shown message and asks before the run goes on", () => {
+    const note = stoppedChatNote("53z", "PLAN-E.md");
+    expect(withoutGuidance("what is your best recommendation?" + note)).toBe("what is your best recommendation?");
+    expect(note).toContain(`${RESUME_ASK} 53z? (yes/no)`);
+    expect(note).toContain("Answer what they ask first");
+  });
+
+  it("goes on only on a plain order, never on a question or a longer message", () => {
+    for (const t of [
+      "continue",
+      "Resume.",
+      "go on",
+      "retry the step",
+      "continue the run",
+      "run it again",
+      "resume the plan run",
+    ])
+      expect(isGoOnOrder(t)).toBe(true);
+    for (const t of [
+      "continue?",
+      "should we continue the run",
+      "what is your best recommendation",
+      "continue with option 1 but",
+    ])
+      expect(isGoOnOrder(t)).toBe(false);
+  });
+
+  it("a yes counts only after the agent asked to resume", () => {
+    for (const t of ["yes", "Yes!", "ok", "go ahead", "yes, resume"]) expect(isYes(t)).toBe(true);
+    for (const t of ["yes but first explain", "no", "1"]) expect(isYes(t)).toBe(false);
+    expect(askedToResume(`Done.\n${RESUME_ASK} 53z? (yes/no)`)).toBe(true);
+    expect(askedToResume("Should I use option 1? (yes/no)")).toBe(false);
+  });
+});

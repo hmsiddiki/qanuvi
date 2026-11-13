@@ -22,8 +22,48 @@ export function guidanceNote(step: string, file: string): string {
 }
 
 export function withoutGuidance(text: string): string {
-  const i = text.indexOf(GUIDE_MARK);
-  return i >= 0 ? text.slice(0, i) : text;
+  const i = [text.indexOf(GUIDE_MARK), text.indexOf(STOPPED_MARK)].filter((x) => x >= 0);
+  return i.length ? text.slice(0, Math.min(...i)) : text;
+}
+
+/** Where the note starts in a message written in the chat of a step the run stopped at (shown: the words only). */
+export const STOPPED_MARK = "\n\n(Qanuvi: the plan run is stopped at step ";
+
+/** The question the agent ends with when the run could go on; the owner's yes to it resumes the run. */
+export const RESUME_ASK = "Should I resume the plan run from step";
+
+/**
+ * Writing in the chat of a step the run stopped at (blocked, failed or stopped) is a chat, not the run: the agent
+ * answers and does what the owner asks in this session, and asks before the run goes on. Only the owner's yes, or a
+ * plain order such as "continue", resumes the run.
+ */
+export function stoppedChatNote(step: string, file: string): string {
+  return (
+    `${STOPPED_MARK}${step} of ${file}; this is a chat with the owner, not the run. Answer what they ask first, ` +
+    "clearly. When they ask you to do something, do it here (with the usual approvals) and keep the plan file true: " +
+    "the step's mark says what is really so. Do not go on with other steps. When the owner wants the run to go on, or " +
+    "what blocked the step is settled, end your reply with this question on its own line: " +
+    `"${RESUME_ASK} ${step}? (yes/no)". Qanuvi resumes the run only when the owner answers yes or says to continue.)`
+  );
+}
+
+/** A plain order to go on with the run ("continue", "resume the run", "retry the step"). */
+export function isGoOnOrder(text: string): boolean {
+  return /^\s*(continue|resume|go on|carry on|proceed|retry|run it|run it again|run again|retry (it|the step|this step)|(continue|resume|run) the (run|plan|plan run|step)( again)?)[\s.!]*$/i.test(
+    text,
+  );
+}
+
+/** A plain yes ("yes", "ok", "go ahead"). */
+export function isYes(text: string): boolean {
+  return /^\s*(y|yes|yeah|yep|yup|ok|okay|sure|go|go ahead|do it|please do|yes please|yes,? (resume|continue|go on)( it)?)[\s.!]*$/i.test(
+    text,
+  );
+}
+
+/** Whether the agent's reply asked to resume the run (so a yes to it resumes). */
+export function askedToResume(reply: string): boolean {
+  return /resume the (plan )?run/i.test(reply) && reply.includes("?");
 }
 
 /** A plain order to stop the run ("stop", "stop the run", "halt now"): Qanuvi stops it at once. */

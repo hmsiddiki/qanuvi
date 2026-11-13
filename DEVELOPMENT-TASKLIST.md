@@ -417,6 +417,21 @@ runs on or off; with it off nothing is sent anywhere.
     hours. Clicking a Windows notification brings Qanuvi forward and opens the same answer window used in the
     Inbox. Secrets are answered in the main app only. The phone is a delivery target in the design and settings;
     the phone app itself (through the Milestone 20 relay) is its own later step.
+- [ ] **24x. Writing in a stopped step's chat is a chat, not a restart (owner, 2026-11-14; agreed 2026-11-14)**: before,
+  any message in the session of a step the last run stopped at restarted the run, with the owner's words buried about
+  17,000 characters into the step request (no bubble of their own; images dropped and left in the box; every message
+  also became a plan note). Owner: the run goes on only when they say so; no buttons in the chat, the agent simply asks
+  "should I resume, yes or no?". Plan runs must stay smart on their own for people who are away (hold only what needs
+  them, do the rest), and step-by-step watching with messages while it works stays as built.
+  - Built 2026-11-14 (verify green 331 + 156): runner `stoppedAt` (a step of the last run, the run not done and not
+    running); the message goes to the chat as usual (bubble, images, box cleared) with a hidden note (guidance
+    `stoppedChatNote`, STOPPED_MARK): answer first, do what is asked here, keep the plan's mark true, no other steps,
+    and end with "Should I resume the plan run from step X? (yes/no)" when the run could go on. The run resumes (same
+    session, so the chat is its context) only on a plain order (`isGoOnOrder`: continue, resume, go on, retry the
+    step...) or a plain yes (`isYes`) right after that question (`askedToResume`); a message with images is always
+    chat. A step finished in the chat counts as done and the run starts at the next one. The resumed step's request
+    now starts with the owner's words. A password-like message is kept as a plan private detail and not sent to the
+    chat. Not driven live.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
