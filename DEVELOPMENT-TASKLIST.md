@@ -463,6 +463,32 @@ runs on or off; with it off nothing is sent anywhere.
     the database (driven on the test build with a fake value: masked); a login typed during a running step is kept
     for the plan and the chat stores a placeholder, the agent gets it in the private block. Not covered: Claude
     Code's own transcript files keep what was sent (outside Qanuvi). Published in: not yet (0.1.19 is before it).
+- [ ] **24z. The assistant core: headless brain, window optional (owner, 2026-11-14; DESIGN RULES, not a build step
+  yet)**: Qanuvi grows into an assistant ("hey Qanuvi, read the finished summary and configure that", "make a new
+  plan from these clauses for this plugin or folder", queued tasks and several plans in a row). As it grows, most
+  memory goes to the brain (speech to text, voice, local models, indexes), not the window; the window (WebView2 on
+  Windows, WebKit on macOS and Linux, about 300 to 470 MB) stays a roughly fixed cost. Owner: focus on the main app;
+  a native UI is a much later subject, only if ever needed.
+  - Rule 1: new assistant abilities (voice: wake word, listening, speaking; the brain and its own agent; language
+    understanding of requests) are built in the Rust core, never inside the window, so they work with the window
+    closed.
+  - Rule 2: the window is one handler among others (like the phone and the laptop through the relay). Everything the
+    assistant does must also work headless.
+  - Gap today: the plan runner (stores/runner.svelte.ts: step order, holds, set-aside, reviews, closing steps,
+    handovers) lives in the window; closing the window ends a run. The headless master (Milestone 16) runs agents
+    and terminals without a window, not plans. One run at a time; no queue of plans or tasks.
+  - Later step A, headless runner and queue: move the runner's decisions into the core (Rust, or the pure plan/*.ts
+    functions run by the core) so runs go on with the window closed and on a master over SSH; a queue of tasks and
+    whole plans that run one after another (or side by side where they touch different projects), each with its
+    holds and answers kept per plan, with the paid agent on top as monitor (24e); the window, the phone and
+    notifications show and answer the same queue (24u part 4 Inbox is its answer channel).
+  - Later step B, tray mode: closing the window keeps Qanuvi in the system tray (runs, queue, voice, notifications
+    go on) and unloads the web engine completely (all of its memory back while gaming); opening it shows everything
+    again. A tiny native overlay ("listening...", a question) only if voice needs one, not a UI rewrite.
+  - Later step C, cheap window trims when convenient: draw only the visible messages of long chats (the biggest
+    cut), drop cached memory while minimized, load heavy views (Git, diffs, Preview) only when opened. Measure the
+    web engine's parts first.
+  - Much later, only if ever needed: a native UI (GPUI or Slint), starting with a measured prototype of the chat.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
