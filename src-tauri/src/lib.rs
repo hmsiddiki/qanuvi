@@ -27,6 +27,7 @@ pub mod master;
 pub mod mcp;
 pub mod memory;
 pub mod memory_disk;
+pub mod notify;
 pub mod omniroute;
 pub mod paths;
 pub mod preview;
@@ -46,6 +47,8 @@ pub mod usage;
 mod account;
 #[cfg(feature = "desktop")]
 mod desktop;
+#[cfg(feature = "desktop")]
+mod desktop_notify;
 #[cfg(feature = "desktop")]
 mod remote;
 #[cfg(feature = "desktop")]

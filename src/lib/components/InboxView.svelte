@@ -44,6 +44,20 @@
     agent.select(id);
   }
 
+  // A clicked desktop notification opened the Inbox at its item: brought into view and marked for a moment.
+  let root: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    const id = ui.inboxFocus;
+    if (!id || !root) return;
+    void inbox.items.length;
+    const el = root.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+    const t = setTimeout(() => {
+      if (ui.inboxFocus === id) ui.inboxFocus = null;
+    }, 4000);
+    return () => clearTimeout(t);
+  });
+
   // What is on screen counts as seen once the user has looked for a moment.
   onMount(() => {
     const t = setTimeout(() => inbox.markRead(), 4000);
@@ -51,7 +65,7 @@
   });
 </script>
 
-<div class="inbox">
+<div class="inbox" bind:this={root}>
   <header>
     <h2>Inbox</h2>
     {#if happened.length}
@@ -62,7 +76,7 @@
   {#if questions.length}
     <h3>Needs your answer</h3>
     {#each questions as item (item.id)}
-      <div class="item unread">
+      <div class="item unread" data-id={item.id} class:focus={ui.inboxFocus === item.id}>
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
           <strong class="title">{item.title}</strong>
@@ -87,7 +101,7 @@
   {#if happened.length}
     <h3>What happened</h3>
     {#each happened as item (item.id)}
-      <div class="item" class:unread={!item.read}>
+      <div class="item" class:unread={!item.read} data-id={item.id} class:focus={ui.inboxFocus === item.id}>
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
           <strong class="title">{item.title}</strong>
@@ -156,6 +170,11 @@
 
   .item.unread {
     border-color: var(--qx-accent);
+  }
+
+  .item.focus {
+    border-color: var(--qx-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--qx-accent) 45%, transparent);
   }
 
   .line {

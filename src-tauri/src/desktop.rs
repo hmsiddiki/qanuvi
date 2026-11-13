@@ -1628,6 +1628,30 @@ fn inbox_changed(app: &tauri::AppHandle, change: &str, item: Option<&inbox::Inbo
     );
 }
 
+// Desktop notifications (24u part 4, session B): the window sends the owner's settings; a click that started Qanuvi
+// waits until the window asks for it.
+#[tauri::command]
+fn notify_settings(
+    notifier: State<crate::desktop_notify::Notifier>,
+    settings: crate::notify::NotifySettings,
+) {
+    notifier.set(settings);
+}
+
+#[tauri::command]
+fn notify_take_start(
+    notifier: State<crate::desktop_notify::Notifier>,
+) -> Option<serde_json::Value> {
+    notifier
+        .take_start()
+        .map(|id| serde_json::json!({ "id": id }))
+}
+
+#[tauri::command]
+fn notify_test(app: tauri::AppHandle) -> Res<()> {
+    crate::desktop_notify::test(&app)
+}
+
 #[tauri::command]
 fn inbox_list(state: State<AppState>) -> Res<Vec<inbox::InboxItem>> {
     inbox::list(&state.db)
@@ -1639,8 +1663,11 @@ fn inbox_add(
     state: State<AppState>,
     item: inbox::NewItem,
 ) -> Res<inbox::InboxItem> {
-    let added = inbox::add(&state.db, &item)?;
+    let (added, new) = inbox::add_new(&state.db, &item)?;
     inbox_changed(&app, "add", Some(&added));
+    if new {
+        crate::desktop_notify::new_item(&app, &added);
+    }
     Ok(added)
 }
 
@@ -1857,7 +1884,17 @@ pub fn run() {
         // window's storage, so the settings and layout live with the rest of the data.
         unsafe { std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &web) };
     }
-    tauri::Builder::default()
+    // One Qanuvi at a time when installed: starting it again (or a notification's qanuvi:// link) reaches the
+    // running one. Not for test builds, which run beside the installed copy. A restart waits for the old instance
+    // above, so its lock is free by now.
+    let mut builder = tauri::Builder::default();
+    if !crate::data_location::from_source() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            crate::desktop_notify::second_start(app, &args);
+        }));
+    }
+    builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1869,6 +1906,25 @@ pub fn run() {
             let db = store::Db::open(&dir.join("qanuvi.db"))?;
             agent::mark_interrupted(&db);
             runs::mark_interrupted(&db);
+            app.manage(crate::desktop_notify::Notifier::default());
+            let args: Vec<String> = std::env::args().collect();
+            crate::desktop_notify::started_with(app.handle(), &args);
+            // macOS hands a clicked qanuvi:// link to the running app instead of starting it with the link.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |e| {
+                    for url in e.urls() {
+                        crate::desktop_notify::opened_url(&handle, url.as_str());
+                    }
+                });
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        crate::desktop_notify::opened_url(app.handle(), url.as_str());
+                    }
+                }
+            }
             app.manage(AppState {
                 db,
                 terminals: terminal::Terminals::default(),
@@ -1941,6 +1997,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            notify_settings,
+            notify_take_start,
+            notify_test,
             app_info,
             browser_agent_view,
             browser_agent_shot,

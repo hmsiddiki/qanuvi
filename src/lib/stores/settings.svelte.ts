@@ -71,6 +71,45 @@ export interface Settings {
   chatHandover: { when: "ask" | "auto" | "off"; limit: number };
   /** Chat clean-up (24t): chats not opened for this many days are deleted at start-up (0 = off). */
   chatCleanupDays: 0 | 30 | 60 | 90;
+  /**
+   * Desktop notifications of new Inbox items (24u part 4, session B): on or off, which items, several together told as
+   * one, and quiet hours (minutes after midnight, local time). The Inbox keeps every item whatever is shown.
+   */
+  notifications: NotifySettings;
+}
+
+export interface NotifySettings {
+  desktop: boolean;
+  what: "questions" | "problems" | "all";
+  bundle: boolean;
+  quiet: boolean;
+  quietFrom: number;
+  quietTo: number;
+}
+
+export const DEFAULT_NOTIFICATIONS: NotifySettings = {
+  desktop: true,
+  what: "problems",
+  bundle: true,
+  quiet: false,
+  quietFrom: 22 * 60,
+  quietTo: 7 * 60,
+};
+
+/** Reads stored notification settings; anything odd falls back to its default. */
+export function parseNotifications(raw: unknown): NotifySettings {
+  const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const d = DEFAULT_NOTIFICATIONS;
+  const minute = (v: unknown, def: number) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.min(1439, Math.max(0, Math.round(v))) : def;
+  return {
+    desktop: typeof r.desktop === "boolean" ? r.desktop : d.desktop,
+    what: r.what === "questions" || r.what === "all" ? r.what : "problems",
+    bundle: typeof r.bundle === "boolean" ? r.bundle : d.bundle,
+    quiet: r.quiet === true,
+    quietFrom: minute(r.quietFrom, d.quietFrom),
+    quietTo: minute(r.quietTo, d.quietTo),
+  };
 }
 
 /** Default context size at which a chat offers a handover (24s). */
@@ -162,6 +201,7 @@ const DEFAULTS: Settings = {
   languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false },
   chatHandover: { when: "ask", limit: CHAT_HANDOVER_LIMIT },
   chatCleanupDays: 60,
+  notifications: DEFAULT_NOTIFICATIONS,
   startup: [],
   team: DEFAULT_TEAM,
 };
@@ -244,6 +284,7 @@ export function parseSettings(json: string | null): Settings {
     };
   }
   s.chatCleanupDays = ([0, 30, 60, 90] as const).find((d) => d === raw.chatCleanupDays) ?? 60;
+  s.notifications = parseNotifications(raw.notifications);
   if (Array.isArray(raw.startup))
     for (const it of raw.startup as Record<string, unknown>[]) {
       const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");

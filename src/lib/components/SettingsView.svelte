@@ -31,6 +31,8 @@
   import Palette from "@lucide/svelte/icons/palette";
   import Code from "@lucide/svelte/icons/code";
   import LanguagesSettings from "./LanguagesSettings.svelte";
+  import NotificationsSettings from "./NotificationsSettings.svelte";
+  import Bell from "@lucide/svelte/icons/bell";
 
   const TABS: { id: SettingsTab; label: string; icon: typeof Bot; words: string }[] = [
     {
@@ -90,6 +92,12 @@
       label: "Start-up",
       icon: Power,
       words: "start up startup headroom proxy command run at start launch",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      words: "notifications desktop toast banner inbox questions quiet hours do not disturb alert",
     },
     {
       id: "updates",
@@ -194,6 +202,8 @@
         <LanguagesSettings />
       {:else if tab === "startup"}
         <StartupSettings />
+      {:else if tab === "notifications"}
+        <NotificationsSettings />
       {:else if tab === "updates"}
         <UpdatesSettings />
       {/if}

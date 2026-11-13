@@ -19,6 +19,7 @@ export type SettingsTab =
   | "appearance"
   | "languages"
   | "startup"
+  | "notifications"
   | "updates";
 
 /** Views that used to be pages in the work area: they open the settings page now. */
@@ -67,6 +68,8 @@ class UiStore {
 
   /** The Inbox drop-down from the sidebar. */
   inboxOpen = $state(false);
+  /** The Inbox item a clicked desktop notification opened (shown and marked for a moment). */
+  inboxFocus = $state<string | null>(null);
   /** Goes up when search was asked for: the work area shows the project panel. */
   searchWanted = $state(0);
 

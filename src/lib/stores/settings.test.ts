@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSettings } from "./settings.svelte";
+import { DEFAULT_NOTIFICATIONS, parseNotifications, parseSettings } from "./settings.svelte";
 
 describe("parseSettings: budget and rules", () => {
   it("keeps a sane budget and clean rules", () => {
@@ -59,5 +59,18 @@ describe("appearance (15h)", () => {
       editorFontSize: 24,
       uiScale: 80,
     });
+  });
+});
+
+describe("notification settings (24u part 4, session B)", () => {
+  it("defaults when missing and keeps good values", () => {
+    expect(parseSettings(null).notifications).toEqual(DEFAULT_NOTIFICATIONS);
+    const kept = { desktop: false, what: "all", bundle: false, quiet: true, quietFrom: 60, quietTo: 420 };
+    expect(parseNotifications(kept)).toEqual(kept);
+  });
+
+  it("falls back on odd values", () => {
+    const n = parseNotifications({ desktop: "yes", what: "loud", quiet: 1, quietFrom: 5000, quietTo: -3 });
+    expect(n).toEqual({ ...DEFAULT_NOTIFICATIONS, quietFrom: 1439, quietTo: 0 });
   });
 });

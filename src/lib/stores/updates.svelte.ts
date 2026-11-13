@@ -6,7 +6,7 @@
  * window, restart Qanuvi.
  */
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "$lib/stores/confirm.svelte";
@@ -102,7 +102,7 @@ class UpdatesStore {
     if (!(await this.#okToStop())) return;
     try {
       await this.#update.install();
-      await relaunch();
+      await restartQanuvi();
     } catch (e) {
       this.state = "error";
       this.error = errorText(e);
@@ -112,7 +112,7 @@ class UpdatesStore {
   /** A full restart of Qanuvi. */
   async restart(): Promise<void> {
     if (!(await this.#okToStop())) return;
-    await relaunch();
+    await restartQanuvi();
   }
 
   /**
@@ -137,3 +137,12 @@ class UpdatesStore {
 }
 
 export const updates = new UpdatesStore();
+
+/**
+ * Starts Qanuvi again through its own restart: the new instance waits until this one has closed, so the
+ * single-instance lock (one installed Qanuvi at a time) is free when it starts. A plain relaunch would start it while
+ * this one still runs, and it would hand over to this one and quit.
+ */
+function restartQanuvi(): Promise<void> {
+  return invoke("app_restart");
+}

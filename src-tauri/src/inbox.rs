@@ -148,6 +148,11 @@ pub fn list(db: &Db) -> Result<Vec<InboxItem>, String> {
 /// Adds an item. One with the same key is replaced; it stays read when nothing in it changed, and an answered one
 /// keeps its answer when the same question comes again (the first answer stands).
 pub fn add(db: &Db, item: &NewItem) -> Result<InboxItem, String> {
+    add_new(db, item).map(|(i, _)| i)
+}
+
+/// Adds an item and says whether it is new (false: the same question was asked again, nothing to tell).
+pub fn add_new(db: &Db, item: &NewItem) -> Result<(InboxItem, bool), String> {
     check(item)?;
     let conn = db.conn();
     let same: Option<InboxItem> = match &item.key {
@@ -170,7 +175,7 @@ pub fn add(db: &Db, item: &NewItem) -> Result<InboxItem, String> {
         && s.status != "closed"
     {
         // Asked again while open or answered: nothing new to tell.
-        return Ok(s.clone());
+        return Ok((s.clone(), false));
     }
     let read = same.as_ref().is_some_and(|s| s.read) && unchanged;
     if let Some(k) = &item.key {
@@ -196,7 +201,7 @@ pub fn add(db: &Db, item: &NewItem) -> Result<InboxItem, String> {
     };
     insert(&conn, &new)?;
     prune(&conn)?;
-    Ok(new)
+    Ok((new, true))
 }
 
 fn insert(conn: &rusqlite::Connection, i: &InboxItem) -> Result<usize, String> {

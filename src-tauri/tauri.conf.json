@@ -53,6 +53,11 @@
     "homepage": "https://qanuvi.com"
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["qanuvi"]
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlBNEU1OTk1NTgwQ0FGRDcKUldUWHJ3eFlsVmxPbXFaVENDRjREdHhIVlkxeUlMUVJBeXJrWnUwaGxBRERQYmNTQlpqU01RRXkK",
       "endpoints": ["https://qlopy.top/qanuvi-updates/dev/latest.json"],

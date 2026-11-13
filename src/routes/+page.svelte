@@ -32,6 +32,7 @@
   import { terminals } from "$lib/stores/terminals.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
+  import { startNotifications } from "$lib/stores/notify.svelte";
   import { ui } from "$lib/stores/ui.svelte";
   import { untrack } from "svelte";
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
@@ -76,6 +77,7 @@
     knowledge.check().catch(() => {});
     startWatch();
     inbox.start().catch(() => {});
+    startNotifications().catch(() => {});
     updates.start();
     startup.start().catch(() => {});
     claudeUpdate.start();
