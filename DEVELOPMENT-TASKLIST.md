@@ -304,10 +304,17 @@ runs on or off; with it off nothing is sent anywhere.
     model (routing reliability: Wilson lower bound, so 33/34 beats 5/5), cost only as a tie-break. Verify green
     (305 + 156). Published as 0.1.16 with Revert/Redo and Pick models (owner: "publish anyway").
   - Driven live 2026-11-13 on a scratch project (test build): Pick models (3 steps picked, run used them, $0.01), Revert and Redo, Rewind to here (preview lists files left alone) and its Redo (files back byte for byte), bookmarks (star moves the chat under Saved), the waiting-message hold (Send now / Don't send, held message read after the turn), the heavy-chat bar at 37k. Fixed: picked steps say "Picked · <model>", not "Auto"; picks of steps without a number follow their title when a run moves lines; the result line "Finished · 4.9 s" had no space and read as a minus. Then fixed (driven live): steps written "1a. ..." without bold are read as numbered (one log per step, renames keep the number); quiet asks (the check before the run, chat review) now pass their session status on, so the status bar no longer keeps "1 working" after they answered. Published as 0.1.18. Published as 0.1.17 (owner: "release anyway"). Still to drive: 24t clean-up, 24s part 3 reopen, 15i part 2.
-  - RESUME HERE (new conversation, 2026-11-13): 24u part 1 is built (verify green, 312 + 156), not driven live yet:
-    drive it first on a scratch project (a plan with a held step, a step that needs it, an unrelated step and a z
-    step: the run goes on, waits, Go ahead releases both, Finish without them ends it). Then 24u part 2 (holds and
-    answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
+  - 24u part 1 driven live 2026-11-13 on a scratch project (1a asks for a choice left empty in the check, 1b same
+    number, 1z, 2a; Haiku 5.5, $0.04 in all): 2a and 1z ran, 1b set aside "waits for 1a", the run waited ("Waiting
+    for you (1 answer)", Needs your answer card with reply box, Try again, Skip this step); answering "dash" + Try
+    again ran 1a with the answer, released 1b, run finished 4 of 4; a second run ended by Finish without them (summary
+    "2 of 4 done, 2 set aside", 1a [!], 1b left open). Findings for the owner, not changed yet: (a) a question left
+    open on the run's FIRST step does not hold it (runner `!firstStep` rule), so 1a ran and blocked itself ($0.004)
+    instead of waiting unrun; (b) the z step ran before the released steps and is not run again after them, so the
+    README missed slugify (the 1b agent noted it as still open).
+  - RESUME HERE (new conversation, after 2026-11-13): ask the owner about findings (a) and (b) above, then 24u part 2
+    (holds and answers kept per plan), part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows
+    notifications). Each part in a short session; drive it live on a scratch project only. After 24u:
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -334,7 +341,7 @@ runs on or off; with it off nothing is sent anywhere.
     are left, the run does not end: "Waiting for you (N answers)", nothing spent, and it carries on by itself when
     answered; "Finish without them" ends it. Answers given while it runs are picked up after each step. Final
     summary: done, decided for you, set aside, waiting for answers.
-    - Built 2026-11-13 (not driven live): step states "held" (a hold, blocked, or not finished by any model) and
+    - Built 2026-11-13 (driven live 2026-11-13, see the checkpoint): step states "held" (a hold, blocked, or not finished by any model) and
       "set-aside" (waits for a held step); src/lib/plan/setaside.ts reads dependence from the plan (Needs line, same
       step number such as 95a/95b, a file both name or the held step changed) and asks the decider once for the other
       open steps (logged as set-aside decisions; free models answer when the paid agent cannot; no answer: only the
