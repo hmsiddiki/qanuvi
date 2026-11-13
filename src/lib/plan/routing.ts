@@ -49,6 +49,8 @@ export interface ModelStats {
   tries: number;
   successes: number;
   costUsd: number;
+  /** Tokens read and written over all tries (what a model burns, apart from its price). */
+  tokens?: number;
 }
 
 /** Per job type and model: how many tries, how many succeeded, what they cost — from saved runs. */
@@ -60,10 +62,11 @@ export function learn(runs: Pick<PlanRun, "steps">[], typeOf: (title: string) =>
       for (const a of step.attempts) {
         if (a.outcome === "stopped") continue; // the user stopped it: says nothing about the model
         const key = `${type}|${a.model}`;
-        const s = stats.get(key) ?? { tries: 0, successes: 0, costUsd: 0 };
+        const s = stats.get(key) ?? { tries: 0, successes: 0, costUsd: 0, tokens: 0 };
         s.tries++;
         if (a.outcome === "done") s.successes++;
         s.costUsd += a.costUsd;
+        s.tokens = (s.tokens ?? 0) + (a.inputTokens ?? 0) + (a.outputTokens ?? 0);
         stats.set(key, s);
       }
     }
@@ -86,6 +89,47 @@ export function learnedModel(stats: Map<string, ModelStats>, type: JobType, mode
     if (!best || perSuccess < best.perSuccess) best = { model: m.id, perSuccess, s };
   }
   return best;
+}
+
+/** How a model did on one kind of work, from saved runs: what the decider weighs when it picks models. */
+export interface ModelProfile {
+  model: string;
+  tries: number;
+  successes: number;
+  tokensPerSuccess: number;
+  costPerSuccess: number;
+  /**
+   * Burns far more tokens than the lightest model that also finishes this kind of work (1.5× the tokens per finished
+   * step, with at least three tries): picked only when a step really needs it. Tokens, not price: a stronger model is
+   * not heavy only for costing more per token (quality first).
+   */
+  heavy: boolean;
+}
+
+export const HEAVY_FACTOR = 1.5;
+
+/** Per model, for one kind of work: tries, successes, tokens and cost per finished step, and whether it is heavy. */
+export function modelProfiles(stats: Map<string, ModelStats>, type: JobType, models: AgentModel[]): ModelProfile[] {
+  const out: ModelProfile[] = [];
+  for (const m of models) {
+    const s = stats.get(`${type}|${m.id}`);
+    if (!s || !s.tries) continue;
+    const done = Math.max(1, s.successes);
+    out.push({
+      model: m.id,
+      tries: s.tries,
+      successes: s.successes,
+      tokensPerSuccess: Math.round((s.tokens ?? 0) / done),
+      costPerSuccess: s.costUsd / done,
+      heavy: false,
+    });
+  }
+  // Compared only with models that do finish this kind of work (a model that always fails is not "light").
+  const proven = out.filter((p) => p.tries >= MIN_TRIES && p.successes / p.tries >= MIN_SUCCESS);
+  const minTokens = Math.min(...proven.map((p) => p.tokensPerSuccess).filter((t) => t > 0));
+  if (Number.isFinite(minTokens))
+    for (const p of out) if (p.tries >= MIN_TRIES) p.heavy = p.tokensPerSuccess >= minTokens * HEAVY_FACTOR;
+  return out;
 }
 
 export interface Budget {
@@ -118,13 +162,17 @@ export function chooseModel(opts: {
   models: AgentModel[];
   defaultModel: string;
   budget: Budget;
+  /** The decider's pick for this step (it read the step and the token record), when it made one. */
+  picked?: { model: string; why: string } | null;
 }): Choice {
-  const { stepModel, type, rules, stats, models, defaultModel, budget } = opts;
+  const { stepModel, type, rules, stats, models, defaultModel, budget, picked } = opts;
   if (stepModel?.trim()) return { model: stepModel.trim(), reason: "set on the step" };
   let choice: Choice;
   const rule = rules[type];
   const learned = learnedModel(stats, type, models);
   if (rule) choice = { model: rule, reason: `project rule for ${JOB_LABELS[type].toLowerCase()}` };
+  else if (picked && models.some((m) => m.id === picked.model))
+    choice = { model: picked.model, reason: `decider: ${picked.why || "picked for this step"}` };
   else if (learned)
     choice = {
       model: learned.model,

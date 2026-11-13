@@ -79,6 +79,8 @@ export interface Assignment {
   number: string;
   worker: "free" | "paid";
   why: string;
+  /** The paid model the decider picked for the step (pickPrompt), when it named one from the list. */
+  model?: string;
 }
 
 const LEAN: Record<Priority, string> = {
@@ -130,6 +132,88 @@ export function parseAssignment(answer: string, steps: StepBrief[], priority: Pr
         why: "Qanuvi core's rule (the decider gave no answer for it)",
       }
     );
+  });
+}
+
+/** One kind of work's record, for the decider: per model, how it did and what it burned (plan/routing modelProfiles). */
+export type Profiles = Record<string, import("$lib/plan/routing").ModelProfile[]>;
+
+function profileLines(profiles: Profiles): string[] {
+  const out: string[] = [];
+  for (const [type, list] of Object.entries(profiles)) {
+    if (!list.length) continue;
+    const parts = list.map(
+      (p) =>
+        `${p.model} ${p.successes}/${p.tries} done, ${Math.round(p.tokensPerSuccess / 1000)}k tokens and $${p.costPerSuccess.toFixed(2)} per finished step${p.heavy ? " HEAVY" : ""}`,
+    );
+    out.push(`- ${type}: ${parts.join("; ")}`);
+  }
+  return out;
+}
+
+/**
+ * The decider's question for a whole plan, one call: the model for each step (and, when free models work first, which
+ * steps they take). It sees what each model burned on each kind of work before and keeps heavy models for the steps
+ * that really need them.
+ */
+export function pickPrompt(
+  steps: StepBrief[],
+  opts: { priority: Priority; freeFirst: boolean; models: { id: string; label: string }[]; profiles: Profiles },
+): string {
+  const list = steps
+    .map(
+      (s) =>
+        `${s.number}. ${s.title} [${s.type}]${s.details.length ? `\n   ${s.details.slice(0, 4).join("\n   ")}` : ""}`,
+    )
+    .join("\n");
+  const record = profileLines(opts.profiles);
+  return [
+    "You are the decider in a coding team. Pick, for each step of this plan, the model that does it.",
+    ...(opts.freeFirst
+      ? [
+          'Free models (capable but weaker, may break tool calls) can take routine steps: worker "free". ' +
+            LEAN[opts.priority],
+        ]
+      : []),
+    "Paid models, strongest first:",
+    ...opts.models.map((m) => `- ${m.id} (${m.label})`),
+    "High-quality code comes first, saving tokens second. For each step pick the paid model that will do it well; only among models that would do it equally well, pick the lighter one. Never pick a weaker model to save tokens on a step that needs real judgement (money logic, security, tricky bugs, changes across many files).",
+    ...(record.length
+      ? [
+          "What earlier runs showed, per kind of work (steps done of tried, tokens and cost per finished step). A model marked HEAVY burned far more tokens than another model that also finished that kind of work: pick it only when the step truly needs what it does better, and say why in the reason. A model that often did not finish a kind of work is a quality risk there, whatever it costs.",
+          ...record,
+        ]
+      : []),
+    "Money, payments, security and authentication work always gets a paid model.",
+    "Answer with JSON only, in this shape:",
+    `{"steps":[{"number":"1","worker":"${opts.freeFirst ? "free" : "paid"}","model":"<model id>","why":"a short reason"}]}`,
+    "",
+    "Steps:",
+    list,
+  ].join("\n");
+}
+
+/**
+ * Reads the decider's picks. A model not in the list is dropped (the step then follows the rules); without free models
+ * first every step is paid; steps left out get parseAssignment's safe default.
+ */
+export function parsePicks(
+  answer: string,
+  steps: StepBrief[],
+  opts: { priority: Priority; freeFirst: boolean; modelIds: string[] },
+): Assignment[] {
+  const v = jsonIn(answer) as { steps?: unknown } | null;
+  const models = new Map<string, string>();
+  if (v && Array.isArray(v.steps))
+    for (const s of v.steps as Record<string, unknown>[]) {
+      const number = String(s?.number ?? "").trim();
+      const model = String(s?.model ?? "").trim();
+      if (number && opts.modelIds.includes(model)) models.set(number, model);
+    }
+  return parseAssignment(answer, steps, opts.priority).map((a) => {
+    const model = models.get(a.number);
+    const worker = opts.freeFirst ? a.worker : "paid";
+    return { ...a, worker, ...(model ? { model } : {}) };
   });
 }
 

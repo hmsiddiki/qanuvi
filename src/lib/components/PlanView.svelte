@@ -46,7 +46,10 @@
     } else await load();
   }
   import { runner } from "$lib/stores/runner.svelte";
-  import { modelLabel } from "$lib/agents/providers";
+  import { modelLabel, providerById } from "$lib/agents/providers";
+  import { chooseModel, jobType, monthStart, type ModelStats } from "$lib/plan/routing";
+  import { loadPicks, pickFor } from "$lib/plan/picks";
+  import BrainCircuit from "@lucide/svelte/icons/brain-circuit";
   import { formatCost } from "$lib/agent/events";
 
   let showRun = $state(false);
@@ -122,6 +125,42 @@
   );
 
   const FILE_KEY = (id: string) => `qanuvi.plan.${id}`;
+
+  // A step with no Model: line is routed when it runs (project rule, then what earlier runs taught, then the agent's
+  // default); the list shows that likely pick, so "Auto" is not a blank.
+  let learned = $state<Map<string, ModelStats>>(new Map());
+  let spent = $state(0);
+  async function loadRouting() {
+    learned = await runner.learnedStats().catch(() => new Map());
+    spent = (await api.usage.since(monthStart()).catch(() => ({ cost_usd: 0 }))).cost_usd;
+  }
+  let runProvider = $derived(providerById(agent.runProviderId));
+  /** The decider's picks the owner asked for ("Pick models"), kept on this computer for this plan. */
+  let picks = $derived.by(() => {
+    void runner.picksSaved;
+    return file ? loadPicks(localStorage, project.id, file) : null;
+  });
+  let pickNote = $state("");
+  async function pickModels() {
+    pickNote = "";
+    pickNote = await runner.pickModels(project, file);
+  }
+
+  function autoPick(step: Step): { label: string; why: string } {
+    const p = pickFor(picks, { number: step.number ?? String(step.line), title: step.title }, runProvider.id);
+    const c = chooseModel({
+      picked: p?.model ? { model: p.model, why: p.why } : null,
+      stepModel: null,
+      type: jobType([step.title, step.note ?? "", ...(step.details ?? [])].join("\n")),
+      rules: settings.value.rules[project.id] ?? {},
+      stats: learned,
+      models: runProvider.models,
+      defaultModel: settings.agent(runProvider.id).model,
+      budget: { monthlyUsd: settings.value.monthlyBudgetUsd, spentUsd: spent },
+    });
+    const why = c.reason === "default model" ? "the agent's default model (Settings, Agents)" : c.reason;
+    return { label: modelLabel(runProvider, c.model), why };
+  }
 
   async function discover() {
     try {
@@ -223,6 +262,7 @@
     file = "";
     candidates = [];
     discover().then(load);
+    void loadRouting();
     // Untracked: this effect must not re-run (and reload an old record) whenever the run changes.
     const id = project.id;
     untrack(() => runner.loadLast(id));
@@ -330,6 +370,18 @@
         <Sparkles size={13} />
       </IconButton>
     {/if}
+    {#if file && settings.value.ai}
+      <!-- Only when the owner asks: a run never picks models by itself. Steps with a model of their own are left alone. -->
+      <IconButton
+        label={runner.picking
+          ? "Picking models…"
+          : "Pick models: the decider reads the open steps set to Auto and picks a model for each (quality first; models that burned many tokens before only where needed). Your own choices are kept."}
+        disabled={runner.picking || thisRunning}
+        onclick={pickModels}
+      >
+        <BrainCircuit size={13} />
+      </IconButton>
+    {/if}
     {#if file}
       <IconButton
         label={thisRunning
@@ -350,12 +402,18 @@
         <ListPlus size={13} />
       </IconButton>
     {/if}
-    <IconButton label="Reload the plan and look for new plan files" onclick={() => discover().then(load)}
-      ><RefreshCw size={13} /></IconButton
+    <IconButton
+      label="Reload the plan and look for new plan files"
+      onclick={() => {
+        void loadRouting();
+        void discover().then(load);
+      }}><RefreshCw size={13} /></IconButton
     >
   </header>
 
   {#if error}<p class="error">{error}</p>{/if}
+  {#if runner.picking}<p class="pick-note">Picking models for the open steps…</p>
+  {:else if pickNote}<p class="pick-note">{pickNote}</p>{/if}
 
   <div class="body">
     {#if showPlanner && settings.value.ai}
@@ -489,7 +547,9 @@
                   <select
                     class="model"
                     value={step.model ?? ""}
-                    title="Model for this step"
+                    title={!step.model
+                      ? `Auto: picked when the step runs. Now that would be ${autoPick(step).label}: ${autoPick(step).why}. Choose a model to pin this step to it.`
+                      : "Model for this step (Auto lets the run pick)"}
                     onchange={async (e) => {
                       const el = e.target as HTMLSelectElement;
                       const saved = await applyToStep(step, (t, line, title) =>
@@ -502,7 +562,7 @@
                       else if (el.value) runner.switchStepModel(project.id, file, step.number, step.title, el.value);
                     }}
                   >
-                    <option value="">Default model</option>
+                    <option value="">{step.model ? "Auto" : `Auto · ${autoPick(step).label}`}</option>
                     {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
                     {#if step.model && !agent.provider.models.some((m) => m.id === step.model)}
                       <option value={step.model}>{step.model}</option>
@@ -637,6 +697,13 @@
     font: inherit;
     font-size: var(--qx-text-small);
     cursor: pointer;
+  }
+
+  .pick-note {
+    margin: 0;
+    padding: var(--qx-space-1) var(--qx-space-3);
+    color: var(--qx-text-muted);
+    font-size: var(--qx-text-small);
   }
 
   .error {

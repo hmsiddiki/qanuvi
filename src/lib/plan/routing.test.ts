@@ -71,7 +71,7 @@ describe("learn and learnedModel", () => {
   it("counts tries, successes and cost per job type and model, ignoring stopped tries", () => {
     expect(stats.get(`docs|${H}`)).toMatchObject({ tries: 3, successes: 3 });
     expect(stats.get(`docs|${H}`)?.costUsd).toBeCloseTo(0.03);
-    expect(stats.get(`feature|${H}`)).toEqual({ tries: 1, successes: 0, costUsd: 0.01 });
+    expect(stats.get(`feature|${H}`)).toMatchObject({ tries: 1, successes: 0, costUsd: 0.01 });
   });
 
   it("picks the cheapest model that kept succeeding, once there are enough tries", () => {

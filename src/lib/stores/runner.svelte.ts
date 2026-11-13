@@ -67,11 +67,25 @@ import {
 } from "$lib/plan/runner";
 import { clearStaleSkips, parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
 import { archivePath, doneNumbers as doneIn } from "$lib/plan/housekeeping";
-import { budgetState, chooseModel, jobType, learn, monthStart, type ModelStats } from "$lib/plan/routing";
+import {
+  budgetState,
+  chooseModel,
+  jobType,
+  learn,
+  modelProfiles,
+  monthStart,
+  type JobType,
+  type ModelStats,
+} from "$lib/plan/routing";
+import { loadPicks, pickFor, savePicks, type SavedPicks } from "$lib/plan/picks";
 import {
   assignPrompt,
   freeWorks,
   parseAssignment,
+  parsePicks,
+  pickPrompt,
+  type Profiles,
+  type StepBrief,
   parseReview,
   reviewPrompt,
   type Assignment,
@@ -701,47 +715,43 @@ class RunnerStore {
     // One model for every step (the user's choice for this run) wins over the steps' own Model lines.
     const oneModel = options.model?.trim() || "";
     const models = ladder(provider.models, options.strongerOnFail);
-    // The decider (the paid agent) says once, for the whole plan, which steps free models do (24b).
+    // With free models first, the decider (the paid agent) says once, for the whole plan, which steps they do (24b).
+    // Models: only the picks the owner asked for before the run ("Pick models"); a run never picks them by itself.
     const assignment = new Map<string, Assignment>();
-    if (freeFirst && steps.length) {
-      const briefs = steps.map((s) => ({
-        number: s.number ?? String(s.line),
-        title: s.title,
-        details: s.details ?? [],
-        type: jobType([s.title, s.note ?? "", ...(s.details ?? [])].join("\n")),
-      }));
-      const priority = team.mode === "priority" ? team.priority : "save";
-      let answer = "";
-      let deciderBy = provider.id;
-      try {
-        const model = defaultPlannerModel(provider);
-        const r = await planner.ask(project, assignPrompt(briefs, priority), model, "Decider: who does each step", {
-          agentId: provider.id,
-          lean: true,
-        });
-        answer = r.text;
-        (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
-      } catch {
-        // The paid agent cannot answer now (limit, sign-in, offline): the free models take the seat (24e).
-        try {
-          const f = await freeDecide(
-            "You plan work for coding agents. Answer with JSON only.",
-            assignPrompt(briefs, priority),
-          );
-          answer = f.text;
-          deciderBy = `${f.by} (free, ${provider.name} could not answer)`;
-        } catch {
-          // No answer: Qanuvi core's rules decide (parseAssignment falls back).
+    if (steps.length) {
+      const briefs = steps.map(briefOf);
+      if (freeFirst) {
+        const priority = team.mode === "priority" ? team.priority : "save";
+        const { list, by } = await this.#askPicks(
+          project,
+          provider,
+          briefs,
+          { priority, freeFirst, workersOnly: true },
+          stats,
+          run,
+        );
+        for (const a of list) {
+          assignment.set(a.number, a);
+          this.#decide(run, { kind: "assign", by, subject: `Step ${a.number}`, decision: a.worker, why: a.why });
         }
       }
-      for (const a of parseAssignment(answer, briefs, priority)) {
-        assignment.set(a.number, a);
+      const saved = oneModel ? null : loadPicks(localStorage, project.id, file);
+      for (const b of briefs) {
+        const p = pickFor(saved, b, provider.id);
+        if (!p?.model) continue;
+        const a = assignment.get(b.number);
+        assignment.set(b.number, {
+          number: b.number,
+          worker: a?.worker ?? "paid",
+          why: p.why,
+          model: p.model,
+        });
         this.#decide(run, {
           kind: "assign",
-          by: answer ? deciderBy : "Qanuvi core",
-          subject: `Step ${a.number}`,
-          decision: a.worker,
-          why: a.why,
+          by: "decider (Pick models, before the run)",
+          subject: `Step ${b.number}`,
+          decision: modelLabel(provider, p.model),
+          why: p.why,
         });
       }
       await this.#save(run);
@@ -808,7 +818,9 @@ class RunnerStore {
       stepRun.status = "running";
       const planned = steps.find((s) => s.line === stepRun.line);
       const type = jobType([stepRun.title, planned?.note ?? "", ...(planned?.details ?? [])].join("\n"));
+      const assigned = assignment.get(stepRun.number ?? String(stepRun.line));
       const choice = chooseModel({
+        picked: assigned?.model ? { model: assigned.model, why: assigned.why } : null,
         stepModel: oneModel || (freshModel !== undefined ? freshModel : (planned?.model ?? null)),
         type,
         rules,
@@ -821,7 +833,6 @@ class RunnerStore {
       stepRun.jobType = type;
       const first = choice.model;
       // Free first, except money and security work and steps that name their model.
-      const assigned = assignment.get(stepRun.number ?? String(stepRun.line));
       const free =
         freeFirst &&
         type !== "security" &&
@@ -830,7 +841,9 @@ class RunnerStore {
       stepRun.choice = free
         ? `free first (decider: ${assigned?.why || "free models can do it"}); then ${first}: ${choice.reason}`
         : freeFirst && assigned?.worker === "paid"
-          ? `paid (decider: ${assigned.why}); ${choice.reason}`
+          ? choice.reason.startsWith("decider:")
+            ? `paid; ${choice.reason}`
+            : `paid (decider: ${assigned.why}); ${choice.reason}`
           : choice.reason;
       for (;;) {
         if (this.#stopRequested) {
@@ -1573,6 +1586,109 @@ class RunnerStore {
   }
 
   /** Learning from the latest runs of every project. */
+  /** "Pick models" is asking the decider now (the Plan view's button waits). */
+  picking = $state(false);
+  /** Goes up when picks are saved, so the Plan view reads them again. */
+  picksSaved = $state(0);
+
+  /**
+   * "Pick models" in the Plan view: the decider picks the model for each open step now, before a run, and the picks
+   * are kept on this computer (not in the plan file). Steps with their own Model: line keep it and are not asked.
+   */
+  async pickModels(project: Project, file: string): Promise<string> {
+    if (this.picking) return "";
+    this.picking = true;
+    try {
+      const provider = providerById(agent.runProviderId);
+      const steps = parsePlan((await api.files.read(project.id, file)).text).steps.filter(
+        (s) => s.status !== "x" && !s.model?.trim(),
+      );
+      if (!steps.length) return "No open steps without a model of their own.";
+      const team = settings.value.team;
+      const canFree = provider.id !== "qanuvi" && settings.value.brain.models.length > 0;
+      const freeFirst = canFree && freeWorks(team, true, true);
+      const priority = team.mode === "priority" ? team.priority : "save";
+      const briefs = steps.map(briefOf);
+      const stats = await this.#learned();
+      const { list, by } = await this.#askPicks(project, provider, briefs, { priority, freeFirst }, stats, null);
+      const saved: SavedPicks = { at: Date.now(), providerId: provider.id, freeFirst, picks: {} };
+      for (const a of list) {
+        const b = briefs.find((x) => x.number === a.number);
+        if (b)
+          saved.picks[a.number] = {
+            title: b.title,
+            worker: a.worker,
+            why: a.why,
+            ...(a.model ? { model: a.model } : {}),
+          };
+      }
+      savePicks(localStorage, project.id, file, saved);
+      this.picksSaved++;
+      return `Picked by ${by} for ${list.length} step${list.length === 1 ? "" : "s"}.`;
+    } catch (e) {
+      return errorText(e);
+    } finally {
+      this.picking = false;
+    }
+  }
+
+  /** One decider call for these steps: the paid agent, else the free models, else Qanuvi core's rules. */
+  async #askPicks(
+    project: Project,
+    provider: AgentProvider,
+    briefs: StepBrief[],
+    /** workersOnly: free or paid per step, as runs always asked (models only come from "Pick models"). */
+    opts: { priority: "save" | "balanced" | "solve"; freeFirst: boolean; workersOnly?: boolean },
+    stats: Map<string, ModelStats>,
+    run: PlanRun | null,
+  ): Promise<{ list: Assignment[]; by: string }> {
+    const profiles: Profiles = {};
+    for (const b of briefs) profiles[b.type] ??= modelProfiles(stats, b.type as JobType, provider.models);
+    const prompt = opts.workersOnly
+      ? assignPrompt(briefs, opts.priority)
+      : pickPrompt(briefs, {
+          priority: opts.priority,
+          freeFirst: opts.freeFirst,
+          models: provider.models.map((m) => ({ id: m.id, label: m.label })),
+          profiles,
+        });
+    let answer = "";
+    let by = provider.name;
+    try {
+      const model = defaultPlannerModel(provider);
+      const r = await planner.ask(
+        project,
+        prompt,
+        model,
+        opts.workersOnly ? "Decider: who does each step" : "Decider: the model for each step",
+        {
+          agentId: provider.id,
+          lean: true,
+        },
+      );
+      answer = r.text;
+      if (run) (run.deciderCalls ??= []).push({ model, costUsd: r.costUsd });
+    } catch {
+      // The paid agent cannot answer now (limit, sign-in, offline): the free models take the seat (24e).
+      try {
+        const f = await freeDecide("You plan work for coding agents. Answer with JSON only.", prompt);
+        answer = f.text;
+        by = `${f.by} (free, ${provider.name} could not answer)`;
+      } catch {
+        // No answer: Qanuvi core's rules decide (parsePicks falls back).
+      }
+    }
+    const list = opts.workersOnly
+      ? parseAssignment(answer, briefs, opts.priority)
+      : parsePicks(answer, briefs, { ...opts, modelIds: provider.models.map((m) => m.id) });
+    return { list, by: answer ? by : "Qanuvi core" };
+  }
+
+  /** What earlier runs taught about models (the Plan view shows each step's likely pick from it). */
+  learnedStats(): Promise<Map<string, ModelStats>> {
+    return this.#learned();
+  }
+
   async #learned(): Promise<Map<string, ModelStats>> {
     const records = await api.runs.listAll(300).catch(() => []);
     const runs: PlanRun[] = [];
@@ -1852,3 +1968,13 @@ function totalsOf(s: Session | null): Base {
 }
 
 export type { StepRun };
+
+/** A step as the decider reads it. */
+function briefOf(s: Step): StepBrief {
+  return {
+    number: s.number ?? String(s.line),
+    title: s.title,
+    details: s.details ?? [],
+    type: jobType([s.title, s.note ?? "", ...(s.details ?? [])].join("\n")),
+  };
+}

@@ -289,7 +289,20 @@ runs on or off; with it off nothing is sent anywhere.
     laterChanges). After Revert the card shows Redo; after a rewind a bar above the box offers Redo. Redo writes back
     exactly what the undo replaced, and only while the file is still as the undo left it. Undo records live in the
     window for the open chat only. Verify green (298 + 156). Not driven live yet.
-  - RESUME HERE (new conversation): drive Revert / Rewind to here / Redo and the waiting-message hold, 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
+  - Done 2026-11-13 (later), committed, NOT published (owner agreed A + B; "quality first, saving tokens second";
+    "only if the user wants"): "Pick models" in the Plan view (plan/picks.ts, runner.pickModels, decider pickPrompt /
+    parsePicks): the paid agent reads the open Auto steps once and picks a model each, quality first, seeing per kind
+    of work each model's steps done of tried, tokens and cost per finished step; a model burning 1.5x the tokens of
+    the lightest proven one (3+ tries, 80%+ done) is marked HEAVY and picked only when needed (routing modelProfiles;
+    tokens only, not price). Picks are kept on this computer, not in the plan file; a step's own Model: line (the
+    owner's dropdown choice) is never replaced. Runs never pick models by themselves: they use saved picks (same agent,
+    same step title) and otherwise run as before (the free-first worker call unchanged). Order at a step: own Model:
+    line, project rule, the pick, learned, default. The dropdown shows "Auto · <model>" with the reason. Owner's real
+    record (2026-11-13, security work): Fable 5.2 2/5 done at about 337k tokens per finished step (HEAVY), Opus 5.5
+    33/34 at 220k, Sonnet 5.5 5/5 at 198k. Verify green (305 + 156). Not driven live yet.
+  - Open question for the owner: with no pick, the learned rule takes the cheapest proven model by cost (on security
+    work that is Sonnet 5.5 over Opus 5.5); "quality first" may want the most reliable one instead. Not changed.
+  - RESUME HERE (new conversation): drive Pick models, Revert / Rewind to here / Redo and the waiting-message hold, 24t, 24s parts 2 and 3 and 15i part 2 in the running app on a scratch
     project (fresh data folder; a starred chat needs 40k+ context to show the reopen bar), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
     idea asked about (not yet agreed as a step): "run 5 to 8 of PLAN-X" typed in the chat starts that range of the
