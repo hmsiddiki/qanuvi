@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  changeDecided,
   closingRan,
   closingsDue,
   emptyPlanState,
   holdWording,
   keepAnswer,
+  keepDecided,
   keepHolds,
   markLate,
   pruneState,
@@ -71,5 +73,35 @@ describe("kept per plan (24u part 2)", () => {
     const kept = pruneState(s, new Set(["1b"]), all);
     expect(kept.closings).toEqual([{ closing: "1z", waiting: ["1b"], late: ["1a"] }]);
     expect(pruneState(s, new Set(), new Set(["1a"])).closings).toEqual([]);
+  });
+});
+
+describe("decided for you, kept per plan (24u part 3)", () => {
+  const d = (step: string, answer: string) => ({ step, what: "Separator?", answer, because: "" });
+
+  it("keeps a check's choices and extra checks; a later check replaces those of the same steps", () => {
+    let s = keepDecided(emptyPlanState(), [d("1a", "dash"), d("1b", "dash")], [{ step: "2a", why: "migrates" }], [], 1);
+    s = keepDecided(s, [d("1a", "underscore")], [], ["2a"], 2);
+    expect(s.decided.map((x) => [x.step, x.answer])).toEqual([
+      ["1b", "dash"],
+      ["1a", "underscore"],
+    ]);
+    expect(s.checks).toEqual([]);
+  });
+
+  it("an owner's change stays when the check decides again", () => {
+    let s = keepDecided(emptyPlanState(), [d("1a", "dash")], [], [], 1);
+    s = changeDecided(s, "1a", "Separator?", "dot");
+    s = keepDecided(s, [d("1a", "dash")], [], [], 2);
+    expect(s.decided).toHaveLength(1);
+    expect(s.decided[0].changed).toBe("dot");
+  });
+
+  it("keeps decided choices while the step is in the plan, extra checks only while it is open", () => {
+    const s = keepDecided(emptyPlanState(), [d("1a", "dash")], [{ step: "1a", why: "x" }], [], 1);
+    const p = pruneState(s, new Set(), new Set(["1a"]));
+    expect(p.decided).toHaveLength(1);
+    expect(p.checks).toEqual([]);
+    expect(pruneState(s, new Set(), new Set()).decided).toEqual([]);
   });
 });

@@ -48,6 +48,11 @@ export interface RunOptions {
   onLimit?: "wait" | "free";
   /** Steps the run pauses before (risky ones the owner wants to see, or a question left open), with why (24i). */
   waitBefore?: { step: string; why: string }[];
+  /**
+   * Steps that go ahead with extra checks (24u part 3): the decider reviews the step's diff and the full tests must
+   * pass before it counts as done, whoever did the work.
+   */
+  extraChecks?: { step: string; why: string }[];
   /** When every step of the plan is done, its private details (logins) are deleted; missing: yes. */
   forgetPrivateWhenDone?: boolean;
   /** Steps in a row on the same model and in the same section continue one session; missing: yes. */

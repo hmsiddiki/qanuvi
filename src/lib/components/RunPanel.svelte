@@ -24,8 +24,26 @@
   } from "$lib/plan/runner";
   import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
-  import { holdWording, keepHolds, loadPlanState, savePlanState, type KeptHold } from "$lib/plan/planstate";
-  import { parsePreflight, preflightPrompt, type Preflight } from "$lib/plan/preflight";
+  import {
+    changeDecided,
+    holdWording,
+    keepDecided,
+    keepHolds,
+    loadPlanState,
+    savePlanState,
+    type KeptDecided,
+    type KeptHold,
+  } from "$lib/plan/planstate";
+  import {
+    decidedNote,
+    parsePreflight,
+    preflightPrompt,
+    recommendedRisk,
+    settleCheck,
+    type AskSort,
+    type Preflight,
+    type RiskChoice,
+  } from "$lib/plan/preflight";
   import { finishedCost, planHistory } from "$lib/plan/costs";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
   import { finishEstimate, offersFinish, FINISHER, type FinishAuto, type FinishLevel } from "$lib/plan/finishing";
@@ -257,6 +275,32 @@
     privateCount = 0;
   }
 
+  /** What Qanuvi decided for the owner in this plan's check (24u part 3), each one changeable. */
+  let decidedList = $state<KeptDecided[]>([]);
+  let changing = $state<number | null>(null);
+  let changeText = $state("");
+  $effect(() => {
+    void runner.changed;
+    void run?.id;
+    decidedList = loadPlanState(project.id, file).decided;
+  });
+  function saveChange(d: KeptDecided) {
+    const text = changeText.trim();
+    if (!text) return;
+    savePlanState(project.id, file, changeDecided(loadPlanState(project.id, file), d.step, d.what, text));
+    const done = run?.steps.find((s) => (s.number ?? s.title) === d.step)?.status === "done";
+    // Every later step and model reads it (the plan's FACTS.md).
+    runner.addNote(
+      `The owner changed a choice for step ${d.step}: ${d.what} → ${text} (instead of ${d.changed ?? d.answer}).`,
+    );
+    decidedList = loadPlanState(project.id, file).decided;
+    changing = null;
+    changeText = "";
+    changeDone = done ? d.step : "";
+  }
+  /** The changed choice's step was already done: say it needs opening again to take the change. */
+  let changeDone = $state("");
+
   $effect(() => {
     if (setup) {
       fromLine = openSteps[0]?.line ?? -1;
@@ -273,7 +317,9 @@
   let check = $state<Preflight | null>(null);
   let secretValues = $state<Record<string, string>>({});
   let answers = $state<Record<number, string>>({});
-  let riskyChoice = $state<Record<number, "wait" | "go">>({});
+  /** Answers the owner typed or changed (an untouched recommended answer is Qanuvi's decision). */
+  let answersTouched = $state<Record<number, boolean>>({});
+  let riskyChoice = $state<Record<number, RiskChoice>>({});
   /** Risky steps whose choice the owner set (a hold left at the default is Qanuvi's, not theirs). */
   let riskyTouched = $state<Record<number, boolean>>({});
 
@@ -311,8 +357,7 @@
       const found = parsePreflight(r.text);
       found.secrets = found.secrets.filter((s) => !known.secrets.includes(s.name));
       check = found;
-      riskyChoice = Object.fromEntries(found.risky.map((_, i) => [i, "wait"]));
-      riskyTouched = {};
+      recommendAll(found, false);
       if (!found.secrets.length && !found.questions.length && !found.risky.length && !found.setup.length) {
         check = null;
         await go();
@@ -324,6 +369,25 @@
     }
   }
 
+  /**
+   * The check's recommended answers (24u part 3): Qanuvi's choices filled in, steps that truly need the owner left
+   * open. `all`: "Accept all recommended", which fills those in too and counts as the owner's own answer.
+   */
+  function recommendAll(c: Preflight, all: boolean) {
+    answers = Object.fromEntries(
+      c.questions.map((q, i) => [i, all || q.sort !== "you" ? q.recommended : (answers[i] ?? "")]),
+    );
+    answersTouched = all ? Object.fromEntries(c.questions.map((q, i) => [i, q.sort === "you"])) : {};
+    riskyChoice = Object.fromEntries(c.risky.map((x, i) => [i, recommendedRisk(x.sort)]));
+    riskyTouched = {};
+  }
+
+  const SORT_LABEL: Record<AskSort, string> = {
+    decide: "Qanuvi decides",
+    checks: "goes ahead with extra checks",
+    you: "needs you",
+  };
+
   /** Saves the answers (secrets, notes) and starts, holding at risky steps and open questions. */
   async function startChecked() {
     const c = check;
@@ -332,30 +396,24 @@
       const v = secretValues[s.name]?.trim();
       if (v) await api.agent.setSecret(project.id, s.name, v).catch(() => {});
     }
-    const notes = loadPlanNotes(project.id, file);
+    // Sorted (24u part 3): Qanuvi's own choices, steps with extra checks, and holds only where the owner is needed.
+    const settled = settleCheck(c, answers, answersTouched, riskyChoice, riskyTouched);
+    const notes = [...loadPlanNotes(project.id, file), ...settled.notes, ...settled.decided.map(decidedNote)];
     // Holds are kept per plan (24u part 2): a later run holds the same steps, saying who set each hold.
-    const holds: Omit<KeptHold, "at">[] = [];
-    const cleared = new Set<string>();
-    c.questions.forEach((q, i) => {
-      const a = answers[i]?.trim();
-      if (a) {
-        notes.push(`The owner's answer for step ${q.step}: ${q.question} → ${a}`);
-        if (q.step) cleared.add(q.step);
-      } else if (q.step) holds.push({ step: q.step, why: `a question was left open (${q.question})`, by: "default" });
-    });
-    c.risky.forEach((x, i) => {
-      if (riskyChoice[i] === "go") cleared.add(x.step);
-      else holds.push({ step: x.step, why: x.why, by: riskyTouched[i] ? "you" : "default" });
-    });
+    const holds: Omit<KeptHold, "at">[] = settled.holds;
+    const cleared = new Set(settled.cleared);
     savePlanNotes(project.id, file, notes);
-    let state = loadPlanState(project.id, file);
+    let state = keepDecided(loadPlanState(project.id, file), settled.decided, settled.extraChecks, settled.cleared);
     state = {
       ...state,
       holds: state.holds.filter((h) => !cleared.has(h.step) || holds.some((n) => n.step === h.step)),
     };
     savePlanState(project.id, file, keepHolds(state, holds));
     check = null;
-    await go(holds.map((h) => ({ step: h.step, why: holdWording(h) })));
+    await go(
+      holds.map((h) => ({ step: h.step, why: holdWording(h) })),
+      settled.extraChecks,
+    );
   }
 
   async function start(event: SubmitEvent) {
@@ -365,7 +423,10 @@
     await go();
   }
 
-  async function go(waitBefore: { step: string; why: string }[] = []) {
+  async function go(
+    waitBefore: { step: string; why: string }[] = [],
+    extraChecks: { step: string; why: string }[] = [],
+  ) {
     error = "";
     if (!layout.state.agentVisible) layout.toggleAgent();
     keep();
@@ -395,6 +456,7 @@
         carryLimit: Math.max(20, Math.min(400, Number(carryK) || 150)) * 1000,
         handoverLimit: handoverOn ? Math.max(80, Math.min(800, Number(handoverK) || 200)) * 1000 : 0,
         waitBefore,
+        extraChecks,
         onLimit,
         stepCostLimit: Math.max(0, Number(stepUsd) || 0),
         stepMinutes: Math.max(0, Number(stepMin) || 0),
@@ -710,14 +772,34 @@
             >
           {/each}
         {/if}
+        {#if check.questions.length || check.risky.length}
+          <p class="hint">
+            Recommended answers are filled in: Qanuvi decides what has a sensible default (logged as "Decided for you",
+            changeable later), lets steps go ahead with extra checks (review and tests) where it can, and waits only for
+            what truly needs you.
+            <button type="button" class="link" onclick={() => check && recommendAll(check, true)}
+              >Accept all recommended</button
+            >
+          </p>
+        {/if}
         {#if check.questions.length}
           <p class="hint">
-            Decisions only you can make (kept as notes for this plan; left empty, the run waits there):
+            Choices the steps leave open (kept as notes for this plan; left empty, the run waits there):
           </p>
           {#each check.questions as q, i (i)}
             <label class="row-input"
-              ><span><strong>{q.step}</strong> {q.question}</span>
-              <input type="text" placeholder="your answer" bind:value={answers[i]} /></label
+              ><span
+                ><strong>{q.step}</strong>
+                {q.question} <span class="sort {q.sort}">{SORT_LABEL[q.sort]}</span>{#if q.because}<span class="dim">
+                    {q.because}</span
+                  >{/if}</span
+              >
+              <input
+                type="text"
+                placeholder={q.recommended ? `recommended: ${q.recommended}` : "your answer"}
+                bind:value={answers[i]}
+                oninput={() => (answersTouched[i] = true)}
+              /></label
             >
           {/each}
         {/if}
@@ -725,10 +807,16 @@
           <p class="hint">Risky steps (hard to undo, or they reach outside this computer):</p>
           {#each check.risky as x, i (i)}
             <div class="row-input">
-              <span><strong>{x.step}</strong> {x.why}</span>
+              <span
+                ><strong>{x.step}</strong>
+                {x.why} <span class="sort {x.sort}">{SORT_LABEL[x.sort]}</span>{#if x.because}<span class="dim">
+                    {x.because}</span
+                  >{/if}</span
+              >
               <select bind:value={riskyChoice[i]} onchange={() => (riskyTouched[i] = true)}>
-                <option value="wait">Wait for me before it</option>
                 <option value="go">Go ahead</option>
+                <option value="checks">Go ahead with extra checks (review and tests)</option>
+                <option value="wait">Wait for me before it</option>
               </select>
             </div>
           {/each}
@@ -856,6 +944,50 @@
         every step gets {privateCount === 1 ? "it" : "them"}.
         <button type="button" class="link" onclick={forgetPrivateNow}>Forget</button>
       </p>
+    {/if}
+    {#if decidedList.length}
+      <details class="decisions" open={decidedList.some((d) => !d.changed)}>
+        <summary>Decided for you ({decidedList.length}): Qanuvi's choices from the check. Change?</summary>
+        <ul>
+          {#each decidedList as d, i (d.step + d.what)}
+            <li>
+              <strong>{d.step}</strong>
+              {d.what} → {d.changed ?? d.answer}
+              <span class="dim"
+                >{d.changed ? `(you changed it from ${d.answer})` : d.because ? `because ${d.because}` : ""}</span
+              >
+              {#if changing === i}
+                <span class="row-input">
+                  <input
+                    type="text"
+                    placeholder="your answer"
+                    bind:value={changeText}
+                    onkeydown={(e) => e.key === "Enter" && (e.preventDefault(), saveChange(d))}
+                  />
+                  <button type="button" onclick={() => saveChange(d)} disabled={!changeText.trim()}>Save</button>
+                  <button type="button" class="link" onclick={() => (changing = null)}>Cancel</button>
+                </span>
+              {:else}
+                <button
+                  type="button"
+                  class="link"
+                  onclick={() => {
+                    changing = i;
+                    changeText = d.changed ?? d.answer;
+                    changeDone = "";
+                  }}>Change</button
+                >
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        {#if changeDone}
+          <p class="dim">
+            Step {changeDone} is already done: open it again in the plan (set it back to [ ]) so the next run brings it in
+            line. Later steps get the change at once.
+          </p>
+        {/if}
+      </details>
     {/if}
     {#if run.notes?.length}
       <details class="decisions">
@@ -1040,6 +1172,16 @@
     flex: 1;
   }
 
+  .sort {
+    font-size: 0.85em;
+    padding: 0 0.4em;
+    border-radius: 3px;
+    border: 1px solid var(--qx-border);
+    white-space: nowrap;
+  }
+  .sort.you {
+    color: var(--qx-status-waiting);
+  }
   .hint {
     margin: var(--qx-space-2) 0;
     color: var(--qx-text-secondary);

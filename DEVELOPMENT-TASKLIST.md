@@ -319,8 +319,10 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation): the Team fix below is built (2026-11-14, verify green 320 + 156, not driven
-    live; helper `freeWantedButMissing` in plan/runner.ts); next is part 3. The fix: with no free models set
+    RESUME HERE (new conversation): 24u part 3 (sorted asks) is built (2026-11-14, verify green 328 + 156, NOT driven
+    live; see Part 3 below): drive it on a scratch project first (a fresh plan file with a naming question, a
+    migration on a local file and a push, so all three sorts show), then part 4. The Team fix before it is built too
+    (verify green 320 + 156, not driven live; helper `freeWantedButMissing` in plan/runner.ts). The fix: with no free models set
     up, the Run panel's Team option reads "As in Settings: Paid decides, free works (no free models yet: paid only)"
     and the run logs one decision "No free models set up: every step on <agent>" (found because the test build's
     data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
@@ -394,6 +396,20 @@ runs on or off; with it off nothing is sent anywhere.
     truly needs you: secrets, actions on outside accounts or anything leaving this computer. Risk is judged by where
     the step runs (money on a test database is not real money). Each item comes with the recommended answer chosen,
     plus "Accept all recommended"; holds only where the owner chose one or (c).
+    - Built 2026-11-14 (verify green 328 + 156, not driven live): the check's JSON gives each question and risky step
+      a sort ("decide" / "checks" / "you"), a recommended answer and a because; unsorted risky steps and questions
+      with no recommended answer count as "you" (as before). plan/preflight.ts `settleCheck` turns the form into
+      holds, the owner's notes, decided-for-you choices (an untouched recommended answer of a decide/checks item) and
+      extra-check steps. The Run panel fills recommended answers in (questions that need you stay empty, the
+      recommendation as placeholder), shows a sort tag and the because per item, risky steps choose Go ahead / Go
+      ahead with extra checks / Wait for me (starting on the sort's choice), and "Accept all recommended" fills
+      everything in as the owner's own answers. Decided choices go into the plan notes (FACTS.md) worded "keep it
+      in one place, not hard-coded", into the run's Decisions (kind "decided") at every run, and into the plan
+      state (planstate `decided`, `keepDecided`, `changeDecided`); the run panel lists them under "Decided for
+      you ... Change?": a change is kept, sent to later steps as an owner note, and for a step already done the
+      panel says to open it again. Extra-check steps (options.extraChecks, kept per plan as `checks`) always run
+      the full tests, are told so in their prompt, and their "done" goes through the decider's diff review also on
+      the paid agent (before only free models' work was reviewed).
   - Part 4, one notification centre: the Inbox moves into Qanuvi's database (Rust side), seen by every window, the
     runner and later the phone. Types: for your information, needs an answer, problem. Answer items carry their form
     (options, text, "Let Qanuvi decide", "Skip this step"); the first answer anywhere closes it everywhere. Settings,

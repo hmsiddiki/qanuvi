@@ -745,6 +745,8 @@ class RunnerStore {
     // What this plan kept from earlier runs (24u part 2): holds come back with who set them, answered steps run with
     // the owner's answer, skipped ones stay skipped. Entries of steps no longer open go.
     const waitList = [...(options.waitBefore ?? [])];
+    // Steps that count as done only after the decider's review and passing tests (24u part 3), kept per plan too.
+    const extraChecks = new Map((options.extraChecks ?? []).map((c) => [c.step, c.why]));
     {
       const planned = parsePlan(text).steps;
       const open = new Set(planned.filter((s) => s.status !== "x").map((s) => s.number ?? s.title));
@@ -752,6 +754,19 @@ class RunnerStore {
       savePlanState(project.id, file, kept);
       for (const h of kept.holds)
         if (!waitList.some((w) => w.step === h.step)) waitList.push({ step: h.step, why: holdWording(h) });
+      for (const c of kept.checks) if (!extraChecks.has(c.step)) extraChecks.set(c.step, c.why);
+      // What Qanuvi decided for the owner in the check, once in the run's decisions (the plan notes carry it).
+      for (const d of kept.decided)
+        if (open.has(d.step))
+          this.#decide(run, {
+            kind: "decided",
+            by: "Qanuvi",
+            subject: `Step ${d.step}`,
+            decision: d.changed
+              ? `${d.what} → ${d.changed} (you changed it from ${d.answer})`
+              : `${d.what} → ${d.answer}`,
+            why: d.changed ? "your answer" : d.because || "the check's recommended answer",
+          });
       for (const a of kept.answers) {
         const stepRun = run.steps.find((x) => this.#key(x) === a.step);
         if (!stepRun) continue;
@@ -1084,7 +1099,10 @@ class RunnerStore {
             .slice(run.steps.indexOf(stepRun) + 1)
             .some((x) => x.status === "waiting" && steps.find((s) => s.line === x.line)?.section === fresh.section);
           const fullNow = options.fullChecks !== "section" || lastOfSection;
-          const testCommand = options.packets && fullNow ? project.settings.test_command.trim() : "";
+          // A step with extra checks always runs the full tests (24u part 3).
+          const extra = extraChecks.get(this.#key(stepRun));
+          const testCommand =
+            (options.packets && fullNow) || extra !== undefined ? project.settings.test_command.trim() : "";
           // The plan's private details (read each step: one given during the last step counts at once).
           const privateDetails = await api.agent.planPrivate(project.id, file).catch(() => [] as string[]);
           const ownLog = logPath(file, fresh);
@@ -1122,11 +1140,13 @@ class RunnerStore {
               : "\n\nChecks: run only the tests for what this step changes (and lint the files you touch). The full suite " +
                 "and the plan's other whole-project checks run once, at the last step of this section; skip them here, " +
                 "even where the plan's rules ask for them after every step.");
-          // The reviewer turned down a free model's work: the next model hears why.
+          // The reviewer turned down an earlier try's work: the next model hears why.
           const rejected = [...stepRun.attempts].reverse().find((a) => a.note.startsWith("Review: "));
           if (rejected)
-            prompt += `\n\nA free model already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
-          const before = isFree(model) ? await this.#snapshot(project) : null;
+            prompt += `\n\n${isFree(rejected.model) ? "A free model" : "An earlier try"} already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
+          if (extra !== undefined)
+            prompt += `\n\nThis step goes ahead with extra checks (${extra}): the full tests must pass and the decider reviews your diff before it counts as done. Keep the change small and easy to check.`;
+          const before = isFree(model) || extra !== undefined ? await this.#snapshot(project) : null;
           if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh, file), testCommand);
           // Same model, same section, still small: the step continues the last step's session (it knows the work).
           const section = fresh.section ?? "";
@@ -1290,7 +1310,8 @@ class RunnerStore {
             }
           }
           // Quality first: a free model's "done" is checked by the decider before it counts.
-          if (attempt.outcome === "done" && before && freeFirst) {
+          // A step with extra checks goes through the same review, also on the paid agent (24u part 3).
+          if (attempt.outcome === "done" && before && (freeFirst || extra !== undefined)) {
             const review = await this.#review(project, provider, stepRun, fresh, before, attempt.testsPassed);
             this.#decide(run, {
               kind: "review",

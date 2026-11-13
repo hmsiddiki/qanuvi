@@ -1,3 +1,5 @@
+import type { DecidedForYou } from "./preflight";
+
 /**
  * What a plan keeps between runs (24u part 2): the holds from the check before a run and the owner's answers to held
  * steps, so a run started again later holds the same steps (saying who set the hold) and runs the answered ones with
@@ -31,13 +33,22 @@ export interface KeptClosing {
   late: string[];
 }
 
+/** A choice Qanuvi made for the owner in the check (24u part 3); `changed`: the owner's later answer. */
+export interface KeptDecided extends DecidedForYou {
+  changed?: string;
+  at: number;
+}
+
 export interface PlanState {
   holds: KeptHold[];
   answers: KeptAnswer[];
   closings: KeptClosing[];
+  decided: KeptDecided[];
+  /** Steps that count as done only after the decider's review and passing tests (24u part 3). */
+  checks: { step: string; why: string }[];
 }
 
-export const emptyPlanState = (): PlanState => ({ holds: [], answers: [], closings: [] });
+export const emptyPlanState = (): PlanState => ({ holds: [], answers: [], closings: [], decided: [], checks: [] });
 
 function planStateKey(projectId: string, file: string): string {
   return `qanuvi.planstate.${projectId}.${file}`;
@@ -52,6 +63,10 @@ export function loadPlanState(projectId: string, file: string): PlanState {
       closings: Array.isArray(v?.closings)
         ? v.closings.filter((c) => typeof c?.closing === "string" && Array.isArray(c.waiting) && Array.isArray(c.late))
         : [],
+      decided: Array.isArray(v?.decided)
+        ? v.decided.filter((d) => typeof d?.step === "string" && typeof d.answer === "string")
+        : [],
+      checks: Array.isArray(v?.checks) ? v.checks.filter((c) => typeof c?.step === "string") : [],
     };
   } catch {
     return emptyPlanState();
@@ -61,7 +76,14 @@ export function loadPlanState(projectId: string, file: string): PlanState {
 export function savePlanState(projectId: string, file: string, state: PlanState): void {
   try {
     const key = planStateKey(projectId, file);
-    if (!state.holds.length && !state.answers.length && !state.closings.length) localStorage.removeItem(key);
+    if (
+      !state.holds.length &&
+      !state.answers.length &&
+      !state.closings.length &&
+      !state.decided.length &&
+      !state.checks.length
+    )
+      localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(state));
   } catch {
     // A help only: without it a later run asks again.
@@ -110,6 +132,9 @@ export function pruneState(state: PlanState, open: Set<string>, all: Set<string>
   return {
     holds: state.holds.filter((h) => open.has(h.step)),
     answers: state.answers.filter((a) => open.has(a.step)),
+    // Decided choices stay while their step is in the plan (the owner may still want to see or change them).
+    decided: state.decided.filter((d) => all.has(d.step)),
+    checks: state.checks.filter((c) => open.has(c.step)),
     closings: state.closings
       .filter((c) => all.has(c.closing))
       // A waited-for step done meanwhile (by hand, or outside a run) counts as late; one gone from the plan drops.
@@ -146,4 +171,35 @@ export function markLate(state: PlanState, step: string): PlanState {
  */
 export function closingsDue(state: PlanState, pending: (step: string) => boolean, ending: boolean): KeptClosing[] {
   return state.closings.filter((c) => c.late.length && (ending || !c.waiting.some(pending)));
+}
+
+/**
+ * A check's decided-for-you choices and extra-check steps: they replace the kept ones of the same steps. A decision
+ * the owner already changed stays changed.
+ */
+export function keepDecided(
+  state: PlanState,
+  decided: DecidedForYou[],
+  checks: { step: string; why: string }[],
+  cleared: string[] = [],
+  now = Date.now(),
+): PlanState {
+  const touched = new Set([...decided.map((d) => d.step), ...checks.map((c) => c.step), ...cleared]);
+  const changed = state.decided.filter((d) => d.changed);
+  const fresh = decided
+    .filter((d) => !changed.some((c) => c.step === d.step && c.what === d.what))
+    .map((d) => ({ ...d, at: now }));
+  return {
+    ...state,
+    decided: [...state.decided.filter((d) => d.changed || !touched.has(d.step)), ...fresh],
+    checks: [...state.checks.filter((c) => !touched.has(c.step)), ...checks],
+  };
+}
+
+/** The owner changed a decided-for-you choice: kept, so later runs and the panel show their answer. */
+export function changeDecided(state: PlanState, step: string, what: string, answer: string): PlanState {
+  return {
+    ...state,
+    decided: state.decided.map((d) => (d.step === step && d.what === what ? { ...d, changed: answer } : d)),
+  };
 }
