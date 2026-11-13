@@ -319,7 +319,16 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation, checkpoint 2026-11-14 late): PUBLISHED 0.1.19 (24u parts 1-3, 24x stopped-step
+    RESUME HERE (new conversation, checkpoint 2026-11-14 night): 24u part 4 session A BUILT (f523130, verify green
+    338 + 162, NOT driven live yet): Inbox table (migration 8, src-tauri/src/inbox.rs, "qanuvi-inbox" event to every
+    window), held steps become questions with forms (src/lib/plan/holdask.ts: Go ahead / Let Qanuvi decide / Skip;
+    logins answered in the run panel only), the first answer anywhere closes it and reaches the running run
+    (runner #fromInbox), run panel answers close it too, questions of a plan close at the next run start when the hold
+    is gone, old localStorage items imported once. FIRST: drive it live on a scratch project (fresh plan file, a hold
+    step; answer it from the Inbox; check the run goes on and the run panel and Inbox agree). THEN session B: desktop
+    notifications on Windows, macOS and Linux (owner, 2026-11-14: not Windows only; tauri-plugin-notification shows
+    them everywhere, check whether desktop click events need notify-rust per system), Settings > Notifications
+    ("Desktop notification", bundled, quiet hours), click opens InboxQuestion. Older checkpoint (2026-11-14 late): PUBLISHED 0.1.19 (24u parts 1-3, 24x stopped-step
     chat is a chat and resumes only on yes/continue, End the run here = needs-you, chat keeps its place when
     scrolled up, first-decision-lost fix, Team label). Unpublished since 0.1.19: 779bf51 (plan logins reach
     handed-over step chats; stored requests mask private details; migration 7 masks old copies; a login typed during
@@ -420,8 +429,8 @@ runs on or off; with it off nothing is sent anywhere.
   - Part 4, one notification centre: the Inbox moves into Qanuvi's database (Rust side), seen by every window, the
     runner and later the phone. Types: for your information, needs an answer, problem. Answer items carry their form
     (options, text, "Let Qanuvi decide", "Skip this step"); the first answer anywhere closes it everywhere. Settings,
-    Notifications: per type, Inbox (always), Windows notification, phone; bundled ("5 things need you"); quiet
-    hours. Clicking a Windows notification brings Qanuvi forward and opens the same answer window used in the
+    Notifications: per type, Inbox (always), Desktop notification, phone; bundled ("5 things need you"); quiet
+    hours. Desktop notifications on Windows, macOS and Linux (not Windows only, owner 2026-11-14). Clicking a notification brings Qanuvi forward and opens the same answer window used in the
     Inbox. Secrets are answered in the main app only. The phone is a delivery target in the design and settings;
     the phone app itself (through the Milestone 20 relay) is its own later step.
 - [ ] **24x. Writing in a stopped step's chat is a chat, not a restart (owner, 2026-11-14; agreed 2026-11-14)**: before,
