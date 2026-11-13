@@ -469,9 +469,13 @@ runs on or off; with it off nothing is sent anywhere.
   memory goes to the brain (speech to text, voice, local models, indexes), not the window; the window (WebView2 on
   Windows, WebKit on macOS and Linux, about 300 to 470 MB) stays a roughly fixed cost. Owner: focus on the main app;
   a native UI is a much later subject, only if ever needed.
-  - Rule 1: new assistant abilities (voice: wake word, listening, speaking; the brain and its own agent; language
-    understanding of requests) are built in the Rust core, never inside the window, so they work with the window
-    closed.
+  - Rule 1: the assistant builds on the brain Qanuvi already has, not a new one. Already in the Rust core: brain.rs
+    (model per turn, local first for light jobs, skips limited or broken models, falls back), llm.rs and
+    local_agent.rs (Qanuvi's own agent and its tools), machine.rs (models that fit the PC), memory and the memory
+    disk, the code index. Still in the window (TypeScript): the decider (core/decider.ts, seats and decision log),
+    learned routing, the planner, the plan runner, guides and free-model ranking; these move into the core with
+    step A. New abilities (voice: wake word, listening, speaking; understanding spoken or typed requests) are built
+    in the core and take seats in the same decider (24b), never inside the window, so they work with it closed.
   - Rule 2: the window is one handler among others (like the phone and the laptop through the relay). Everything the
     assistant does must also work headless.
   - Gap today: the plan runner (stores/runner.svelte.ts: step order, holds, set-aside, reviews, closing steps,
