@@ -645,7 +645,12 @@
       <label>
         Team for this run
         <select bind:value={team}>
-          <option value="settings">As in Settings: {TEAM_LABELS[settings.value.team.mode]}</option>
+          <option value="settings"
+            >As in Settings: {TEAM_LABELS[settings.value.team.mode]}{!hasFree &&
+            NEEDS_FREE.includes(settings.value.team.mode)
+              ? " (no free models yet: paid only)"
+              : ""}</option
+          >
           {#each Object.entries(TEAM_LABELS) as [id, name] (id)}
             <option value={id} disabled={!hasFree && NEEDS_FREE.includes(id as TeamMode)}>{name}</option>
           {/each}

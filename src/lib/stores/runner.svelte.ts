@@ -70,6 +70,7 @@ import {
   nextModel,
   nextModelFreeFirst,
   freeFirstFor,
+  freeWantedButMissing,
   ladder,
   paidPerStep,
   runTotals,
@@ -816,6 +817,18 @@ class RunnerStore {
     const freeFirst = options.team
       ? freeFirstFor(options.team, freeWorks(team, true, true), canFree)
       : !!options.freeFirst && canFree && freeWorks(team, true, true);
+    // The Team choice wanted free models but none are set up: say once that every step goes to the paid agent.
+    if (
+      freeWantedButMissing(options.team, team.mode, settings.value.brain.models.length > 0, provider.id === "qanuvi")
+    ) {
+      this.#decide(run, {
+        kind: "assign",
+        by: "Qanuvi",
+        subject: "Team",
+        decision: `No free models set up: every step on ${provider.name}`,
+        why: "The Team mode works with free models, and Settings, Models and providers has none yet.",
+      });
+    }
     // One model for every step (the user's choice for this run) wins over the steps' own Model lines.
     const oneModel = options.model?.trim() || "";
     const models = ladder(provider.models, options.strongerOnFail);

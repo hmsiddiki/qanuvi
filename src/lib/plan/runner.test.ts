@@ -5,6 +5,7 @@ import {
   FREE_MODEL,
   costRatio,
   freeFirstFor,
+  freeWantedButMissing,
   ladder,
   freeSavings,
   nextModel,
@@ -267,5 +268,14 @@ describe("run settings: one model, Team per run", () => {
     expect(freeFirstFor("settings", true, true)).toBe(true);
     expect(freeFirstFor("settings", false, true)).toBe(false);
     expect(freeFirstFor("free", true, false)).toBe(false);
+  });
+
+  it("notes when the Team choice wanted free models but none are set up", () => {
+    expect(freeWantedButMissing("settings", "paid-decides", false, false)).toBe(true);
+    expect(freeWantedButMissing("free", "direct", false, false)).toBe(true);
+    expect(freeWantedButMissing("settings", "direct", false, false)).toBe(false);
+    expect(freeWantedButMissing("paid", "paid-decides", false, false)).toBe(false);
+    expect(freeWantedButMissing("settings", "paid-decides", true, false)).toBe(false);
+    expect(freeWantedButMissing("settings", "paid-decides", false, true)).toBe(false);
   });
 });

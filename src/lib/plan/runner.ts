@@ -5,6 +5,7 @@
 import type { AgentModel } from "$lib/agents/providers";
 import { parsePlan, type Step } from "./tasklist";
 import { FINISHER } from "./finishing";
+import type { TeamMode } from "$lib/core/decider";
 
 export interface RunOptions {
   /** Line of the first step to run; earlier steps are skipped. */
@@ -167,6 +168,20 @@ export function ladder(models: AgentModel[], strongerOnFail: boolean | undefined
 export function freeFirstFor(team: RunTeam | undefined, teamAllows: boolean, canFree: boolean): boolean {
   if (!canFree || team === "paid") return false;
   return team === "free" ? true : teamAllows;
+}
+
+/**
+ * Whether the run's Team choice wanted free models but none are set up, so every step goes to the paid agent
+ * (the run says so once in its decisions). Not for runs on Qanuvi's own agent, or ones set to paid only.
+ */
+export function freeWantedButMissing(
+  team: RunTeam | undefined,
+  mode: TeamMode,
+  hasFree: boolean,
+  ownAgent: boolean,
+): boolean {
+  if (hasFree || ownAgent || team === "paid") return false;
+  return team === "free" || team === "free-only" || mode !== "direct";
 }
 
 /**

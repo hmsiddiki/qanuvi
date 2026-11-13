@@ -319,13 +319,13 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation): first the small Team fix the owner agreed (2026-11-14): with no free models set
+    RESUME HERE (new conversation): the Team fix below is built (2026-11-14, verify green 320 + 156, not driven
+    live; helper `freeWantedButMissing` in plan/runner.ts); next is part 3. The fix: with no free models set
     up, the Run panel's Team option reads "As in Settings: Paid decides, free works (no free models yet: paid only)"
     and the run logs one decision "No free models set up: every step on <agent>" (found because the test build's
     data has no free models, so its "paid decides" runs were paid only, as designed, but the label did not say so).
     Then part 3 (sorted asks), part 4 (central Inbox with answer forms, Windows notifications). Test plans: the
     scratch project's plan state is kept per plan file (localStorage), so use a fresh plan file name per test. Each part in a short session; drive it live on a scratch project only. After 24u:
-    24v parts 1 and 2 (Qanuvi's own compression, owner agreed 2026-11-14) with a 24w measurement after each, then
     drive 24t, 24s part 3 and 15i part 2 live (Pick models, Revert / Rewind / Redo and the waiting-message hold were
     driven 2026-11-13), then 15i part 3 (debugging, PHP / Xdebug and Node first). Publish only with the owner's yes. Older open notes: drive 24j, 24o, 24n
     part 6, the stale-file fix and the model switch live on the scratch plan (never on the owner's folders). Owner's
@@ -401,7 +401,8 @@ runs on or off; with it off nothing is sent anywhere.
     hours. Clicking a Windows notification brings Qanuvi forward and opens the same answer window used in the
     Inbox. Secrets are answered in the main app only. The phone is a delivery target in the design and settings;
     the phone app itself (through the Milestone 20 relay) is its own later step.
-- [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14)**: the
+- [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
+  it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
   Claude Code; measured 2026-11-14: 4 python processes, 544 MB (the proxy worker alone 513 MB), all counted in
   Qanuvi's status-bar total because it was started from Qanuvi's terminal. If that terminal closes, every Claude
@@ -423,7 +424,7 @@ runs on or off; with it off nothing is sent anywhere.
     only if the machine has room (machine::room/fits) and only if 24w shows heuristics are not enough.
   - Aim: tens of MB, not hundreds (estimate, to be measured). Headroom stays the owner's setup until part 2 works
     and 24w shows Qanuvi is close enough. On a Max plan the saving is room in the 5-hour window, not dollars.
-- [ ] **24w. Keep measuring Qanuvi's compression against Headroom (owner, 2026-11-14; repeats, not one-off)**: Headroom
+- [ ] **24w. Keep measuring Qanuvi's compression against Headroom (owner, 2026-11-14; repeats, not one-off; later, starts with 24v)**: Headroom
   has been tuned for a long time, so 24v starts behind it. After each 24v part and after each tuning change: run the
   same scratch plan (same model, fresh plan file name) once through Headroom and once through Qanuvi's compressor;
   record input tokens, cache reads, output tokens, steps passed, retrieve calls, memory and time per request, in a
