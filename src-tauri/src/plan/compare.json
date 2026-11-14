@@ -1,0 +1,1656 @@
+[
+ {
+  "fn": "parseTeam",
+  "args": [
+   {
+    "mode": "direct",
+    "priority": "solve"
+   }
+  ],
+  "out": {
+   "mode": "direct",
+   "priority": "solve"
+  }
+ },
+ {
+  "fn": "parseTeam",
+  "args": [
+   {
+    "mode": "nonsense",
+    "priority": 3
+   }
+  ],
+  "out": {
+   "mode": "paid-decides",
+   "priority": "balanced"
+  }
+ },
+ {
+  "fn": "parseTeam",
+  "args": [
+   null
+  ],
+  "out": {
+   "mode": "paid-decides",
+   "priority": "balanced"
+  }
+ },
+ {
+  "fn": "deciderSeat",
+  "args": [
+   {
+    "agent": "claude-code",
+    "model": "opus"
+   },
+   [
+    {
+     "id": "or/a",
+     "local": false
+    }
+   ]
+  ],
+  "out": {
+   "kind": "paid",
+   "agent": "claude-code",
+   "model": "opus"
+  }
+ },
+ {
+  "fn": "deciderSeat",
+  "args": [
+   null,
+   [
+    {
+     "id": "ollama/q",
+     "local": true
+    },
+    {
+     "id": "omniroute/s",
+     "local": false
+    }
+   ]
+  ],
+  "out": {
+   "kind": "free",
+   "models": [
+    "omniroute/s",
+    "ollama/q"
+   ]
+  }
+ },
+ {
+  "fn": "deciderSeat",
+  "args": [
+   null,
+   []
+  ],
+  "out": {
+   "kind": "none"
+  }
+ },
+ {
+  "fn": "freeWorks",
+  "args": [
+   {
+    "mode": "priority"
+   },
+   true,
+   true
+  ],
+  "out": true
+ },
+ {
+  "fn": "freeWorks",
+  "args": [
+   {
+    "mode": "free-decides"
+   },
+   true,
+   true
+  ],
+  "out": false
+ },
+ {
+  "fn": "freeWorks",
+  "args": [
+   {
+    "mode": "direct"
+   },
+   true,
+   false
+  ],
+  "out": true
+ },
+ {
+  "fn": "freeWorks",
+  "args": [
+   {},
+   false,
+   false
+  ],
+  "out": false
+ },
+ {
+  "fn": "assignPrompt",
+  "args": [
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   "save"
+  ],
+  "out": "You are the decider in a coding team. Free models (capable but weaker, may break tool calls) and one paid model (strong) can do each step of this plan.\nSave the paid model's tokens: give free models every step they can plausibly do.\nMoney, payments, security and authentication work always goes to the paid model.\nLook at the steps, then answer with JSON only, in this shape:\n{\"steps\":[{\"number\":\"1\",\"worker\":\"free\",\"why\":\"a short reason\"}]}\n\nSteps:\n1. Write a README [docs]\n2. Add a checkout page [security]\n   Stripe\n   Webhooks\n   Refunds\n   Tests\n3. Add a filter to the list [feature]\n   Ünïcode détail\n4. Tidy [refactor]"
+ },
+ {
+  "fn": "assignPrompt",
+  "args": [
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   "solve"
+  ],
+  "out": "You are the decider in a coding team. Free models (capable but weaker, may break tool calls) and one paid model (strong) can do each step of this plan.\nSolving the problem comes first: give the paid model every step that is not routine; free models only for plain, low-risk steps.\nMoney, payments, security and authentication work always goes to the paid model.\nLook at the steps, then answer with JSON only, in this shape:\n{\"steps\":[{\"number\":\"1\",\"worker\":\"free\",\"why\":\"a short reason\"}]}\n\nSteps:\n1. Write a README [docs]\n2. Add a checkout page [security]\n   Stripe\n   Webhooks\n   Refunds\n   Tests\n3. Add a filter to the list [feature]\n   Ünïcode détail\n4. Tidy [refactor]"
+ },
+ {
+  "fn": "parseAssignment",
+  "args": [
+   "Sure:\n```json\n{\"steps\":[{\"number\":1,\"worker\":\"free\",\"why\":\"plain docs\"},{\"number\":\"2\",\"worker\":\"free\"},{\"number\":\"4\",\"worker\":\"paid\",\"why\":\"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\"}]}\n```",
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   "balanced"
+  ],
+  "out": [
+   {
+    "number": "1",
+    "worker": "free",
+    "why": "plain docs"
+   },
+   {
+    "number": "2",
+    "worker": "paid",
+    "why": "money or security work"
+   },
+   {
+    "number": "3",
+    "worker": "paid",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "4",
+    "worker": "paid",
+    "why": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+   }
+  ]
+ },
+ {
+  "fn": "parseAssignment",
+  "args": [
+   "no idea",
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   "save"
+  ],
+  "out": [
+   {
+    "number": "1",
+    "worker": "free",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "2",
+    "worker": "paid",
+    "why": "money or security work"
+   },
+   {
+    "number": "3",
+    "worker": "free",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "4",
+    "worker": "free",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   }
+  ]
+ },
+ {
+  "fn": "parseAssignment",
+  "args": [
+   "{broken json}",
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   "solve"
+  ],
+  "out": [
+   {
+    "number": "1",
+    "worker": "free",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "2",
+    "worker": "paid",
+    "why": "money or security work"
+   },
+   {
+    "number": "3",
+    "worker": "paid",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "4",
+    "worker": "paid",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   }
+  ]
+ },
+ {
+  "fn": "pickPrompt",
+  "args": [
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   {
+    "priority": "balanced",
+    "freeFirst": true,
+    "models": [
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5"
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5"
+     }
+    ],
+    "profiles": {
+     "docs": [],
+     "security": [
+      {
+       "model": "claude-fable-5-2",
+       "tries": 5,
+       "successes": 2,
+       "tokensPerSuccess": 336500,
+       "costPerSuccess": 4.5,
+       "heavy": true
+      },
+      {
+       "model": "claude-opus-5-5",
+       "tries": 34,
+       "successes": 33,
+       "tokensPerSuccess": 219757.5,
+       "costPerSuccess": 0.125,
+       "heavy": false
+      }
+     ]
+    }
+   }
+  ],
+  "out": "You are the decider in a coding team. Pick, for each step of this plan, the model that does it.\nFree models (capable but weaker, may break tool calls) can take routine steps: worker \"free\". Balance: free models for routine steps, the paid model for steps that need real judgement.\nPaid models, strongest first:\n- claude-opus-5-5 (Opus 5.5)\n- claude-haiku-5-5 (Haiku 5.5)\nHigh-quality code comes first, saving tokens second. For each step pick the paid model that will do it well; only among models that would do it equally well, pick the lighter one. Never pick a weaker model to save tokens on a step that needs real judgement (money logic, security, tricky bugs, changes across many files).\nWhat earlier runs showed, per kind of work (steps done of tried, tokens and cost per finished step). A model marked HEAVY burned far more tokens than another model that also finished that kind of work: pick it only when the step truly needs what it does better, and say why in the reason. A model that often did not finish a kind of work is a quality risk there, whatever it costs.\n- security: claude-fable-5-2 2/5 done, 337k tokens and $4.50 per finished step HEAVY; claude-opus-5-5 33/34 done, 220k tokens and $0.13 per finished step\nMoney, payments, security and authentication work always gets a paid model.\nAnswer with JSON only, in this shape:\n{\"steps\":[{\"number\":\"1\",\"worker\":\"free\",\"model\":\"<model id>\",\"why\":\"a short reason\"}]}\n\nSteps:\n1. Write a README [docs]\n2. Add a checkout page [security]\n   Stripe\n   Webhooks\n   Refunds\n   Tests\n3. Add a filter to the list [feature]\n   Ünïcode détail\n4. Tidy [refactor]"
+ },
+ {
+  "fn": "pickPrompt",
+  "args": [
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   {
+    "priority": "save",
+    "freeFirst": false,
+    "models": [
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5"
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5"
+     }
+    ],
+    "profiles": {}
+   }
+  ],
+  "out": "You are the decider in a coding team. Pick, for each step of this plan, the model that does it.\nPaid models, strongest first:\n- claude-opus-5-5 (Opus 5.5)\n- claude-haiku-5-5 (Haiku 5.5)\nHigh-quality code comes first, saving tokens second. For each step pick the paid model that will do it well; only among models that would do it equally well, pick the lighter one. Never pick a weaker model to save tokens on a step that needs real judgement (money logic, security, tricky bugs, changes across many files).\nMoney, payments, security and authentication work always gets a paid model.\nAnswer with JSON only, in this shape:\n{\"steps\":[{\"number\":\"1\",\"worker\":\"paid\",\"model\":\"<model id>\",\"why\":\"a short reason\"}]}\n\nSteps:\n1. Write a README [docs]\n2. Add a checkout page [security]\n   Stripe\n   Webhooks\n   Refunds\n   Tests\n3. Add a filter to the list [feature]\n   Ünïcode détail\n4. Tidy [refactor]"
+ },
+ {
+  "fn": "parsePicks",
+  "args": [
+   "{\"steps\":[{\"number\":\"1\",\"worker\":\"free\",\"model\":\"claude-haiku-5-5\"},{\"number\":\"3\",\"model\":\"gpt-9\",\"worker\":\"free\"}]}",
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   {
+    "priority": "save",
+    "freeFirst": true,
+    "modelIds": [
+     "claude-opus-5-5",
+     "claude-haiku-5-5"
+    ]
+   }
+  ],
+  "out": [
+   {
+    "number": "1",
+    "worker": "free",
+    "why": "",
+    "model": "claude-haiku-5-5"
+   },
+   {
+    "number": "2",
+    "worker": "paid",
+    "why": "money or security work"
+   },
+   {
+    "number": "3",
+    "worker": "free",
+    "why": ""
+   },
+   {
+    "number": "4",
+    "worker": "free",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   }
+  ]
+ },
+ {
+  "fn": "parsePicks",
+  "args": [
+   "{\"steps\":[{\"number\":\"1\",\"worker\":\"free\",\"model\":\"claude-haiku-5-5\"}]}",
+   [
+    {
+     "number": "1",
+     "title": "Write a README",
+     "details": [],
+     "type": "docs"
+    },
+    {
+     "number": "2",
+     "title": "Add a checkout page",
+     "details": [
+      "Stripe",
+      "Webhooks",
+      "Refunds",
+      "Tests",
+      "Fifth"
+     ],
+     "type": "security"
+    },
+    {
+     "number": "3",
+     "title": "Add a filter to the list",
+     "details": [
+      "Ünïcode détail"
+     ],
+     "type": "feature"
+    },
+    {
+     "number": "4",
+     "title": "Tidy",
+     "details": [],
+     "type": "refactor"
+    }
+   ],
+   {
+    "priority": "save",
+    "freeFirst": false,
+    "modelIds": [
+     "claude-opus-5-5",
+     "claude-haiku-5-5"
+    ]
+   }
+  ],
+  "out": [
+   {
+    "number": "1",
+    "worker": "paid",
+    "why": "",
+    "model": "claude-haiku-5-5"
+   },
+   {
+    "number": "2",
+    "worker": "paid",
+    "why": "money or security work"
+   },
+   {
+    "number": "3",
+    "worker": "paid",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   },
+   {
+    "number": "4",
+    "worker": "paid",
+    "why": "Qanuvi core's rule (the decider gave no answer for it)"
+   }
+  ]
+ },
+ {
+  "fn": "reviewPrompt",
+  "args": [
+   {
+    "title": "Sort",
+    "details": [
+     "a",
+     "b",
+     "c",
+     "d",
+     "e",
+     "f",
+     "g"
+    ]
+   },
+   "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   ""
+  ],
+  "out": "You are reviewing a change a free model made for one step of a plan. Is it correct and complete for the step,\nwithout breaking anything around it? Be strict but fair; style alone is not a reason to reject.\nAnswer with JSON only: {\"ok\": true, \"why\": \"a short reason\"} or {\"ok\": false, \"why\": \"what is wrong\"}\n\nStep: Sort\n- a\n- b\n- c\n- d\n- e\n- f\n\nTests: none were run.\n\nThe change (git diff):\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n… (cut)"
+ },
+ {
+  "fn": "reviewPrompt",
+  "args": [
+   {
+    "title": "Sort",
+    "details": []
+   },
+   "",
+   "3 passed"
+  ],
+  "out": "You are reviewing a change a free model made for one step of a plan. Is it correct and complete for the step,\nwithout breaking anything around it? Be strict but fair; style alone is not a reason to reject.\nAnswer with JSON only: {\"ok\": true, \"why\": \"a short reason\"} or {\"ok\": false, \"why\": \"what is wrong\"}\n\nStep: Sort\n\nTests: 3 passed\n\nThe change (git diff):\n(no change)"
+ },
+ {
+  "fn": "parseReview",
+  "args": [
+   "{\"ok\": true, \"why\": \"fine\"}"
+  ],
+  "out": {
+   "ok": true,
+   "why": "fine"
+  }
+ },
+ {
+  "fn": "parseReview",
+  "args": [
+   "```json\n{\"ok\": \"yes\"}\n```"
+  ],
+  "out": {
+   "ok": false,
+   "why": "the review could not be read"
+  }
+ },
+ {
+  "fn": "parseReview",
+  "args": [
+   "{\"ok\": false}"
+  ],
+  "out": {
+   "ok": false,
+   "why": ""
+  }
+ },
+ {
+  "fn": "chatModelPrompt",
+  "args": [
+   "rename a variable",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": "Pick the paid model for this coding request: the cheapest one that will do it well. Stronger models first in the list.\n- claude-opus-5-5 (Opus 5.5)\n- claude-haiku-5-5 (Haiku 5.5)\nAnswer with JSON only: {\"model\": \"<id>\", \"why\": \"a short reason\"}\n\nRequest:\nrename a variable"
+ },
+ {
+  "fn": "parseChatModel",
+  "args": [
+   "{\"model\":\" claude-haiku-5-5 \",\"why\":\"small\"}",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": {
+   "model": "claude-haiku-5-5",
+   "why": "small"
+  }
+ },
+ {
+  "fn": "parseChatModel",
+  "args": [
+   "{\"model\":\"gpt-9\"}",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": null
+ },
+ {
+  "fn": "stepDiff",
+  "args": [
+   "notes.txt",
+   "Shopping list\n- milk\n- apples\n- bread\n- butter\n",
+   "Shopping list\n- apples\n- bread\n- butter\n- milk\n"
+  ],
+  "out": "--- notes.txt (before this step)\n+++ notes.txt (after)\n-- milk\n+- milk"
+ },
+ {
+  "fn": "stepDiff",
+  "args": [
+   "a",
+   "x\ny",
+   "x\ny"
+  ],
+  "out": ""
+ },
+ {
+  "fn": "stepDiff",
+  "args": [
+   "a",
+   "",
+   "new\nfile"
+  ],
+  "out": "--- a (before this step)\n+++ a (after)\n+new\n+file\n-"
+ },
+ {
+  "fn": "overruleNote",
+  "args": [
+   "Haiku 5.5",
+   "a short question"
+  ],
+  "out": "\n\n(Qanuvi: a free model chose Haiku 5.5 for this message because: a short question. If this message needs a\nstronger model to be done well, answer only \"NEEDS_STRONGER_MODEL: <the reason>\" and do nothing else.)"
+ },
+ {
+  "fn": "overruleNote",
+  "args": [
+   "Haiku 5.5",
+   ""
+  ],
+  "out": "\n\n(Qanuvi: a free model chose Haiku 5.5 for this message. If this message needs a\nstronger model to be done well, answer only \"NEEDS_STRONGER_MODEL: <the reason>\" and do nothing else.)"
+ },
+ {
+  "fn": "withoutOverruleNote",
+  "args": [
+   "Is it sorted?\n\n(Qanuvi: a free model chose Haiku 5.5 for this message because: short. If this message needs a\nstronger model to be done well, answer only \"NEEDS_STRONGER_MODEL: <the reason>\" and do nothing else.)"
+  ],
+  "out": "Is it sorted?"
+ },
+ {
+  "fn": "overruleIn",
+  "args": [
+   "NEEDS_STRONGER_MODEL: the refactor\nspans many files"
+  ],
+  "out": "the refactor\nspans many files"
+ },
+ {
+  "fn": "overruleIn",
+  "args": [
+   "  NEEDS_STRONGER_MODEL"
+  ],
+  "out": "no reason given"
+ },
+ {
+  "fn": "overruleIn",
+  "args": [
+   "The file holds prices. NEEDS_STRONGER_MODEL is not needed."
+  ],
+  "out": null
+ },
+ {
+  "fn": "strongerModel",
+  "args": [
+   [
+    {
+     "id": "fable"
+    },
+    {
+     "id": "opus"
+    }
+   ],
+   "opus"
+  ],
+  "out": "fable"
+ },
+ {
+  "fn": "strongerModel",
+  "args": [
+   [
+    {
+     "id": "fable"
+    },
+    {
+     "id": "opus"
+    }
+   ],
+   "unknown"
+  ],
+  "out": "fable"
+ },
+ {
+  "fn": "strongerModel",
+  "args": [
+   [],
+   "x"
+  ],
+  "out": "x"
+ },
+ {
+  "fn": "isLimit",
+  "args": [
+   "You've hit your session limit · resets 5:20am (Asia/Dhaka)"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isLimit",
+  "args": [
+   "Rate limit was reached"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isLimit",
+  "args": [
+   "Tests failed."
+  ],
+  "out": false
+ },
+ {
+  "fn": "limitResetAt",
+  "args": [
+   "You've hit your session limit · resets 5:20am (Asia/Dhaka)",
+   1794430800000
+  ],
+  "out": 1794439260000
+ },
+ {
+  "fn": "limitResetAt",
+  "args": [
+   "hit your weekly limit · resets 11pm (UTC)",
+   1794522600000
+  ],
+  "out": 1794524460000
+ },
+ {
+  "fn": "limitResetAt",
+  "args": [
+   "hit your limit · resets at 12am (America/New_York)",
+   1794459540000
+  ],
+  "out": 1794459660000
+ },
+ {
+  "fn": "limitResetAt",
+  "args": [
+   "You've hit your usage limit",
+   1794430800000
+  ],
+  "out": 1794434400000
+ },
+ {
+  "fn": "limitResetAt",
+  "args": [
+   "no limit here",
+   1794430800000
+  ],
+  "out": null
+ },
+ {
+  "fn": "holdKey",
+  "args": [
+   "p1",
+   "docs/PLAN.md",
+   "1c"
+  ],
+  "out": "hold:p1:docs/PLAN.md:1c"
+ },
+ {
+  "fn": "asksSecret",
+  "args": [
+   "needs an API key for the mail service"
+  ],
+  "out": true
+ },
+ {
+  "fn": "asksSecret",
+  "args": [
+   "it changes the date format"
+  ],
+  "out": false
+ },
+ {
+  "fn": "holdForm",
+  "args": [
+   "hold",
+   "it pushes to the live server"
+  ],
+  "out": {
+   "choices": [
+    {
+     "id": "go",
+     "label": "Go ahead"
+    },
+    {
+     "id": "decide",
+     "label": "Let Qanuvi decide",
+     "hint": "It picks the safer way and says what it chose"
+    },
+    {
+     "id": "skip",
+     "label": "Skip this step",
+     "hint": "Leave it, and the steps waiting for it"
+    }
+   ],
+   "text": "Your answer (optional)"
+  }
+ },
+ {
+  "fn": "holdForm",
+  "args": [
+   "failed",
+   "the tests kept failing"
+  ],
+  "out": {
+   "choices": [
+    {
+     "id": "go",
+     "label": "Try again"
+    },
+    {
+     "id": "skip",
+     "label": "Skip this step",
+     "hint": "Leave it, and the steps waiting for it"
+    }
+   ],
+   "text": "What to do differently (optional)"
+  }
+ },
+ {
+  "fn": "holdForm",
+  "args": [
+   "hold",
+   "it needs the database login"
+  ],
+  "out": {
+   "choices": [
+    {
+     "id": "go",
+     "label": "Go ahead"
+    },
+    {
+     "id": "skip",
+     "label": "Skip this step",
+     "hint": "Leave it, and the steps waiting for it"
+    }
+   ],
+   "secret": true
+  }
+ },
+ {
+  "fn": "holdReply",
+  "args": [
+   {
+    "choice": "go",
+    "text": " yes "
+   }
+  ],
+  "out": {
+   "choice": "go",
+   "text": "yes"
+  }
+ },
+ {
+  "fn": "holdReply",
+  "args": [
+   {
+    "choice": "skip"
+   }
+  ],
+  "out": {
+   "choice": "skip",
+   "text": ""
+  }
+ },
+ {
+  "fn": "holdReply",
+  "args": [
+   {
+    "choice": "decide",
+    "text": "keep it small"
+   }
+  ],
+  "out": {
+   "choice": "go",
+   "text": "Decide this yourself: choose what fits the plan and the project best, take the safer way when unsure, and say in your summary what you chose and why.\nkeep it small"
+  }
+ },
+ {
+  "fn": "isClosingStep",
+  "args": [
+   "95Z"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isClosingStep",
+  "args": [
+   "95b"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isClosingStep",
+  "args": [
+   null
+  ],
+  "out": false
+ },
+ {
+  "fn": "mentionedFiles",
+  "args": [
+   "Change includes\\Checkout.php and src/a.ts, src/a.ts; see MAP.md and app.tsx, x.yml"
+  ],
+  "out": [
+   "includes/checkout.php",
+   "src/a.ts",
+   "app.tsx",
+   "x.yml"
+  ]
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95b",
+    "title": "Refunds",
+    "details": [
+     "edit includes/refund.php"
+    ]
+   },
+   {
+    "number": "72a",
+    "title": "x",
+    "needs": [
+     " 95b "
+    ]
+   }
+  ],
+  "out": "its Needs line names step 95b"
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95b",
+    "title": "Refunds",
+    "details": [
+     "edit includes/refund.php"
+    ]
+   },
+   {
+    "number": "95c",
+    "title": "x"
+   }
+  ],
+  "out": "same step number (95)"
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95b",
+    "title": "Refunds",
+    "details": [
+     "edit includes/refund.php"
+    ]
+   },
+   {
+    "number": "72a",
+    "title": "Log refund.php errors"
+   }
+  ],
+  "out": "both work on includes/refund.php"
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95b",
+    "title": "Refunds",
+    "details": [
+     "edit includes/refund.php"
+    ]
+   },
+   {
+    "number": "72a",
+    "title": "Change lib/includes/refund.php"
+   }
+  ],
+  "out": "both work on lib/includes/refund.php"
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95b",
+    "title": "Refunds",
+    "details": [],
+    "changed": [
+     "src\\X.ts"
+    ]
+   },
+   {
+    "number": "1",
+    "title": "fix x.ts"
+   }
+  ],
+  "out": "both work on src/x.ts"
+ },
+ {
+  "fn": "planDependence",
+  "args": [
+   {
+    "number": "95a",
+    "title": "a"
+   },
+   {
+    "number": "96a",
+    "title": "b"
+   }
+  ],
+  "out": null
+ },
+ {
+  "fn": "dependencePrompt",
+  "args": [
+   [
+    {
+     "number": "95b",
+     "title": "Refunds",
+     "why": "a question"
+    }
+   ],
+   [
+    {
+     "number": "72a",
+     "title": "Mail",
+     "details": [
+      "one",
+      "two",
+      "three",
+      "four"
+     ]
+    },
+    {
+     "number": null,
+     "title": "No number"
+    }
+   ]
+  ],
+  "out": "A plan run set these steps aside (they wait for the owner):\n- 95b. Refunds (a question)\n\nWhich of these open steps cannot be done properly before one of them is done? A step only needs another when it\nuses what that step makes or changes; working on the same project is not enough.\n- 72a. Mail: one two three\n- No number\n\nAnswer with JSON only: {\"needs\":[{\"step\":\"72a\",\"on\":\"95b\",\"why\":\"...\"}]} (an empty list when none do)."
+ },
+ {
+  "fn": "parseDependence",
+  "args": [
+   "ok {\"needs\":[{\"step\":\"72a\",\"on\":\"95b\",\"why\":\"mails the refund\"},{\"step\":\"99\",\"on\":\"95b\"},{\"step\":\"72a\",\"on\":\"1\"}]}",
+   [
+    "72a"
+   ],
+   [
+    "95b"
+   ]
+  ],
+  "out": [
+   [
+    "72a",
+    {
+     "on": "95b",
+     "why": "mails the refund"
+    }
+   ]
+  ]
+ },
+ {
+  "fn": "parseDependence",
+  "args": [
+   "no",
+   [
+    "72a"
+   ],
+   [
+    "95b"
+   ]
+  ],
+  "out": []
+ },
+ {
+  "fn": "waitingLine",
+  "args": [
+   1
+  ],
+  "out": "Waiting for you (1 answer). Nothing is spent meanwhile; the run goes on by itself once you answer."
+ },
+ {
+  "fn": "waitingLine",
+  "args": [
+   3
+  ],
+  "out": "Waiting for you (3 answers). Nothing is spent meanwhile; the run goes on by itself once you answer."
+ },
+ {
+  "fn": "closingRerunNote",
+  "args": [
+   [
+    "1a"
+   ]
+  ],
+  "out": "\n\nYou already ran once in this run while step 1a was set aside; it is done now.\nQanuvi opened this step again in the plan on purpose (it shows [ ] instead of [x]); mark it done again when\nfinished. Bring your step's work up to date with them (and take them off your log's still-open list); do not\nredo the rest."
+ },
+ {
+  "fn": "closingRerunNote",
+  "args": [
+   [
+    "1a",
+    "1b"
+   ]
+  ],
+  "out": "\n\nYou already ran once in this run while steps 1a, 1b were set aside; they are done now.\nQanuvi opened this step again in the plan on purpose (it shows [ ] instead of [x]); mark it done again when\nfinished. Bring your step's work up to date with them (and take them off your log's still-open list); do not\nredo the rest."
+ },
+ {
+  "fn": "setAsideBlock",
+  "args": [
+   []
+  ],
+  "out": ""
+ },
+ {
+  "fn": "setAsideBlock",
+  "args": [
+   [
+    {
+     "label": "95b",
+     "why": "waits for you"
+    },
+    {
+     "label": "96",
+     "why": "failed"
+    }
+   ]
+  ],
+  "out": "\n\nSet aside in this run (they wait for the owner): 95b (waits for you); 96 (failed).\nDo what you can without them, write in your log what is still open because of them, and mark this step done\n([x]) for what you did: do not mark it blocked for them. Qanuvi runs this step again once they are done."
+ },
+ {
+  "fn": "toolKinds",
+  "args": [
+   [
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"Read\",\"input\":{}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"mcp__qanuvi__find_symbol\",\"input\":{}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"Bash\",\"input\":{\"description\":\"Read CheckoutPage first half\"}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"Bash\",\"input\":{\"command\":\"cd src && grep -n x a.ts\"}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"PowerShell\",\"input\":{\"description\":null,\"command\":\"npm test\"}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"Edit\",\"input\":{}}]}}",
+    "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"x\",\"name\":\"TodoWrite\",\"input\":{}}]}}",
+    "not json"
+   ]
+  ],
+  "out": {
+   "read": 4,
+   "change": 1,
+   "run": 2
+  }
+ },
+ {
+  "fn": "finishedCost",
+  "args": [
+   {
+    "steps": [
+     {
+      "status": "done",
+      "attempts": [
+       {
+        "costUsd": 2
+       },
+       {
+        "costUsd": 1.25
+       }
+      ]
+     },
+     {
+      "status": "blocked"
+     }
+    ]
+   }
+  ],
+  "out": {
+   "steps": 1,
+   "cost": 3.25
+  }
+ },
+ {
+  "fn": "planHistory",
+  "args": [
+   [
+    {
+     "id": "a",
+     "file": "P.md",
+     "data": "{\"steps\":[{\"status\":\"done\",\"attempts\":[{\"costUsd\":5}]}]}"
+    },
+    {
+     "id": "b",
+     "file": "P.md",
+     "data": "not json"
+    },
+    {
+     "id": "now",
+     "file": "P.md",
+     "data": "{\"steps\":[]}"
+    }
+   ],
+   "P.md",
+   "now"
+  ],
+  "out": {
+   "runs": 1,
+   "steps": 1,
+   "cost": 5,
+   "perStep": 5
+  }
+ },
+ {
+  "fn": "planHistory",
+  "args": [
+   [],
+   "P.md",
+   "now"
+  ],
+  "out": {
+   "runs": 0,
+   "steps": 0,
+   "cost": 0,
+   "perStep": null
+  }
+ },
+ {
+  "fn": "overLimit",
+  "args": [
+   3.125,
+   10,
+   {
+    "usd": 3
+   }
+  ],
+  "out": "it cost $3.13, over the limit of $3.00 per step"
+ },
+ {
+  "fn": "overLimit",
+  "args": [
+   1,
+   45.5,
+   {
+    "usd": 3,
+    "minutes": 30
+   }
+  ],
+  "out": "it ran 46 minutes, over the limit of 30 per step"
+ },
+ {
+  "fn": "overLimit",
+  "args": [
+   1,
+   10,
+   {
+    "usd": 0,
+    "minutes": 30
+   }
+  ],
+  "out": null
+ },
+ {
+  "fn": "pickFor",
+  "args": [
+   {
+    "at": 1,
+    "providerId": "claude-code",
+    "freeFirst": false,
+    "picks": {
+     "6": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "x"
+     },
+     "7": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "y"
+     },
+     "8": {
+      "title": "Add tests",
+      "worker": "paid",
+      "why": "z"
+     },
+     "95a": {
+      "title": "Erasure",
+      "worker": "paid",
+      "model": "claude-opus-5-5",
+      "why": "money"
+     }
+    }
+   },
+   {
+    "number": "95a",
+    "title": "Erasure"
+   },
+   "claude-code"
+  ],
+  "out": {
+   "title": "Erasure",
+   "worker": "paid",
+   "model": "claude-opus-5-5",
+   "why": "money"
+  }
+ },
+ {
+  "fn": "pickFor",
+  "args": [
+   {
+    "at": 1,
+    "providerId": "claude-code",
+    "freeFirst": false,
+    "picks": {
+     "6": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "x"
+     },
+     "7": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "y"
+     },
+     "8": {
+      "title": "Add tests",
+      "worker": "paid",
+      "why": "z"
+     },
+     "95a": {
+      "title": "Erasure",
+      "worker": "paid",
+      "model": "claude-opus-5-5",
+      "why": "money"
+     }
+    }
+   },
+   {
+    "number": "95a",
+    "title": "Erasure"
+   },
+   "codex"
+  ],
+  "out": null
+ },
+ {
+  "fn": "pickFor",
+  "args": [
+   {
+    "at": 1,
+    "providerId": "claude-code",
+    "freeFirst": false,
+    "picks": {
+     "6": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "x"
+     },
+     "7": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "y"
+     },
+     "8": {
+      "title": "Add tests",
+      "worker": "paid",
+      "why": "z"
+     },
+     "95a": {
+      "title": "Erasure",
+      "worker": "paid",
+      "model": "claude-opus-5-5",
+      "why": "money"
+     }
+    }
+   },
+   {
+    "number": "9",
+    "title": "Write docs"
+   },
+   "claude-code"
+  ],
+  "out": null
+ },
+ {
+  "fn": "pickFor",
+  "args": [
+   {
+    "at": 1,
+    "providerId": "claude-code",
+    "freeFirst": false,
+    "picks": {
+     "6": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "x"
+     },
+     "7": {
+      "title": "Write docs",
+      "worker": "free",
+      "why": "y"
+     },
+     "8": {
+      "title": "Add tests",
+      "worker": "paid",
+      "why": "z"
+     },
+     "95a": {
+      "title": "Erasure",
+      "worker": "paid",
+      "model": "claude-opus-5-5",
+      "why": "money"
+     }
+    }
+   },
+   {
+    "number": "9",
+    "title": "Add tests"
+   },
+   "claude-code"
+  ],
+  "out": {
+   "title": "Add tests",
+   "worker": "paid",
+   "why": "z"
+  }
+ },
+ {
+  "fn": "pickFor",
+  "args": [
+   null,
+   {
+    "number": "1",
+    "title": "x"
+   },
+   "claude-code"
+  ],
+  "out": null
+ },
+ {
+  "fn": "taskListPrompt",
+  "args": [
+   "PLAN.md"
+  ],
+  "out": "Write a task list for this project in PLAN.md, in this format so Qanuvi can show and run it:\n\n## Section name\n\n- [ ] **1. Step title** (optional short note)\n  - What the step does, one point per line.\n  - Validate: how to check it is done.\n  - Model: claude-opus-5-5\n\nFor each step choose the model that fits the work (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5): the strongest for money, security and hard design, a mid model for normal coding, the smallest for small edits and docs. If the file already exists, keep what is there and add to it. Ask me first if the goal is not clear from the project's files.\n\nGoal: "
+ }
+]

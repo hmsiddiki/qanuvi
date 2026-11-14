@@ -31,6 +31,7 @@ pub mod memory_disk;
 pub mod notify;
 pub mod omniroute;
 pub mod paths;
+pub mod plan;
 pub mod preview;
 pub mod projects;
 pub mod relay;

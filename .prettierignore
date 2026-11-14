@@ -5,3 +5,5 @@ src-tauri/target
 src-tauri/gen
 package-lock.json
 *.md
+# Written by src/lib/plan/compare.test.ts (the Rust port comparison check)
+src-tauri/src/plan/compare.json

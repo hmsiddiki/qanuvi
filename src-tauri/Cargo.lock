@@ -3471,6 +3471,7 @@ dependencies = [
  "globset",
  "hkdf 0.13.0",
  "ignore",
+ "jiff",
  "keyring",
  "libc",
  "notify-rust",

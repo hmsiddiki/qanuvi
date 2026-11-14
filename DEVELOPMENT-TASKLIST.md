@@ -369,7 +369,11 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14, after the 24z split decision): the owner chose the RUST CORE for 24z step A (more
+    RESUME HERE (newest, 2026-11-14 19:30): R1 PART 1 DONE (see 24z "R1 part 1"): src-tauri/src/plan/ with decider,
+    limits, holdask, prompts, picks, costs, setaside, js helpers, and the TypeScript/Rust comparison check (88 cases,
+    all match). NEXT: R1 part 2 in a fresh conversation (tasklist first, then routing, preflight, packet, planstate,
+    housekeeping, finishing, guidance, planner, plan/runner.ts), then R2 onwards continuously.
+    RESUME HERE (before, 2026-11-14, after the 24z split decision): the owner chose the RUST CORE for 24z step A (more
     stable than an embedded JavaScript engine: one language and runtime, no promise bridge, no garbage collector in
     long unattended runs; the TypeScript runner is deleted afterwards either way). Order: R1 port the pure logic
     with its tests, R2 the runner in Rust, R3 the queue, R4 tray mode (step B moved in; owner: a visible tray icon,
@@ -642,6 +646,19 @@ runs on or off; with it off nothing is sent anywhere.
     - [ ] R1: port the pure logic to Rust with its tests (decider, tasklist, preflight, routing, packet, setaside,
       holdask, limits, costs, picks, planstate, housekeeping, finishing, guidance, planner, prompts); a comparison
       check runs the same inputs through TypeScript and Rust and must match before TypeScript is removed.
+      - R1 part 1 DONE 2026-11-14: module src-tauri/src/plan/ (in the library, so qanuvi-master gets it; builds
+        without the desktop feature): decider, limits, holdask, prompts, picks (pickFor; storing moves to the DB in
+        R2), costs, setaside, a first routing.rs (ModelProfile only), and js.rs (helpers that behave like the
+        TypeScript: String(), toFixed ties, Math.round, slice on UTF-16 units, jsonIn). Each test file ported with its
+        code (29 Rust tests). Comparison check: src/lib/plan/compare.test.ts runs 88 cases through the TypeScript
+        and keeps src-tauri/src/plan/compare.json current (a file snapshot: npx vitest run -u
+        src/lib/plan/compare.test.ts writes it again); plan::compare runs the same inputs through Rust and compares
+        the JSON (numbers by value). All 88 match; a changed output was checked to fail. Limit reset times use jiff
+        (already in the lock file through another crate; its jiff-static part was fetched once) for time zones.
+        Verify: 376 TypeScript + 201 Rust tests (Rust tests -j 1; the parallel run left a corrupt artifact).
+      - R1 part 2, NEXT: tasklist (parsePlan; then prompts' parsePlan test), routing (the rest: chooseModel,
+        modelProfiles), preflight, packet, planstate, housekeeping, finishing, guidance, planner, and plan/runner.ts
+        (pure decisions, 463 lines, not named above but pure) with handover.test.ts; add each to compare.test.ts.
     - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
       closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
       updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in
