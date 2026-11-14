@@ -39,7 +39,9 @@ impl Notifier {
     }
 }
 
-/// An installed Qanuvi (not a test build out of `target/`): its own app id and the qanuvi:// link work.
+/// An installed Qanuvi (not a test build out of `target/`): its own app id and the qanuvi:// link work. Only Windows
+/// and macOS ask; on Linux it was unused, and clippy's warning failed every Linux CI build from 07d8e38 on.
+#[cfg(any(windows, target_os = "macos"))]
 fn installed() -> bool {
     !crate::data_location::from_source()
 }
