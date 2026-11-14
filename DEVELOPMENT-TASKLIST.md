@@ -331,13 +331,16 @@ runs on or off; with it off nothing is sent anywhere.
     old one and quit. Test builds send under PowerShell's app id and read the banner click in the process. Driven
     live 2026-11-14 with the build installed over D:\qanuvi (owner's yes): qanuvi://inbox while running = one
     process, window to front, Inbox open; owner clicked the test notification on the banner, in the notification
-    centre after the time-out, and with Qanuvi closed: all three opened the Inbox. NOT driven live: opening at one
-    question's item (link with an id, same path; parse_link tested), a real held step notifying, bundling, quiet
-    hours, the restart change. Linux: notification code cross-builds with zigbuild in a throwaway crate; click not
+    centre after the time-out, and with Qanuvi closed: all three opened the Inbox. Driven live 2026-11-14 (test
+    build, scratch project, PLAN-K, $0): the check held 1a ("needs you"), the run waited, a banner came for the
+    question, the owner clicked it and the Inbox opened with that question's item marked; Skip from the run panel
+    closed the question ("You answered: Skip this step") and a "finished" item came in. NOT driven live: bundling,
+    quiet hours, the restart change, an item link through the installed build's protocol launch. Linux: notification code cross-builds with zigbuild in a throwaway crate; click not
     tested (Zorin laptop). macOS: code review only. The Linux server build (--no-default-features) fails in
-    secrets.rs (keyring), 8 errors, already before session B. NEXT: on a scratch project in the test build, a held
-    step raises a question, its notification opens the Inbox at that item (banner click while it shows); then ask
-    the owner about publishing 0.1.20 (unpublished: 779bf51, session A f523130, session B 07d8e38). After that: drive
+    secrets.rs (keyring), 8 errors, already before session B (keyring is only in the desktop feature, but agent.rs
+    calls secrets::env in the master too); proposed to the owner, not built yet: without desktop, env/names return
+    empty and saving says "this build has no credential store"; an encrypted file store on servers later if wanted.
+    NEXT: ask the owner about publishing 0.1.20 (unpublished: 779bf51, session A f523130, session B 07d8e38). After that: drive
     24t, 24s part 3, 15i part 2, then 15i part 3. Earlier text of this checkpoint:
     (session A) 24u part 4 session A DRIVEN LIVE on a
     scratch project (test build, Haiku 5.5, $0.01), no fixes needed. PLAN-I: 1a set to "Wait for me" in the check,
