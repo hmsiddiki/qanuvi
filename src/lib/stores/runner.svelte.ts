@@ -454,6 +454,11 @@ class RunnerStore {
     }
     if (run.status === "running") run.status = "stopped";
     for (const s of run.steps) if (s.status === "running") s.status = "waiting";
+    // No pass runs after a restart; its result, when it got that far, is in the plan's FINISH.md log.
+    if (run.finish?.status === "running") {
+      run.finish.status = "stopped";
+      run.finish.note = "Its saved state ended mid-pass; the result, if any, is in the plan's FINISH.md log.";
+    }
     this.run = run;
     const p = run.pausedSession;
     if (run.status === "paused" && p) {
@@ -1531,7 +1536,7 @@ class RunnerStore {
     // The paid agent on top decides and monitors (24e): intelligence paid for once, where it catches most.
     const provider = providerById(agent.runProviderId);
     const model = defaultPlannerModel(provider);
-    const pass: FinishPass = {
+    const draft: FinishPass = {
       level,
       status: "running",
       model,
@@ -1546,7 +1551,10 @@ class RunnerStore {
     this.finishing = true;
     this.#stopRequested = false;
     this.stopping = false;
-    run.finish = pass;
+    run.finish = draft;
+    // The run is deep state: it holds its own copy, so the pass changes that copy (changing the draft would leave
+    // the panel and the saved run saying "at work" after the pass ended).
+    const pass = run.finish;
     this.changed++;
     await this.#save(run);
     try {

@@ -355,7 +355,7 @@ export function stepPrompt(file: string, step: Step, done: { number: string | nu
     "",
     "Rules:",
     "- Work only on this step.",
-    `- When the step is complete and checked, change its line in ${file} to "- [x]" and add a short "  - Done: ..." line under it saying what you did and how you checked it.`,
+    `- When the step is complete and checked, change its line in ${file} to "- [x]" and add a short "  - Done: ..." line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as "$45" or "$0" in the note.`,
     `- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it "- [!]" and add the reason under it.`,
   );
   return lines.join("\n");

@@ -340,6 +340,12 @@ runs on or off; with it off nothing is sent anywhere.
     secrets.rs (keyring), 8 errors, already before session B (keyring is only in the desktop feature, but agent.rs
     calls secrets::env in the master too); proposed to the owner, not built yet: without desktop, env/names return
     empty and saving says "this build has no credential store"; an encrypted file store on servers later if wanted.
+    FIX 2026-11-14 (owner's PLAN-E run, unpublished, verify green 340 + 166): the finishing pass panel kept "at
+    work" and "1x $0" after the pass ended (FINISH.md said done). Cause: finishPass changed its local object after
+    putting it on the deep-state run, which holds its own copy (checked with a Svelte probe), so the panel and the
+    saved run never saw the end. Now it changes run.finish; a restored run with a pass still "running" shows it
+    stopped with a note. Done-line rule now says: edit with the file edit tool, never a shell/regex replace (96b's
+    note lost "$45"/"$0" amounts that way). Not driven live yet: watch the next finishing pass end in the panel.
     UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
     qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
     (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:
