@@ -371,11 +371,12 @@ runs on or off; with it off nothing is sent anywhere.
     publish 0.1.20 yet.
     RESUME HERE (newest, 2026-11-15, after R2c part 2): R2c PART 2 DONE (see 24z "R2c part 2 DONE"): owner messages
     in step chats in the core (sorted, passed on, change asked with a safe default). 365 Rust tests pass, clippy and fmt
-    clean, nothing published. Open with the owner: the tidy-code and write-scope proposal (reuse brief and project
-    atlas in plan memory, silent duplicate check with automatic fix, write scope from the plan's folder with one
-    permission question kept in project memory, standing owner rules from chat notes into plan memory); not in this
-    list until they agree. NEXT: R2d wiring. Test runs: plain `cargo test -j 1` with a `timeout` (a hung test once
-    looked like a slow build for 45 minutes under the guard script, which shows nothing until the end).
+    clean, nothing published. No live check yet: the window does not call the Rust runner until R2d, and the live
+    drive on a scratch project is R2e. Agreed with the owner 2026-11-15 and written in: 24z2 (tidy code and write
+    scope, after R2) and "R2d also: standing owner rules". NEXT: R2d wiring (commands, the qanuvi-run event, a thin
+    RunnerStore, the step chat sending to the runner, the master's commands and run stream), in a fresh conversation.
+    Test runs: `cargo test -j 1` with a `timeout`, output to a file, "running for over 60 seconds" kept visible (a hung
+    test once looked like a slow build for 45 minutes). Check free RAM first (scratchpad room.ps1).
     RESUME HERE (before, 2026-11-15, after R2c part 1): R2c PART 1 DONE (see 24z "R2c part 1 DONE"): the run loop
     in the core (plan/run.rs) on RunEnv, all 10 ported scenarios un-ignored and passing, 5 new ones; 350 Rust tests
     pass, clippy clean; TypeScript unchanged, nothing published. NEXT: R2c part 2, owner messages in step chats (24z
@@ -883,11 +884,52 @@ runs on or off; with it off nothing is sent anywhere.
         left their Needs lines as "Needs: 97a1" etc., so 97a-2-97a-4 were skipped as "needs step 97a1, which is not
         done", and 97b-97z after them. The renumbering must rewrite Needs lines inside the replacement steps too
         (and accept the planner's own label as the same step). Add a scenario first.
+    - [ ] R2d also (owner agreed 2026-11-15, part of 24z2): standing owner rules. A note in a step's chat that is a
+      rule for the whole plan ("always follow WordPress core style", "check the other plugins before adding helpers")
+      is saved into the plan's memory (FACTS.md, "Owner rules"), so every later step and model sees it, not only that
+      session; a one-off correction stays with its step. The decider tells them apart (one more kind in
+      ownermsg's sort: "rule"). Scenario first: a rule said in step 1 reaches step 3's prompt on another model.
     - [ ] R3: the queue (DB table, migration 8): tasks and whole plans, one after another per project, side by side
       across projects, holds and answers per plan, a hook for the paid monitor (24e, built later).
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
       the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
     - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
+- [ ] **24z2. Tidy code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
+  build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
+  over files, and edit folders they should not touch. Qanuvi fixes that by itself, with zero noise: no tidiness
+  questions to the owner, only a line in the step's log and one in the run summary. Nothing assumes a framework or a
+  language (not Qlopy, not WordPress, not PHP): it learns each project. The owner steers through the plan text and
+  chat notes ("follow how the core and the other plugins do it"); what is learned once stays in the plan's memory
+  for the whole run, on every model.
+  - [ ] 1. Project atlas and reuse brief: at plan start one scan with no model: what is shared (found by how code is
+    used, not by folder names), the existing functions and classes (code index: PHP, JS/TS/Svelte/Vue, Rust, Python,
+    Dart, C#, Go, Java/Kotlin; a language server where installed; plain text for other languages), installed
+    libraries from the manifests, the project's naming and grouping, and read-only places the plan or the owner names
+    (core, other plugins, vendor). One model call (paid or free) writes a short REUSE.md into the plan's memory (next
+    to MAP, FACTS, API): helpers and patterns that fit this plan, where new shared code belongs, how things are named.
+    Every step reads it; written again only when the owner points at a new place. The atlas lives in Qanuvi's data,
+    not the repo (writing it into the repo is an option).
+  - [ ] 2. Write scope: a plan inside a folder (content/plugins/qcommerce/PLAN.md) writes only inside that folder; the
+    rest is read only. A plan at the root writes anywhere except protected areas (core and third-party code the atlas
+    finds, plus anything the owner marks). Outside edits are the owner's decision: asked once, as early as possible
+    (at plan start for steps that clearly need it, in one question; mid-run the step is set aside with one question and
+    the run goes on). Answers: allow for this plan (plan memory), always for this project (project memory, given to
+    every later plan that touches it), or no (the plan builds on the core from its own folder). Enforced after every
+    step from Qanuvi's own snapshots (no git needed): a change outside the scope is undone and kept aside, one
+    question: keep or drop. Stopped at write time too where the agent's permission hook allows (check per agent).
+    Project permissions listed in the project settings, removable.
+  - [ ] 3. Standing owner rules from chat notes into plan memory: built in R2d (see 24z R2).
+  - [ ] 4. Step prompt rules (reuse first; new shared code where this project keeps it; what the step may write) and a
+    find_similar tool for every agent, the Qanuvi agent included.
+  - [ ] 5. Tidy check after each step, no model unless a candidate is found: new functions like existing ones (name
+    words, parameters), copied code (fingerprints of normalised text, any language), the same helper twice, a general
+    helper in the wrong place, a new function nothing calls. The cheap decider (free first) reads both bodies only for
+    a candidate; a confirmed duplicate gets a fix round in the same session ("use X from path, remove Y, keep the tests
+    passing"). Old duplicates are left alone (no risky merges without the owner).
+  - [ ] 6. Finishing pass sweeps everything the plan added (duplicates across steps, scattered helpers, dead code) and
+    fixes them the same way; the run summary gets one line ("Tidy: 2 duplicates replaced with existing helpers").
+  - [ ] 7. Benchmark: sample projects in several languages that already have helpers, plans that tempt rewriting them
+    and editing the core; checks on and off; count duplicates, outside edits and the extra tokens.
 - [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
   reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
   TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
