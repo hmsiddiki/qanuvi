@@ -369,7 +369,10 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 20:30): R1 PART 2a DONE (see 24z "R1 part 2a"): tasklist, routing, runner and
+    RESUME HERE (newest, 2026-11-14 21:15): R1 DONE (part 2b: preflight, packet, planstate, housekeeping, planner,
+    guidance in Rust; see 24z "R1 part 2b"); comparison check 429 cases, all match. NEXT: R2 (the runner in Rust) in
+    a fresh conversation: map stores/runner.svelte.ts onto the plan module first, then split R2 into parts.
+    RESUME HERE (before, 2026-11-14 20:30): R1 PART 2a DONE (see 24z "R1 part 2a"): tasklist, routing, runner and
     finishing in Rust, 209 comparison cases all match. NEXT: R1 part 2b in a fresh conversation (preflight, packet,
     planstate, housekeeping, guidance, planner), then R2 onwards continuously.
     RESUME HERE (before, 2026-11-14 19:30): R1 PART 1 DONE (see 24z "R1 part 1"): src-tauri/src/plan/ with decider,
@@ -646,7 +649,7 @@ runs on or off; with it off nothing is sent anywhere.
     mid-step model/mode/interrupt hooks; settings, inbox, projects, planner.ask, memoryContext; localStorage for picks;
     setTimeout for limit waits). master.rs already serves files/git/checks/index/agent sessions headless; runs.rs only
     stores records.
-    - [ ] R1: port the pure logic to Rust with its tests (decider, tasklist, preflight, routing, packet, setaside,
+    - [x] R1: port the pure logic to Rust with its tests (decider, tasklist, preflight, routing, packet, setaside,
       holdask, limits, costs, picks, planstate, housekeeping, finishing, guidance, planner, prompts); a comparison
       check runs the same inputs through TypeScript and Rust and must match before TypeScript is removed.
       - R1 part 1 DONE 2026-11-14: module src-tauri/src/plan/ (in the library, so qanuvi-master gets it; builds
@@ -668,9 +671,18 @@ runs on or off; with it off nothing is sent anywhere.
         all match (a changed output checked to fail). Stats is a HashMap: paidPerStep sums per type in another order
         than the TypeScript Map, so cases use sums exact in binary. Verify: 376 TypeScript + 53 Rust plan tests,
         clippy and svelte-check clean.
-      - R1 part 2b, NEXT: preflight, packet, planstate, housekeeping, guidance (with handover.test.ts), planner; add
-        each to compare.test.ts (build edit scripts with the Write tool: a heredoc turned "\r\n" in a script into a
-        real line break once).
+      - R1 part 2b DONE 2026-11-14: preflight.rs, packet.rs, planstate.rs, housekeeping.rs, planner.rs, guidance.rs
+        (handover.test.ts ported into guidance's tests); js.rs gained trim_end, from_unit (slice from a UTF-16 unit),
+        parse_int, cmp_utf16 (JavaScript's default sort) and S / DOT (JavaScript's `\s` and `.` as Rust classes).
+        JavaScript regex traits done by hand: the path lookahead in mentions (the end is matched and the next search
+        starts where the path ends), the password lookbehind/lookaheads in looksSecret, the lookbehind split in
+        sectionTitleFrom and the lookahead split in mergeApi; `\b`, `\w`, `\d` and `/i` kept ASCII as in JavaScript.
+        Left for R2 (localStorage today, the DB then): loadPlanState/savePlanState (PlanState::from_json and
+        is_empty are ported; from_json drops entries with missing fields, the TypeScript keeps any with a step),
+        keepRunSetting/runSettingsKey, loadPlanNotes/savePlanNotes. Known small difference: backticked names in
+        mentions are 2-80 characters in Rust, 2-80 UTF-16 units in TypeScript (differs only outside the BMP).
+        Comparison check: 429 cases (220 new), all match; three changed outputs checked to fail. Verify: 376
+        TypeScript + 286 Rust tests (114 plan tests), clippy and svelte-check clean. R1 is complete.
     - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
       closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
       updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in

@@ -8,7 +8,8 @@ use serde_json::json;
 
 #[cfg(test)]
 use super::{
-    costs, decider, finishing, holdask, limits, picks, prompts, routing, runner, setaside, tasklist,
+    costs, decider, finishing, guidance, holdask, housekeeping, limits, packet, picks, planner,
+    planstate, preflight, prompts, routing, runner, setaside, tasklist,
 };
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
@@ -338,6 +339,241 @@ fn run(name: &str, a: &[Value]) -> Value {
         "doneNotes" => to(finishing::done_notes(&de::<Vec<_>>(&a[0]))),
         "isPlanFile" => json!(finishing::is_plan_file(&s(0), &s(1), &s(2))),
         "finishEntry" => json!(finishing::finish_entry(&de(&a[0]))),
+        other => run_2b(other, a),
+    }
+}
+
+/// R1 part 2b: preflight, packet, planstate, housekeeping, planner, guidance.
+#[cfg(test)]
+fn run_2b(name: &str, a: &[Value]) -> Value {
+    fn de<T: serde::de::DeserializeOwned>(v: &Value) -> T {
+        serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("bad input {v}: {e}"))
+    }
+    fn to(v: impl serde::Serialize) -> Value {
+        serde_json::to_value(v).unwrap()
+    }
+    let s = |i: usize| a[i].as_str().unwrap_or_default().to_string();
+    let n = |i: usize| a[i].as_i64().unwrap();
+    let f = |i: usize| a[i].as_f64().unwrap();
+    let set = |v: &Value| -> HashSet<String> { de::<Vec<String>>(v).into_iter().collect() };
+    let state = || de::<planstate::PlanState>(&a[0]);
+    let lines = |v: Vec<&tasklist::Step>| to(v.iter().map(|s| s.line).collect::<Vec<_>>());
+    match name {
+        "preflightPrompt" => json!(preflight::preflight_prompt(
+            &s(0),
+            &de::<Vec<_>>(&a[1]),
+            &de(&a[2])
+        )),
+        "parsePreflight" => to(preflight::parse_preflight(&s(0))),
+        "recommendedRisk" => to(preflight::recommended_risk(de(&a[0]))),
+        "decidedNote" => json!(preflight::decided_note(&de(&a[0]))),
+        "settleCheck" => to(preflight::settle_check(
+            &preflight::parse_preflight(&s(0)),
+            &de(&a[1]),
+            &de(&a[2]),
+            &de(&a[3]),
+            &de(&a[4]),
+        )),
+        "waitsBefore" => {
+            let wait: Option<Vec<preflight::StepWhy>> = de(&a[1]);
+            to(preflight::waits_before(a[0].as_str(), wait.as_deref()))
+        }
+        "mentions" => to(packet::mentions(&s(0))),
+        "excerptAround" => to(packet::excerpt_around(&s(0), n(1), n(2), n(3))),
+        "packetContextBlock" => json!(packet::context_block(&de::<Vec<_>>(&a[0]), n(1) as usize)),
+        "failureSummary" => json!(packet::failure_summary(&s(0), n(1) as usize)),
+        "packetPrompt" => json!(packet::packet_prompt(&s(0), &s(1), &s(2))),
+        "fixPrompt" => json!(packet::fix_prompt(&s(0), &s(1), n(2) as u32, n(3) as u32)),
+        "locationBlock" => json!(packet::location_block(
+            &de::<Vec<_>>(&a[0]),
+            &de::<Vec<_>>(&a[1]),
+            &de::<Vec<_>>(&a[2]),
+            n(3) as usize
+        )),
+        "holdWording" => json!(planstate::hold_wording(
+            a[0]["why"].as_str().unwrap(),
+            de(&a[0]["by"])
+        )),
+        "keepHolds" => to(planstate::keep_holds(&state(), &de::<Vec<_>>(&a[1]), f(2))),
+        "keepAnswer" => to(planstate::keep_answer(
+            &state(),
+            &s(1),
+            de(&a[2]),
+            &s(3),
+            f(4),
+        )),
+        "pruneState" => {
+            let open = set(&a[1]);
+            let all = if a[2].is_null() {
+                open.clone()
+            } else {
+                set(&a[2])
+            };
+            to(planstate::prune_state(&state(), &open, &all))
+        }
+        "closingRan" => to(planstate::closing_ran(
+            &state(),
+            &s(1),
+            &de::<Vec<_>>(&a[2]),
+        )),
+        "markLate" => to(planstate::mark_late(&state(), &s(1))),
+        "closingsDue" => {
+            let pending = set(&a[1]);
+            to(planstate::closings_due(
+                &state(),
+                |x| pending.contains(x),
+                a[2] == true,
+            ))
+        }
+        "keepDecided" => to(planstate::keep_decided(
+            &state(),
+            &de::<Vec<_>>(&a[1]),
+            &de::<Vec<_>>(&a[2]),
+            &de::<Vec<_>>(&a[3]),
+            f(4),
+        )),
+        "changeDecided" => to(planstate::change_decided(&state(), &s(1), &s(2), &s(3))),
+        "archivePath" => json!(housekeeping::archive_path(&s(0))),
+        "isArchive" => json!(housekeeping::is_archive(&s(0))),
+        "doneNumbers" => {
+            let texts: Vec<Option<&str>> = a.iter().map(Value::as_str).collect();
+            to(housekeeping::done_numbers(&texts))
+        }
+        "finishedSections" => to(housekeeping::finished_sections(&s(0))
+            .iter()
+            .map(|x| json!([x.title, x.line, x.steps.len()]))
+            .collect::<Vec<_>>()),
+        "archiveFinished" => to(housekeeping::archive_finished(&s(0), a[1].as_str(), &s(2))),
+        "mergePlans" => {
+            let o = &a[4];
+            let taken: Vec<String> = de(o.get("taken").unwrap_or(&json!([])));
+            to(housekeeping::merge_plans(
+                &s(0),
+                &s(1),
+                &s(2),
+                &s(3),
+                o["onlyOpen"] == true,
+                &taken,
+            ))
+        }
+        "stepNumbers" => to(housekeeping::step_numbers(a[0].as_str())),
+        "plannerPrompt" => json!(planner::planner_prompt(&s(0), &s(1), &de::<Vec<_>>(&a[2]))),
+        "replanPrompt" => {
+            let plan = tasklist::parse_plan(&s(1));
+            json!(planner::replan_prompt(
+                &s(0),
+                &plan.steps[n(2) as usize],
+                &s(3),
+                &de::<Vec<_>>(&a[4])
+            ))
+        }
+        "extractSteps" => {
+            let e = planner::extract_steps(&s(0));
+            json!({ "block": e.block, "steps": to(&e.steps) })
+        }
+        "lastNumber" => json!(planner::last_number(&s(0))),
+        "renumber" => {
+            let start = match a[1].as_i64() {
+                Some(x) => planner::Start::From(x),
+                None => planner::Start::Under(a[1].as_str().unwrap()),
+            };
+            json!(planner::renumber(&s(0), start))
+        }
+        "appendSection" => json!(planner::append_section(&s(0), &s(1), &s(2))),
+        "replaceStep" => match planner::replace_step(
+            &s(0),
+            a[1]["number"].as_str(),
+            a[1]["title"].as_str().unwrap(),
+            &s(2),
+            &s(3),
+        ) {
+            Ok(t) => json!(t),
+            Err(e) => json!({ "error": e }),
+        },
+        "labelRange" => json!(planner::label_range(&s(0))),
+        "sectionTitleFrom" => json!(planner::section_title_from(&s(0))),
+        "guidanceNote" => json!(guidance::guidance_note(&s(0), &s(1))),
+        "withoutGuidance" => json!(guidance::without_guidance(&s(0))),
+        "stoppedChatNote" => json!(guidance::stopped_chat_note(&s(0), &s(1))),
+        "isGoOnOrder" => json!(guidance::is_go_on_order(&s(0))),
+        "isYes" => json!(guidance::is_yes(&s(0))),
+        "askedToResume" => json!(guidance::asked_to_resume(&s(0))),
+        "isStopOrder" => json!(guidance::is_stop_order(&s(0))),
+        "addedSteps" => {
+            let plan = tasklist::parse_plan(&s(0));
+            lines(guidance::added_steps(&plan.steps, &set(&a[1])))
+        }
+        "reopenedSteps" => {
+            let plan = tasklist::parse_plan(&s(1));
+            lines(guidance::reopened_steps(
+                &de::<Vec<_>>(&a[0]),
+                &plan.steps,
+                &set(&a[2]),
+            ))
+        }
+        "stepKey" => json!(guidance::step_key(
+            a[0]["number"].as_str(),
+            a[0]["title"].as_str().unwrap()
+        )),
+        "notesBlock" => json!(guidance::notes_block(&de::<Vec<_>>(&a[0]))),
+        "notesIn" => to(guidance::notes_in(&s(0))),
+        "looksSecret" => json!(guidance::looks_secret(&s(0))),
+        "contextSize" => json!(guidance::context_size(&de::<Vec<_>>(&a[0]))),
+        "handoverDue" => json!(guidance::handover_due(
+            n(0) as u64,
+            n(1) as u64,
+            n(2) as u32
+        )),
+        "handoverRequest" => json!(guidance::handover_request(&s(0), n(1) as u64)),
+        "modelSwitchRequest" => json!(guidance::model_switch_request(&s(0), &s(1))),
+        "canCarry" => {
+            let carry: Option<guidance::Carry> = de(&a[0]);
+            json!(guidance::can_carry(
+                carry.as_ref(),
+                &s(1),
+                &s(2),
+                n(3) as u64
+            ))
+        }
+        "needingCount" => json!(guidance::needing_count(
+            &s(0),
+            &de::<Vec<_>>(&a[1]),
+            &set(&a[2])
+        )),
+        "privateBlock" => json!(guidance::private_block(&de::<Vec<_>>(&a[0]))),
+        "logDir" => json!(guidance::log_dir(&s(0))),
+        "logPath" => json!(guidance::log_path(
+            &s(0),
+            a[1]["number"].as_str(),
+            a[1]["title"].as_str().unwrap()
+        )),
+        "attemptEntry" => json!(guidance::attempt_entry(&de(&a[0]))),
+        "resultEntry" => json!(guidance::result_entry(&s(0), a[1].as_str())),
+        "logsBlock" => json!(guidance::logs_block(&s(0), &s(1), a[2] == true)),
+        "mapPath" => json!(guidance::map_path(&s(0))),
+        "factsPath" => json!(guidance::facts_path(&s(0))),
+        "apiPath" => json!(guidance::api_path(&s(0))),
+        "guidanceContextBlock" => json!(guidance::context_block(
+            &s(0),
+            &s(1),
+            &de::<Vec<_>>(&a[2]),
+            a[3] == true
+        )),
+        "knowledgeBlock" => json!(guidance::knowledge_block(
+            &s(0),
+            &s(1),
+            &s(2),
+            &de::<Vec<_>>(&a[3]),
+            a[4] == true
+        )),
+        "isCode" => json!(guidance::is_code(&s(0))),
+        "apiSection" => json!(guidance::api_section(&s(0), &de::<Vec<_>>(&a[1]))),
+        "mergeApi" => json!(guidance::merge_api(
+            &s(0),
+            &de::<Vec<(String, String)>>(&a[1])
+        )),
+        "referencedPlans" => to(guidance::referenced_plans(&s(0), &s(1))),
+        "referencedBlock" => json!(guidance::referenced_block(&de::<Vec<_>>(&a[0]))),
         other => panic!("no Rust function for {other}"),
     }
 }

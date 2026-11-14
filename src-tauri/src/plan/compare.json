@@ -1,5 +1,5685 @@
 [
  {
+  "fn": "preflightPrompt",
+  "args": [
+   "PLAN-D.md",
+   [
+    {
+     "number": "82e",
+     "title": "Short field set",
+     "details": [
+      "- d0",
+      "- d1",
+      "- d2",
+      "- d3",
+      "- d4",
+      "- d5",
+      "- d6",
+      "- d7",
+      "- d8",
+      "- d9"
+     ]
+    },
+    {
+     "number": null,
+     "title": "Unnumbered",
+     "details": []
+    },
+    {
+     "number": "",
+     "title": "Empty number",
+     "details": [
+      "x"
+     ]
+    }
+   ],
+   {
+    "secrets": [
+     "DB_USER",
+     "DB_PASS"
+    ],
+    "testCommand": "npm test",
+    "previewUrl": "http://localhost:5173",
+    "notes": []
+   }
+  ],
+  "out": "Before an unattended run of PLAN-D.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): DB_USER, DB_PASS\n- Test command: npm test\n- Preview address: http://localhost:5173\n\nOpen steps:\n- 82e. Short field set\n    - d0\n    - d1\n    - d2\n    - d3\n    - d4\n    - d5\n    - d6\n    - d7\n- Unnumbered\n- Empty number\n    x\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer. At most 8 items in each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+ },
+ {
+  "fn": "preflightPrompt",
+  "args": [
+   "P.md",
+   [],
+   {
+    "secrets": [],
+    "testCommand": "",
+    "previewUrl": "",
+    "notes": [
+     "one",
+     "two"
+    ]
+   }
+  ],
+  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- The owner's notes for this plan:\n  - one\n  - two\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer. At most 8 items in each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all."
+  ],
+  "out": {
+   "secrets": [
+    {
+     "name": "DB_PASS",
+     "why": "db",
+     "steps": [
+      "1",
+      "2"
+     ]
+    }
+   ],
+   "questions": [
+    {
+     "step": "1a",
+     "question": "Separator?",
+     "sort": "decide",
+     "recommended": "dash",
+     "because": "URLs"
+    },
+    {
+     "step": "1b",
+     "question": "Bank?",
+     "sort": "you",
+     "recommended": "",
+     "because": ""
+    },
+    {
+     "step": "1d",
+     "question": "Format?",
+     "sort": "decide",
+     "recommended": "ISO",
+     "because": ""
+    },
+    {
+     "step": "",
+     "question": "Numbered step?",
+     "sort": "checks",
+     "recommended": "y",
+     "because": ""
+    },
+    {
+     "step": "1e",
+     "question": "Column?",
+     "sort": "checks",
+     "recommended": "slug",
+     "because": ""
+    },
+    {
+     "step": "1f",
+     "question": "Bank login?",
+     "sort": "you",
+     "recommended": "test bank",
+     "because": ""
+    }
+   ],
+   "risky": [
+    {
+     "step": "2a",
+     "why": "migrates",
+     "sort": "checks",
+     "because": "test db"
+    },
+    {
+     "step": "2b",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "sort": "you",
+     "because": ""
+    },
+    {
+     "step": "2c",
+     "why": "clears cache",
+     "sort": "decide",
+     "because": ""
+    },
+    {
+     "step": "1a",
+     "why": "renames files",
+     "sort": "you",
+     "because": ""
+    }
+   ],
+   "setup": [
+    {
+     "what": "MySQL",
+     "why": "tests"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "no json here"
+  ],
+  "out": {
+   "secrets": [],
+   "questions": [],
+   "risky": [],
+   "setup": []
+  }
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "} {"
+  ],
+  "out": {
+   "secrets": [],
+   "questions": [],
+   "risky": [],
+   "setup": []
+  }
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "{ not json }"
+  ],
+  "out": {
+   "secrets": [],
+   "questions": [],
+   "risky": [],
+   "setup": []
+  }
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "{\"secrets\": \"x\", \"questions\": {\"a\": 1}, \"risky\": [], \"setup\": [{\"what\": \"é\".repeat(400)}]}"
+  ],
+  "out": {
+   "secrets": [],
+   "questions": [],
+   "risky": [],
+   "setup": []
+  }
+ },
+ {
+  "fn": "recommendedRisk",
+  "args": [
+   "decide"
+  ],
+  "out": "go"
+ },
+ {
+  "fn": "recommendedRisk",
+  "args": [
+   "checks"
+  ],
+  "out": "checks"
+ },
+ {
+  "fn": "recommendedRisk",
+  "args": [
+   "you"
+  ],
+  "out": "wait"
+ },
+ {
+  "fn": "decidedNote",
+  "args": [
+   {
+    "step": "1a",
+    "what": "Sep?",
+    "answer": "dash",
+    "because": "URLs"
+   }
+  ],
+  "out": "Decided for you for step 1a: Sep? → dash, because URLs. The owner may change it later, so keep it in one place (a setting or constant), not hard-coded."
+ },
+ {
+  "fn": "decidedNote",
+  "args": [
+   {
+    "step": "2",
+    "what": "W?",
+    "answer": "x",
+    "because": ""
+   }
+  ],
+  "out": "Decided for you for step 2: W? → x. The owner may change it later, so keep it in one place (a setting or constant), not hard-coded."
+ },
+ {
+  "fn": "settleCheck",
+  "args": [
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   {
+    "0": "dash",
+    "1": "  ",
+    "2": "ISO",
+    "3": " y ",
+    "4": "slug",
+    "5": "test bank"
+   },
+   {
+    "2": true
+   },
+   {
+    "0": "go",
+    "3": "wait",
+    "4": "checks"
+   },
+   {
+    "3": true
+   }
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1b",
+     "why": "a question was left open (Bank?)",
+     "by": "default"
+    },
+    {
+     "step": "2b",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "renames files",
+     "by": "you"
+    }
+   ],
+   "cleared": [
+    "1d",
+    "1e",
+    "1f",
+    "2a",
+    "2c"
+   ],
+   "notes": [
+    "The owner's answer for step 1d: Format? → ISO",
+    "The owner's answer for step 1f: Bank login? → test bank"
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "URLs"
+    },
+    {
+     "step": "",
+     "what": "Numbered step?",
+     "answer": "y",
+     "because": ""
+    },
+    {
+     "step": "1e",
+     "what": "Column?",
+     "answer": "slug",
+     "because": ""
+    },
+    {
+     "step": "2a",
+     "what": "migrates",
+     "answer": "go ahead",
+     "because": "test db"
+    },
+    {
+     "step": "2c",
+     "what": "clears cache",
+     "answer": "go ahead",
+     "because": ""
+    }
+   ],
+   "extraChecks": [
+    {
+     "step": "1e",
+     "why": "Column?"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "settleCheck",
+  "args": [
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   {},
+   {},
+   {},
+   {}
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "a question was left open (Separator?)",
+     "by": "default"
+    },
+    {
+     "step": "1b",
+     "why": "a question was left open (Bank?)",
+     "by": "default"
+    },
+    {
+     "step": "1d",
+     "why": "a question was left open (Format?)",
+     "by": "default"
+    },
+    {
+     "step": "1e",
+     "why": "a question was left open (Column?)",
+     "by": "default"
+    },
+    {
+     "step": "1f",
+     "why": "a question was left open (Bank login?)",
+     "by": "default"
+    },
+    {
+     "step": "2b",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "renames files",
+     "by": "default"
+    }
+   ],
+   "cleared": [
+    "2a",
+    "2c"
+   ],
+   "notes": [],
+   "decided": [
+    {
+     "step": "2a",
+     "what": "migrates",
+     "answer": "go ahead with extra checks",
+     "because": "test db"
+    },
+    {
+     "step": "2c",
+     "what": "clears cache",
+     "answer": "go ahead",
+     "because": ""
+    }
+   ],
+   "extraChecks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "waitsBefore",
+  "args": [
+   "84a",
+   [
+    {
+     "step": "84a",
+     "why": "refunds"
+    },
+    {
+     "step": "84a",
+     "why": "second"
+    }
+   ]
+  ],
+  "out": "refunds"
+ },
+ {
+  "fn": "waitsBefore",
+  "args": [
+   "84b",
+   [
+    {
+     "step": "84a",
+     "why": "refunds"
+    }
+   ]
+  ],
+  "out": null
+ },
+ {
+  "fn": "waitsBefore",
+  "args": [
+   "",
+   [
+    {
+     "step": "",
+     "why": "empty"
+    }
+   ]
+  ],
+  "out": null
+ },
+ {
+  "fn": "waitsBefore",
+  "args": [
+   "84a",
+   null
+  ],
+  "out": null
+ },
+ {
+  "fn": "mentions",
+  "args": [
+   "**3. Add a discount** to `src/price.js`: make `applyDiscount(price, percent)` use roundMoney and keep MAX_PERCENT. Validate: tests in test/price.test.js pass."
+  ],
+  "out": {
+   "paths": [
+    "src/price.js",
+    "test/price.test.js"
+   ],
+   "names": [
+    "applyDiscount",
+    "roundMoney",
+    "MAX_PERCENT"
+   ]
+  }
+ },
+ {
+  "fn": "mentions",
+  "args": [
+   "./src/a.ts, lib/b.rs; c.json5 d.yml `obj.method()` `$var` `@Annotation` `ns::Fn()` `a` snake_case_name HTMLParser camelCaseX JSON Ünïcode_näme café.php `src/a.ts` (e.php) 'f.md' \"g.sql\"\nfoo.ts.bak w.json. x.ts:12 `Model` `__init__()` `${\"x\".repeat(90)}`"
+  ],
+  "out": {
+   "paths": [
+    "src/a.ts",
+    "lib/b.rs",
+    "d.yml",
+    "e.php",
+    "f.md",
+    "g.sql",
+    "foo.ts",
+    "w.json",
+    "x.ts"
+   ],
+   "names": [
+    "method",
+    "var",
+    "Annotation",
+    "php",
+    "__init__",
+    "repeat",
+    "snake_case_name",
+    "camelCaseX",
+    "code_n"
+   ]
+  }
+ },
+ {
+  "fn": "mentions",
+  "args": [
+   "a.js b.ts c.vue d.go"
+  ],
+  "out": {
+   "paths": [
+    "a.js",
+    "b.ts",
+    "c.vue",
+    "d.go"
+   ],
+   "names": []
+  }
+ },
+ {
+  "fn": "excerptAround",
+  "args": [
+   "line 1\r\nline 2\r\nline 3\r\nline 4\r\nline 5\r\nline 6\r\nline 7\r\nline 8\r\nline 9\r\nline 10\r\nline 11\r\nline 12\r\nline 13\r\nline 14\r\nline 15\r\nline 16\r\nline 17\r\nline 18\r\nline 19\r\nline 20\r\nline 21\r\nline 22\r\nline 23\r\nline 24\r\nline 25\r\nline 26\r\nline 27\r\nline 28\r\nline 29\r\nline 30\r\nline 31\r\nline 32\r\nline 33\r\nline 34\r\nline 35\r\nline 36\r\nline 37\r\nline 38\r\nline 39\r\nline 40\r\nline 41\r\nline 42\r\nline 43\r\nline 44\r\nline 45\r\nline 46\r\nline 47\r\nline 48\r\nline 49\r\nline 50",
+   3,
+   5,
+   2
+  ],
+  "out": {
+   "start": 1,
+   "text": "line 1\nline 2\nline 3\nline 4\nline 5"
+  }
+ },
+ {
+  "fn": "excerptAround",
+  "args": [
+   "a\nb\nc",
+   60,
+   2,
+   3
+  ],
+  "out": {
+   "start": 58,
+   "text": ""
+  }
+ },
+ {
+  "fn": "excerptAround",
+  "args": [
+   "a\nb\nc",
+   0,
+   0,
+   0
+  ],
+  "out": {
+   "start": 1,
+   "text": ""
+  }
+ },
+ {
+  "fn": "excerptAround",
+  "args": [
+   "a\nb\nc",
+   2,
+   0,
+   0
+  ],
+  "out": {
+   "start": 2,
+   "text": "b"
+  }
+ },
+ {
+  "fn": "packetContextBlock",
+  "args": [
+   [
+    {
+     "path": "src/é.js",
+     "start": 998,
+     "text": "x\ny\nz",
+     "reason": "definition of ü"
+    },
+    {
+     "path": "src/b.js",
+     "start": 1,
+     "text": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+     "reason": "mentioned"
+    },
+    {
+     "path": "src/c.js",
+     "start": 1,
+     "text": "c",
+     "reason": "late"
+    }
+   ],
+   90
+  ],
+  "out": "src/é.js (definition of ü):\n 998  x\n 999  y\n1000  z"
+ },
+ {
+  "fn": "packetContextBlock",
+  "args": [
+   [
+    {
+     "path": "big.js",
+     "start": 1,
+     "text": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+     "reason": "big"
+    }
+   ],
+   50
+  ],
+  "out": "big.js (big):\n   1  éééééééééééééééééééééééééééééé"
+ },
+ {
+  "fn": "packetContextBlock",
+  "args": [
+   [],
+   6000
+  ],
+  "out": ""
+ },
+ {
+  "fn": "failureSummary",
+  "args": [
+   "\u001b[32m✔ adds\u001b[0m\r\nok 0\r\nok 1\r\nok 2\r\nok 3\r\nok 4\r\nok 5\r\nok 6\r\nok 7\r\nok 8\r\nok 9\r\nok 10\r\nok 11\r\nok 12\r\nok 13\r\nok 14\r\nok 15\r\nok 16\r\nok 17\r\nok 18\r\nok 19\r\n✖ applies a discount\r\n  AssertionError: expected 90 to equal 81\r\n    at test/price.test.js:12:5\r\n    at Object.<anonymous> (node_modules/vitest/x.js:1:1)\r\n\r\nErrors: 1\r\nERRORS found\r\nPASS src/ok.test.ts\r\nPassed fine\r\nok more 0\r\nok more 1\r\nok more 2\r\nok more 3\r\nok more 4\r\nok more 5\r\nok more 6\r\nok more 7\r\nok more 8\r\nok more 9\r\nok more 10\r\nok more 11\r\nok more 12\r\nok more 13\r\nok more 14\r\nok more 15\r\nok more 16\r\nok more 17\r\nok more 18\r\nok more 19\r\nℹ todo 0\r\nℹ todo0\r\n# fail 1",
+   3000
+  ],
+  "out": "✖ applies a discount\n  AssertionError: expected 90 to equal 81\n    at test/price.test.js:12:5\n…\nErrors: 1\nERRORS found\nPassed fine\nok more 0\nok more 1\n…\nok more 10\nok more 11\nok more 12\nok more 13\nok more 14\nok more 15\nok more 16\nok more 17\nok more 18\nok more 19\nℹ todo0\n# fail 1"
+ },
+ {
+  "fn": "failureSummary",
+  "args": [
+   "éééééééééééééééééééééééééééééééééééééééééééééééééé\nFAIL x\nüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü",
+   10
+  ],
+  "out": "…\nüüüüüüüüüü"
+ },
+ {
+  "fn": "failureSummary",
+  "args": [
+   "",
+   3000
+  ],
+  "out": ""
+ },
+ {
+  "fn": "failureSummary",
+  "args": [
+   "traceback here\nTRACEBACK\nnot ok 3\nerrorless\nassertEquals failed\n× bad",
+   3000
+  ],
+  "out": "traceback here\nTRACEBACK\nnot ok 3\nerrorless\nassertEquals failed\n× bad"
+ },
+ {
+  "fn": "packetPrompt",
+  "args": [
+   "Do it.",
+   "",
+   ""
+  ],
+  "out": "Do it."
+ },
+ {
+  "fn": "packetPrompt",
+  "args": [
+   "Do it.",
+   "src/a.js (x):\n   1  y",
+   "npm test"
+  ],
+  "out": "Do it.\n\nWhere the code this step mentions is, from Qanuvi's index (go straight there instead of searching):\nsrc/a.js (x):\n   1  y\n\nQanuvi runs `npm test` itself when you finish and sends you only the failures. Do not run the whole test suite yourself; you may run a single test while working."
+ },
+ {
+  "fn": "packetPrompt",
+  "args": [
+   "Do it.",
+   "",
+   "cargo test"
+  ],
+  "out": "Do it.\n\nQanuvi runs `cargo test` itself when you finish and sends you only the failures. Do not run the whole test suite yourself; you may run a single test while working."
+ },
+ {
+  "fn": "fixPrompt",
+  "args": [
+   "npm test",
+   "boom",
+   1,
+   2
+  ],
+  "out": "`npm test` failed (fix round 1 of 2). The failures:\n```\nboom\n```\nFix the cause, then mark the step done again only when it is complete.\nIf a failure was not caused by this step, fix it only when the fix is small and clearly right; otherwise mark the step \"- [!]\" and say why."
+ },
+ {
+  "fn": "locationBlock",
+  "args": [
+   [
+    {
+     "name": "applyDiscount",
+     "kind": "function",
+     "path": "src/price.js",
+     "line": 6,
+     "container": null
+    },
+    {
+     "name": "add",
+     "kind": "method",
+     "path": "src/cart.ts",
+     "line": 12,
+     "container": "Cart"
+    },
+    {
+     "name": "x",
+     "kind": "const",
+     "path": "a.ts",
+     "line": 1,
+     "container": ""
+    }
+   ],
+   [
+    {
+     "path": "src/price.js",
+     "items": [
+      {
+       "name": "MAX_PERCENT",
+       "kind": "constant",
+       "line": 3,
+       "container": null
+      }
+     ]
+    },
+    {
+     "path": "empty.js",
+     "items": []
+    }
+   ],
+   [
+    "src/cart.js",
+    "é.js"
+   ],
+   2500
+  ],
+  "out": "applyDiscount: function at src/price.js:6\nadd: method in Cart at src/cart.ts:12\nx: const at a.ts:1\nsrc/price.js: MAX_PERCENT (constant, line 3)\nempty.js: no definitions\nsrc/cart.js: does not exist yet\né.js: does not exist yet"
+ },
+ {
+  "fn": "locationBlock",
+  "args": [
+   [],
+   [],
+   [
+    "a.js",
+    "b.js"
+   ],
+   30
+  ],
+  "out": "a.js: does not exist yet"
+ },
+ {
+  "fn": "locationBlock",
+  "args": [
+   [],
+   [],
+   [
+    "éééééééééé"
+   ],
+   10
+  ],
+  "out": ""
+ },
+ {
+  "fn": "holdWording",
+  "args": [
+   {
+    "why": "pushes",
+    "by": "you"
+   }
+  ],
+  "out": "you asked to see it first (pushes)"
+ },
+ {
+  "fn": "holdWording",
+  "args": [
+   {
+    "why": "a question",
+    "by": "default"
+   }
+  ],
+  "out": "Qanuvi's default: a question"
+ },
+ {
+  "fn": "keepHolds",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    {
+     "step": "3a",
+     "why": "answered already",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "new",
+     "by": "you"
+    },
+    {
+     "step": "7a",
+     "why": "x",
+     "by": "default"
+    }
+   ],
+   5
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    },
+    {
+     "step": "1a",
+     "why": "new",
+     "by": "you",
+     "at": 5
+    },
+    {
+     "step": "7a",
+     "why": "x",
+     "by": "default",
+     "at": 5
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "keepAnswer",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "1a",
+   "skip",
+   "",
+   6
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    },
+    {
+     "step": "1a",
+     "choice": "skip",
+     "text": "",
+     "at": 6
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "keepAnswer",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "3a",
+   "go",
+   "again",
+   6
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "again",
+     "at": 6
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "pruneState",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    "1a",
+    "1b",
+    "2a"
+   ],
+   [
+    "1a",
+    "1b",
+    "1c",
+    "1z",
+    "2a",
+    "3a",
+    "5z"
+   ]
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b"
+     ],
+     "late": [
+      "1c"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "fn": "pruneState",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    "1a"
+   ],
+   null
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    }
+   ],
+   "answers": [],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    }
+   ],
+   "checks": [],
+   "closings": []
+  }
+ },
+ {
+  "fn": "pruneState",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [],
+   []
+  ],
+  "out": {
+   "holds": [],
+   "answers": [],
+   "decided": [],
+   "checks": [],
+   "closings": []
+  }
+ },
+ {
+  "fn": "closingRan",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "1z",
+   []
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "closingRan",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "7z",
+   [
+    "7a",
+    "7b"
+   ]
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    },
+    {
+     "closing": "7z",
+     "waiting": [
+      "7a",
+      "7b"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "markLate",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "1b"
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "9x"
+     ],
+     "late": [
+      "1c",
+      "1b"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "markLate",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "nope"
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "closingsDue",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    "1a"
+   ],
+   false
+  ],
+  "out": []
+ },
+ {
+  "fn": "closingsDue",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [],
+   false
+  ],
+  "out": [
+   {
+    "closing": "1z",
+    "waiting": [
+     "1a",
+     "1b",
+     "9x"
+    ],
+    "late": [
+     "1c"
+    ]
+   }
+  ]
+ },
+ {
+  "fn": "closingsDue",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    "1a",
+    "1b"
+   ],
+   true
+  ],
+  "out": [
+   {
+    "closing": "1z",
+    "waiting": [
+     "1a",
+     "1b",
+     "9x"
+    ],
+    "late": [
+     "1c"
+    ]
+   }
+  ]
+ },
+ {
+  "fn": "keepDecided",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": ""
+    },
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "under",
+     "because": ""
+    },
+    {
+     "step": "4a",
+     "what": "New?",
+     "answer": "yes",
+     "because": ""
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "y",
+     "because": ""
+    }
+   ],
+   [
+    {
+     "step": "4a",
+     "why": "new check"
+    }
+   ],
+   [
+    "2a"
+   ],
+   7
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "under",
+     "because": "",
+     "at": 7
+    },
+    {
+     "step": "4a",
+     "what": "New?",
+     "answer": "yes",
+     "because": "",
+     "at": 7
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "y",
+     "because": "",
+     "at": 7
+    }
+   ],
+   "checks": [
+    {
+     "step": "4a",
+     "why": "new check"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "keepDecided",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   [],
+   [],
+   [],
+   8
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "changeDecided",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "1a",
+   "Separator?",
+   "dot"
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1,
+     "changed": "dot"
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "changeDecided",
+  "args": [
+   {
+    "holds": [
+     {
+      "step": "1a",
+      "why": "q",
+      "by": "default",
+      "at": 1
+     },
+     {
+      "step": "2a",
+      "why": "p",
+      "by": "you",
+      "at": 1
+     }
+    ],
+    "answers": [
+     {
+      "step": "3a",
+      "choice": "go",
+      "text": "dash",
+      "at": 2
+     }
+    ],
+    "closings": [
+     {
+      "closing": "1z",
+      "waiting": [
+       "1a",
+       "1b",
+       "9x"
+      ],
+      "late": [
+       "1c"
+      ]
+     },
+     {
+      "closing": "5z",
+      "waiting": [],
+      "late": []
+     },
+     {
+      "closing": "gone",
+      "waiting": [
+       "1a"
+      ],
+      "late": []
+     }
+    ],
+    "decided": [
+     {
+      "step": "1a",
+      "what": "Separator?",
+      "answer": "dash",
+      "because": "",
+      "at": 1
+     },
+     {
+      "step": "1b",
+      "what": "Format?",
+      "answer": "ISO",
+      "because": "b",
+      "changed": "RFC",
+      "at": 1
+     },
+     {
+      "step": "1c",
+      "what": "Width?",
+      "answer": "x",
+      "because": "",
+      "changed": "",
+      "at": 1
+     }
+    ],
+    "checks": [
+     {
+      "step": "2a",
+      "why": "migrates"
+     },
+     {
+      "step": "4a",
+      "why": "x"
+     }
+    ]
+   },
+   "1a",
+   "nope",
+   "x"
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1a",
+     "why": "q",
+     "by": "default",
+     "at": 1
+    },
+    {
+     "step": "2a",
+     "why": "p",
+     "by": "you",
+     "at": 1
+    }
+   ],
+   "answers": [
+    {
+     "step": "3a",
+     "choice": "go",
+     "text": "dash",
+     "at": 2
+    }
+   ],
+   "closings": [
+    {
+     "closing": "1z",
+     "waiting": [
+      "1a",
+      "1b",
+      "9x"
+     ],
+     "late": [
+      "1c"
+     ]
+    },
+    {
+     "closing": "5z",
+     "waiting": [],
+     "late": []
+    },
+    {
+     "closing": "gone",
+     "waiting": [
+      "1a"
+     ],
+     "late": []
+    }
+   ],
+   "decided": [
+    {
+     "step": "1a",
+     "what": "Separator?",
+     "answer": "dash",
+     "because": "",
+     "at": 1
+    },
+    {
+     "step": "1b",
+     "what": "Format?",
+     "answer": "ISO",
+     "because": "b",
+     "changed": "RFC",
+     "at": 1
+    },
+    {
+     "step": "1c",
+     "what": "Width?",
+     "answer": "x",
+     "because": "",
+     "changed": "",
+     "at": 1
+    }
+   ],
+   "checks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    },
+    {
+     "step": "4a",
+     "why": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "archivePath",
+  "args": [
+   "docs/PLAN.md"
+  ],
+  "out": "docs/PLAN.archive.md"
+ },
+ {
+  "fn": "archivePath",
+  "args": [
+   "docs/PLAN.MD"
+  ],
+  "out": "docs/PLAN.archive.md"
+ },
+ {
+  "fn": "archivePath",
+  "args": [
+   "PLAN"
+  ],
+  "out": "PLAN.archive.md"
+ },
+ {
+  "fn": "archivePath",
+  "args": [
+   "a.md.txt"
+  ],
+  "out": "a.md.txt.archive.md"
+ },
+ {
+  "fn": "isArchive",
+  "args": [
+   "X.ARCHIVE.MD"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isArchive",
+  "args": [
+   "X.archive.md.bak"
+  ],
+  "out": false
+ },
+ {
+  "fn": "doneNumbers",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n",
+   null,
+   "- [x] **7. A**\n- [x] **1. Again**",
+   ""
+  ],
+  "out": [
+   "1",
+   "2",
+   "3",
+   "5",
+   "7"
+  ]
+ },
+ {
+  "fn": "doneNumbers",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+  ],
+  "out": [
+   "1"
+  ]
+ },
+ {
+  "fn": "finishedSections",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n"
+  ],
+  "out": [
+   [
+    "Stage 1",
+    2,
+    2
+   ],
+   [
+    "Stage 2",
+    12,
+    1
+   ],
+   [
+    "Stage 3",
+    18,
+    1
+   ]
+  ]
+ },
+ {
+  "fn": "finishedSections",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+  ],
+  "out": []
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n",
+   null,
+   "docs/PLAN.md"
+  ],
+  "out": {
+   "plan": "# Work map\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Empty stage\n\n#Not a heading",
+   "archive": "# Archive of PLAN.md\n\nFinished sections moved here from docs/PLAN.md. Plan runs still count their steps as done.\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n## Stage 2\nWords.\n- [x] **3. Editor**\n\n## Stage 3\n- [x] **5. Done too**\n",
+   "sections": [
+    {
+     "title": "Stage 1",
+     "steps": 2
+    },
+    {
+     "title": "Stage 2",
+     "steps": 1
+    },
+    {
+     "title": "Stage 3",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1\r\n\r\n- [x] **1. Setup**\r\n  - Done.\r\n- [x] **2. Layout**\r\n\r\n\r\n### Sub of 1\r\n\r\n- [ ] **2a. Open sub**\r\n## Stage 2\r\nWords.\r\n- [x] **3. Editor**\r\n## Empty stage\r\n\r\n#Not a heading\r\n## Stage 3\r\n- [x] **5. Done too**\r\n",
+   "# Archive\r\n\r\n## Old\r\n\r\n\r\n",
+   "P.md"
+  ],
+  "out": {
+   "plan": "# Work map\r\n\r\n### Sub of 1\r\n\r\n- [ ] **2a. Open sub**\r\n## Empty stage\r\n\r\n#Not a heading",
+   "archive": "# Archive\r\n\r\n## Old\r\n\r\n## Stage 1\r\n\r\n- [x] **1. Setup**\r\n  - Done.\r\n- [x] **2. Layout**\r\n\r\n## Stage 2\r\nWords.\r\n- [x] **3. Editor**\r\n\r\n## Stage 3\r\n- [x] **5. Done too**\r\n",
+   "sections": [
+    {
+     "title": "Stage 1",
+     "steps": 2
+    },
+    {
+     "title": "Stage 2",
+     "steps": 1
+    },
+    {
+     "title": "Stage 3",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n",
+   "",
+   "P.md"
+  ],
+  "out": {
+   "plan": "# Work map\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Empty stage\n\n#Not a heading",
+   "archive": "# Archive of P.md\n\nFinished sections moved here from P.md. Plan runs still count their steps as done.\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n## Stage 2\nWords.\n- [x] **3. Editor**\n\n## Stage 3\n- [x] **5. Done too**\n",
+   "sections": [
+    {
+     "title": "Stage 1",
+     "steps": 2
+    },
+    {
+     "title": "Stage 2",
+     "steps": 1
+    },
+    {
+     "title": "Stage 3",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n",
+   "# Archive\r\n",
+   "P.md"
+  ],
+  "out": {
+   "plan": "# Work map\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Empty stage\n\n#Not a heading",
+   "archive": "# Archive\r\n\r\n## Stage 1\r\n\r\n- [x] **1. Setup**\r\n  - Done.\r\n- [x] **2. Layout**\r\n\r\n## Stage 2\r\nWords.\r\n- [x] **3. Editor**\r\n\r\n## Stage 3\r\n- [x] **5. Done too**\r\n",
+   "sections": [
+    {
+     "title": "Stage 1",
+     "steps": 2
+    },
+    {
+     "title": "Stage 2",
+     "steps": 1
+    },
+    {
+     "title": "Stage 3",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   null,
+   "PLAN.md"
+  ],
+  "out": null
+ },
+ {
+  "fn": "archiveFinished",
+  "args": [
+   "## A\n\n- [ ] **1. Open**\n",
+   null,
+   "P"
+  ],
+  "out": null
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n",
+   "./PLAN.md",
+   "Intro text before any heading.\n- [ ] **3-1. Loose sub**\n  - Needs: 3, ./PLAN.md#2\n## Other\n\n- [x] **1. Old done**\n- [ ] **2. Next**\n  - needs: 1,  2b ,docs/X.md#3\n  - Model: claude-opus-5-5\n- [ ] **2b. Sub**\n  - Needs: 2, PLAN.md#1, LIB.md#3, #4\n- [ ] **9. Free number**\n- [ ] **007. Zeros**\n\n",
+   "OTHER.md",
+   {}
+  ],
+  "out": {
+   "text": "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n\n## From OTHER.md\n\n- [ ] **3-10. Loose sub**\n  - Needs: OTHER.md#3, 2\n\n## Other\n\n- [x] **10. Old done**\n- [ ] **11. Next**\n  - needs: 10, 11b, docs/X.md#3\n  - Model: claude-opus-5-5\n- [ ] **11b. Sub**\n  - Needs: 11, 1, LIB.md#3, #4\n- [ ] **9. Free number**\n- [ ] **7. Zeros**\n",
+   "added": 6,
+   "leftOut": 0,
+   "renumbered": [
+    [
+     "3-1",
+     "3-10"
+    ],
+    [
+     "1",
+     "10"
+    ],
+    [
+     "2",
+     "11"
+    ],
+    [
+     "2b",
+     "11b"
+    ],
+    [
+     "007",
+     "7"
+    ]
+   ],
+   "sections": [
+    {
+     "title": "From OTHER.md",
+     "steps": 1
+    },
+    {
+     "title": "Other",
+     "steps": 5
+    }
+   ]
+  }
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n",
+   "PLAN.md",
+   "Intro text before any heading.\n- [ ] **3-1. Loose sub**\n  - Needs: 3, ./PLAN.md#2\n## Other\n\n- [x] **1. Old done**\n- [ ] **2. Next**\n  - needs: 1,  2b ,docs/X.md#3\n  - Model: claude-opus-5-5\n- [ ] **2b. Sub**\n  - Needs: 2, PLAN.md#1, LIB.md#3, #4\n- [ ] **9. Free number**\n- [ ] **007. Zeros**\n\n",
+   "OTHER.md",
+   {
+    "onlyOpen": true,
+    "taken": [
+     "10",
+     "x",
+     ""
+    ]
+   }
+  ],
+  "out": {
+   "text": "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n\n## From OTHER.md\n\n- [ ] **3-11. Loose sub**\n  - Needs: OTHER.md#3, 2\n\n## Other\n\n- [ ] **12. Next**\n  - needs: OTHER.md#1, 12b, docs/X.md#3\n  - Model: claude-opus-5-5\n- [ ] **12b. Sub**\n  - Needs: 12, 1, LIB.md#3, #4\n- [ ] **9. Free number**\n- [ ] **7. Zeros**\n",
+   "added": 5,
+   "leftOut": 1,
+   "renumbered": [
+    [
+     "3-1",
+     "3-11"
+    ],
+    [
+     "2",
+     "12"
+    ],
+    [
+     "2b",
+     "12b"
+    ],
+    [
+     "007",
+     "7"
+    ]
+   ],
+   "sections": [
+    {
+     "title": "From OTHER.md",
+     "steps": 1
+    },
+    {
+     "title": "Other",
+     "steps": 4
+    }
+   ]
+  }
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "# Plan\r\n\r\n## A\r\n\r\n- [ ] **1. One**\r\n- [ ] **2. Two**\r\n",
+   "PLAN.md",
+   "Intro text before any heading.\n- [ ] **3-1. Loose sub**\n  - Needs: 3, ./PLAN.md#2\n## Other\n\n- [x] **1. Old done**\n- [ ] **2. Next**\n  - needs: 1,  2b ,docs/X.md#3\n  - Model: claude-opus-5-5\n- [ ] **2b. Sub**\n  - Needs: 2, PLAN.md#1, LIB.md#3, #4\n- [ ] **9. Free number**\n- [ ] **007. Zeros**\n\n",
+   "O.md",
+   {}
+  ],
+  "out": {
+   "text": "# Plan\r\n\r\n## A\r\n\r\n- [ ] **1. One**\r\n- [ ] **2. Two**\r\n\r\n## From O.md\r\n\r\n- [ ] **3-10. Loose sub**\r\n  - Needs: O.md#3, 2\r\n\r\n## Other\r\n\r\n- [x] **10. Old done**\r\n- [ ] **11. Next**\r\n  - needs: 10, 11b, docs/X.md#3\r\n  - Model: claude-opus-5-5\r\n- [ ] **11b. Sub**\r\n  - Needs: 11, 1, LIB.md#3, #4\r\n- [ ] **9. Free number**\r\n- [ ] **7. Zeros**\r\n",
+   "added": 6,
+   "leftOut": 0,
+   "renumbered": [
+    [
+     "3-1",
+     "3-10"
+    ],
+    [
+     "1",
+     "10"
+    ],
+    [
+     "2",
+     "11"
+    ],
+    [
+     "2b",
+     "11b"
+    ],
+    [
+     "007",
+     "7"
+    ]
+   ],
+   "sections": [
+    {
+     "title": "From O.md",
+     "steps": 1
+    },
+    {
+     "title": "Other",
+     "steps": 5
+    }
+   ]
+  }
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "",
+   "PLAN.md",
+   "- [ ] **7. Loose**",
+   "notes/TODO.md",
+   {}
+  ],
+  "out": {
+   "text": "## From notes/TODO.md\n\n- [ ] **7. Loose**\n",
+   "added": 1,
+   "leftOut": 0,
+   "renumbered": [],
+   "sections": [
+    {
+     "title": "From notes/TODO.md",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "# P\n\n\n",
+   "PLAN.md",
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   "P2.md",
+   {
+    "onlyOpen": true
+   }
+  ],
+  "out": {
+   "text": "# P\n\n## Stage 1 ##\n\n- [-] **2. Layout** (built)\n  - Three panes.\n  - Model: claude-opus-5-5\n  - model: second-ignored\n  - Needs: P2.md#1, docs/OTHER.md#4, x\n  - Skipped: needs step 1\n- [ ] **1b. Updates**\n\n## Stage 2\n\n - [!] 12-2. Plain numbered\n  * star detail\n",
+   "added": 3,
+   "leftOut": 2,
+   "renumbered": [],
+   "sections": [
+    {
+     "title": "Stage 1",
+     "steps": 2
+    },
+    {
+     "title": "Stage 2",
+     "steps": 1
+    }
+   ]
+  }
+ },
+ {
+  "fn": "mergePlans",
+  "args": [
+   "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n",
+   "PLAN.md",
+   "- [x] **1. Done**\n",
+   "O.md",
+   {
+    "onlyOpen": true
+   }
+  ],
+  "out": null
+ },
+ {
+  "fn": "stepNumbers",
+  "args": [
+   "# Work map\n\n## Stage 1\n\n- [x] **1. Setup**\n  - Done.\n- [x] **2. Layout**\n\n\n### Sub of 1\n\n- [ ] **2a. Open sub**\n## Stage 2\nWords.\n- [x] **3. Editor**\n## Empty stage\n\n#Not a heading\n## Stage 3\n- [x] **5. Done too**\n"
+  ],
+  "out": [
+   "1",
+   "2",
+   "2a",
+   "3",
+   "5"
+  ]
+ },
+ {
+  "fn": "stepNumbers",
+  "args": [
+   null
+  ],
+  "out": []
+ },
+ {
+  "fn": "plannerPrompt",
+  "args": [
+   "  Add VAT to the cart \n",
+   "TASKLIST.md",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": "Plan the following work for this project. You are the planner: read the code as much as you need (read-only),\nthen answer with the plan only, as task-list steps inside one ```tasklist block. Do not change any file.\n\nRequest:\nAdd VAT to the cart\n\nFormat of each step (Qanuvi reads exactly this):\n```tasklist\n- [ ] **1. Short step title**\n  - What to do, concretely: files, functions, behaviour. One point per line.\n  - Validate: how to check it is done (a test, a command, what to look at).\n  - Model: <model id>\n```\n\nRules:\n- 2 to 10 steps, in order; each small enough for one focused session, and each leaves the project working.\n- Choose a model per step from: claude-opus-5-5, claude-haiku-5-5 (strongest first). Use the strongest for money, security and hard design; a mid model for normal coding; the smallest for docs and small edits.\n- Number the steps from 1; Qanuvi renumbers them to follow the steps already in TASKLIST.md.\n- Put tests in the same step as the code they test."
+ },
+ {
+  "fn": "replanPrompt",
+  "args": [
+   "T.md",
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   1,
+   "  ",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nWhat went wrong:\n(no details)"
+ },
+ {
+  "fn": "replanPrompt",
+  "args": [
+   "T.md",
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   4,
+   " Tests kept failing: x !== y \n",
+   [
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5"
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5"
+    }
+   ]
+  ],
+  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**12-2. Plain numbered**\n  * star detail\n\nWhat went wrong:\nTests kept failing: x !== y"
+ },
+ {
+  "fn": "extractSteps",
+  "args": [
+   "Plan:\r\n```Markdown  \r\n# Heading\n - [X] **1. First**\r\n    - detail one\n\t- tab detail\n\n- [!] **2. Second** (note)\n - not a detail\n- [ ] Plain third\n  - Model: claude-haiku-5-5\n```\nafter"
+  ],
+  "out": {
+   "block": "- [ ] **1. First**\n    - detail one\n- [ ] **2. Second** (note)\n- [ ] Plain third\n  - Model: claude-haiku-5-5",
+   "steps": [
+    {
+     "line": 0,
+     "status": " ",
+     "number": "1",
+     "title": "First",
+     "note": "",
+     "details": [
+      "  - detail one"
+     ],
+     "model": null,
+     "needs": [],
+     "end": 2,
+     "section": ""
+    },
+    {
+     "line": 2,
+     "status": " ",
+     "number": "2",
+     "title": "Second",
+     "note": "(note)",
+     "details": [],
+     "model": null,
+     "needs": [],
+     "end": 3,
+     "section": ""
+    },
+    {
+     "line": 3,
+     "status": " ",
+     "number": null,
+     "title": "Plain third",
+     "note": "",
+     "details": [],
+     "model": "claude-haiku-5-5",
+     "needs": [],
+     "end": 5,
+     "section": ""
+    }
+   ]
+  }
+ },
+ {
+  "fn": "extractSteps",
+  "args": [
+   "- [ ] **1. No fence**\n  - d\nText\n- [x] **2. Done one**"
+  ],
+  "out": {
+   "block": "- [ ] **1. No fence**\n  - d\n- [ ] **2. Done one**",
+   "steps": [
+    {
+     "line": 0,
+     "status": " ",
+     "number": "1",
+     "title": "No fence",
+     "note": "",
+     "details": [
+      "- d"
+     ],
+     "model": null,
+     "needs": [],
+     "end": 2,
+     "section": ""
+    },
+    {
+     "line": 2,
+     "status": " ",
+     "number": "2",
+     "title": "Done one",
+     "note": "",
+     "details": [],
+     "model": null,
+     "needs": [],
+     "end": 3,
+     "section": ""
+    }
+   ]
+  }
+ },
+ {
+  "fn": "extractSteps",
+  "args": [
+   "I could not plan this."
+  ],
+  "out": {
+   "block": "",
+   "steps": []
+  }
+ },
+ {
+  "fn": "extractSteps",
+  "args": [
+   "```tasklist\n```"
+  ],
+  "out": {
+   "block": "",
+   "steps": []
+  }
+ },
+ {
+  "fn": "lastNumber",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+  ],
+  "out": 12
+ },
+ {
+  "fn": "lastNumber",
+  "args": [
+   "- [x] **3. A**\n- [ ] **12b. B**\n- [ ] C"
+  ],
+  "out": 12
+ },
+ {
+  "fn": "lastNumber",
+  "args": [
+   "# empty"
+  ],
+  "out": 0
+ },
+ {
+  "fn": "renumber",
+  "args": [
+   "- [ ] **1. A**\n  - d\n- [ ] **2b.  B  **tail\n- [ ] Plain\nnot a step\n- [x] **3. Done**",
+   13
+  ],
+  "out": "- [ ] **13. A**\n  - d\n- [ ] **14. B**tail\n- [ ] **15. Plain**\nnot a step\n- [x] **3. Done**"
+ },
+ {
+  "fn": "renumber",
+  "args": [
+   "- [ ] **1. A**\n- [ ] **2. B**",
+   "12"
+  ],
+  "out": "- [ ] **12a. A**\n- [ ] **12b. B**"
+ },
+ {
+  "fn": "renumber",
+  "args": [
+   "- [ ] ****\n- [ ] **x**",
+   1
+  ],
+  "out": "- [ ] **1. ******\n- [ ] **2. x**"
+ },
+ {
+  "fn": "appendSection",
+  "args": [
+   "# P\r\n\r\n- [x] **1. Old**\r\n\r\n",
+   "  Long \t title xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "\n- [ ] **2. New**\n  - d\n"
+  ],
+  "out": "# P\r\n\r\n- [x] **1. Old**\r\n\r\n## Long title xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n\r\n- [ ] **2. New**\r\n  - d\r\n"
+ },
+ {
+  "fn": "appendSection",
+  "args": [
+   "",
+   "",
+   "- [ ] **1. X**"
+  ],
+  "out": "## Planned work\n\n- [ ] **1. X**\n"
+ },
+ {
+  "fn": "appendSection",
+  "args": [
+   "# P",
+   "VAT",
+   ""
+  ],
+  "out": "# P\n\n## VAT\n\n\n"
+ },
+ {
+  "fn": "replaceStep",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": "2",
+    "title": "Layout"
+   },
+   "\n- [ ] **2a. A**\n- [ ] **2b. B**\n",
+   "2a–2b"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [!] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n  - Replaced by steps 2a–2b, rewritten by the planner after it failed on every model.\r\n- [ ] **2a. A**\r\n- [ ] **2b. B**\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "replaceStep",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": null,
+    "title": "Plain step without bold"
+   },
+   "- [ ] **x. y**",
+   "x"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [!] Plain step without bold\r\n  - Replaced by steps x, rewritten by the planner after it failed on every model.\r\n- [ ] **x. y**\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "replaceStep",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": "99",
+    "title": "Gone"
+   },
+   "",
+   ""
+  ],
+  "out": {
+   "error": "The step is no longer in the task list."
+  }
+ },
+ {
+  "fn": "labelRange",
+  "args": [
+   "- [ ] **12a. A**\n- [ ] **12b. B**\n- [ ] **12c. C**"
+  ],
+  "out": "12a–12c"
+ },
+ {
+  "fn": "labelRange",
+  "args": [
+   "- [ ] **5. A**"
+  ],
+  "out": "5"
+ },
+ {
+  "fn": "labelRange",
+  "args": [
+   "- [ ] Plain"
+  ],
+  "out": ""
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "Add coupons. Then test them."
+  ],
+  "out": "Add coupons"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "Add optional VAT to the cart total using addVat from src/tax.js, with tests."
+  ],
+  "out": "Add optional VAT to the cart total using addVat from…"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "  "
+  ],
+  "out": "Planned work"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "\n\n  Do it now!!! Please\nSecond line"
+  ],
+  "out": "Do it now"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "Version 1.2 is out. Next"
+  ],
+  "out": "Version 1.2 is out"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "Make the checkout page handle coupons, gift cards, and store credit;also refunds"
+  ],
+  "out": "Make the checkout page handle coupons, gift cards, and…"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "Ünïcödé wörds äre hére tö tést thé cütting öf löng séntences néar sixty"
+  ],
+  "out": "Ünïcödé wörds äre hére tö tést thé cütting öf löng…"
+ },
+ {
+  "fn": "sectionTitleFrom",
+  "args": [
+   "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ],
+  "out": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+ },
+ {
+  "fn": "guidanceNote",
+  "args": [
+   "82a",
+   "PLAN-D.md"
+  ],
+  "out": "\n\n(Qanuvi: the user wrote this while you work on step 82a of PLAN-D.md. The user is watching. Take it in now and decide: if it changes how to do this step, follow it; if it says not to do something, do not do it, even when the step asks for it. If it asks for something more: when it is small, do it now as part of this step and add a short note of it under the step in the plan; when it is big, do not do it now: add it to the plan as a new open step right after 82a, numbered 82a-1 (then 82a-2), in the plan's format, and say so; it runs after this step. If it asks you to stop, stop and say where you left off. If it asks to go back to an earlier step (one that is blocked, skipped or not finished), set that step back to [ ] in the plan and remove its Blocked or Skipped line; Qanuvi runs it right after this step. Answer it in one short line before going on.)"
+ },
+ {
+  "fn": "withoutGuidance",
+  "args": [
+   "use the shop currency\n\n(Qanuvi: the user wrote this while you work on step 82a of PLAN-D.md. The user is watching. Take it in now and decide: if it changes how to do this step, follow it; if it says not to do something, do not do it, even when the step asks for it. If it asks for something more: when it is small, do it now as part of this step and add a short note of it under the step in the plan; when it is big, do not do it now: add it to the plan as a new open step right after 82a, numbered 82a-1 (then 82a-2), in the plan's format, and say so; it runs after this step. If it asks you to stop, stop and say where you left off. If it asks to go back to an earlier step (one that is blocked, skipped or not finished), set that step back to [ ] in the plan and remove its Blocked or Skipped line; Qanuvi runs it right after this step. Answer it in one short line before going on.)"
+  ],
+  "out": "use the shop currency"
+ },
+ {
+  "fn": "withoutGuidance",
+  "args": [
+   "ask\n\n(Qanuvi: the plan run is stopped at step 1 of P.md; this is a chat with the owner, not the run. Answer what they ask first, clearly. When they ask you to do something, do it here (with the usual approvals) and keep the plan file true: the step's mark says what is really so. Do not go on with other steps. When the owner wants the run to go on, or what blocked the step is settled, end your reply with this question on its own line: \"Should I resume the plan run from step 1? (yes/no)\". Qanuvi resumes the run only when the owner answers yes or says to continue.)\n\n(Qanuvi: the user wrote this while you work on step 1 of P.md. The user is watching. Take it in now and decide: if it changes how to do this step, follow it; if it says not to do something, do not do it, even when the step asks for it. If it asks for something more: when it is small, do it now as part of this step and add a short note of it under the step in the plan; when it is big, do not do it now: add it to the plan as a new open step right after 1, numbered 1-1 (then 1-2), in the plan's format, and say so; it runs after this step. If it asks you to stop, stop and say where you left off. If it asks to go back to an earlier step (one that is blocked, skipped or not finished), set that step back to [ ] in the plan and remove its Blocked or Skipped line; Qanuvi runs it right after this step. Answer it in one short line before going on.)"
+  ],
+  "out": "ask"
+ },
+ {
+  "fn": "withoutGuidance",
+  "args": [
+   "plain words"
+  ],
+  "out": "plain words"
+ },
+ {
+  "fn": "stoppedChatNote",
+  "args": [
+   "53z",
+   "PLAN-E.md"
+  ],
+  "out": "\n\n(Qanuvi: the plan run is stopped at step 53z of PLAN-E.md; this is a chat with the owner, not the run. Answer what they ask first, clearly. When they ask you to do something, do it here (with the usual approvals) and keep the plan file true: the step's mark says what is really so. Do not go on with other steps. When the owner wants the run to go on, or what blocked the step is settled, end your reply with this question on its own line: \"Should I resume the plan run from step 53z? (yes/no)\". Qanuvi resumes the run only when the owner answers yes or says to continue.)"
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "continue"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   " Resume. "
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "go on!"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "retry the step"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "Continue The Run Again"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "run it again"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "continue?"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isGoOnOrder",
+  "args": [
+   "carry on please"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "yes"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "Yes!"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "ok."
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "go ahead"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "yes, resume it"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "yes resume"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "y"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "yes but first"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   "no"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isYes",
+  "args": [
+   " ok "
+  ],
+  "out": true
+ },
+ {
+  "fn": "askedToResume",
+  "args": [
+   "Done.\nShould I resume the plan run from step 53z? (yes/no)"
+  ],
+  "out": true
+ },
+ {
+  "fn": "askedToResume",
+  "args": [
+   "RESUME THE RUN now."
+  ],
+  "out": false
+ },
+ {
+  "fn": "askedToResume",
+  "args": [
+   "Should I use option 1? (yes/no)"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "stop"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "Stop!"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "stop the run"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "halt now now"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "cancel everything here."
+  ],
+  "out": true
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "stop using floats"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isStopOrder",
+  "args": [
+   "do not stop"
+  ],
+  "out": false
+ },
+ {
+  "fn": "addedSteps",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   [
+    "1|Project setup",
+    "|Plain step without bold"
+   ]
+  ],
+  "out": [
+   8,
+   14
+  ]
+ },
+ {
+  "fn": "addedSteps",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   []
+  ],
+  "out": [
+   8,
+   14
+  ]
+ },
+ {
+  "fn": "reopenedSteps",
+  "args": [
+   [
+    {
+     "line": 0,
+     "number": "1",
+     "title": "Project setup",
+     "status": "blocked"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Layout",
+     "status": "failed"
+    },
+    {
+     "line": 2,
+     "number": "1b",
+     "title": "Updates",
+     "status": "skipped"
+    },
+    {
+     "line": 3,
+     "number": null,
+     "title": "Plain step without bold",
+     "status": "skipped"
+    },
+    {
+     "line": 4,
+     "number": "1b",
+     "title": "Updates",
+     "status": "waiting"
+    }
+   ],
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   []
+  ],
+  "out": []
+ },
+ {
+  "fn": "reopenedSteps",
+  "args": [
+   [
+    {
+     "line": 0,
+     "number": "1",
+     "title": "Project setup",
+     "status": "blocked"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Layout",
+     "status": "failed"
+    },
+    {
+     "line": 2,
+     "number": "1b",
+     "title": "Updates",
+     "status": "skipped"
+    },
+    {
+     "line": 3,
+     "number": null,
+     "title": "Plain step without bold",
+     "status": "skipped"
+    },
+    {
+     "line": 4,
+     "number": "1b",
+     "title": "Updates",
+     "status": "waiting"
+    }
+   ],
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   [
+    "2|Layout"
+   ]
+  ],
+  "out": []
+ },
+ {
+  "fn": "stepKey",
+  "args": [
+   {
+    "number": null,
+    "title": "T"
+   }
+  ],
+  "out": "|T"
+ },
+ {
+  "fn": "stepKey",
+  "args": [
+   {
+    "number": "4",
+    "title": "T|x"
+   }
+  ],
+  "out": "4|T|x"
+ },
+ {
+  "fn": "notesBlock",
+  "args": [
+   [
+    "use the shop currency",
+    "run php 8.2"
+   ]
+  ],
+  "out": "\nNotes from earlier in this run (the owner's words and what earlier steps left); follow them:\n- use the shop currency\n- run php 8.2\n\nIf later steps need something you learned or decided, add a line starting with \"Note for the next steps:\" to your last answer. Never put a password or key in it: the project's secrets reach every step as environment variables."
+ },
+ {
+  "fn": "notesBlock",
+  "args": [
+   []
+  ],
+  "out": "\nIf later steps need something you learned or decided, add a line starting with \"Note for the next steps:\" to your last answer. Never put a password or key in it: the project's secrets reach every step as environment variables."
+ },
+ {
+  "fn": "notesIn",
+  "args": [
+   "Done.\n**Note for the next steps:** tests need php 8.2\nNote for the next steps:   \nx Note for the next steps: the db password is abc12345\n- Note for the next steps: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  ],
+  "out": [
+   "tests need php 8.2",
+   "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  ]
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "root qz7test9 if you need db user pass"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "the db password is abc12345"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "key sk-test-abcdefghijklmnopqrstu"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "use the shop currency"
+  ],
+  "out": false
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "do not change the login page"
+  ],
+  "out": false
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "token: a1b2"
+  ],
+  "out": false
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "token is x_abc1.def"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "the API-key value is k9!@#$"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "password word9plain"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "Passwd: ab12cd"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "login éabc123"
+  ],
+  "out": true
+ },
+ {
+  "fn": "looksSecret",
+  "args": [
+   "secret a.b.c.1d"
+  ],
+  "out": true
+ },
+ {
+  "fn": "contextSize",
+  "args": [
+   [
+    "{\"type\":\"assistant\",\"message\":{\"usage\":{\"input_tokens\":7,\"cache_creation_input_tokens\":3}}}",
+    "{\"type\":\"assistant\",\"usage\" broken",
+    "{\"type\":\"assistant\",\"message\":{\"usage\":null},\"usage\":1}",
+    "{\"type\":\"result\",\"usage\":{\"input_tokens\":99}}"
+   ]
+  ],
+  "out": 10
+ },
+ {
+  "fn": "contextSize",
+  "args": [
+   []
+  ],
+  "out": 0
+ },
+ {
+  "fn": "contextSize",
+  "args": [
+   [
+    "{\"type\":\"assistant\",\"usage\" broken"
+   ]
+  ],
+  "out": 0
+ },
+ {
+  "fn": "handoverDue",
+  "args": [
+   150000,
+   200000,
+   0
+  ],
+  "out": false
+ },
+ {
+  "fn": "handoverDue",
+  "args": [
+   200000,
+   200000,
+   3
+  ],
+  "out": true
+ },
+ {
+  "fn": "handoverDue",
+  "args": [
+   900000,
+   0,
+   0
+  ],
+  "out": false
+ },
+ {
+  "fn": "handoverDue",
+  "args": [
+   300000,
+   200000,
+   4
+  ],
+  "out": false
+ },
+ {
+  "fn": "handoverRequest",
+  "args": [
+   "PLAN-D/logs/83b.md",
+   212500
+  ],
+  "out": "(Qanuvi: this session's context is now about 213k tokens. A new session takes over this step, so the work stays focused and the cost stays down. Finish the edit you are making so no file is left half-written or broken; do not start anything new. Then add a \"Progress\" note to PLAN-D/logs/83b.md that a new session can work from without guessing: what is done and checked, what is left (in order), the files you touched and why, anything half-way, decisions you made and their reasons, and facts about the code you learned (names, places, traps). Do not mark the step done unless it is. Then stop and answer \"Handed over\".)"
+ },
+ {
+  "fn": "handoverRequest",
+  "args": [
+   "L.md",
+   499
+  ],
+  "out": "(Qanuvi: this session's context is now about 0k tokens. A new session takes over this step, so the work stays focused and the cost stays down. Finish the edit you are making so no file is left half-written or broken; do not start anything new. Then add a \"Progress\" note to L.md that a new session can work from without guessing: what is done and checked, what is left (in order), the files you touched and why, anything half-way, decisions you made and their reasons, and facts about the code you learned (names, places, traps). Do not mark the step done unless it is. Then stop and answer \"Handed over\".)"
+ },
+ {
+  "fn": "modelSwitchRequest",
+  "args": [
+   ".qanuvi/plan-logs/p/93a.md",
+   "Opus 5.5"
+  ],
+  "out": "(Qanuvi: the owner picked Opus 5.5 for this step; it takes over in a new session. Finish the edit you are making so no file is left half-written or broken; do not start anything new. Then add a \"Progress\" note to .qanuvi/plan-logs/p/93a.md that a new session can work from without guessing: what is done and checked, what is left (in order), the files you touched and why, anything half-way, decisions you made and their reasons, and facts about the code you learned (names, places, traps). Do not mark the step done unless it is. Then stop and answer \"Handed over\".)"
+ },
+ {
+  "fn": "canCarry",
+  "args": [
+   {
+    "model": "opus",
+    "section": "S82",
+    "tokens": 40000,
+    "steps": 5
+   },
+   "opus",
+   "S82",
+   80000
+  ],
+  "out": true
+ },
+ {
+  "fn": "canCarry",
+  "args": [
+   {
+    "model": "opus",
+    "section": "S82",
+    "tokens": 80000,
+    "steps": 1
+   },
+   "opus",
+   "S82",
+   80000
+  ],
+  "out": false
+ },
+ {
+  "fn": "canCarry",
+  "args": [
+   {
+    "model": "opus",
+    "section": "S82",
+    "tokens": 1,
+    "steps": 6
+   },
+   "opus",
+   "S82",
+   80000
+  ],
+  "out": false
+ },
+ {
+  "fn": "canCarry",
+  "args": [
+   null,
+   "opus",
+   "S82",
+   80000
+  ],
+  "out": false
+ },
+ {
+  "fn": "needingCount",
+  "args": [
+   "82b",
+   [
+    {
+     "number": "82c",
+     "needs": [
+      "82a"
+     ]
+    },
+    {
+     "number": "82d",
+     "needs": [
+      " 82b "
+     ]
+    },
+    {
+     "number": null,
+     "needs": [
+      "82b"
+     ]
+    },
+    {
+     "number": "82e",
+     "needs": [
+      "82d"
+     ]
+    },
+    {
+     "number": "82f"
+    },
+    {
+     "number": "83a",
+     "needs": [
+      "82e",
+      "x"
+     ]
+    }
+   ],
+   [
+    "82c",
+    "82d",
+    "83a"
+   ]
+  ],
+  "out": 2
+ },
+ {
+  "fn": "privateBlock",
+  "args": [
+   [
+    "db user: test\r\n  password: x1",
+    "plain"
+   ]
+  ],
+  "out": "\nPrivate details the owner gave earlier in this plan (logins, passwords). Use them where the work needs them; never write them into files, notes, commits, plans or your answers:\n- db user: test password: x1\n- plain"
+ },
+ {
+  "fn": "privateBlock",
+  "args": [
+   []
+  ],
+  "out": ""
+ },
+ {
+  "fn": "logDir",
+  "args": [
+   "content\\plugins\\qcommerce\\PLAN-D.MD"
+  ],
+  "out": ".qanuvi/plan-logs/content_plugins_qcommerce_PLAN-D"
+ },
+ {
+  "fn": "logDir",
+  "args": [
+   "docs/plän (2).md.txt"
+  ],
+  "out": ".qanuvi/plan-logs/docs_pl_n_2_.md.txt"
+ },
+ {
+  "fn": "logPath",
+  "args": [
+   "PLAN.md",
+   {
+    "number": "82b",
+    "title": "x"
+   }
+  ],
+  "out": ".qanuvi/plan-logs/PLAN/82b.md"
+ },
+ {
+  "fn": "logPath",
+  "args": [
+   "PLAN.md",
+   {
+    "number": null,
+    "title": "Add greet test with a very long title that goes on and on"
+   }
+  ],
+  "out": ".qanuvi/plan-logs/PLAN/Add_greet_test_with_a_very_long_title_th.md"
+ },
+ {
+  "fn": "logPath",
+  "args": [
+   "PLAN.md",
+   {
+    "number": "",
+    "title": "Empty number"
+   }
+  ],
+  "out": ".qanuvi/plan-logs/PLAN/.md"
+ },
+ {
+  "fn": "attemptEntry",
+  "args": [
+   {
+    "when": 1794477659999,
+    "model": "claude-opus-5-5",
+    "outcome": "open",
+    "costUsd": 2.19,
+    "seconds": 349.5,
+    "testsPassed": false,
+    "failure": "Expected 1200, got 1250",
+    "answer": "  The cart cache was not cleared.  "
+   }
+  ],
+  "out": "\n## Attempt 2026-11-12 10:00 · claude-opus-5-5 · turn ended · $2.19 · 350 s\nTests: failed.\nFailure:\n```\nExpected 1200, got 1250\n```\nThe agent's last answer:\n\nThe cart cache was not cleared.\n"
+ },
+ {
+  "fn": "attemptEntry",
+  "args": [
+   {
+    "when": 1767323040000,
+    "model": "claude-haiku-5-5",
+    "outcome": "done",
+    "costUsd": 0.125,
+    "seconds": 2.4,
+    "testsPassed": true,
+    "note": "kept going",
+    "failure": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "answer": ""
+   }
+  ],
+  "out": "\n## Attempt 2026-01-02 03:04 · claude-haiku-5-5 · done · $0.13 · 2 s\nTests: passed.\nNote: kept going\nFailure:\n```\néééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé …\n```\n"
+ },
+ {
+  "fn": "attemptEntry",
+  "args": [
+   {
+    "when": 0,
+    "model": "m",
+    "outcome": "error",
+    "costUsd": 0,
+    "seconds": 0,
+    "testsPassed": null
+   }
+  ],
+  "out": "\n## Attempt 1970-01-01 00:00 · m · error · $0.00 · 0 s\n"
+ },
+ {
+  "fn": "resultEntry",
+  "args": [
+   "blocked",
+   "no database login"
+  ],
+  "out": "\n**Result: blocked** — no database login\n"
+ },
+ {
+  "fn": "resultEntry",
+  "args": [
+   "done",
+   null
+  ],
+  "out": "\n**Result: done**\n"
+ },
+ {
+  "fn": "logsBlock",
+  "args": [
+   "PLAN.md",
+   ".qanuvi/plan-logs/PLAN/2.md",
+   true
+  ],
+  "out": "\nEvery step of this plan has a log in .qanuvi/plan-logs/PLAN/ (its attempts, failures and results). Read the log of a step you depend on or that failed, when it helps.\nThis step was tried before: read its log .qanuvi/plan-logs/PLAN/2.md first and do not repeat what failed."
+ },
+ {
+  "fn": "logsBlock",
+  "args": [
+   "PLAN.md",
+   "x",
+   false
+  ],
+  "out": "\nEvery step of this plan has a log in .qanuvi/plan-logs/PLAN/ (its attempts, failures and results). Read the log of a step you depend on or that failed, when it helps."
+ },
+ {
+  "fn": "mapPath",
+  "args": [
+   "docs/PLAN.md"
+  ],
+  "out": ".qanuvi/plan-logs/docs_PLAN/MAP.md"
+ },
+ {
+  "fn": "factsPath",
+  "args": [
+   "docs/PLAN.md"
+  ],
+  "out": ".qanuvi/plan-logs/docs_PLAN/FACTS.md"
+ },
+ {
+  "fn": "apiPath",
+  "args": [
+   "docs/PLAN.md"
+  ],
+  "out": ".qanuvi/plan-logs/docs_PLAN/API.md"
+ },
+ {
+  "fn": "guidanceContextBlock",
+  "args": [
+   "PLAN-D.md",
+   "  src/a.php — a\n",
+   [
+    {
+     "number": "1",
+     "files": [
+      "a.ts"
+     ]
+    },
+    {
+     "number": null,
+     "files": [
+      "f0.ts",
+      "f1.ts",
+      "f2.ts",
+      "f3.ts",
+      "f4.ts",
+      "f5.ts",
+      "f6.ts",
+      "f7.ts",
+      "f8.ts",
+      "f9.ts",
+      "f10.ts",
+      "f11.ts",
+      "f12.ts",
+      "f13.ts",
+      "f14.ts",
+      "f15.ts",
+      "f16.ts",
+      "f17.ts",
+      "f18.ts",
+      "f19.ts",
+      "f20.ts",
+      "f21.ts",
+      "f22.ts",
+      "f23.ts",
+      "f24.ts",
+      "f25.ts",
+      "f26.ts"
+     ]
+    },
+    {
+     "number": "3",
+     "files": []
+    },
+    {
+     "number": "4",
+     "files": [
+      "b.rs",
+      "c.rs"
+     ]
+    },
+    {
+     "number": "5",
+     "files": [
+      "d.svelte"
+     ]
+    }
+   ],
+   true
+  ],
+  "out": "\nThe plan map (.qanuvi/plan-logs/PLAN-D/MAP.md): what earlier steps built and where. Start from it.\nsrc/a.php — a\n\nFiles the last steps changed:\n- step: f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts, f8.ts, f9.ts, f10.ts, f11.ts, f12.ts, f13.ts, f14.ts, f15.ts, f16.ts, f17.ts, f18.ts, f19.ts, f20.ts, f21.ts, f22.ts, f23.ts, f24.ts, …\n- 4: b.rs, c.rs\n- 5: d.svelte\n\nFinding your way: use Qanuvi's code index (find_symbol for where something is defined, outline for what a file holds, read_lines for just the lines you need, project_map for the layout) rather than reading whole files with cat or sed.\nWhen the step is done, update the plan map .qanuvi/plan-logs/PLAN-D/MAP.md (create it if it is missing): under 80 lines, one line per file, \"path — what it holds or does\", grouped by area; add what this step created or changed, keep earlier lines unless they are wrong now."
+ },
+ {
+  "fn": "guidanceContextBlock",
+  "args": [
+   "P.md",
+   "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   [],
+   false
+  ],
+  "out": "\nThe plan map (.qanuvi/plan-logs/P/MAP.md): what earlier steps built and where. Start from it.\néééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n…\n\nWhen the step is done, update the plan map .qanuvi/plan-logs/P/MAP.md (create it if it is missing): under 80 lines, one line per file, \"path — what it holds or does\", grouped by area; add what this step created or changed, keep earlier lines unless they are wrong now."
+ },
+ {
+  "fn": "guidanceContextBlock",
+  "args": [
+   "P.md",
+   "   ",
+   [],
+   false
+  ],
+  "out": "\nWhen the step is done, update the plan map .qanuvi/plan-logs/P/MAP.md (create it if it is missing): under 80 lines, one line per file, \"path — what it holds or does\", grouped by area; add what this step created or changed, keep earlier lines unless they are wrong now."
+ },
+ {
+  "fn": "knowledgeBlock",
+  "args": [
+   "PLAN-D.md",
+   "f0.php — x\nf1.php — x\nf2.php — x\nf3.php — x\nf4.php — x\nf5.php — x\nf6.php — x\nf7.php — x\nf8.php — x\nf9.php — x\nf10.php — x\nf11.php — x\nf12.php — x\nf13.php — x\nf14.php — x\nf15.php — x\nf16.php — x\nf17.php — x\nf18.php — x\nf19.php — x\nf20.php — x\nf21.php — x\nf22.php — x\nf23.php — x\nf24.php — x\nf25.php — x\nf26.php — x\nf27.php — x\nf28.php — x\nf29.php — x\nf30.php — x\nf31.php — x\nf32.php — x\nf33.php — x\nf34.php — x\nf35.php — x\nf36.php — x\nf37.php — x\nf38.php — x\nf39.php — x\nf40.php — x\nf41.php — x\nf42.php — x\nf43.php — x\nf44.php — x\nf45.php — x\nf46.php — x\nf47.php — x\nf48.php — x\nf49.php — x\nf50.php — x\nf51.php — x\nf52.php — x\nf53.php — x\nf54.php — x\nf55.php — x\nf56.php — x\nf57.php — x\nf58.php — x\nf59.php — x\nf60.php — x\nf61.php — x\nf62.php — x\nf63.php — x\nf64.php — x\nf65.php — x\nf66.php — x\nf67.php — x\nf68.php — x\nf69.php — x\nf70.php — x\nf71.php — x\nf72.php — x\nf73.php — x\nf74.php — x\nf75.php — x\nf76.php — x\nf77.php — x\nf78.php — x\nf79.php — x\nf80.php — x\nf81.php — x\nf82.php — x\nf83.php — x\nf84.php — x\nf85.php — x\nf86.php — x\nf87.php — x\nf88.php — x\nf89.php — x",
+   "fact 0\n\nfact 1\n\nfact 2\n\nfact 3\n\nfact 4\n\nfact 5\n\nfact 6\n\nfact 7\n\nfact 8\n\nfact 9\n\nfact 10\n\nfact 11\n\nfact 12\n\nfact 13\n\nfact 14\n\nfact 15\n\nfact 16\n\nfact 17\n\nfact 18\n\nfact 19\n\nfact 20\n\nfact 21\n\nfact 22\n\nfact 23\n\nfact 24\n\nfact 25\n\nfact 26\n\nfact 27\n\nfact 28\n\nfact 29\n\nfact 30\n\nfact 31\n\nfact 32\n\nfact 33\n\nfact 34\n\nfact 35\n\nfact 36\n\nfact 37\n\nfact 38\n\nfact 39\n\nfact 40\n\nfact 41\n\nfact 42\n\nfact 43\n\nfact 44\n\nfact 45\n\nfact 46\n\nfact 47\n\nfact 48\n\nfact 49\n\nfact 50\n\nfact 51\n\nfact 52\n\nfact 53\n\nfact 54\n\nfact 55\n\nfact 56\n\nfact 57\n\nfact 58\n\nfact 59\n\nfact 60",
+   [
+    {
+     "number": "1",
+     "files": [
+      "a.ts"
+     ]
+    },
+    {
+     "number": null,
+     "files": [
+      "f0.ts",
+      "f1.ts",
+      "f2.ts",
+      "f3.ts",
+      "f4.ts",
+      "f5.ts",
+      "f6.ts",
+      "f7.ts",
+      "f8.ts",
+      "f9.ts",
+      "f10.ts",
+      "f11.ts",
+      "f12.ts",
+      "f13.ts",
+      "f14.ts",
+      "f15.ts",
+      "f16.ts",
+      "f17.ts",
+      "f18.ts",
+      "f19.ts",
+      "f20.ts",
+      "f21.ts",
+      "f22.ts",
+      "f23.ts",
+      "f24.ts",
+      "f25.ts",
+      "f26.ts"
+     ]
+    },
+    {
+     "number": "3",
+     "files": []
+    },
+    {
+     "number": "4",
+     "files": [
+      "b.rs",
+      "c.rs"
+     ]
+    },
+    {
+     "number": "5",
+     "files": [
+      "d.svelte"
+     ]
+    }
+   ],
+   true
+  ],
+  "out": "This plan's knowledge, shared by every step and model, is in .qanuvi/plan-logs/PLAN-D/: MAP.md (what is where), FACTS.md (decisions, conventions, how to run and test, gotchas), API.md (functions and classes the plan added, with file and line; read it before opening files) and a log per step. Start from it; do not rediscover what it says.\n\nMAP.md:\nf0.php — x\nf1.php — x\nf2.php — x\nf3.php — x\nf4.php — x\nf5.php — x\nf6.php — x\nf7.php — x\nf8.php — x\nf9.php — x\nf10.php — x\nf11.php — x\nf12.php — x\nf13.php — x\nf14.php — x\nf15.php — x\nf16.php — x\nf17.php — x\nf18.php — x\nf19.php — x\nf20.php — x\nf21.php — x\nf22.php — x\nf23.php — x\nf24.php — x\nf25.php — x\nf26.php — x\nf27.php — x\nf28.php — x\nf29.php — x\nf30.php — x\nf31.php — x\nf32.php — x\nf33.php — x\nf34.php — x\nf35.php — x\nf36.php — x\nf37.php — x\nf38.php — x\nf39.php — x\nf40.php — x\nf41.php — x\nf42.php — x\nf43.php — x\nf44.php — x\nf45.php — x\nf46.php — x\nf47.php — x\nf48.php — x\nf49.php — x\nf50.php — x\nf51.php — x\nf52.php — x\nf53.php — x\nf54.php — x\nf55.php — x\nf56.php — x\nf57.php — x\nf58.php — x\nf59.php — x\nf60.php — x\nf61.php — x\nf62.php — x\nf63.php — x\nf64.php — x\nf65.php — x\nf66.php — x\nf67.php — x\nf68.php — x\nf69.php — x\nf70.php — x\nf71.php — x\nf72.php — x\nf73.php — x\nf74.php — x\nf75.php — x\nf76.php — x\nf77.php — x\nf78.php — x\nf79.php — x\nf80.php — x\nf81.php — x\nf82.php — x\nf83.php — x\nf84.php — x\nf85.php — x\nf86.php — x\nf87.php — x\nf88.php — x\nf89.php — x\n\nFACTS.md:\nfact 0\n\nfact 1\n\nfact 2\n\nfact 3\n\nfact 4\n\nfact 5\n\nfact 6\n\nfact 7\n\nfact 8\n\nfact 9\n\nfact 10\n\nfact 11\n\nfact 12\n\nfact 13\n\nfact 14\n\nfact 15\n\nfact 16\n\nfact 17\n\nfact 18\n\nfact 19\n\nfact 20\n\nfact 21\n\nfact 22\n\nfact 23\n\nfact 24\n\nfact 25\n\nfact 26\n\nfact 27\n\nfact 28\n\nfact 29\n\nfact 30\n\nfact 31\n\nfact 32\n\nfact 33\n\nfact 34\n\nfact 35\n\nfact 36\n\nfact 37\n\nfact 38\n\nfact 39\n\nfact 40\n\nfact 41\n\nfact 42\n\nfact 43\n\nfact 44\n\nfact 45\n\nfact 46\n\nfact 47\n\nfact 48\n\nfact 49\n\nfact 50\n\nfact 51\n\nfact 52\n\nfact 53\n\nfact 54\n\nfact 55\n\nfact 56\n\nfact 57\n\nfact 58\n\nfact 59\n\nfact 60\n\nFiles the last steps changed:\n- step: f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts, f8.ts, f9.ts, f10.ts, f11.ts, f12.ts, f13.ts, f14.ts, f15.ts, f16.ts, f17.ts, f18.ts, f19.ts, f20.ts, f21.ts, f22.ts, f23.ts, f24.ts, …\n- 4: b.rs, c.rs\n- 5: d.svelte\n\nFinding your way: use Qanuvi's code index (find_symbol for where something is defined, outline for what a file holds, read_lines for just the lines you need, project_map for the layout) rather than reading whole files with cat or sed.\n\nBefore you finish: update .qanuvi/plan-logs/PLAN-D/MAP.md (one line per file, \"path — what it holds or does\", under 80 lines; create it if missing) and .qanuvi/plan-logs/PLAN-D/FACTS.md (what later steps must know: decisions, conventions, how to run things, gotchas; under 60 lines; never passwords or keys). Change or remove lines that are no longer right instead of adding more. MAP.md has 90 lines: tidy it to under 80; FACTS.md has 61 lines: tidy it to under 60.\n"
+ },
+ {
+  "fn": "knowledgeBlock",
+  "args": [
+   "P.md",
+   " map ",
+   "",
+   [],
+   false
+  ],
+  "out": "This plan's knowledge, shared by every step and model, is in .qanuvi/plan-logs/P/: MAP.md (what is where), FACTS.md (decisions, conventions, how to run and test, gotchas), API.md (functions and classes the plan added, with file and line; read it before opening files) and a log per step. Start from it; do not rediscover what it says.\n\nMAP.md:\nmap\n\nBefore you finish: update .qanuvi/plan-logs/P/MAP.md (one line per file, \"path — what it holds or does\", under 80 lines; create it if missing) and .qanuvi/plan-logs/P/FACTS.md (what later steps must know: decisions, conventions, how to run things, gotchas; under 60 lines; never passwords or keys). Change or remove lines that are no longer right instead of adding more.\n"
+ },
+ {
+  "fn": "knowledgeBlock",
+  "args": [
+   "P.md",
+   "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+   "  ",
+   [],
+   false
+  ],
+  "out": "This plan's knowledge, shared by every step and model, is in .qanuvi/plan-logs/P/: MAP.md (what is where), FACTS.md (decisions, conventions, how to run and test, gotchas), API.md (functions and classes the plan added, with file and line; read it before opening files) and a log per step. Start from it; do not rediscover what it says.\n\nMAP.md:\nmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm\n…\n\nBefore you finish: update .qanuvi/plan-logs/P/MAP.md (one line per file, \"path — what it holds or does\", under 80 lines; create it if missing) and .qanuvi/plan-logs/P/FACTS.md (what later steps must know: decisions, conventions, how to run things, gotchas; under 60 lines; never passwords or keys). Change or remove lines that are no longer right instead of adding more.\n"
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "src/Cart/CartLine.php"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "README.md"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "vendor/x/y.php"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "a/build/b.ts"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "rebuild/c.TS"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "x.Svelte"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "x.hpp.bak"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isCode",
+  "args": [
+   "dist.ts"
+  ],
+  "out": true
+ },
+ {
+  "fn": "apiSection",
+  "args": [
+   "src/A.php",
+   [
+    {
+     "name": "resetCache",
+     "kind": "method",
+     "line": 88,
+     "container": "CartStorage"
+    },
+    {
+     "name": "f",
+     "kind": "function",
+     "line": 1,
+     "container": null
+    },
+    {
+     "name": "n0",
+     "kind": "const",
+     "line": 0,
+     "container": ""
+    },
+    {
+     "name": "n1",
+     "kind": "const",
+     "line": 1,
+     "container": ""
+    },
+    {
+     "name": "n2",
+     "kind": "const",
+     "line": 2,
+     "container": ""
+    },
+    {
+     "name": "n3",
+     "kind": "const",
+     "line": 3,
+     "container": ""
+    },
+    {
+     "name": "n4",
+     "kind": "const",
+     "line": 4,
+     "container": ""
+    },
+    {
+     "name": "n5",
+     "kind": "const",
+     "line": 5,
+     "container": ""
+    },
+    {
+     "name": "n6",
+     "kind": "const",
+     "line": 6,
+     "container": ""
+    },
+    {
+     "name": "n7",
+     "kind": "const",
+     "line": 7,
+     "container": ""
+    },
+    {
+     "name": "n8",
+     "kind": "const",
+     "line": 8,
+     "container": ""
+    },
+    {
+     "name": "n9",
+     "kind": "const",
+     "line": 9,
+     "container": ""
+    },
+    {
+     "name": "n10",
+     "kind": "const",
+     "line": 10,
+     "container": ""
+    },
+    {
+     "name": "n11",
+     "kind": "const",
+     "line": 11,
+     "container": ""
+    },
+    {
+     "name": "n12",
+     "kind": "const",
+     "line": 12,
+     "container": ""
+    },
+    {
+     "name": "n13",
+     "kind": "const",
+     "line": 13,
+     "container": ""
+    },
+    {
+     "name": "n14",
+     "kind": "const",
+     "line": 14,
+     "container": ""
+    },
+    {
+     "name": "n15",
+     "kind": "const",
+     "line": 15,
+     "container": ""
+    },
+    {
+     "name": "n16",
+     "kind": "const",
+     "line": 16,
+     "container": ""
+    },
+    {
+     "name": "n17",
+     "kind": "const",
+     "line": 17,
+     "container": ""
+    },
+    {
+     "name": "n18",
+     "kind": "const",
+     "line": 18,
+     "container": ""
+    },
+    {
+     "name": "n19",
+     "kind": "const",
+     "line": 19,
+     "container": ""
+    },
+    {
+     "name": "n20",
+     "kind": "const",
+     "line": 20,
+     "container": ""
+    },
+    {
+     "name": "n21",
+     "kind": "const",
+     "line": 21,
+     "container": ""
+    },
+    {
+     "name": "n22",
+     "kind": "const",
+     "line": 22,
+     "container": ""
+    },
+    {
+     "name": "n23",
+     "kind": "const",
+     "line": 23,
+     "container": ""
+    },
+    {
+     "name": "n24",
+     "kind": "const",
+     "line": 24,
+     "container": ""
+    },
+    {
+     "name": "n25",
+     "kind": "const",
+     "line": 25,
+     "container": ""
+    },
+    {
+     "name": "n26",
+     "kind": "const",
+     "line": 26,
+     "container": ""
+    },
+    {
+     "name": "n27",
+     "kind": "const",
+     "line": 27,
+     "container": ""
+    },
+    {
+     "name": "n28",
+     "kind": "const",
+     "line": 28,
+     "container": ""
+    },
+    {
+     "name": "n29",
+     "kind": "const",
+     "line": 29,
+     "container": ""
+    },
+    {
+     "name": "n30",
+     "kind": "const",
+     "line": 30,
+     "container": ""
+    },
+    {
+     "name": "n31",
+     "kind": "const",
+     "line": 31,
+     "container": ""
+    },
+    {
+     "name": "n32",
+     "kind": "const",
+     "line": 32,
+     "container": ""
+    },
+    {
+     "name": "n33",
+     "kind": "const",
+     "line": 33,
+     "container": ""
+    },
+    {
+     "name": "n34",
+     "kind": "const",
+     "line": 34,
+     "container": ""
+    },
+    {
+     "name": "n35",
+     "kind": "const",
+     "line": 35,
+     "container": ""
+    },
+    {
+     "name": "n36",
+     "kind": "const",
+     "line": 36,
+     "container": ""
+    },
+    {
+     "name": "n37",
+     "kind": "const",
+     "line": 37,
+     "container": ""
+    },
+    {
+     "name": "n38",
+     "kind": "const",
+     "line": 38,
+     "container": ""
+    },
+    {
+     "name": "n39",
+     "kind": "const",
+     "line": 39,
+     "container": ""
+    }
+   ]
+  ],
+  "out": "### src/A.php\n- method CartStorage::resetCache :88\n- function f :1\n- const n0 :0\n- const n1 :1\n- const n2 :2\n- const n3 :3\n- const n4 :4\n- const n5 :5\n- const n6 :6\n- const n7 :7\n- const n8 :8\n- const n9 :9\n- const n10 :10\n- const n11 :11\n- const n12 :12\n- const n13 :13\n- const n14 :14\n- const n15 :15\n- const n16 :16\n- const n17 :17\n- const n18 :18\n- const n19 :19\n- const n20 :20\n- const n21 :21\n- const n22 :22\n- const n23 :23\n- const n24 :24\n- const n25 :25\n- const n26 :26\n- const n27 :27\n- const n28 :28\n- const n29 :29\n- const n30 :30\n- const n31 :31\n- const n32 :32\n- const n33 :33\n- const n34 :34\n- const n35 :35\n- const n36 :36\n- const n37 :37"
+ },
+ {
+  "fn": "apiSection",
+  "args": [
+   "src/A.php",
+   []
+  ],
+  "out": ""
+ },
+ {
+  "fn": "mergeApi",
+  "args": [
+   "# What this plan added\n\n### src/B.php\n- class B :3\n\n###  src/Z.php \n- z\n### src/É.php\n- e\n##### not\nloose text\n### \n",
+   [
+    [
+     "src/A.php",
+     "### src/A.php\n- a :1"
+    ],
+    [
+     "src/B.php",
+     ""
+    ],
+    [
+     "src/a.php",
+     "### src/a.php\n- lower :2"
+    ],
+    [
+     "src/Z.php",
+     "### src/Z.php\n- z2"
+    ]
+   ]
+  ],
+  "out": "# What this plan added (written by Qanuvi from its code index after each step)\n\n### src/A.php\n- a :1\n\n### src/Z.php\n- z2\n\n### src/a.php\n- lower :2\n\n### src/É.php\n- e\n##### not\nloose text\n"
+ },
+ {
+  "fn": "mergeApi",
+  "args": [
+   "",
+   []
+  ],
+  "out": "# What this plan added (written by Qanuvi from its code index after each step)\n"
+ },
+ {
+  "fn": "referencedPlans",
+  "args": [
+   "Builds on content/plugins/qcommerce/PLAN-C.md and the DEVELOPMENT-TASKLIST.md.\n- [ ] **90. Hand over**\n  - Needs: 89z, docs/OTHER-PLAN.md#4, docs\\OTHER-PLAN.md#5, ./lib/Road#1#2\n  - NEEDS: #7, .qanuvi/x/plan.md#1\nSee PLAN-D.md for this plan, also sub/plan-d.md and my_todo_list.md, TODO.MD, roadmap-2026.md.",
+   "PLAN-D.md"
+  ],
+  "out": [
+   "docs/OTHER-PLAN.md",
+   "docs/OTHER-PLAN.md",
+   "lib/Road#1",
+   "content/plugins/qcommerce/PLAN-C.md",
+   "DEVELOPMENT-TASKLIST.md",
+   "OTHER-PLAN.md",
+   "my_todo_list.md",
+   "TODO.MD",
+   "roadmap-2026.md"
+  ]
+ },
+ {
+  "fn": "referencedPlans",
+  "args": [
+   "Needs: docs/PLAN.md#1 and docs/PLAN.md",
+   "docs\\plan.md"
+  ],
+  "out": []
+ },
+ {
+  "fn": "referencedBlock",
+  "args": [
+   [
+    "docs/OTHER-PLAN.md",
+    "p0.md",
+    "p1.md",
+    "p2.md",
+    "p3.md",
+    "p4.md",
+    "p5.md",
+    "p6.md",
+    "p7.md",
+    "p8.md"
+   ]
+  ],
+  "out": "\nPlans this one builds on keep their own knowledge (read their MAP.md, FACTS.md and API.md when the step touches their work):\n- docs/OTHER-PLAN.md: .qanuvi/plan-logs/docs_OTHER-PLAN/\n- p0.md: .qanuvi/plan-logs/p0/\n- p1.md: .qanuvi/plan-logs/p1/\n- p2.md: .qanuvi/plan-logs/p2/\n- p3.md: .qanuvi/plan-logs/p3/\n- p4.md: .qanuvi/plan-logs/p4/\n- p5.md: .qanuvi/plan-logs/p5/\n- p6.md: .qanuvi/plan-logs/p6/"
+ },
+ {
+  "fn": "referencedBlock",
+  "args": [
+   []
+  ],
+  "out": ""
+ },
+ {
   "fn": "parseTeam",
   "args": [
    {

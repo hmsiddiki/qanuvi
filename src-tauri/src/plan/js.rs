@@ -98,6 +98,47 @@ pub fn trim_start(s: &str) -> &str {
     s.trim_start_matches(js_space)
 }
 
+/// `s.trimEnd()` (also `s.replace(/\s+$/, "")`).
+pub fn trim_end(s: &str) -> &str {
+    s.trim_end_matches(js_space)
+}
+
+/// JavaScript's `\s` as a Rust class: Unicode white space and the byte order mark, not U+0085.
+pub const S: &str = r"[\s\x{FEFF}--\x{85}]";
+
+/// JavaScript's `.` without the `s` flag: anything but the four line ends.
+pub const DOT: &str = r"[^\n\r\x{2028}\x{2029}]";
+
+/// `s.slice(n)` on UTF-16 units (a character cut in half is left out).
+pub fn from_unit(s: &str, n: usize) -> &str {
+    let mut units = 0;
+    for (i, c) in s.char_indices() {
+        if units >= n {
+            return &s[i..];
+        }
+        units += c.len_utf16();
+    }
+    ""
+}
+
+/// `parseInt(s, 10)` for whole numbers: the digits after leading white space (and a sign), None for NaN.
+pub fn parse_int(s: &str) -> Option<i64> {
+    let t = trim_start(s);
+    let (neg, rest) = match t.as_bytes().first() {
+        Some(b'-') => (true, &t[1..]),
+        Some(b'+') => (false, &t[1..]),
+        _ => (false, t),
+    };
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    let n: i64 = digits.parse().ok()?;
+    Some(if neg { -n } else { n })
+}
+
+/// The order of JavaScript's default `sort()` for strings: by UTF-16 units.
+pub fn cmp_utf16(a: &str, b: &str) -> std::cmp::Ordering {
+    a.encode_utf16().cmp(b.encode_utf16())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
