@@ -894,8 +894,8 @@ runs on or off; with it off nothing is sent anywhere.
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
       the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
     - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
-- [ ] **24z2. Tidy code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
-  build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
+- [ ] **24z2. Tidy, safe code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
+  safe code added the same day; build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
   over files, and edit folders they should not touch. Qanuvi fixes that by itself, with zero noise: no tidiness
   questions to the owner, only a line in the step's log and one in the run summary. Nothing assumes a framework or a
   language (not Qlopy, not WordPress, not PHP): it learns each project. The owner steers through the plan text and
@@ -928,8 +928,31 @@ runs on or off; with it off nothing is sent anywhere.
     passing"). Old duplicates are left alone (no risky merges without the owner).
   - [ ] 6. Finishing pass sweeps everything the plan added (duplicates across steps, scattered helpers, dead code) and
     fixes them the same way; the run summary gets one line ("Tidy: 2 duplicates replaced with existing helpers").
-  - [ ] 7. Benchmark: sample projects in several languages that already have helpers, plans that tempt rewriting them
-    and editing the core; checks on and off; count duplicates, outside edits and the extra tokens.
+  - [ ] 7. Safe code, sensitive paths: the atlas also finds the code where harm is done when it breaks or leaks, by
+    what it does, not by one framework's names: money (payments, prices, orders, refunds), secrets and keys, tokens
+    and sessions, sign-in and permissions, personal data, input from outside (requests, headers, uploads), logs,
+    database changes. Found per project in any language from what the code calls (payment SDKs, crypto, session and
+    auth APIs, SQL, file writes, header reads) and its names; the owner can add or remove paths in plain words.
+    Kept in project memory, given to each plan in its memory.
+  - [ ] 8. Safe code, checks on every step's diff: a change that touches a sensitive path always gets the extra
+    checks (full tests, the decider's review, never free-model-only work). The review is told what to look for:
+    weak or fixed fallbacks for secrets, secrets or personal data reaching logs, trusted client headers (IP,
+    Referer, Host), missing escaping or input checks, raw SQL with outside input, a weaker copy of a safe helper the
+    project already has. Plus the project's own analyzers when they are installed (found from the manifests and the
+    project's config: linters, type checkers, security scanners for its languages); Qanuvi runs them on the changed
+    files with no model, and their findings feed the same fix round. Nothing is installed without the owner's yes.
+    A confirmed problem gets a fix round; one that needs a decision (a behaviour change for users) is asked once.
+  - [ ] 9. Safe code, a release gate: a project can name a staging copy (a folder, a second site, a branch) and the
+    paths to try there in plain words ("checkout and payment, sign-in, order emails"). At the end of a run the
+    finishing pass copies to staging only if the owner allowed that, runs the tests there, lists what to try by hand,
+    and stops at "ready for your approval": Qanuvi never ships to a live site by itself. Backups and a way back
+    named before any update. One project's staging is not another's: nothing here assumes a shop, PHP or one host.
+  - [ ] 10. Benchmark: sample projects in several languages that already have helpers and some unsafe spots, plans that
+    tempt rewriting helpers, editing the core and adding weak fallbacks; checks on and off; count duplicates, outside
+    edits, unsafe changes caught, and the extra tokens.
+  - Optional, never core (owner rule: no forced model, agent-only features optional): an agent's own review tools
+    (for example Claude Code's /security-review command) can be used by that agent's steps when present; the checks
+    above must work without them, on every agent and on free models.
 - [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
   reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
   TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
