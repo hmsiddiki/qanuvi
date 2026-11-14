@@ -5,8 +5,47 @@
 
 use std::collections::BTreeMap;
 
-fn entry(project_id: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new("Qanuvi", &format!("secrets:{project_id}")).map_err(|e| e.to_string())
+/// The credential store under the three calls this file needs. The desktop build uses the system's store (keyring);
+/// a server build without the desktop feature has none: nothing is read, saving says so, deleting is a no-op.
+#[cfg(feature = "desktop")]
+mod store {
+    fn entry(key: &str) -> Result<keyring::Entry, String> {
+        keyring::Entry::new("Qanuvi", key).map_err(|e| e.to_string())
+    }
+
+    pub fn read(key: &str) -> Option<String> {
+        entry(key).ok()?.get_password().ok()
+    }
+
+    pub fn write(key: &str, text: &str) -> Result<(), String> {
+        entry(key)?.set_password(text).map_err(|e| e.to_string())
+    }
+
+    pub fn delete(key: &str) -> Result<(), String> {
+        match entry(key)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[cfg(not(feature = "desktop"))]
+mod store {
+    pub fn read(_key: &str) -> Option<String> {
+        None
+    }
+
+    pub fn write(_key: &str, _text: &str) -> Result<(), String> {
+        Err("This build has no credential store, so secrets cannot be saved here.".into())
+    }
+
+    pub fn delete(_key: &str) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+fn key(project_id: &str) -> String {
+    format!("secrets:{project_id}")
 }
 
 /// An environment variable name: letters, digits and underscores, not starting with a digit.
@@ -23,22 +62,17 @@ pub fn parse(text: &str) -> BTreeMap<String, String> {
 }
 
 fn load(project_id: &str) -> BTreeMap<String, String> {
-    entry(project_id)
-        .and_then(|e| e.get_password().map_err(|e| e.to_string()))
+    store::read(&key(project_id))
         .map(|t| parse(&t))
         .unwrap_or_default()
 }
 
-fn store(project_id: &str, all: &BTreeMap<String, String>) -> Result<(), String> {
-    let e = entry(project_id)?;
+fn save(project_id: &str, all: &BTreeMap<String, String>) -> Result<(), String> {
     if all.is_empty() {
-        return match e.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(err) => Err(err.to_string()),
-        };
+        return store::delete(&key(project_id));
     }
     let text = serde_json::to_string(all).map_err(|e| e.to_string())?;
-    e.set_password(&text).map_err(|e| e.to_string())
+    store::write(&key(project_id), &text)
 }
 
 /// The names only (what the window shows).
@@ -56,13 +90,13 @@ pub fn set(project_id: &str, name: &str, value: &str) -> Result<(), String> {
     }
     let mut all = load(project_id);
     all.insert(name.to_string(), value.to_string());
-    store(project_id, &all)
+    save(project_id, &all)
 }
 
 pub fn remove(project_id: &str, name: &str) -> Result<(), String> {
     let mut all = load(project_id);
     all.remove(name);
-    store(project_id, &all)
+    save(project_id, &all)
 }
 
 /// Name and value pairs for a process's environment.
@@ -75,14 +109,12 @@ pub fn env(project_id: &str) -> Vec<(String, String)> {
 
 /// Private details the owner gave during a plan's run (a login typed into a step): kept for that plan, in the
 /// credential store, so every later step and run of the plan has them; never in files or Qanuvi's database.
-fn plan_entry(project_id: &str, file: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new("Qanuvi", &format!("plan:{project_id}:{file}")).map_err(|e| e.to_string())
+fn plan_key(project_id: &str, file: &str) -> String {
+    format!("plan:{project_id}:{file}")
 }
 
 pub fn plan_private(project_id: &str, file: &str) -> Vec<String> {
-    plan_entry(project_id, file)
-        .and_then(|e| e.get_password().map_err(|e| e.to_string()))
-        .ok()
+    store::read(&plan_key(project_id, file))
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
 }
@@ -101,16 +133,11 @@ pub fn plan_private_add(project_id: &str, file: &str, text: &str) -> Result<(), 
         all.remove(0);
     }
     let t = serde_json::to_string(&all).map_err(|e| e.to_string())?;
-    plan_entry(project_id, file)?
-        .set_password(&t)
-        .map_err(|e| e.to_string())
+    store::write(&plan_key(project_id, file), &t)
 }
 
 pub fn plan_private_clear(project_id: &str, file: &str) -> Result<(), String> {
-    match plan_entry(project_id, file)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    store::delete(&plan_key(project_id, file))
 }
 
 #[cfg(test)]
