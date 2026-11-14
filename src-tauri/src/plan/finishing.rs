@@ -83,6 +83,15 @@ fn median(xs: &[f64]) -> f64 {
     }
 }
 
+/// Prices to turn the steps' costs into the pass model's (`PassPrices`): the pass model's price and each model's
+/// (any one price per model works). A model with no known price keeps its cost as it is.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PassPrices {
+    pub pass: f64,
+    pub by_model: std::collections::HashMap<String, f64>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Estimate {
@@ -92,15 +101,27 @@ pub struct Estimate {
 
 /// About what the pass costs and how long it takes, from the run's own finished steps: a light pass is about half a
 /// typical step, a full one about 1.5 typical steps, more for long runs. Cost is None when no finished step was paid
-/// for (free steps tell nothing about the paid decider's price).
-pub fn finish_estimate(steps: &[StepRun], level: FinishLevel) -> Estimate {
+/// for (free steps tell nothing about the paid decider's price). With `prices`, each step's cost is scaled to the
+/// pass model's price (cheap steps say little about a pass on a dear model).
+pub fn finish_estimate(
+    steps: &[StepRun],
+    level: FinishLevel,
+    prices: Option<&PassPrices>,
+) -> Estimate {
+    let scale = |model: &str| match prices {
+        Some(p) if p.pass > 0.0 => match p.by_model.get(model) {
+            Some(own) if *own > 0.0 => p.pass / own,
+            _ => 1.0,
+        },
+        _ => 1.0,
+    };
     let done: Vec<(f64, f64)> = steps
         .iter()
         .filter(|s| s.status == RunStepStatus::Done && !s.attempts.is_empty())
         .map(|s| {
-            s.attempts
-                .iter()
-                .fold((0.0, 0.0), |(c, t), a| (c + a.cost_usd, t + a.seconds))
+            s.attempts.iter().fold((0.0, 0.0), |(c, t), a| {
+                (c + a.cost_usd * scale(&a.model), t + a.seconds)
+            })
         })
         .collect();
     if done.is_empty() {
@@ -459,35 +480,64 @@ mod tests {
             step("done", &[(3.0, 300.0, "done")]),
         ];
         assert_eq!(
-            finish_estimate(&run, FinishLevel::Light),
+            finish_estimate(&run, FinishLevel::Light, None),
             Estimate {
                 cost_usd: Some(1.0),
                 seconds: Some(100.0)
             }
         );
         let one = [step("done", &[(2.0, 60.0, "done")])];
-        assert!((finish_estimate(&one, FinishLevel::Full).cost_usd.unwrap() - 3.2).abs() < 1e-9);
+        assert!(
+            (finish_estimate(&one, FinishLevel::Full, None)
+                .cost_usd
+                .unwrap()
+                - 3.2)
+                .abs()
+                < 1e-9
+        );
         let long: Vec<StepRun> = (0..40)
             .map(|_| step("done", &[(1.0, 60.0, "done")]))
             .collect();
         assert_eq!(
-            finish_estimate(&long, FinishLevel::Full).cost_usd,
+            finish_estimate(&long, FinishLevel::Full, None).cost_usd,
             Some(4.0)
         );
         assert_eq!(
-            finish_estimate(&[step("done", &[(0.0, 50.0, "done")])], FinishLevel::Light),
+            finish_estimate(
+                &[step("done", &[(0.0, 50.0, "done")])],
+                FinishLevel::Light,
+                None
+            ),
             Estimate {
                 cost_usd: None,
                 seconds: Some(25.0)
             }
         );
         assert_eq!(
-            finish_estimate(&[step("failed", &[(1.0, 1.0, "open")])], FinishLevel::Light),
+            finish_estimate(
+                &[step("failed", &[(1.0, 1.0, "open")])],
+                FinishLevel::Light,
+                None
+            ),
             Estimate {
                 cost_usd: None,
                 seconds: None
             }
         );
+        // A cheap model's steps, the pass on a model 40 times dearer: the estimate follows the pass's price.
+        let cheap = [step("done", &[(0.01, 10.0, "done")])];
+        let prices = PassPrices {
+            pass: 20.0,
+            by_model: [("m".to_string(), 0.5)].into_iter().collect(),
+        };
+        let priced = finish_estimate(&cheap, FinishLevel::Light, Some(&prices));
+        assert!((priced.cost_usd.unwrap() - 0.2).abs() < 1e-9);
+        let unknown = PassPrices {
+            pass: 20.0,
+            by_model: Default::default(),
+        };
+        let kept = finish_estimate(&cheap, FinishLevel::Light, Some(&unknown));
+        assert!((kept.cost_usd.unwrap() - 0.005).abs() < 1e-9);
         let done = [step("done", &[(1.0, 1.0, "done")])];
         assert!(offers_finish(RunStatus::Done, &done, None));
         assert!(!offers_finish(RunStatus::Stopped, &done, None));

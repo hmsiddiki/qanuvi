@@ -5,7 +5,7 @@
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import X from "@lucide/svelte/icons/x";
   import type { Project } from "$lib/api";
-  import { setStepModel, type Plan } from "$lib/plan/tasklist";
+  import { addOrderNeeds, setStepModel, type Plan } from "$lib/plan/tasklist";
   import { modelLabel, providerById, PROVIDERS } from "$lib/agents/providers";
   import { api, errorText } from "$lib/api";
   import { formatCost, formatTokens } from "$lib/agent/events";
@@ -363,7 +363,13 @@
       found.secrets = found.secrets.filter((s) => !known.secrets.includes(s.name));
       check = found;
       recommendAll(found, false);
-      if (!found.secrets.length && !found.questions.length && !found.risky.length && !found.setup.length) {
+      if (
+        !found.secrets.length &&
+        !found.questions.length &&
+        !found.risky.length &&
+        !found.setup.length &&
+        !found.order.length
+      ) {
         check = null;
         await go();
       }
@@ -414,6 +420,19 @@
       holds: state.holds.filter((h) => !cleared.has(h.step) || holds.some((n) => n.step === h.step)),
     };
     savePlanState(project.id, file, keepHolds(state, holds));
+    // The check's order decisions (R2e g) become Needs lines in the plan, so the run keeps that order.
+    if (c.order.length) {
+      try {
+        const now = await api.files.read(project.id, file);
+        const r = addOrderNeeds(now.text, c.order);
+        if (r.added.length) {
+          await api.files.write(project.id, file, r.text, now.hash);
+          onchanged?.();
+        }
+      } catch (e) {
+        error = `The order from the check was not written into the plan (${errorText(e)}).`;
+      }
+    }
     check = null;
     await go(
       holds.map((h) => ({ step: h.step, why: holdWording(h) })),
@@ -516,7 +535,11 @@
   let offer = $derived(!!run && !runner.finishing && offersFinish(run));
   function estimate(level: FinishLevel): string {
     if (!run) return "";
-    const e = finishEstimate(run, level);
+    // Scaled by the pass model's price (output per million tokens): cheap steps under-guess a pass on a dear model.
+    const byModel: Record<string, number> = {};
+    for (const p of PROVIDERS) for (const m of p.models) if (m.price) byModel[m.id] = m.price[1];
+    const pass = byModel[defaultPlannerModel(deciderProvider)] ?? 0;
+    const e = finishEstimate(run, level, { pass, byModel });
     const cost = e.costUsd === null ? "cost not known yet" : `about ${formatCost(e.costUsd)}`;
     const time = e.seconds === null ? "" : `, about ${Math.max(1, Math.round(e.seconds / 60))} min`;
     return cost + time;
@@ -530,7 +553,10 @@
       error = errorText(e);
     }
   }
-  let currentAttempt = $derived(current ? current.attempts.length + 1 : 0);
+  /** The try the step is on: once an attempt finished the step, its after-work (notes, checks) is still that try. */
+  let currentAttempt = $derived(
+    current ? current.attempts.length + (current.attempts.at(-1)?.outcome === "done" ? 0 : 1) : 0,
+  );
   /** Steps set aside for the owner's answer (24u), and the steps waiting for each. */
   let heldSteps = $derived(run?.status === "running" ? run.steps.filter((s) => s.status === "held") : []);
   let replies = $state<Record<string, string>>({});
@@ -830,6 +856,15 @@
           <p class="hint">To have running or set:</p>
           <ul>
             {#each check.setup as x, i (i)}<li><strong>{x.what}</strong> <span class="dim">{x.why}</span></li>{/each}
+          </ul>
+        {/if}
+        {#if check.order.length}
+          <p class="hint">Order (written into the plan as Needs lines when the run starts):</p>
+          <ul>
+            {#each check.order as x, i (i)}<li>
+                <strong>Step {x.step} after {x.after.join(", ")}</strong>
+                <span class="dim">{x.why}</span>
+              </li>{/each}
           </ul>
         {/if}
       </div>

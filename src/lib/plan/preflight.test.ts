@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { decidedNote, parsePreflight, preflightPrompt, recommendedRisk, settleCheck, waitsBefore } from "./preflight";
+import {
+  clipReason,
+  decidedNote,
+  parsePreflight,
+  preflightPrompt,
+  recommendedRisk,
+  settleCheck,
+  waitsBefore,
+} from "./preflight";
 
 describe("the check before a run", () => {
   it("asks with what is known and the open steps", () => {
@@ -25,7 +33,14 @@ describe("the check before a run", () => {
     expect(r.questions).toHaveLength(1);
     expect(r.risky[0].step).toBe("84a");
     expect(r.setup[0].what).toBe("MySQL running");
-    expect(parsePreflight("no json here")).toEqual({ secrets: [], questions: [], risky: [], setup: [] });
+    expect(parsePreflight("no json here")).toEqual({ secrets: [], questions: [], risky: [], setup: [], order: [] });
+    const o = parsePreflight(
+      '{"order":[{"step":"1b","after":["1c","1b","1c","a b"],"why":"README lists the final exports"},{"step":"2","after":"1"},{"step":"3","after":[]}]}',
+    );
+    expect(o.order).toEqual([
+      { step: "1b", after: ["1c"], why: "README lists the final exports" },
+      { step: "2", after: ["1"], why: "" },
+    ]);
   });
 
   it("knows the steps to wait at", () => {
@@ -113,5 +128,15 @@ describe("the check before a run", () => {
     const n = decidedNote({ step: "1a", what: "Separator?", answer: "dash", because: "URLs" });
     expect(n).toContain("Decided for you for step 1a: Separator? → dash, because URLs");
     expect(n).toContain("not hard-coded");
+  });
+
+  it("ends a long reason at a word with an ellipsis", () => {
+    const long = "word ".repeat(80).trim();
+    const c = clipReason(long);
+    expect(c.length).toBeLessThanOrEqual(300);
+    expect(c.endsWith("word…")).toBe(true);
+    expect(clipReason("short")).toBe("short");
+    const noSpace = "x".repeat(400);
+    expect(clipReason(noSpace)).toBe("x".repeat(299) + "…");
   });
 });

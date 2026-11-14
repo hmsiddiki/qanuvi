@@ -551,3 +551,17 @@ fn words_for_the_agent_from_the_window_go_as_they_are_and_no_model_sorts_them() 
     assert!(!env.calls().iter().any(|c| c == "free_decide"));
     assert!(w.messages.is_empty(), "not an owner message to log");
 }
+
+#[test]
+fn a_session_that_goes_on_into_the_next_step_takes_that_steps_title() {
+    let env = FakeEnv::new();
+    let c = Controls::default();
+    let mut w = watch(&env);
+    let mut a = ask("");
+    a.title = "Step 2: Second".into();
+    a.resume = Some(("s-1".into(), Totals::default()));
+    run(&env, &c, &mut w, &a);
+    let reqs = env.requests();
+    assert_eq!(reqs[0].session_id.as_deref(), Some("s-1"));
+    assert_eq!(reqs[0].title.as_deref(), Some("Step 2: Second"));
+}

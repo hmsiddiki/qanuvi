@@ -248,7 +248,7 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   nextModelFreeFirst: runner.nextModelFreeFirst,
   freeSavings: (steps, per) => runner.freeSavings({ steps }, per),
   paidPerStep: (stats) => runner.paidPerStep(statsOf(stats)),
-  finishEstimate: (steps, level) => finishing.finishEstimate({ steps }, level),
+  finishEstimate: (steps, level, prices) => finishing.finishEstimate({ steps }, level, prices ?? undefined),
   offersFinish: (status, steps, finish) => finishing.offersFinish({ status, steps, finish: finish ?? undefined }),
   finishReviewPrompt: finishing.finishReviewPrompt,
   parseFinishReview: finishing.parseFinishReview,
@@ -505,6 +505,13 @@ const cases: [string, unknown[]][] = [
   ["parsePreflight", [PF_ANSWER]],
   ["parsePreflight", ["no json here"]],
   ["parsePreflight", ["} {"]],
+  [
+    "parsePreflight",
+    [
+      '{"order":[{"step":"1b","after":["1c","1b","1c","a b","x,y",3],"why":"README lists the exports"},' +
+        '{"step":"2","after":"1"},{"step":"3","after":[]},{"after":["1"]},[1]]}',
+    ],
+  ],
   ["parsePreflight", ["{ not json }"]],
   ["parsePreflight", ['{"secrets": "x", "questions": {"a": 1}, "risky": [], "setup": [{"what": "é".repeat(400)}]}']],
   ["recommendedRisk", ["decide"]],
@@ -1403,6 +1410,8 @@ const cases: [string, unknown[]][] = [
   ["finishEstimate", [RUN_STEPS, "light"]],
   ["finishEstimate", [RUN_STEPS, "full"]],
   ["finishEstimate", [[], "full"]],
+  ["finishEstimate", [RUN_STEPS, "light", { pass: 20, byModel: { [H5]: 0.5, [S5]: 10 } }]],
+  ["finishEstimate", [RUN_STEPS, "full", { pass: 0, byModel: { [H5]: 0.5 } }]],
   ["offersFinish", ["done", RUN_STEPS, null]],
   ["offersFinish", ["done", RUN_STEPS, FINISH]],
   ["offersFinish", ["needs-you", RUN_STEPS, null]],

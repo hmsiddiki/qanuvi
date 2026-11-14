@@ -337,9 +337,10 @@
           type="button"
           class="run-btn"
           disabled={runner.pausing}
-          title="The agent finishes the edit it is making, notes where it is, and stops; Resume goes on in the same session"
-          onclick={() => runner.pause()}
-          ><Pause size={12} /> {runner.pausing ? "Pausing (finishing its edit)…" : "Pause"}</button
+          title={runner.pausing
+            ? "Pausing: the agent is finishing the edit it is making"
+            : "The agent finishes the edit it is making, notes where it is, and stops; Resume goes on in the same session"}
+          onclick={() => runner.pause()}><Pause size={12} /> {runner.pausing ? "Pausing…" : "Pause"}</button
         >
         <button
           type="button"
@@ -658,6 +659,8 @@
 
   .run-btn {
     display: inline-flex;
+    flex-shrink: 0;
+    white-space: nowrap;
     align-items: center;
     gap: 5px;
     height: 24px;

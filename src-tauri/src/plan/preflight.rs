@@ -66,6 +66,16 @@ pub struct Preflight {
     pub questions: Vec<PreflightQuestion>,
     pub risky: Vec<PreflightRisk>,
     pub setup: Vec<Setup>,
+    /// Steps that must run after steps the file lists after them (R2e g): each becomes a "- Needs:" line.
+    #[serde(default)]
+    pub order: Vec<Order>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Order {
+    pub step: String,
+    pub after: Vec<String>,
+    pub why: String,
 }
 
 /// What a risky step does in the run: go ahead, go ahead with extra checks, or wait for the owner.
@@ -144,10 +154,13 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         r#"{"secrets":[{"name":"ENV_NAME","why":"...","steps":["82e"]}],"#.into(),
         r#" "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],"#.into(),
         r#" "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],"#.into(),
-        r#" "setup":[{"what":"something that must run or be set","why":"..."}]}"#.into(),
+        r#" "setup":[{"what":"something that must run or be set","why":"..."}],"#.into(),
+        r#" "order":[{"step":"85b","after":["85c"],"why":"..."}]}"#.into(),
         "Rules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);".into(),
         "questions only for real choices the steps leave open, not for things you can decide from the code; risky only".into(),
-        "for steps that are hard to undo or reach outside this computer. At most 8 items in each list.".into(),
+        "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps".into(),
+        "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items".into(),
+        "in each list.".into(),
         "Sort every question and risky step (sort):".into(),
         r#"- "decide": a sensible default exists that can be changed later (a setting, not hard-coded); give it as"#.into(),
         "  recommended and say why. Most naming, format, layout and library choices are this.".into(),
@@ -169,11 +182,29 @@ fn sort_of(v: &Value, fallback: AskSort) -> AskSort {
     }
 }
 
-/// `typeof v === "string" ? v.trim().slice(0, 300) : ""`.
+/// `typeof v === "string" ? clipReason(v.trim()) : ""`.
 fn text(v: &Value) -> String {
     v.as_str()
-        .map(|s| js::cut(js::trim(s), 300).to_string())
+        .map(|s| clip_reason(js::trim(s), 300))
         .unwrap_or_default()
+}
+
+/// A text longer than `n` characters (UTF-16 units) ends at a word (when one ends at 200 or later) with "…"
+/// (`clipReason`).
+pub fn clip_reason(s: &str, n: usize) -> String {
+    if js::len(s) <= n {
+        return s.to_string();
+    }
+    let mut head = js::cut(s, n - 1);
+    if let Some(space) = head.rfind(' ')
+        && js::len(&head[..space]) >= 200
+    {
+        head = &head[..space];
+    }
+    format!(
+        "{}…",
+        head.trim_end_matches(|c: char| c.is_whitespace() && c != '\u{85}')
+    )
 }
 
 /// The list's items that are objects (arrays count, as `typeof` says "object"; their fields read as missing).
@@ -267,6 +298,35 @@ pub fn parse_preflight(answer: &str) -> Preflight {
                 why: text(&x["why"]),
             })
             .filter(|x| !x.what.is_empty())
+            .take(8)
+            .collect(),
+        order: items(field("order"))
+            .into_iter()
+            .map(|o| {
+                let step = text(&o["step"]);
+                let list: Vec<Value> = match &o["after"] {
+                    Value::Array(a) => a.clone(),
+                    s @ Value::String(_) => vec![s.clone()],
+                    _ => vec![],
+                };
+                let mut after: Vec<String> = Vec::new();
+                for a in list.iter().map(text) {
+                    // JavaScript's \s and the comma: one label per item.
+                    let bad = a.chars().any(|c| {
+                        c == ',' || (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
+                    });
+                    if !a.is_empty() && a != step && !bad && !after.contains(&a) {
+                        after.push(a);
+                    }
+                }
+                after.truncate(10);
+                Order {
+                    step,
+                    after,
+                    why: text(&o["why"]),
+                }
+            })
+            .filter(|o| !o.step.is_empty() && !o.after.is_empty())
             .take(8)
             .collect(),
     }
@@ -626,5 +686,18 @@ mod tests {
         });
         assert!(n.contains("Decided for you for step 1a: Separator? → dash, because URLs"));
         assert!(n.contains("not hard-coded"));
+    }
+
+    #[test]
+    fn ends_a_long_reason_at_a_word_with_an_ellipsis() {
+        let long = "word ".repeat(80).trim().to_string();
+        let c = clip_reason(&long, 300);
+        assert!(js::len(&c) <= 300);
+        assert!(c.ends_with("word…"));
+        assert_eq!(clip_reason("short", 300), "short");
+        assert_eq!(
+            clip_reason(&"x".repeat(400), 300),
+            format!("{}…", "x".repeat(299))
+        );
     }
 }

@@ -416,11 +416,9 @@ pub fn turn(
         } else {
             None
         },
-        title: if session_id.is_none() && !title.is_empty() {
-            Some(title.to_string())
-        } else {
-            None
-        },
+        // Also on a session that goes on into the next step: it is renamed to the step at work (the window title
+        // shows it), not left on the first step's title.
+        title: (!title.is_empty()).then(|| title.to_string()),
     };
     let current = watch
         .live_model
@@ -858,7 +856,8 @@ pub fn attempt(
                 &follow,
                 &model,
                 &mode,
-                &ask.title,
+                // A fix round in the same step: the session keeps the title its first turn gave it.
+                "",
                 forward,
             );
         }

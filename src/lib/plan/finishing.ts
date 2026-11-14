@@ -35,12 +35,25 @@ export interface FinishPass {
 /** The key the pass's cost has in the run's lines per model. */
 export const FINISHER = "finish:";
 
-/** A finished step's cost and time in this run (all its attempts). */
-function stepCost(s: StepRun): { cost: number; seconds: number } {
-  return s.attempts.reduce((t, a) => ({ cost: t.cost + a.costUsd, seconds: t.seconds + a.seconds }), {
-    cost: 0,
-    seconds: 0,
-  });
+/**
+ * Prices to turn the steps' costs into the pass model's: the pass model's price and each model's (any one price per
+ * model works, e.g. output per million tokens). A model with no known price keeps its cost as it is.
+ */
+export interface PassPrices {
+  pass: number;
+  byModel: Record<string, number>;
+}
+
+/** A finished step's cost and time in this run (all its attempts), its cost scaled to the pass model when priced. */
+function stepCost(s: StepRun, prices?: PassPrices): { cost: number; seconds: number } {
+  return s.attempts.reduce(
+    (t, a) => {
+      const own = prices?.byModel[a.model];
+      const scale = prices && prices.pass > 0 && own && own > 0 ? prices.pass / own : 1;
+      return { cost: t.cost + a.costUsd * scale, seconds: t.seconds + a.seconds };
+    },
+    { cost: 0, seconds: 0 },
+  );
 }
 
 function median(xs: number[]): number {
@@ -52,13 +65,15 @@ function median(xs: number[]): number {
 /**
  * About what the pass costs and how long it takes, from the run's own finished steps: a light pass is about half a
  * typical step (one review of the whole diff, plus the checks), a full one about 1.5 typical steps, more for long runs.
- * Cost is null when no finished step was paid for (free steps tell nothing about the paid decider's price).
+ * Cost is null when no finished step was paid for (free steps tell nothing about the paid decider's price). With
+ * `prices`, each step's cost is scaled to the pass model's price (cheap steps say little about a pass on a dear model).
  */
 export function finishEstimate(
   run: Pick<PlanRun, "steps">,
   level: FinishLevel,
+  prices?: PassPrices,
 ): { costUsd: number | null; seconds: number | null } {
-  const done = run.steps.filter((s) => s.status === "done" && s.attempts.length).map(stepCost);
+  const done = run.steps.filter((s) => s.status === "done" && s.attempts.length).map((s) => stepCost(s, prices));
   if (!done.length) return { costUsd: null, seconds: null };
   const paid = done.filter((d) => d.cost > 0).map((d) => d.cost);
   const factor = level === "light" ? 0.5 : Math.min(4, 1.5 + 0.1 * done.length);

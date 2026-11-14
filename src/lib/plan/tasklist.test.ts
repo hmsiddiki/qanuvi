@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  addOrderNeeds,
+  addStepNeeds,
   findTaskLists,
   nextStatus,
   parsePlan,
@@ -159,6 +161,42 @@ describe("findTaskLists", () => {
       "notes/todo-list.md",
       "content/plugins/shop/PLAN-D.md",
     ]);
+  });
+});
+
+describe("order from the check before a run (R2e g)", () => {
+  const text = [
+    "## Steps",
+    "- [ ] **1. First**",
+    "  - do it",
+    "- [ ] **2. Second**",
+    "  - Needs: 1",
+    "- [ ] **3. Third**",
+    "",
+  ].join("\n");
+  it("writes a Needs line or adds to the one there", () => {
+    const first = addStepNeeds(text, 1, ["3"]);
+    expect(first).toContain("- [ ] **1. First**\n  - do it\n  - Needs: 3\n- [ ] **2. Second**");
+    expect(parsePlan(first).steps[0].needs).toEqual(["3"]);
+    const second = addStepNeeds(text, 3, ["3", "1"]);
+    expect(second).toContain("  - Needs: 1, 3\n- [ ] **3. Third**");
+    expect(addStepNeeds(text, 3, ["1"])).toBe(text);
+    expect(addStepNeeds(text.replace(/\n/g, "\r\n"), 1, ["2"])).toContain("  - Needs: 2\r\n");
+  });
+  it("writes order decisions for steps in the plan, never in a circle", () => {
+    const r = addOrderNeeds(text, [
+      { step: "1", after: ["3", "9"] },
+      { step: "3", after: ["1"] }, // 1 now waits for 3: a circle
+      { step: "2", after: ["3"] },
+      { step: "7", after: ["1"] },
+    ]);
+    expect(r.added).toEqual([
+      { step: "1", after: ["3"] },
+      { step: "2", after: ["3"] },
+    ]);
+    const steps = parsePlan(r.text).steps;
+    expect(steps.map((s) => s.needs)).toEqual([["3"], ["1", "3"], []]);
+    expect(addOrderNeeds(text, []).text).toBe(text);
   });
 });
 

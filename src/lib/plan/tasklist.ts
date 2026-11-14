@@ -198,6 +198,65 @@ export function setStepModel(text: string, line: number, model: string | null, e
  * Sets, changes or (with null) removes the step's "- Skipped:" line: why a plan run skipped it (24f). A later run
  * that finishes the step removes it.
  */
+/**
+ * Writes order decisions ("run `step` after `after`") as Needs lines: only steps in this plan, and never one that
+ * would make steps wait for each other in a circle. Answers the new text and what was written.
+ */
+export function addOrderNeeds(
+  text: string,
+  order: { step: string; after: string[] }[],
+): { text: string; added: { step: string; after: string[] }[] } {
+  const steps = parsePlan(text).steps;
+  const byNumber = new Map(steps.filter((s) => s.number).map((s) => [s.number as string, s]));
+  const needs = new Map(steps.filter((s) => s.number).map((s) => [s.number as string, new Set(s.needs)]));
+  /** Whether `from` already waits for `to`, through any Needs lines. */
+  const waits = (from: string, to: string, seen = new Set<string>()): boolean => {
+    if (from === to) return true;
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return [...(needs.get(from) ?? [])].some((n) => waits(n, to, seen));
+  };
+  const added: { step: string; after: string[] }[] = [];
+  for (const o of order) {
+    if (!byNumber.has(o.step)) continue;
+    const after = o.after.filter((a) => byNumber.has(a) && !needs.get(o.step)!.has(a) && !waits(a, o.step));
+    for (const a of after) needs.get(o.step)!.add(a);
+    if (after.length) added.push({ step: o.step, after });
+  }
+  // From the bottom up: a Needs line added to a step moves the lines below it.
+  let out = text;
+  for (const a of [...added].sort((x, y) => byNumber.get(y.step)!.line - byNumber.get(x.step)!.line))
+    out = addStepNeeds(out, byNumber.get(a.step)!.line, a.after);
+  return { text: out, added };
+}
+
+/**
+ * Adds step labels to the step's "- Needs:" line (R2e g: an order decision of the check before a run), writing the
+ * line when the step has none. Labels it already needs are not repeated.
+ */
+export function addStepNeeds(text: string, line: number, labels: string[], expectTitle?: string): string {
+  const { plan, step, lines } = stepAt(text, line, expectTitle);
+  const existing = lines.findIndex((l, i) => i > line && i < step.end && NEEDS_RE.test(l.trim()));
+  const had =
+    existing >= 0
+      ? NEEDS_RE.exec(lines[existing].trim())![1]
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : [];
+  const all = [...had, ...labels.map((l) => l.trim()).filter((l) => l && !had.includes(l))];
+  if (all.length === had.length) return text;
+  const unique = [...new Set(all)];
+  const indent = existing >= 0 ? lines[existing].slice(0, indentOf(lines[existing])) : "  ";
+  if (existing >= 0) lines[existing] = `${indent}- Needs: ${unique.join(", ")}`;
+  else {
+    let at = line + 1;
+    while (at < lines.length && lines[at].trim() && indentOf(lines[at]) >= 2 && !SKIPPED_RE.test(lines[at])) at++;
+    lines.splice(at, 0, `  - Needs: ${unique.join(", ")}`);
+  }
+  return join(lines, plan.eol);
+}
+
 export function setStepSkipped(text: string, line: number, reason: string | null, expectTitle?: string): string {
   const value = reason?.replace(/\s+/g, " ").trim() || null;
   const { plan, step, lines } = stepAt(text, line, expectTitle);

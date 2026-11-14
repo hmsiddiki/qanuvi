@@ -314,7 +314,14 @@ fn run(name: &str, a: &[Value]) -> Value {
         )),
         "freeSavings" => to(runner::free_savings(&de::<Vec<_>>(&a[0]), &de(&a[1]))),
         "paidPerStep" => to(runner::paid_per_step(&de(&a[0]))),
-        "finishEstimate" => to(finishing::finish_estimate(&de::<Vec<_>>(&a[0]), de(&a[1]))),
+        "finishEstimate" => {
+            let prices: Option<finishing::PassPrices> = a.get(2).and_then(de);
+            to(finishing::finish_estimate(
+                &de::<Vec<_>>(&a[0]),
+                de(&a[1]),
+                prices.as_ref(),
+            ))
+        }
         "offersFinish" => {
             let finish: Option<finishing::FinishPass> = de(&a[2]);
             json!(finishing::offers_finish(

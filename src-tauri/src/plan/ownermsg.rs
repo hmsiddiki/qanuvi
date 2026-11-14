@@ -203,16 +203,67 @@ pub fn guess(text: &str) -> Kind {
     Kind::Note
 }
 
-/// A short title for a change as a plan step, from the message itself.
+/// A short title for a change as a plan step, from the message itself: a long message ends at a word (the step's
+/// "Asked by the owner" line keeps all of it).
 pub fn title_of(text: &str) -> String {
-    let one = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let one = one.trim_end_matches(['.', '!', '?']);
+    tidy_title(&text.chars().take(400).collect::<String>())
+}
+
+/// A step title made clean for the plan: no label the owner or the decider put in front ("Change:", "New step:"),
+/// no "as a new step" asking how to take it, no ellipsis, at most 60 characters ending at a word, a capital first.
+pub fn tidy_title(title: &str) -> String {
+    const LEADS: [&str; 6] = ["change", "new step", "add step", "step", "todo", "to do"];
+    let mut one = title.split_whitespace().collect::<Vec<_>>().join(" ");
+    loop {
+        let lower = one.to_lowercase();
+        if lower.len() != one.len() {
+            break; // lower-casing changed byte lengths: positions would not match
+        }
+        let lead = LEADS.iter().find_map(|l| {
+            let rest = lower.strip_prefix(l)?;
+            let rest_t = rest.trim_start();
+            let sep = rest_t
+                .chars()
+                .next()
+                .filter(|c| [':', '-', '–'].contains(c))?;
+            Some(one.len() - rest_t.len() + sep.len_utf8())
+        });
+        match lead {
+            Some(at) => one = one[at..].trim_start().to_string(),
+            None => break,
+        }
+    }
+    let lower = one.to_lowercase();
+    // Positions in the lower-cased text are only good for the title when lower-casing kept the byte lengths.
+    let tails: &[&str] = if lower.len() == one.len() {
+        &[
+            ", as a new step",
+            " as a new step",
+            ", as its own step",
+            " as its own step",
+        ]
+    } else {
+        &[]
+    };
+    for tail in tails {
+        if let Some(at) = lower.rfind(tail) {
+            let after = lower[at + tail.len()..]
+                .trim_matches(|c: char| c.is_whitespace() || ".!?".contains(c));
+            if after.is_empty() {
+                one.truncate(at);
+                break;
+            }
+        }
+    }
+    let one = one
+        .trim_end_matches(['.', '!', '?', '…', ' ', ',', ';', ':'])
+        .to_string();
     let mut t: String = one.chars().take(60).collect();
     if one.chars().count() > 60 {
         if let Some(cut) = t.rfind(' ') {
             t.truncate(cut);
         }
-        t.push('…');
+        t = t.trim_end_matches([',', ';', ':', '-', ' ']).to_string();
     }
     let mut c = t.chars();
     match c.next() {
@@ -434,7 +485,7 @@ pub fn add_step(
         .map(|n| format!("during step {n}"))
         .unwrap_or_else(|| format!("during \"{title}\""));
     let mut insert = vec![
-        format!("- [ ] **{label}. {}**", new.title),
+        format!("- [ ] **{label}. {}**", tidy_title(&new.title)),
         format!("  - Asked by the owner {after}: \"{}\"", new.text),
     ];
     if let Some(n) = number {
@@ -508,7 +559,30 @@ mod tests {
     fn a_title_from_the_message_is_short_and_starts_with_a_capital() {
         assert_eq!(title_of("also add a CSV export."), "Also add a CSV export");
         let long = title_of(&"word ".repeat(30));
-        assert!(long.chars().count() <= 61 && long.ends_with('…'), "{long}");
+        assert!(
+            long.chars().count() <= 60 && long.ends_with("word"),
+            "{long}"
+        );
+    }
+
+    #[test]
+    fn a_step_title_has_no_label_in_front_no_asking_how_and_no_ellipsis() {
+        assert_eq!(tidy_title("Change: add a CSV export…"), "Add a CSV export");
+        assert_eq!(
+            tidy_title("change - new step: log the totals"),
+            "Log the totals"
+        );
+        assert_eq!(
+            tidy_title("add a CSV export as a new step."),
+            "Add a CSV export"
+        );
+        assert_eq!(tidy_title("Changes to the README"), "Changes to the README");
+        assert_eq!(tidy_title("Step 2 tests"), "Step 2 tests");
+        assert_eq!(tidy_title("Change: "), "The owner's change");
+        assert_eq!(
+            title_of("Change: also export JSON, as a new step"),
+            "Also export JSON"
+        );
     }
 
     #[test]

@@ -43,7 +43,7 @@
     "notes": []
    }
   ],
-  "out": "Before an unattended run of PLAN-D.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): DB_USER, DB_PASS\n- Test command: npm test\n- Preview address: http://localhost:5173\n\nOpen steps:\n- 82e. Short field set\n    - d0\n    - d1\n    - d2\n    - d3\n    - d4\n    - d5\n    - d6\n    - d7\n- Unnumbered\n- Empty number\n    x\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer. At most 8 items in each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+  "out": "Before an unattended run of PLAN-D.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): DB_USER, DB_PASS\n- Test command: npm test\n- Preview address: http://localhost:5173\n\nOpen steps:\n- 82e. Short field set\n    - d0\n    - d1\n    - d2\n    - d3\n    - d4\n    - d5\n    - d6\n    - d7\n- Unnumbered\n- Empty number\n    x\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
  },
  {
   "fn": "preflightPrompt",
@@ -60,7 +60,7 @@
     ]
    }
   ],
-  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- The owner's notes for this plan:\n  - one\n  - two\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer. At most 8 items in each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- The owner's notes for this plan:\n  - one\n  - two\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);\nquestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
  },
  {
   "fn": "parsePreflight",
@@ -131,7 +131,7 @@
     },
     {
      "step": "2b",
-     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww…",
      "sort": "you",
      "because": ""
     },
@@ -153,7 +153,8 @@
      "what": "MySQL",
      "why": "tests"
     }
-   ]
+   ],
+   "order": []
   }
  },
  {
@@ -165,7 +166,8 @@
    "secrets": [],
    "questions": [],
    "risky": [],
-   "setup": []
+   "setup": [],
+   "order": []
   }
  },
  {
@@ -177,7 +179,36 @@
    "secrets": [],
    "questions": [],
    "risky": [],
-   "setup": []
+   "setup": [],
+   "order": []
+  }
+ },
+ {
+  "fn": "parsePreflight",
+  "args": [
+   "{\"order\":[{\"step\":\"1b\",\"after\":[\"1c\",\"1b\",\"1c\",\"a b\",\"x,y\",3],\"why\":\"README lists the exports\"},{\"step\":\"2\",\"after\":\"1\"},{\"step\":\"3\",\"after\":[]},{\"after\":[\"1\"]},[1]]}"
+  ],
+  "out": {
+   "secrets": [],
+   "questions": [],
+   "risky": [],
+   "setup": [],
+   "order": [
+    {
+     "step": "1b",
+     "after": [
+      "1c"
+     ],
+     "why": "README lists the exports"
+    },
+    {
+     "step": "2",
+     "after": [
+      "1"
+     ],
+     "why": ""
+    }
+   ]
   }
  },
  {
@@ -189,7 +220,8 @@
    "secrets": [],
    "questions": [],
    "risky": [],
-   "setup": []
+   "setup": [],
+   "order": []
   }
  },
  {
@@ -201,7 +233,8 @@
    "secrets": [],
    "questions": [],
    "risky": [],
-   "setup": []
+   "setup": [],
+   "order": []
   }
  },
  {
@@ -282,7 +315,7 @@
     },
     {
      "step": "2b",
-     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww…",
      "by": "default"
     },
     {
@@ -380,7 +413,7 @@
     },
     {
      "step": "2b",
-     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww…",
      "by": "default"
     },
     {
@@ -11715,6 +11748,325 @@
   "out": {
    "costUsd": null,
    "seconds": null
+  }
+ },
+ {
+  "fn": "finishEstimate",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   "light",
+   {
+    "pass": 20,
+    "byModel": {
+     "claude-haiku-5-5": 0.5,
+     "claude-sonnet-5-5": 10
+    }
+   }
+  ],
+  "out": {
+   "costUsd": 5.5,
+   "seconds": 20
+  }
+ },
+ {
+  "fn": "finishEstimate",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   "full",
+   {
+    "pass": 0,
+    "byModel": {
+     "claude-haiku-5-5": 0.5
+    }
+   }
+  ],
+  "out": {
+   "costUsd": 1.35,
+   "seconds": 72
   }
  },
  {

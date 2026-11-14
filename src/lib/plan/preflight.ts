@@ -39,6 +39,8 @@ export interface Preflight {
   questions: PreflightQuestion[];
   risky: PreflightRisk[];
   setup: { what: string; why: string }[];
+  /** Steps that must run after steps the file lists after them (R2e g): each becomes a "- Needs:" line. */
+  order: { step: string; after: string[]; why: string }[];
 }
 
 /** What a risky step does in the run: go ahead, go ahead with extra checks, or wait for the owner. */
@@ -49,7 +51,7 @@ export function recommendedRisk(sort: AskSort): RiskChoice {
   return sort === "decide" ? "go" : sort === "checks" ? "checks" : "wait";
 }
 
-export const EMPTY_PREFLIGHT: Preflight = { secrets: [], questions: [], risky: [], setup: [] };
+export const EMPTY_PREFLIGHT: Preflight = { secrets: [], questions: [], risky: [], setup: [], order: [] };
 
 export function preflightPrompt(
   file: string,
@@ -79,10 +81,13 @@ export function preflightPrompt(
     '{"secrets":[{"name":"ENV_NAME","why":"...","steps":["82e"]}],',
     ' "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],',
     ' "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],',
-    ' "setup":[{"what":"something that must run or be set","why":"..."}]}',
+    ' "setup":[{"what":"something that must run or be set","why":"..."}],',
+    ' "order":[{"step":"85b","after":["85c"],"why":"..."}]}',
     "Rules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);",
     "questions only for real choices the steps leave open, not for things you can decide from the code; risky only",
-    "for steps that are hard to undo or reach outside this computer. At most 8 items in each list.",
+    "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps",
+    "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items",
+    "in each list.",
     "Sort every question and risky step (sort):",
     '- "decide": a sensible default exists that can be changed later (a setting, not hard-coded); give it as',
     "  recommended and say why. Most naming, format, layout and library choices are this.",
@@ -98,6 +103,15 @@ function sortOf(v: unknown, fallback: AskSort): AskSort {
   return v === "decide" || v === "checks" || v === "you" ? v : fallback;
 }
 
+/** A text longer than `n` characters ends at a word (when one ends at 200 or later) with "…". */
+export function clipReason(s: string, n = 300): string {
+  if (s.length <= n) return s;
+  let head = s.slice(0, n - 1);
+  const space = head.lastIndexOf(" ");
+  if (space >= 200) head = head.slice(0, space);
+  return head.trimEnd() + "…";
+}
+
 /** Reads the agent's answer; anything unreadable gives an empty check (the run is not held up by it). */
 export function parsePreflight(text: string): Preflight {
   const start = text.indexOf("{");
@@ -111,7 +125,7 @@ export function parsePreflight(text: string): Preflight {
   }
   const arr = (v: unknown) =>
     Array.isArray(v) ? (v as Record<string, unknown>[]).filter((x) => x && typeof x === "object") : [];
-  const str = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 300) : "");
+  const str = (v: unknown) => (typeof v === "string" ? clipReason(v.trim()) : "");
   const okName = (n: string) => /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(n);
   return {
     secrets: arr(raw.secrets)
@@ -146,6 +160,15 @@ export function parsePreflight(text: string): Preflight {
     setup: arr(raw.setup)
       .map((x) => ({ what: str(x.what), why: str(x.why) }))
       .filter((x) => x.what)
+      .slice(0, 8),
+    order: arr(raw.order)
+      .map((o) => {
+        const step = str(o.step);
+        const list = Array.isArray(o.after) ? (o.after as unknown[]) : typeof o.after === "string" ? [o.after] : [];
+        const after = [...new Set(list.map(str).filter((a) => a && a !== step && !/[\s,]/.test(a)))].slice(0, 10);
+        return { step, after, why: str(o.why) };
+      })
+      .filter((o) => o.step && o.after.length)
       .slice(0, 8),
   };
 }
