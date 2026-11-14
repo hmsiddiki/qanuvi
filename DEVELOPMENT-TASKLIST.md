@@ -364,7 +364,12 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
-    UPDATE 2026-11-14 (newest): 15i part 3 SESSION A DRIVEN LIVE: works; five small findings (a)-(e) in 15i
+    UPDATE 2026-11-14 (newest): the owner agreed the fixes for findings (a)-(e); they are BUILT (4abc7de, unpublished,
+    verify 358 + 169, NOT driven live). Xdebug 3.5.3 (8.2 NTS VS16 x64, SHA256 checked against xdebug.org) is in
+    E:/DevTools/xdebug, owner's yes; php.ini NOT changed (Wnmp's PHP serves the live www folder), so it loads per run
+    with php -d zend_extension=... NEXT: session B (PHP / Xdebug) in a fresh conversation; drive the (a)-(e) fixes in
+    the same test build. Owner: do NOT publish 0.1.20 yet.
+    UPDATE 2026-11-14 (before): 15i part 3 SESSION A DRIVEN LIVE: works; five small findings (a)-(e) in 15i
     "Driven live (part 3, session A)", waiting for the owner. js-debug is installed in the test data folder. NEXT:
     the owner decides on the findings, then session B (PHP / Xdebug; Xdebug install needs the owner's yes).
     Owner: do NOT publish 0.1.20 yet.
@@ -1458,6 +1463,16 @@ runs on or off; with it off nothing is sent anywhere.
     (d) a watch shows "not pa…" when not debugging; (e) once, launch.json read back from disk as one line right
     after the gear and was formatted 30 s later; a repeat was formatted from the first write, not reproduced.
     Not a bug: a stray click on an internal call-stack frame shows that frame's scopes without an arrow (correct).
+  - Fixed (owner agreed, 2026-11-14, 4abc7de, not driven live): (a) a click on the line number also toggles a
+    breakpoint, and hovering a number shows the faint dot in the strip; (b) one label, the adapter's description
+    ("Paused on breakpoint") or "Paused on <reason>", and the extra note only when its text differs (exception
+    text); (c) the dropdown shows the full name on hover and ends cut names with an ellipsis (the sidebar width
+    still limits it; the open list shows full names); (d) a watch shows "–" with "Not debugging" on hover; (e) the
+    gear writes launch.json, reads it back and writes again (up to 3 times) before it opens the file.
+  - Session B notes (2026-11-14): Xdebug 3.5.3 DLL in E:/DevTools/xdebug, loaded per run only (php.ini untouched:
+    Wnmp's PHP serves live sites). php.ini still holds Xdebug 2 keys (xdebug.remote_*), so Xdebug 3 prints
+    "[Config] ... has been renamed" warnings on start: Qanuvi passes the Xdebug 3 settings itself (xdebug.mode=debug,
+    xdebug.start_with_request=yes, xdebug.client_port=9003) and should keep those warnings out of the console.
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),
