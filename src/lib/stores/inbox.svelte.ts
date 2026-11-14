@@ -3,8 +3,12 @@
  * sign-ins that need renewing, newer knowledge. Kept in Qanuvi's database, so every window shows the same list and
  * the first answer anywhere closes a question everywhere. This store is the window's copy, kept fresh by the
  * "qanuvi-inbox" event.
+ *
+ * A connected master (a server without a window, 24z R2d part 3) has its own Inbox: a run there asks its questions
+ * in it. Its items are shown in the same list, marked with the master, and what is done to one goes to that master.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { callMaster } from "$lib/remote";
 import { listen } from "@tauri-apps/api/event";
 import type { Place } from "./ui.svelte";
 import { keepAnswer, loadPlanState, savePlanState } from "$lib/plan/planstate";
@@ -63,18 +67,32 @@ export interface InboxItem {
   answer?: InboxAnswer | null;
   answeredBy?: string | null;
   answeredAt?: number | null;
+  /** The master whose Inbox has it; absent for this computer's own. Set by the window only. */
+  master?: string;
 }
 
 export type NewInboxItem = Pick<InboxItem, "kind" | "title" | "text"> &
   Partial<Pick<InboxItem, "type" | "open" | "key" | "form" | "source">>;
 
-type Change = { change: "add" | "answer" | "close" | "read" | "remove"; item?: InboxItem | null };
+type Change = {
+  change: "add" | "answer" | "close" | "read" | "remove" | "resolve";
+  item?: InboxItem | null;
+  /** From a run: a new item, not one that replaced an item with the same key. */
+  new?: boolean;
+};
+
+const newest = (a: InboxItem, b: InboxItem) => b.at - a.at;
 
 /** A question still waiting for the owner. */
 export const isOpenQuestion = (i: InboxItem) => i.type === "answer" && i.status === "open";
 
 class InboxStore {
+  /** This computer's items and every connected master's, newest first. */
   items = $state<InboxItem[]>([]);
+  #local: InboxItem[] = [];
+  #remote: Record<string, InboxItem[]> = {};
+  /** Masters whose Inbox is followed now (a stream that ends with the connection). */
+  #following = new Set<string>();
   #started = false;
   #answered = new Set<(item: InboxItem) => void>();
 
@@ -110,10 +128,64 @@ class InboxStore {
 
   async refresh(): Promise<void> {
     try {
-      this.items = await invoke<InboxItem[]>("inbox_list");
+      this.#local = await invoke<InboxItem[]>("inbox_list");
+      this.#merge();
     } catch {
       // Keeps what it shows; the next change refreshes again.
     }
+  }
+
+  #merge(): void {
+    const remote = Object.values(this.#remote).flat();
+    this.items = remote.length ? [...this.#local, ...remote].sort(newest) : this.#local;
+  }
+
+  #setRemote(master: string, list: InboxItem[]): void {
+    if (!this.#following.has(master)) return;
+    this.#remote[master] = list.map((i) => ({ ...i, master }));
+    this.#merge();
+  }
+
+  /**
+   * Shows a connected master's Inbox and follows its changes until the connection ends (masters.svelte.ts calls
+   * this on connect and `dropMaster` when it ends). A new question there shows a desktop notification, once.
+   */
+  async followMaster(master: string): Promise<void> {
+    if (this.#following.has(master)) return;
+    this.#following.add(master);
+    const events = new Channel<Change>();
+    events.onmessage = (c) => {
+      const item = c.item ? { ...c.item, master } : null;
+      if (c.change === "answer" && item) for (const fn of this.#answered) fn(item);
+      if (c.change === "add" && item && c.new !== false) void invoke("notify_item", { item: c.item }).catch(() => {});
+      void callMaster<InboxItem[]>(master, "inbox_list", {})
+        .then((list) => this.#setRemote(master, list))
+        .catch(() => {});
+    };
+    try {
+      this.#setRemote(master, await callMaster<InboxItem[]>(master, "inbox_watch", { onEvent: events }));
+    } catch {
+      // An older master has no Inbox commands: its questions stay on it.
+      this.#following.delete(master);
+    }
+  }
+
+  /** The connection to a master ended: its items leave the list (they stay on the master). */
+  dropMaster(master: string): void {
+    this.#following.delete(master);
+    if (!(master in this.#remote)) return;
+    delete this.#remote[master];
+    this.#merge();
+  }
+
+  /** The master that has this item, or null for this computer's own. */
+  #masterOf(id: string): string | null {
+    return this.items.find((i) => i.id === id)?.master ?? null;
+  }
+
+  /** Calls the Inbox command on this computer, or on the master that has the item. */
+  #call<T>(master: string | null, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+    return master ? callMaster<T>(master, cmd, args) : invoke<T>(cmd, args);
   }
 
   /** Called with every answered question, whichever window (or later device) answered it. */
@@ -132,8 +204,10 @@ class InboxStore {
    * closed it first. A plan step's answer is kept for its plan, so a run started later goes on with it too.
    */
   async answer(id: string, answer: InboxAnswer): Promise<boolean> {
-    const done = await invoke<InboxItem | null>("inbox_answer", { id, answer }).catch(() => null);
-    if (done?.source?.kind === "hold") {
+    const master = this.#masterOf(id);
+    const done = await this.#call<InboxItem | null>(master, "inbox_answer", { id, answer }).catch(() => null);
+    // A master's run reads its answer from the master's Inbox; its plan's state is kept there.
+    if (!master && done?.source?.kind === "hold") {
       const { choice, text } = holdReply(answer);
       const s = done.source;
       savePlanState(s.projectId, s.file, keepAnswer(loadPlanState(s.projectId, s.file), s.step, choice, text));
@@ -159,18 +233,20 @@ class InboxStore {
 
   /** Marks one item read, or all of them (open questions stay unread: they still need the owner). */
   markRead(id?: string): void {
-    if (!this.items.some((i) => !i.read && (id === undefined ? !isOpenQuestion(i) : i.id === id))) return;
-    void invoke("inbox_mark_read", { id: id ?? null }).catch(() => {});
+    const unread = this.items.filter((i) => !i.read && (id === undefined ? !isOpenQuestion(i) : i.id === id));
+    for (const master of new Set(unread.map((i) => i.master ?? null)))
+      void this.#call(master, "inbox_mark_read", { id: id ?? null }).catch(() => {});
   }
 
   /** Removes an item; open questions are answered or closed, not removed. */
   remove(id: string): void {
-    void invoke("inbox_remove", { id }).catch(() => {});
+    void this.#call(this.#masterOf(id), "inbox_remove", { id }).catch(() => {});
   }
 
-  /** Clears everything except open questions. */
+  /** Clears everything except open questions, here and on every connected master. */
   clear(): void {
     void invoke("inbox_clear").catch(() => {});
+    for (const master of this.#following) void callMaster(master, "inbox_clear", {}).catch(() => {});
   }
 }
 

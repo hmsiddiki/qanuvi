@@ -6,7 +6,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
 import { callMaster, disown, forgetMaster, own } from "$lib/remote";
+import { inbox } from "./inbox.svelte";
 import { projects } from "./projects.svelte";
+import { runner } from "./runner.svelte";
 import { settings, type MasterSettings } from "./settings.svelte";
 
 export interface MasterInfo {
@@ -55,6 +57,8 @@ class MastersStore {
   #dropped(id: string, error?: string) {
     forgetMaster(id);
     projects.dropRemote(id);
+    inbox.dropMaster(id);
+    runner.dropMaster(id);
     this.#set(id, error ? { state: "error", error } : { state: "off" });
   }
 
@@ -74,6 +78,10 @@ class MastersStore {
       for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
       projects.addRemote(m.id, list);
       this.#set(m.id, { state: "on", info });
+      // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
+      void inbox.followMaster(m.id);
+      // A run going on there (it goes on when no computer is connected) is shown.
+      void runner.masterConnected(m.id);
     } catch (e) {
       invoke("remote_disconnect", { id: m.id }).catch(() => {});
       this.#dropped(m.id, errorText(e));

@@ -1747,6 +1747,18 @@ fn notify_test(app: tauri::AppHandle) -> Res<()> {
     crate::desktop_notify::test(&app)
 }
 
+// A new item in a connected master's Inbox (24z R2d part 3): every window that follows the master asks, it is shown once.
+#[tauri::command]
+fn notify_item(
+    app: tauri::AppHandle,
+    notifier: State<crate::desktop_notify::Notifier>,
+    item: inbox::InboxItem,
+) {
+    if notifier.first_time(&item.id) {
+        crate::desktop_notify::new_item(&app, &item);
+    }
+}
+
 #[tauri::command]
 fn inbox_list(state: State<AppState>) -> Res<Vec<inbox::InboxItem>> {
     inbox::list(&state.db)
@@ -2141,6 +2153,7 @@ pub fn run() {
             notify_settings,
             notify_take_start,
             notify_test,
+            notify_item,
             app_info,
             browser_agent_view,
             browser_agent_shot,

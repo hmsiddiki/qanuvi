@@ -4,10 +4,15 @@
  * commands, and shows what the core tells: "qanuvi-run" brings the run's view, "qanuvi-run-agent" the steps' agent
  * events, which go to the chat like any session's. Closing the window never ends a run.
  *
+ * A project on a master (a server without a window) runs there: its view and agent events come on the stream of the
+ * master's plan_run_watch (24z R2d part 3), one per project while the connection lasts.
+ *
  * What stays here: "Pick models" (before a run), what earlier runs taught about models, a plan's private details for
  * chats in its step sessions, and going on from a step the last run stopped at.
  */
+import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { callMaster, ownerOf } from "$lib/remote";
 import { api, errorText, type AgentEvent, type Project, type RunView, type Session } from "$lib/api";
 import { modelLabel, providerById, type AgentProvider } from "$lib/agents/providers";
 import { freeDecide, ownSetup } from "./brain.svelte";
@@ -100,6 +105,10 @@ class RunnerStore {
   #shape = "";
   #resume: Resume | null = null;
   #ready: Promise<void> | null = null;
+  /** Projects on a master whose run this window follows, with that master. */
+  #watched = new Map<string, string>();
+  /** The master the shown run is on (null for this computer). */
+  #shownOn: string | null = null;
 
   /** Follows the core's runs from the start (a run may already go on when the window opens). */
   follow(): Promise<void> {
@@ -137,6 +146,51 @@ class RunnerStore {
     return this.#ready;
   }
 
+  /**
+   * A project on a master: follows its run on the master's stream (once per connection). This computer's projects
+   * come by the "qanuvi-run" events already.
+   */
+  async #watch(projectId: string): Promise<void> {
+    const master = ownerOf(projectId);
+    if (!master || this.#watched.get(projectId) === master) return;
+    this.#watched.set(projectId, master);
+    type Streamed =
+      | { kind: "view"; view: RunView }
+      | { kind: "agent"; sessionId: string | null; event: AgentEvent }
+      | { kind: "event"; event: string; value: unknown };
+    const events = new Channel<Streamed>();
+    events.onmessage = (m) => {
+      if (m.kind === "view") this.#take(m.view);
+      else if (m.kind === "agent") this.#agentEvent({ projectId, sessionId: m.sessionId, event: m.event });
+      // "event": the master's Inbox changes come on its own Inbox stream (inbox.svelte.ts).
+    };
+    try {
+      this.#take(await callMaster<RunView>(master, "plan_run_watch", { projectId, onEvent: events }));
+    } catch {
+      // An older master: no run news from it.
+      this.#watched.delete(projectId);
+    }
+  }
+
+  /** A master connected: a run going on there (started from any computer) is shown when nothing runs here. */
+  async masterConnected(master: string): Promise<void> {
+    await this.#listen();
+    const active = await callMaster<string[]>(master, "plan_run_active", {}).catch(() => [] as string[]);
+    if (active.length && !this.#running && !this.finishing) await this.loadLast(active[0]);
+  }
+
+  /** The connection to a master ended: its runs go on there, but this window hears no more of them. */
+  dropMaster(master: string): void {
+    for (const [p, m] of this.#watched) if (m === master) this.#watched.delete(p);
+    if (this.#shownOn !== master || !(this.#running || this.finishing)) return;
+    this.#running = false;
+    this.finishing = false;
+    this.#sessionId = null;
+    agent.planSessionId = null;
+    this.#unhook();
+    agent.notice("The connection to the server ended. The plan run goes on there; connect again to see it.");
+  }
+
   /** The core's view of a project's run. */
   #take(v: RunView): void {
     const busy = v.running || v.finishing;
@@ -144,6 +198,7 @@ class RunnerStore {
     if (this.#project && v.projectId !== this.#project && (this.#running || this.finishing || !busy)) return;
     const wasBusy = this.#running || this.finishing;
     this.#project = v.projectId;
+    this.#shownOn = ownerOf(v.projectId);
     this.run = v.run;
     this.#running = v.running;
     this.finishing = v.finishing;
@@ -282,6 +337,7 @@ class RunnerStore {
     this.paidPerStep = paidPerStep(await this.#learned());
     this.#project = project.id;
     this.error = "";
+    await this.#watch(project.id);
     try {
       await api.planRun.start(project.id, this.#startOf(project, file, options, provider, resume));
     } catch (e) {
@@ -298,6 +354,7 @@ class RunnerStore {
     if (!run || run.projectId !== project.id || this.#running || this.finishing) return;
     const provider = providerById(agent.runProviderId);
     this.#project = project.id;
+    await this.#watch(project.id);
     try {
       await api.planRun.finish(project.id, this.#startOf(project, run.file, run.options, provider, null), level);
     } catch (e) {
@@ -313,6 +370,7 @@ class RunnerStore {
     await this.#listen();
     if ((this.#running || this.finishing) && this.#project !== projectId) return;
     try {
+      await this.#watch(projectId);
       const v = await api.planRun.state(projectId);
       // Shown as it is now, also when another project was shown before.
       this.#project = projectId;

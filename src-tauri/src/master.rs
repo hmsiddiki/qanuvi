@@ -22,6 +22,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[path = "master_inbox.rs"]
+mod inbox_cmds;
 #[path = "master_runs.rs"]
 mod plan_runs;
 
@@ -34,6 +36,8 @@ pub struct Master {
     /// Plan runs on this master, and the connections that follow them.
     runs: Arc<crate::plan::live::Runs>,
     watchers: Arc<plan_runs::Watchers>,
+    /// The connections that follow this master's Inbox (24z R2d part 3).
+    inbox_watchers: Arc<inbox_cmds::InboxWatchers>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -95,6 +99,7 @@ impl Master {
             indexes: index::Indexes::default(),
             runs: Arc::default(),
             watchers: Arc::default(),
+            inbox_watchers: Arc::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
         })
@@ -430,6 +435,7 @@ impl Master {
             "runs_list" => to(runs::list(db, &s(args, "projectId"))),
             "runs_list_all" => to(runs::list_all(db, n(args, "limit").max(1) as usize)),
             c if c.starts_with("plan_run_") => self.plan_run(c, args, stream),
+            c if c.starts_with("inbox_") => self.inbox(c, args, stream),
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
     }
@@ -833,5 +839,102 @@ mod tests {
         )
         .unwrap_err();
         assert!(bad.contains("start is not valid"));
+    }
+
+    #[test]
+    fn its_inbox_is_read_and_answered_from_the_desktop() {
+        use crate::plan::env::RunEnv;
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+        let heard: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let h = heard.clone();
+        let streams = move |_: &str| {
+            let h = h.clone();
+            Sink::new(move |v: Value| {
+                h.lock().unwrap().push(v);
+                true
+            })
+        };
+        let first = m
+            .dispatch(
+                "inbox_watch",
+                &json!({"onEvent": "i1"}),
+                &streams,
+                &Mutex::new(HashSet::new()),
+            )
+            .unwrap();
+        assert_eq!(first, json!([]));
+        // A question a run on the master asks reaches the watching desktop, though it does not watch the run.
+        let asked = m
+            .run_env(&id)
+            .unwrap()
+            .inbox_add(&crate::inbox::NewItem {
+                kind_of: "answer".into(),
+                kind: "run".into(),
+                title: "Git cannot see some files".into(),
+                text: String::new(),
+                key: Some(format!("changes-from:{id}")),
+                open: None,
+                form: Some(json!({"choices": [{"id": "qanuvi", "label": "Use snapshots"}]})),
+                source: Some(json!({"kind": "changes-from", "projectId": id})),
+            })
+            .unwrap();
+        {
+            let heard = heard.lock().unwrap();
+            assert_eq!(heard.len(), 1);
+            assert_eq!(heard[0]["change"], "add");
+            assert_eq!(heard[0]["item"]["id"], asked.id.as_str());
+        }
+        let list = call(&m, "inbox_list", json!({})).unwrap();
+        assert_eq!(list.as_array().unwrap().len(), 1);
+        // "All read" leaves the open question unread, as on the desktop.
+        assert_eq!(
+            call(&m, "inbox_mark_read", json!({"id": null})).unwrap(),
+            false
+        );
+        // The desktop's answer closes it here, says so to the watchers and is applied to the project.
+        let done = call(
+            &m,
+            "inbox_answer",
+            json!({"id": asked.id, "answer": {"choice": "qanuvi"}, "by": "main"}),
+        )
+        .unwrap();
+        assert_eq!(done["status"], "answered");
+        assert_eq!(done["answeredBy"], "main");
+        assert_eq!(
+            crate::projects::get(&m.db, &id)
+                .unwrap()
+                .settings
+                .changes_from,
+            "qanuvi"
+        );
+        assert_eq!(heard.lock().unwrap().last().unwrap()["change"], "answer");
+        // A second answer (another window, the phone) is too late.
+        let late = call(
+            &m,
+            "inbox_answer",
+            json!({"id": asked.id, "answer": {"choice": "qanuvi"}}),
+        )
+        .unwrap();
+        assert!(late.is_null());
+        assert!(
+            call(&m, "inbox_answer", json!({}))
+                .unwrap_err()
+                .contains("Which question")
+        );
+        assert_eq!(
+            call(&m, "inbox_remove", json!({"id": asked.id})).unwrap(),
+            true
+        );
+        assert_eq!(call(&m, "inbox_list", json!({})).unwrap(), json!([]));
+        assert_eq!(heard.lock().unwrap().last().unwrap()["change"], "remove");
     }
 }

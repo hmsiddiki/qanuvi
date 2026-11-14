@@ -23,6 +23,8 @@ pub struct Notifier {
     gathered: Mutex<(Vec<InboxItem>, bool)>,
     /// A click that started Qanuvi: kept until the window is ready to ask for it.
     at_start: Mutex<Option<Option<String>>>,
+    /// A master's items already told (each window following that master asks), so each shows once.
+    told: Mutex<std::collections::VecDeque<String>>,
     /// Shown toasts, kept so their click handlers live as long as the banner (test builds).
     #[cfg(windows)]
     toasts: Mutex<std::collections::VecDeque<windows::UI::Notifications::ToastNotification>>,
@@ -31,6 +33,19 @@ pub struct Notifier {
 impl Notifier {
     pub fn set(&self, s: NotifySettings) {
         *self.settings.lock().unwrap() = s;
+    }
+
+    /// True the first time this item is seen (a short list of the last ids is kept).
+    pub fn first_time(&self, id: &str) -> bool {
+        let mut told = self.told.lock().unwrap();
+        if told.iter().any(|t| t == id) {
+            return false;
+        }
+        if told.len() >= 200 {
+            told.pop_front();
+        }
+        told.push_back(id.to_string());
+        true
     }
 
     /// The click that started Qanuvi, once.

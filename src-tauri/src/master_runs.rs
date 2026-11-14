@@ -69,11 +69,16 @@ impl Master {
             .ok_or_else(|| "The master is not shared yet.".to_string())
     }
 
-    fn run_env(&self, project_id: &str) -> Result<CoreEnv<'_>, String> {
+    pub(super) fn run_env(&self, project_id: &str) -> Result<CoreEnv<'_>, String> {
         let watchers = self.watchers.clone();
+        let inbox_watchers = self.inbox_watchers.clone();
         let pid = project_id.to_string();
-        // What the window hears as events on the desktop goes to the watching connections here.
+        // What the window hears as events on the desktop goes to the watching connections here; Inbox changes also go
+        // to the connections that follow the Inbox (a desktop that does not watch this run still sees its questions).
         let notify: Notify = Arc::new(move |event: &str, value: Value| {
+            if event == "qanuvi-inbox" {
+                inbox_watchers.send(&value);
+            }
             watchers.send(
                 &pid,
                 json!({"kind": "event", "event": event, "value": value}),

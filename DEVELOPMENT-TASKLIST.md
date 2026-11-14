@@ -369,7 +369,15 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2d part 2): R2d PART 2 DONE (see 24z "R2d part 2 DONE"): the window runs
+    RESUME HERE (newest, 2026-11-15, after R2d part 3): R2d PART 3 DONE (see 24z "R2d part 3 DONE"): the master's
+    Inbox commands and stream (master_inbox.rs), the window's Inbox showing each connected master's items and
+    sending answers to the machine that has them, one desktop notification per new master question (notify_item),
+    and, found on the way, the window now follows a master's run over plan_run_watch (part 2 showed nothing for a
+    run on a master). 374 Rust tests (1 old ignored) and 400 TS tests pass; clippy (desktop and master-only), fmt,
+    prettier and svelte-check clean. Nothing published, not driven live. Noted, not done: plan data is not routed to
+    masters (the Plan view of a master project lacks the master's held-step list). NEXT: R2e, drive it live on a
+    scratch project in a test build (list in the entry below), with a "This PC" master for the master paths.
+    RESUME HERE (before, 2026-11-15, after R2d part 2): R2d PART 2 DONE (see 24z "R2d part 2 DONE"): the window runs
     no runner of its own any more. stores/runner.svelte.ts is a thin store (same exports) over the plan_run_*
     commands and the "qanuvi-run" / "qanuvi-run-agent" events; a running step's chat goes to plan_run_message (a
     private detail to the new plan_run_tell, never sorted by a model); runner lines are kept in the step session's
@@ -920,6 +928,28 @@ runs on or off; with it off nothing is sent anywhere.
         it is, no model sorts it). Runner lines ("Taken as a note ...") are kept in the step session's stored events
         (RunEnv::keep_line), so a chat opened later still shows them. The old TypeScript runner's scenario test and
         fake core are gone (R2 ported the scenarios to Rust). Not driven live (R2e).
+      - [x] R2d part 3 DONE 2026-11-15 (the master's Inbox, and the window following a master's run): master_inbox.rs
+        gives the master the desktop's inbox_* commands with the same arguments (list, answer by id or key, close,
+        resolve, mark read with no id = all but open questions, remove, clear) plus inbox_watch, a stream of
+        {change, item} (the "qanuvi-inbox" payload) until the connection goes. An Inbox change a master run makes
+        (CoreEnv's notify) goes to these watchers too, so a desktop that does not watch the run still sees its
+        questions. An answer on the master applies run::on_answer there (changes-from), as the desktop does; a held
+        step needs nothing more (its run reads the master's Inbox). Window: stores/inbox.svelte.ts merges this
+        computer's items with each connected master's (newest first, each marked `master`); answer, remove and mark
+        read go to the machine that has the item, "all read" and Clear all to every machine; the master's answers
+        reach onAnswer listeners; an older master without the commands is left as before. masters.svelte.ts follows
+        a master's Inbox on connect and drops its items when the connection ends. A new question on a master shows
+        a desktop notification once (new command notify_item; Notifier::first_time keeps the last 200 ids, as every
+        window following the master asks). Found on the way, fixed here: part 2 never followed a master's run (the
+        window only heard this computer's "qanuvi-run"), so a run started on a master showed nothing. runner.svelte.ts
+        now calls the master's plan_run_watch once per project per connection (start, finishing pass, last run) and
+        takes its view and agent events from that stream; on connect, a run going on there is shown when nothing runs
+        here; when the connection ends the panel stops showing it as running and says the run goes on there.
+        Not done, noted: plan data (holds, answers kept per plan) is not routed to masters (planData.svelte.ts calls
+        this computer's core), so the Plan view of a master project does not show the master's held-step list; the
+        Inbox does. A hold answered in the Inbox of a master project is not kept in this computer's plan state (it
+        would be the wrong machine's). Tests: master test "its_inbox_is_read_and_answered_from_the_desktop"; vitest
+        stores/inbox.test.ts (merge, routing, notification once, older master). Not driven live (R2e).
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
