@@ -293,3 +293,43 @@ fn a_start_from_the_window_reads_its_camel_case_shape() {
     assert!(r.is_note);
     assert!((r.base.cost - 0.2).abs() < 1e-9);
 }
+
+#[test]
+fn a_run_record_left_running_when_qanuvi_closed_reads_as_stopped_and_can_be_resumed() {
+    // R2e: closing the last window ends the process mid-step; its record stayed "running", so the reopened window
+    // showed a step at work that nothing ran and offered Run instead of Resume.
+    let env = world("");
+    agent(&env, "{}");
+    let sh = Shared::new(Duration::from_millis(5));
+    let mut run = run_plan(&*env, &sh, test_setup(FILE, options())).expect("the run");
+    run.status = RunStatus::Running;
+    run.steps[0].status = RunStepStatus::Running;
+    run.finish = Some(FinishPass {
+        level: FinishLevel::Light,
+        status: FinishStatus::Running,
+        model: "claude-opus-5-5".into(),
+        started_at: 1.0,
+        ended_at: None,
+        cost_usd: 0.0,
+        seconds: 0.0,
+        checks: None,
+        findings: vec![],
+        still_open: vec![],
+        session_id: None,
+        note: None,
+    });
+    let record = crate::runs::RunRecord {
+        id: run.id.clone(),
+        file: FILE.into(),
+        status: "running".into(),
+        data: serde_json::to_string(&run).unwrap(),
+        created_at: 1,
+        updated_at: 2,
+    };
+    let last = last_run(&[record], Some(FILE)).expect("the record reads");
+    assert_eq!(last.status, RunStatus::Stopped);
+    assert_eq!(last.steps[0].status, RunStepStatus::Waiting);
+    let f = last.finish.expect("the pass");
+    assert_eq!(f.status, FinishStatus::Stopped);
+    assert!(f.note.unwrap().contains("Qanuvi closed"));
+}

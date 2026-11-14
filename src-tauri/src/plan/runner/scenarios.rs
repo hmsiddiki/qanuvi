@@ -643,6 +643,40 @@ fn a_usage_limit_waits_for_the_reset_and_the_step_is_tried_again() {
 }
 
 #[test]
+fn the_window_sees_the_step_at_work_as_running_while_its_agent_works() {
+    // R2e: the run was told to the window only after a step's attempt, so the window found no running step during
+    // it: a model picked for the step and words typed into its chat never reached the runner, and the panel said
+    // "try 2" on a first try.
+    let env = world("# Plan\n\n- [ ] **1. First**\n- [ ] **2. Second**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let s = seen.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        let view = sh.run().expect("the run is shown");
+        let st = step(&view, n);
+        s.lock()
+            .unwrap()
+            .push((n.to_string(), st.status, st.attempts.len()));
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(
+        *seen.lock().unwrap(),
+        vec![
+            ("1".to_string(), RunStepStatus::Running, 0),
+            ("2".to_string(), RunStepStatus::Running, 0)
+        ]
+    );
+}
+
+#[test]
 fn the_owners_model_switch_hands_the_step_over_to_the_chosen_model() {
     let env = world("# Plan\n\n- [ ] **1. Rework**\n");
     let stop = stop_button();

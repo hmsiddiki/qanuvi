@@ -15,7 +15,7 @@ use super::guidance as g;
 use super::packet::failure_summary;
 use super::routing::{AgentModel, JobType};
 use super::run::{ResumeAt, RunSetup, Shared, status_word};
-use super::runner::{Outcome, PlanRun, RunOptions, RunStepStatus};
+use super::runner::{Outcome, PlanRun, RunOptions, RunStatus, RunStepStatus};
 use super::tasklist::parse_plan;
 use super::turn::{self, AttemptAsk, CHECK_TIMEOUT, FAILURE_CHARS, StepWatch, Totals, TurnSetup};
 use crate::agent::AgentEvent;
@@ -249,13 +249,33 @@ impl Runs {
     }
 }
 
-/// The newest run in the records (of one plan file, when given) that still reads.
+/// The newest run in the records (of one plan file, when given) that still reads. Only asked when no run is shown,
+/// so a record still "running" was cut off when Qanuvi closed: it reads as stopped (the button says Resume), its
+/// step as not started, and a finishing pass as stopped (R2e; the TypeScript runner did the same).
 pub fn last_run(records: &[crate::runs::RunRecord], file: Option<&str>) -> Option<PlanRun> {
-    records
+    let mut run: PlanRun = records
         .iter()
         .filter(|r| file.is_none_or(|f| r.file == f))
         .max_by_key(|r| r.updated_at)
-        .and_then(|r| serde_json::from_str(&r.data).ok())
+        .and_then(|r| serde_json::from_str(&r.data).ok())?;
+    if run.status == RunStatus::Running {
+        run.status = RunStatus::Stopped;
+    }
+    for s in &mut run.steps {
+        if s.status == RunStepStatus::Running {
+            s.status = RunStepStatus::Waiting;
+        }
+    }
+    if let Some(f) = run.finish.as_mut()
+        && f.status == FinishStatus::Running
+    {
+        f.status = FinishStatus::Stopped;
+        f.note = Some(
+            "Qanuvi closed while it ran; the result, if any, is in the plan's FINISH.md log."
+                .into(),
+        );
+    }
+    Some(run)
 }
 
 // ---------- The start as the window sends it ----------

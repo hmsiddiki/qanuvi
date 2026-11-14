@@ -369,7 +369,18 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2d part 3): R2d PART 3 DONE (see 24z "R2d part 3 DONE"): the master's
+    RESUME HERE (newest, 2026-11-15, after R2e part 1): R2e PART 1 DONE (see 24z "R2e part 1 DONE"): the Rust runner
+    driven live on a scratch project in a test build (4 runs, about $0.60): start, pre-run check, held step answered
+    in the Inbox, step chat note / question / rule / change (answered "as a new step"), Pause and Resume, model
+    switch, finishing pass, closing and reopening the window. Three bugs found and fixed (scenario or test first):
+    the window never saw the step at work, a run cut off by closing Qanuvi reopened as still running, and Plan view
+    spinners on steps already done. 183 plan tests + master tests pass, clippy (desktop and master-only), fmt,
+    prettier, svelte-check clean. Nothing published. NEXT: R2e part 2 in a fresh conversation: the master paths with
+    a "This PC" master (Servers, target "local"; a run on the master project, its held step in this window's Inbox,
+    the window following the run), then the open small findings below (owner's choice), then delete what is left of
+    the TypeScript runner. Scratch project + scripts (u.sh/ui.ps1 with combos/pick, guard, rplan.sh, clip.sh,
+    build.sh) in the scratchpad of session e93ec9c3.
+    RESUME HERE (before, 2026-11-15, after R2d part 3): R2d PART 3 DONE (see 24z "R2d part 3 DONE"): the master's
     Inbox commands and stream (master_inbox.rs), the window's Inbox showing each connected master's items and
     sending answers to the machine that has them, one desktop notification per new master question (notify_item),
     and, found on the way, the window now follows a master's run over plan_run_watch (part 2 showed nothing for a
@@ -950,6 +961,29 @@ runs on or off; with it off nothing is sent anywhere.
         Inbox does. A hold answered in the Inbox of a master project is not kept in this computer's plan state (it
         would be the wrong machine's). Tests: master test "its_inbox_is_read_and_answered_from_the_desktop"; vitest
         stores/inbox.test.ts (merge, routing, notification once, older master). Not driven live (R2e).
+      - [x] R2e part 1 DONE 2026-11-15 (driven live on this computer; master paths are part 2): a scratch Node project
+        (PLAN-R2E.md, 19 steps in 5 sections), test build, 4 runs. Worked: pre-run check (a risky step set to "Wait for
+        me" held it; 2b set aside behind 2a by the same-step-number rule), the held step answered in the Inbox page
+        and the run went on, a question in a step chat ("Taken as a question", answered, step went on), a change
+        ("as a new step" typed in words made step 5b-1 with the owner's words), Pause (agent ends the edit, writes a
+        progress note) and Resume in the same session, the model switch (Haiku stops after the edit, Sonnet goes on
+        with the handover note), the light finishing pass with checks and a still-open list, a desktop notification
+        for the change question, and the run going on while the window was closed until the process ended.
+        Bugs fixed: (1) the run was published only after a step's attempt, so the window never saw the step at work:
+        a model picked for it and words typed into its chat never reached the runner (the chat queued them as plain
+        follow-ups), and the panel said "try 2" on a first try; run.rs now saves before each attempt; scenario
+        "the_window_sees_the_step_at_work_as_running_while_its_agent_works". (2) Closing the last window ends the
+        process (by design until R4), but its run record stayed "running": the reopened window showed a step at
+        work that nothing ran and offered Run, not Resume; live::last_run now reads such a record as stopped, its
+        step as waiting and a finishing pass as stopped, as the TypeScript runner did; test in live_tests.rs; driven
+        live (Resume shown, run resumed). (3) Plan view spinners on steps already done: a session that goes on
+        across steps keeps the first step's title; the title fallback now applies only when no run of the plan goes.
+        Open, small, for the owner to choose: (a) the light finishing pass was offered "about $0.0024" and cost
+        $0.19 (the estimate uses the steps' median cost, cheap Haiku steps, but the pass runs on Opus; proposal: scale
+        by the pass model's price); (b) preflight reasons are cut at 300 characters mid-word with no "…" (js::cut);
+        (c) "Pausing (finishing its edit)…" squeezes the plan header so the file name and Open file wrap; (d) a
+        change made into a step keeps the "Change:" prefix and an ellipsis in its title; (e) "(try 2)" still shows
+        during a step's after-work (notes, checks) once its first attempt is recorded.
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work

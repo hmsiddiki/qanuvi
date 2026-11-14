@@ -1855,6 +1855,9 @@ impl<'a> Loop<'a> {
                 test_command: test_command.clone(),
                 resume,
             };
+            // The window learns the step is at work before its agent starts: a model picked for it and words typed
+            // into its chat go to the runner only while the window sees it running (R2e).
+            self.save();
             let sh = self.sh;
             let end = turn::attempt(
                 self.env,

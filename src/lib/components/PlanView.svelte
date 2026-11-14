@@ -492,7 +492,10 @@
                       runner.run.steps.some(
                         (r) => r.status === "running" && r.number === step.number && r.title === step.title,
                       )) ||
-                      (!!step.number &&
+                      // A step chat working outside a run. During a run its view says which step works: a session
+                      // that goes on across steps keeps the first step's title (R2e).
+                      (!thisRunning &&
+                        !!step.number &&
                         agent.sessions.some(
                           (x) =>
                             x.project_id === project.id &&
