@@ -369,7 +369,16 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 17:06): 0.1.20 PUBLISHED on the dev channel (owner: "publish anyway"; release
+    RESUME HERE (newest, 2026-11-14, after the 24z split decision): the owner chose the RUST CORE for 24z step A (more
+    stable than an embedded JavaScript engine: one language and runtime, no promise bridge, no garbage collector in
+    long unattended runs; the TypeScript runner is deleted afterwards either way). Order: R1 port the pure logic
+    with its tests, R2 the runner in Rust, R3 the queue, R4 tray mode (step B moved in; owner: a visible tray icon,
+    nothing hidden from the user), R5 drive live (scratch project, then the VPS master). See item 24z "Step A plan".
+    Each part in its own fresh conversation, checkpoint after each. NEXT: R1 in a fresh conversation (start with
+    decider.ts and the smallest plan/*.ts files; port each test file with its code; compare the TypeScript and Rust
+    results on the same inputs before anything TypeScript is deleted). Discuss-before-changes is satisfied for R1-R5
+    as described; anything beyond it needs the owner's yes.
+    RESUME HERE (before, 2026-11-14 17:06): 0.1.20 PUBLISHED on the dev channel (owner: "publish anyway"; release
     rule skipped with QANUVI_RELEASE_ANYWAY=1 because Claude Code here is 2.1.318 and 2.1.325 is out: the owner runs
     "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
     storage, Inbox and desktop notifications (24u part 4), debugging for Node and PHP (15i part 3), split editor and
@@ -622,6 +631,24 @@ runs on or off; with it off nothing is sent anywhere.
     cut), drop cached memory while minimized, load heavy views (Git, diffs, Preview) only when opened. Measure the
     web engine's parts first.
   - Much later, only if ever needed: a native UI (GPUI or Slint), starting with a measured prototype of the chat.
+  - Step A plan (owner agreed 2026-11-14): RUST CORE, not an embedded JavaScript engine. Map of today: core/decider.ts
+    (343 lines) and plan/*.ts (about 3,900 lines with tests) are pure; stores/runner.svelte.ts (2,454 lines) is the
+    window part (api.files 49 calls, api.agent 22, runs/index/checks/git/usage; the agent store's sessions, events and
+    mid-step model/mode/interrupt hooks; settings, inbox, projects, planner.ask, memoryContext; localStorage for picks;
+    setTimeout for limit waits). master.rs already serves files/git/checks/index/agent sessions headless; runs.rs only
+    stores records.
+    - [ ] R1: port the pure logic to Rust with its tests (decider, tasklist, preflight, routing, packet, setaside,
+      holdask, limits, costs, picks, planstate, housekeeping, finishing, guidance, planner, prompts); a comparison
+      check runs the same inputs through TypeScript and Rust and must match before TypeScript is removed.
+    - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
+      closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
+      updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in
+      qanuvi-master; the TypeScript runner deleted.
+    - [ ] R3: the queue (DB table, migration 8): tasks and whole plans, one after another per project, side by side
+      across projects, holds and answers per plan, a hook for the paid monitor (24e, built later).
+    - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
+      the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
+    - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
