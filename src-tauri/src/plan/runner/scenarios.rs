@@ -10,7 +10,8 @@ use super::{
     FullChecks, OnLimit, PauseMode, PlanRun, RunOptions, RunStatus, RunStepStatus, RunTeam, StepWhy,
 };
 use crate::plan::env::RunEnv;
-use crate::plan::run::{Shared, run_plan, test_setup};
+use crate::plan::ownermsg;
+use crate::plan::run::{RunSetup, Shared, run_plan, test_setup};
 use crate::projects::ProjectSettings;
 use serde_json::json;
 use std::sync::Arc;
@@ -36,9 +37,12 @@ impl Stop {
 
 impl Run {
     fn start(env: Arc<FakeEnv>, file: &str, opts: RunOptions, stop: Stop) -> Run {
+        Run::start_setup(env, test_setup(file, opts), stop)
+    }
+
+    fn start_setup(env: Arc<FakeEnv>, setup: RunSetup, stop: Stop) -> Run {
         let shared = stop.0.clone();
         let sh = shared.clone();
-        let setup = test_setup(file, opts);
         let thread = std::thread::spawn(move || run_plan(&*env, &sh, setup));
         // The run has its record before anyone looks at it.
         let until = std::time::Instant::now() + Duration::from_secs(5);
@@ -746,4 +750,283 @@ fn an_answer_given_in_the_inbox_while_no_run_went_on_counts_at_the_next_start() 
             .contains("the key is set now")
     );
     assert_eq!(questions(&env), 0);
+}
+
+// ---------- The owner's messages in a step's chat (R2c part 2) ----------
+
+/// A run whose turns have Qanuvi's free models set up (the decider that sorts the owner's messages).
+fn with_free(env: &Arc<FakeEnv>, opts: RunOptions, stop: Stop) -> Run {
+    let mut setup = test_setup(FILE, opts);
+    setup.turns.setups.insert("qanuvi".into(), "{}".into());
+    Run::start_setup(env.clone(), setup, stop)
+}
+
+/// The free decider sorts every message as `kind` (with a step title for a change).
+fn decider_says(env: &FakeEnv, kind: &'static str, title: &'static str) {
+    env.set_decide(move |prompt| {
+        assert!(prompt.contains("Sort it."), "{prompt}");
+        Ok((
+            "Free model".into(),
+            json!({"kind": kind, "title": title}).to_string(),
+        ))
+    });
+}
+
+fn log_of(env: &FakeEnv, number: &str, title: &str) -> String {
+    env.text(&crate::plan::guidance::log_path(FILE, Some(number), title))
+}
+
+fn sent_texts(env: &FakeEnv) -> Vec<String> {
+    env.sent().into_iter().map(|(_, t)| t).collect()
+}
+
+fn messages_decided(r: &PlanRun) -> Vec<(String, String, String)> {
+    r.decisions
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|d| d.kind == "owner message")
+        .map(|d| (d.by, d.decision, d.why))
+        .collect()
+}
+
+#[test]
+fn a_note_typed_in_the_steps_chat_is_sorted_first_then_passed_on_and_the_step_goes_on() {
+    let env = world("# Plan\n\n- [ ] **1. Prices**\n");
+    decider_says(&env, "note", "");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        sh.owner_message("the price helper is in lib/money.php");
+        c.env.mark(FILE, "1", 'x');
+        AgentReply {
+            ticks: 2,
+            ..Default::default()
+        }
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    // The agent never got the owner's words raw: it got them as a note, and nothing paused or held the step.
+    assert_eq!(
+        sent_texts(&env),
+        [ownermsg::note_message(
+            "the price helper is in lib/money.php"
+        )]
+    );
+    assert_eq!(step(&r, "1").attempts.len(), 1);
+    assert!(env.calls().iter().any(|c| c == "free_decide"));
+    let log = log_of(&env, "1", "Prices");
+    assert!(
+        log.contains("Owner message")
+            && log.contains(
+                "\"the price helper is in lib/money.php\". Taken as a note (by Free model)"
+            ),
+        "{log}"
+    );
+    assert_eq!(messages_decided(&r).len(), 1);
+    assert_eq!(messages_decided(&r)[0].1, "note");
+}
+
+#[test]
+fn a_question_is_answered_briefly_in_the_chat_and_without_free_models_the_word_rules_sort_it() {
+    let env = world("# Plan\n\n- [ ] **1. Store**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        sh.owner_message("why sqlite and not a JSON file?");
+        c.env.mark(FILE, "1", 'x');
+        AgentReply {
+            ticks: 2,
+            ..Default::default()
+        }
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(
+        sent_texts(&env),
+        [ownermsg::question_message(
+            "why sqlite and not a JSON file?"
+        )]
+    );
+    assert!(!env.calls().iter().any(|c| c == "free_decide"));
+    assert_eq!(messages_decided(&r)[0].0, ownermsg::WORD_RULES);
+}
+
+#[test]
+fn a_change_with_no_answer_waits_then_becomes_a_new_step_after_this_one_and_runs_next() {
+    let env = world("# Plan\n\n- [ ] **1. Export**\n- [ ] **2. Later**\n");
+    decider_says(&env, "change", "CSV export");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let started = env.now_ms();
+    env.set_agent(move |c| {
+        if c.prompt
+            .starts_with("(Qanuvi: go on with the step as planned")
+        {
+            // Told to go on once the wait was over: it finishes the step as planned.
+            c.env.mark(FILE, "1", 'x');
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "1a", "2"]);
+        if n == "1" {
+            sh.owner_message("also add a CSV export");
+            return AgentReply {
+                ticks: 2,
+                ..Default::default()
+            };
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    // The agent held after the edit in hand; the owner was asked in the Inbox; no answer in 10 minutes.
+    let sent = sent_texts(&env);
+    assert_eq!(
+        sent[0],
+        ownermsg::change_hold_message("also add a CSV export")
+    );
+    assert_eq!(
+        sent[1],
+        ownermsg::when_message(ownermsg::When::NewStep, "also add a CSV export")
+    );
+    assert!(env.now_ms() - started >= ownermsg::WAIT_DEFAULT_MS);
+    // The change is its own step right after step 1, done next, and the question is gone from the Inbox.
+    let plan = env.text(FILE);
+    assert!(
+        plan.contains("- [x] **1. Export**\n- [x] **1a. CSV export**\n  - Asked by the owner during step 1: \"also add a CSV export\"\n  - Needs: 1\n- [x] **2. Later**"),
+        "{plan}"
+    );
+    let order: Vec<Option<String>> = r.steps.iter().map(|s| s.number.clone()).collect();
+    assert_eq!(
+        order,
+        [Some("1".into()), Some("1a".into()), Some("2".into())]
+    );
+    assert_eq!(questions(&env), 0);
+    let log = log_of(&env, "1", "Export");
+    assert!(
+        log.contains("no answer in 10 minutes, so added as a new step after this one"),
+        "{log}"
+    );
+    assert!(
+        log.contains("The owner's change became step 1a: CSV export."),
+        "{log}"
+    );
+}
+
+#[test]
+fn a_change_answered_now_in_words_in_the_chat_goes_into_this_step() {
+    let env = world("# Plan\n\n- [ ] **1. Export**\n");
+    decider_says(&env, "change", "JSON export");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let asked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (sh2, once) = (sh.clone(), asked.clone());
+    // The owner reads the question and answers "now" in the chat while the agent waits.
+    env.set_tick(move |e| {
+        let open = e
+            .inbox()
+            .iter()
+            .any(|i| i.key.as_deref().is_some_and(|k| k.starts_with("msg:")));
+        if open && !once.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            sh2.owner_message("do it now");
+        }
+    });
+    env.set_agent(move |c| {
+        if c.turn == 1 {
+            sh.owner_message("write the export as JSON instead");
+            return AgentReply::default();
+        }
+        assert!(
+            c.prompt.contains("the owner wants the change now"),
+            "{}",
+            c.prompt
+        );
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
+    // No new step, the question is settled, and the step's log says what the owner chose.
+    assert_eq!(r.steps.len(), 1);
+    assert!(!env.text(FILE).contains("1a."));
+    assert_eq!(questions(&env), 0);
+    let decided = messages_decided(&r);
+    assert_eq!(decided.len(), 1);
+    assert!(
+        decided[0].2.ends_with("the owner chose: done in this step"),
+        "{:?}",
+        decided
+    );
+}
+
+#[test]
+fn a_change_answered_after_this_step_in_the_inbox_goes_on_in_the_same_session() {
+    let env = world("# Plan\n\n- [ ] **1. Export**\n");
+    decider_says(&env, "change", "Header row");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_tick(|e| {
+        if let Some(q) = e
+            .inbox()
+            .into_iter()
+            .find(|i| i.status == "open" && i.key.as_deref().is_some_and(|k| k.starts_with("msg:")))
+        {
+            assert!(
+                q.title.ends_with("when should your change be done?"),
+                "{}",
+                q.title
+            );
+            e.answer(q.key.as_deref().unwrap(), json!({"choice": "after"}));
+        }
+    });
+    env.set_agent(move |c| {
+        if c.turn == 1 {
+            sh.owner_message("the export also needs a header row");
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    let sent = sent_texts(&env);
+    assert_eq!(
+        sent.last().unwrap(),
+        &ownermsg::when_message(ownermsg::When::After, "the export also needs a header row")
+    );
+    // One session for all of it.
+    assert_eq!(env.requests().len(), 1);
+    assert_eq!(questions(&env), 0);
+    assert!(
+        messages_decided(&r)[0]
+            .2
+            .ends_with("the owner chose: done after this step, in the same session")
+    );
+}
+
+#[test]
+fn stop_typed_in_the_chat_stops_the_run_like_the_button_without_asking_a_model() {
+    let env = world("# Plan\n\n- [ ] **1. Long**\n- [ ] **2. Later**\n");
+    decider_says(&env, "note", "");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |_| {
+        sh.owner_message("Stop!");
+        AgentReply {
+            ticks: 2,
+            ..Default::default()
+        }
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Stopped);
+    assert!(!env.calls().iter().any(|c| c == "free_decide"));
+    assert!(
+        sent_texts(&env)
+            .iter()
+            .any(|t| t == crate::plan::turn::STOP_REQUEST)
+    );
+    assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
+    assert_eq!(messages_decided(&r)[0].1, "stop");
 }

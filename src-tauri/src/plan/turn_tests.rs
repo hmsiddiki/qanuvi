@@ -385,8 +385,10 @@ fn read_my_message_now_holds_the_turn_then_tells_the_agent_to_go_on() {
     let env = FakeEnv::new();
     let c = Arc::new(Controls::default());
     let cc = c.clone();
-    env.set_agent(move |_| {
-        cc.interrupt();
+    env.set_agent(move |call| {
+        if call.turn == 1 {
+            cc.interrupt();
+        }
         AgentReply::default()
     });
     let mut w = watch(&env);
@@ -440,4 +442,86 @@ fn an_agent_error_is_an_error_with_its_text() {
     assert_eq!(end.attempt.outcome, Outcome::Error);
     assert!(!end.idle);
     assert!(!env.calls().iter().any(|c| c == "checks_run"));
+}
+
+fn quick_wait() -> TurnSetup {
+    TurnSetup {
+        message_wait_ms: 5000,
+        ..setup()
+    }
+}
+
+#[test]
+fn a_change_asked_as_the_turn_stops_becomes_a_new_step_nothing_lost() {
+    let env = FakeEnv::new();
+    let c = Arc::new(Controls::default());
+    let cc = c.clone();
+    env.set_agent(move |_| {
+        cc.owner_message("also add a CSV export");
+        AgentReply {
+            ticks: 1,
+            status: Some("stopped"),
+            ..Default::default()
+        }
+    });
+    let mut w = watch(&env);
+    let end = attempt(&env, &c, &mut w, &quick_wait(), &ask(""), &mut |_| {});
+    assert_eq!(end.attempt.outcome, Outcome::Stopped);
+    assert_eq!(w.new_steps.len(), 1);
+    assert_eq!(w.new_steps[0].title, "Also add a CSV export");
+    assert_eq!(w.messages.len(), 1);
+    assert!(
+        w.messages[0]
+            .handled
+            .starts_with("the turn ended before an answer")
+    );
+    // The question was asked and is settled again.
+    assert!(env.inbox().is_empty());
+}
+
+#[test]
+fn a_second_change_while_one_is_asked_becomes_its_own_step_and_the_first_waits_its_turn() {
+    let env = FakeEnv::new();
+    let c = Arc::new(Controls::default());
+    let cc = c.clone();
+    env.set_agent(move |call| {
+        if call.turn == 1 {
+            cc.owner_message("also add a CSV export");
+            cc.owner_message("also remove the old XML export");
+            return AgentReply {
+                ticks: 3,
+                ..Default::default()
+            };
+        }
+        AgentReply::default()
+    });
+    let mut w = watch(&env);
+    let mut said = Vec::new();
+    let started = env.now_ms();
+    attempt(&env, &c, &mut w, &quick_wait(), &ask(""), &mut |e| {
+        if let AgentEvent::Line { line } = e
+            && line.contains("qanuvi_runner")
+        {
+            said.push(line.clone());
+        }
+    });
+    // The second at once; the first after the wait (5 s here, from the run's setting).
+    let titles: Vec<&str> = w.new_steps.iter().map(|n| n.title.as_str()).collect();
+    assert_eq!(
+        titles,
+        ["Also remove the old XML export", "Also add a CSV export"]
+    );
+    assert!(env.now_ms() - started >= 5000);
+    let sent: Vec<String> = env.sent().into_iter().map(|(_, t)| t).collect();
+    assert_eq!(
+        sent,
+        [
+            ownermsg::change_hold_message("also add a CSV export"),
+            ownermsg::when_message(When::NewStep, "also add a CSV export"),
+        ]
+    );
+    // The chat heard the question, the second change and the choice made.
+    assert_eq!(said.len(), 3, "{said:?}");
+    assert!(said[2].contains("No answer in 1 minute"), "{}", said[2]);
+    assert!(env.inbox().is_empty());
 }

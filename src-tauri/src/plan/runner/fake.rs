@@ -45,6 +45,8 @@ pub struct AgentReply {
 
 type AgentScript = Arc<dyn Fn(&AgentCall) -> AgentReply + Send + Sync>;
 type CheckScript = Arc<dyn Fn(&str) -> (bool, String) + Send + Sync>;
+type DecideScript = Arc<dyn Fn(&str) -> Result<(String, String), String> + Send + Sync>;
+type TickScript = Arc<dyn Fn(&FakeEnv) + Send + Sync>;
 
 #[derive(Clone)]
 struct File {
@@ -89,6 +91,10 @@ pub struct FakeEnv {
     pub git_blind: Mutex<Vec<String>>,
     /// What the memory slice answers (None: nothing applies).
     pub memory: Mutex<Option<String>>,
+    /// The free models' answers to a decision (by its prompt); none: no free models.
+    decide: Mutex<Option<DecideScript>>,
+    /// Called each quiet second of a turn (the owner acting while the agent works or waits).
+    on_tick: Mutex<Option<TickScript>>,
 }
 
 impl Default for FakeEnv {
@@ -110,6 +116,8 @@ impl FakeEnv {
             blind_diff: Mutex::new(false),
             git_blind: Mutex::new(Vec::new()),
             memory: Mutex::new(None),
+            decide: Mutex::new(None),
+            on_tick: Mutex::new(None),
         }
     }
 
@@ -120,6 +128,28 @@ impl FakeEnv {
     /// The scripted agent: edits files through `call.env`, answers how the turn ended.
     pub fn set_agent(&self, f: impl Fn(&AgentCall) -> AgentReply + Send + Sync + 'static) {
         *self.agent.lock().unwrap() = Arc::new(f);
+    }
+
+    /// The free models answer decisions: who answered and the text, by the prompt.
+    pub fn set_decide(
+        &self,
+        f: impl Fn(&str) -> Result<(String, String), String> + Send + Sync + 'static,
+    ) {
+        *self.decide.lock().unwrap() = Some(Arc::new(f));
+    }
+
+    /// What happens each quiet second of a turn.
+    pub fn set_tick(&self, f: impl Fn(&FakeEnv) + Send + Sync + 'static) {
+        *self.on_tick.lock().unwrap() = Some(Arc::new(f));
+    }
+
+    /// One quiet second: the clock moves, then the tick script runs.
+    fn tick(&self) {
+        self.w().clock += 1000;
+        let f = self.on_tick.lock().unwrap().clone();
+        if let Some(f) = f {
+            f(self);
+        }
     }
 
     /// The test command's answer: passed, and its output.
@@ -392,132 +422,150 @@ impl RunEnv for FakeEnv {
         on_event: &mut dyn FnMut(Option<&AgentEvent>) -> Flow,
     ) -> Result<TurnEnd, String> {
         self.call("agent_start");
-        let (id, turn) = {
+        let id = {
             let mut w = self.w();
             w.n += 1;
-            let id = req
-                .session_id
+            req.session_id
                 .clone()
-                .unwrap_or_else(|| format!("s{}", w.n));
-            let turn = w.turns.get(&id).copied().unwrap_or(0) + 1;
-            w.turns.insert(id.clone(), turn);
-            w.prompts.push((req.model.clone(), req.prompt.clone()));
-            w.requests.push(req.clone());
-            (id, turn)
+                .unwrap_or_else(|| format!("s{}", w.n))
         };
         let script = self.agent.lock().unwrap().clone();
-        let reply = script(&AgentCall {
-            prompt: &req.prompt,
-            model: &req.model,
-            agent: &req.agent,
-            mode: &req.mode,
-            title: req.title.as_deref(),
-            session_id: &id,
-            turn,
-            env: self,
-        });
-        let (cost, tokens) = {
-            let mut w = self.w();
-            let c = w.costs.entry(id.clone()).or_insert(0.0);
-            *c += reply.cost.unwrap_or(0.01);
-            let c = *c;
-            let t = w.tokens.entry(id.clone()).or_insert((0, 0, 0));
-            *t = (t.0 + 1000, t.1 + 100, t.2 + 2000);
-            (c, *t)
-        };
-        {
-            let mut w = self.w();
-            let kept = w.lines.entry(id.clone()).or_default();
-            kept.extend(reply.lines.iter().cloned());
-            if let Some(text) = &reply.result {
-                kept.push(serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}).to_string());
+        let mut prompt = req.prompt.clone();
+        // A message sent to a turn that waits at its end (Flow::Hold) or at its end itself is the agent's next turn
+        // in the same session; a few at most, so a script that never settles cannot loop.
+        for round in 0..20 {
+            let turn = {
+                let mut w = self.w();
+                let turn = w.turns.get(&id).copied().unwrap_or(0) + 1;
+                w.turns.insert(id.clone(), turn);
+                w.prompts.push((req.model.clone(), prompt.clone()));
+                if round == 0 {
+                    w.requests.push(req.clone());
+                }
+                turn
+            };
+            let reply = script(&AgentCall {
+                prompt: &prompt,
+                model: &req.model,
+                agent: &req.agent,
+                mode: &req.mode,
+                title: req.title.as_deref(),
+                session_id: &id,
+                turn,
+                env: self,
+            });
+            let (cost, tokens) = {
+                let mut w = self.w();
+                let c = w.costs.entry(id.clone()).or_insert(0.0);
+                *c += reply.cost.unwrap_or(0.01);
+                let c = *c;
+                let t = w.tokens.entry(id.clone()).or_insert((0, 0, 0));
+                *t = (t.0 + 1000, t.1 + 100, t.2 + 2000);
+                (c, *t)
+            };
+            {
+                let mut w = self.w();
+                let kept = w.lines.entry(id.clone()).or_default();
+                kept.extend(reply.lines.iter().cloned());
+                if let Some(text) = &reply.result {
+                    kept.push(serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}).to_string());
+                }
             }
-        }
-        let mut end = TurnEnd {
-            session_id: id.clone(),
-            status: "running".into(),
-            cost_usd: cost,
-            input_tokens: tokens.0,
-            output_tokens: tokens.1,
-            duration_ms: tokens.2,
-            ..Default::default()
-        };
-        let session = |status: &str| AgentEvent::Session {
-            session: Box::new(crate::agent::Session {
-                id: id.clone(),
-                status: status.into(),
+            let mut end = TurnEnd {
+                session_id: id.clone(),
+                status: "running".into(),
                 cost_usd: cost,
                 input_tokens: tokens.0,
                 output_tokens: tokens.1,
                 duration_ms: tokens.2,
-                model: req.model.clone(),
-                mode: req.mode.clone(),
                 ..Default::default()
-            }),
-        };
-        // What the runner answered: a message is kept, a stop or an end finishes the turn here.
-        let steer = |flow: Flow, end: &mut TurnEnd| -> bool {
-            match flow {
-                Flow::Go | Flow::Hold => false,
-                Flow::Send(text) => {
-                    self.w().sent.push((id.clone(), text));
-                    false
+            };
+            let session = |status: &str| AgentEvent::Session {
+                session: Box::new(crate::agent::Session {
+                    id: id.clone(),
+                    status: status.into(),
+                    cost_usd: cost,
+                    input_tokens: tokens.0,
+                    output_tokens: tokens.1,
+                    duration_ms: tokens.2,
+                    model: req.model.clone(),
+                    mode: req.mode.clone(),
+                    ..Default::default()
+                }),
+            };
+            // What the runner answered: a message is kept, a stop or an end finishes the turn here.
+            let steer = |flow: Flow, end: &mut TurnEnd| -> bool {
+                match flow {
+                    Flow::Go | Flow::Hold => false,
+                    Flow::Send(text) => {
+                        self.w().sent.push((id.clone(), text));
+                        false
+                    }
+                    Flow::Stop => {
+                        self.w().stopped.push(id.clone());
+                        end.status = "stopped".into();
+                        end.cut_short = true;
+                        true
+                    }
+                    Flow::End => {
+                        end.cut_short = true;
+                        true
+                    }
                 }
-                Flow::Stop => {
-                    self.w().stopped.push(id.clone());
-                    end.status = "stopped".into();
-                    end.cut_short = true;
-                    true
-                }
-                Flow::End => {
-                    end.cut_short = true;
-                    true
-                }
-            }
-        };
-        if steer(on_event(Some(&session("running"))), &mut end) {
-            return Ok(end);
-        }
-        for line in &reply.lines {
-            if steer(
-                on_event(Some(&AgentEvent::Line { line: line.clone() })),
-                &mut end,
-            ) {
+            };
+            if steer(on_event(Some(&session("running"))), &mut end) {
                 return Ok(end);
             }
-        }
-        for _ in 0..reply.ticks {
-            self.w().clock += 1000;
-            if steer(on_event(None), &mut end) {
-                return Ok(end);
+            for line in &reply.lines {
+                if steer(
+                    on_event(Some(&AgentEvent::Line { line: line.clone() })),
+                    &mut end,
+                ) {
+                    return Ok(end);
+                }
             }
-        }
-        if let Some(text) = &reply.result {
-            let line =
-                serde_json::json!({"type": "result", "result": text, "is_error": reply.is_error})
-                    .to_string();
-            if steer(on_event(Some(&AgentEvent::Line { line })), &mut end) {
-                return Ok(end);
-            }
-        }
-        end.result = reply.result.clone();
-        end.is_error = reply.is_error;
-        end.status = reply.status.unwrap_or("idle").into();
-        let flow = on_event(Some(&session(&end.status)));
-        let hold = flow == Flow::Hold;
-        if steer(flow, &mut end) {
-            return Ok(end);
-        }
-        // Held at its end (an interrupt): quiet seconds until the runner ends the turn.
-        if hold {
-            for _ in 0..1000 {
-                self.w().clock += 1000;
+            for _ in 0..reply.ticks {
+                self.tick();
                 if steer(on_event(None), &mut end) {
                     return Ok(end);
                 }
             }
+            if let Some(text) = &reply.result {
+                let line =
+                    serde_json::json!({"type": "result", "result": text, "is_error": reply.is_error})
+                        .to_string();
+                if steer(on_event(Some(&AgentEvent::Line { line })), &mut end) {
+                    return Ok(end);
+                }
+            }
+            end.result = reply.result.clone();
+            end.is_error = reply.is_error;
+            end.status = reply.status.unwrap_or("idle").into();
+            let mut flow = on_event(Some(&session(&end.status)));
+            // Held at its end (an interrupt, the owner being asked): quiet seconds until the runner sends, stops or
+            // ends the turn.
+            if flow == Flow::Hold {
+                for _ in 0..2000 {
+                    self.tick();
+                    flow = on_event(None);
+                    if !matches!(flow, Flow::Go | Flow::Hold) {
+                        break;
+                    }
+                }
+            }
+            match flow {
+                Flow::Send(text) if end.status == "idle" => {
+                    self.w().sent.push((id.clone(), text.clone()));
+                    prompt = text;
+                    continue;
+                }
+                other => {
+                    steer(other, &mut end);
+                    return Ok(end);
+                }
+            }
         }
-        Ok(end)
+        Err("the scripted agent never settled".into())
     }
 
     fn agent_stop(&self, session_id: &str) {
@@ -640,9 +688,14 @@ impl RunEnv for FakeEnv {
         &self,
         _setup: &str,
         _system: &str,
-        _prompt: &str,
+        prompt: &str,
     ) -> Result<(String, String), String> {
-        Err("no free models in the test world".into())
+        self.call("free_decide");
+        let f = self.decide.lock().unwrap().clone();
+        match f {
+            Some(f) => f(prompt),
+            None => Err("no free models in the test world".into()),
+        }
     }
 
     fn list_all_runs(&self, _limit: usize) -> Result<Vec<RunRecord>, String> {

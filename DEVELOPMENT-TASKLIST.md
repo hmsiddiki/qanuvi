@@ -369,7 +369,14 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2c part 1): R2c PART 1 DONE (see 24z "R2c part 1 DONE"): the run loop
+    RESUME HERE (newest, 2026-11-15, after R2c part 2): R2c PART 2 DONE (see 24z "R2c part 2 DONE"): owner messages
+    in step chats in the core (sorted, passed on, change asked with a safe default). 365 Rust tests pass, clippy and fmt
+    clean, nothing published. Open with the owner: the tidy-code and write-scope proposal (reuse brief and project
+    atlas in plan memory, silent duplicate check with automatic fix, write scope from the plan's folder with one
+    permission question kept in project memory, standing owner rules from chat notes into plan memory); not in this
+    list until they agree. NEXT: R2d wiring. Test runs: plain `cargo test -j 1` with a `timeout` (a hung test once
+    looked like a slow build for 45 minutes under the guard script, which shows nothing until the end).
+    RESUME HERE (before, 2026-11-15, after R2c part 1): R2c PART 1 DONE (see 24z "R2c part 1 DONE"): the run loop
     in the core (plan/run.rs) on RunEnv, all 10 ported scenarios un-ignored and passing, 5 new ones; 350 Rust tests
     pass, clippy clean; TypeScript unchanged, nothing published. NEXT: R2c part 2, owner messages in step chats (24z
     "Owner messages in step chats": scenario tests first, then the decider's sorting in the Rust runner), in a fresh
@@ -829,7 +836,24 @@ runs on or off; with it off nothing is sent anywhere.
         colour (not the red of a real block) and the label "replaced by 97a-1–97a-4"; it turns green when all its
         replacement steps are done (closeReplaced already ticks it [x]). Seen live: PLAN-F 97a showed red while its
         replacements ran fine. Small window change; next build.
-      - [ ] Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
+      - [x] R2c part 2 DONE 2026-11-15 (core side; the window sends to it in R2d): owner messages in step chats.
+        plan/ownermsg.rs: the sorting (bare stop/pause words at once with no model; else the free decider, Qanuvi's
+        own models; else word rules), the texts to the agent and the chat, the "now / after this step / new step" Inbox
+        form, reading an answer in words, and add_step (the change as its own step right after the step at work, a
+        free number, "Needs:" that step). turn.rs: Controls::owner_message queues a message; the turn takes one per
+        tick: a note or question is sent to the agent as such and the step goes on; stop/pause act as the buttons; a
+        change holds the agent after the edit in hand and asks in the chat (a "qanuvi_runner" line, shown as a notice
+        in events.ts) and the Inbox, waits (run option messageWaitMinutes, default 10) with the step's limits not
+        counted, then takes the answer (chat words or Inbox) or the safe choice (a new step); a second change while
+        one is asked becomes a new step at once; a turn that ends while asked also gives a new step (nothing lost).
+        run.rs: Shared::owner_message; each message into the step's log and the run's decisions (kind "owner
+        message", who sorted it, how it was handled); new steps written into the plan and taken next. Fake: a
+        scripted free decider, a tick hook, and a message sent to a turn waiting at its end runs the agent again in
+        the same session. 6 new scenarios, 2 turn tests, 7 ownermsg tests; 365 Rust tests pass (1 old ignored),
+        clippy and fmt clean; events test 35/35. For R2d: the window's chat on a running step sends to the runner
+        (not api.agent.send), shows the owner's own message, and keeps the runner's notices in the session's lines
+        (today they reach only the live listeners).
+      - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
         goes on; (b) a question: the agent answers it briefly in the chat, then goes on; (c) a change of plan or scope:

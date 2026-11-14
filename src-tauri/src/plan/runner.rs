@@ -132,6 +132,10 @@ pub struct RunOptions {
     /// At the end of a run that got done: offer the finishing pass, or run it by itself (24o); missing: offer it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finish_pass: Option<FinishAuto>,
+    /// How long a change the owner asks for in a step's chat waits for their answer (now, after the step, new step)
+    /// before the step goes on and the change becomes a new step; missing: 10 minutes (R2c part 2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_wait_minutes: Option<f64>,
 }
 
 /// The "model" of an attempt on Qanuvi's own agent (Qanuvi core picks among the free and local models).

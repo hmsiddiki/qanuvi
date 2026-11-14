@@ -188,6 +188,15 @@ describe("live text and the model at work", () => {
       "sonnet",
     );
   });
+
+  it("shows the plan runner's words in a step's chat as a notice", () => {
+    const items = reduceAll([
+      JSON.stringify({ type: "system", subtype: "qanuvi_runner", text: "Taken as a note: passed to the agent." }),
+    ]);
+    expect(items).toEqual([
+      { kind: "notice", id: expect.any(String), text: "Taken as a note: passed to the agent.", tone: "info" },
+    ]);
+  });
 });
 
 describe("elapsedLabel", () => {

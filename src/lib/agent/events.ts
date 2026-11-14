@@ -455,6 +455,9 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       text: msg.is_error ? firstLine(str(msg.result) || str(msg.subtype), 300) : "",
       ...(interrupted ? { stopped: true } : {}),
     });
+  } else if (type === "system" && str(msg.subtype) === "qanuvi_runner") {
+    // The plan runner's words in a step's chat: how it took the owner's message, or its question about a change.
+    out.push({ kind: "notice", id: `rn${seq}`, text: str(msg.text), tone: "info" });
   } else if (type === "system" && str(msg.subtype) === "qanuvi_route") {
     // Qanuvi's brain gave the turn to a model (first pick or a handover), with the reason.
     const model = str(msg.model) || undefined;

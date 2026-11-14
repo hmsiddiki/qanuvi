@@ -18,6 +18,7 @@ use super::guidance::{self as g, Carry, Recent};
 use super::holdask::{self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply};
 use super::housekeeping::{archive_path, done_numbers};
 use super::limits::{is_limit, limit_reset_at};
+use super::ownermsg;
 use super::packet::{self, Outline, packet_prompt};
 use super::planner;
 use super::planstate::{self, PlanState};
@@ -174,6 +175,13 @@ impl Shared {
     /// Ends a run that waits for answers: what is set aside stays open, the summary lists it.
     pub fn finish_without(&self) {
         self.live().finish_without = true;
+        self.wake.notify_all();
+    }
+
+    /// The owner typed a message into the running step's chat: the step's turn sorts it before the agent hears it
+    /// (R2c part 2). One typed while no step works waits for the next step's turn.
+    pub fn owner_message(&self, text: &str) {
+        self.controls.owner_message(text);
         self.wake.notify_all();
     }
 
@@ -353,7 +361,10 @@ pub fn run_plan(env: &dyn RunEnv, sh: &Shared, setup: RunSetup) -> Result<PlanRu
 }
 
 impl<'a> Loop<'a> {
-    fn start(env: &'a dyn RunEnv, sh: &'a Shared, s: RunSetup) -> Result<Loop<'a>, String> {
+    fn start(env: &'a dyn RunEnv, sh: &'a Shared, mut s: RunSetup) -> Result<Loop<'a>, String> {
+        if let Some(m) = s.options.message_wait_minutes.filter(|m| *m > 0.0) {
+            s.turns.message_wait_ms = (m * 60_000.0) as i64;
+        }
         let file = s.file.clone();
         let options = s.options.clone();
         let mut text = env.read(&file)?.text;
@@ -1851,6 +1862,7 @@ impl<'a> Loop<'a> {
             }
             self.run.steps[i].changed = Some(all);
             self.log_attempt(i, &mut attempt);
+            self.take_messages(i);
             // Handed over (context too big, or the owner's model switch): no failure; unless the step got done, a new
             // session goes on from the note.
             if self.watch.handover != 0
@@ -2302,6 +2314,61 @@ impl<'a> Loop<'a> {
             answer: texts.last().cloned(),
         });
         let _ = self.env.log_append(&path, &entry);
+    }
+
+    /// The owner's messages in the step's chat (R2c part 2): each goes into the step's log and the run's decisions
+    /// with how it was handled; a change wanted as its own step is written into the plan after this step (the run
+    /// takes it next).
+    fn take_messages(&mut self, i: usize) {
+        let messages = std::mem::take(&mut self.watch.messages);
+        let new_steps = std::mem::take(&mut self.watch.new_steps);
+        if messages.is_empty() && new_steps.is_empty() {
+            return;
+        }
+        let st = self.run.steps[i].clone();
+        let path = g::log_path(&self.s.file, st.number.as_deref(), &st.title);
+        let subject = format!("Step {}", key(&st));
+        for m in &messages {
+            let time = jiff::Timestamp::from_millisecond(m.at)
+                .map(|t| t.strftime("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_default();
+            let _ = self.env.log_append(&path, &ownermsg::log_entry(m, &time));
+            self.decide(
+                "owner message",
+                &m.by,
+                &subject,
+                m.kind.word(),
+                &format!("\"{}\": {}", m.text, m.handled),
+            );
+        }
+        let archive = self
+            .env
+            .read(&archive_path(&self.s.file))
+            .map(|f| f.text)
+            .unwrap_or_default();
+        for n in &new_steps {
+            let Some(now) = self.plan() else { break };
+            match ownermsg::add_step(&now.text, &archive, st.number.as_deref(), &st.title, n) {
+                Ok((next, label)) => {
+                    if self.env.write(&self.s.file, &next, Some(&now.hash)).is_ok() {
+                        let _ = self.env.log_append(
+                            &path,
+                            &format!("\n- The owner's change became step {label}: {}.\n", n.title),
+                        );
+                    }
+                }
+                Err(e) => {
+                    let _ = self.env.log_append(
+                        &path,
+                        &format!(
+                            "\n- The owner's change \"{}\" could not be added as a step: {e}\n",
+                            n.text
+                        ),
+                    );
+                }
+            }
+        }
+        self.save();
     }
 
     /// Adds the step's result (done, blocked, skipped with why) to its log.

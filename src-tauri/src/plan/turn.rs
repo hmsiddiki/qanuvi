@@ -12,6 +12,7 @@ use crate::checks::CheckResult;
 use crate::plan::costs::{StepLimits, over_limit};
 use crate::plan::env::{Flow, MemoryUse, RunEnv, TurnEnd, TurnRequest, memory_context, turn_over};
 use crate::plan::guidance::{context_size, handover_due, handover_request, model_switch_request};
+use crate::plan::ownermsg::{self, Kind, When};
 use crate::plan::packet::{failure_summary, fix_prompt};
 use crate::plan::runner::{Attempt, Outcome, is_free};
 use std::collections::BTreeMap;
@@ -53,6 +54,8 @@ struct Asks {
     mode: Option<String>,
     session_id: Option<String>,
     checking: bool,
+    /// The owner's messages in the step's chat, not taken by a turn yet.
+    said: std::collections::VecDeque<String>,
 }
 
 /// The owner's asks to the running step, set by the commands and read by the turn (and later the run loop).
@@ -99,6 +102,23 @@ impl Controls {
     /// "Stop this command, read my message now" on the running step (24r).
     pub fn interrupt(&self) {
         self.asks().interrupted = true;
+    }
+
+    /// The owner typed a message into the step's chat: the turn sorts it before the agent hears it (R2c part 2).
+    pub fn owner_message(&self, text: &str) {
+        let t = text.trim();
+        if !t.is_empty() {
+            self.asks().said.push_back(t.to_string());
+        }
+    }
+
+    /// Messages not taken yet.
+    pub fn waiting_messages(&self) -> usize {
+        self.asks().said.len()
+    }
+
+    fn take_said(&self) -> Option<String> {
+        self.asks().said.pop_front()
     }
 
     /// The owner picked another model for the running step.
@@ -160,6 +180,10 @@ pub struct StepWatch {
     pub switching_to: Option<String>,
     /// A model switch the run loop has not taken yet: the step goes on with this model from the next attempt.
     pub switched: Option<String>,
+    /// The owner's messages and how each was handled (the run loop logs them).
+    pub messages: Vec<ownermsg::Record>,
+    /// Changes the owner wants as their own steps (the run loop writes them into the plan).
+    pub new_steps: Vec<ownermsg::NewStep>,
 }
 
 impl StepWatch {
@@ -199,6 +223,8 @@ pub struct TurnSetup {
     pub memory: MemoryUse,
     /// Model names as the owner sees them ("Opus 5.5"), for the messages to the agent.
     pub labels: BTreeMap<String, String>,
+    /// How long a change question waits for the owner (milliseconds; 0 = the default, 10 minutes).
+    pub message_wait_ms: i64,
 }
 
 impl TurnSetup {
@@ -250,6 +276,78 @@ pub fn pause_request(log: &str) -> String {
 }
 
 pub const STOP_REQUEST: &str = "(Qanuvi: the owner stops the run. Finish only the edit you are making, start nothing new, then stop and answer \"Stopped\".)";
+
+/// A change the owner asked for in the step's chat, waiting for their answer (now, after this step, new step).
+struct Asking {
+    at: i64,
+    text: String,
+    title: String,
+    by: String,
+    key: String,
+    until: i64,
+}
+
+/// Sorts the owner's message: bare stop and pause words at once, else the free decider, else the word rules.
+fn sort_message(env: &dyn RunEnv, setup: &TurnSetup, step: &str, text: &str) -> ownermsg::Sorted {
+    if let Some(kind) = ownermsg::quick(text) {
+        return ownermsg::Sorted {
+            kind,
+            by: ownermsg::WORD_RULES.into(),
+            title: String::new(),
+        };
+    }
+    if let Some(free) = setup.setups.get("qanuvi")
+        && let Ok((who, answer)) = env.free_decide(
+            free,
+            ownermsg::SORT_SYSTEM,
+            &ownermsg::sort_prompt(step, text),
+        )
+        && let Some((kind, title)) = ownermsg::parse_sort(&answer)
+    {
+        return ownermsg::Sorted {
+            kind,
+            by: who,
+            title,
+        };
+    }
+    ownermsg::Sorted {
+        kind: ownermsg::guess(text),
+        by: ownermsg::WORD_RULES.into(),
+        title: String::new(),
+    }
+}
+
+/// The owner's change question is settled (their answer, or the safe choice): the Inbox question goes, the step's
+/// record keeps what was chosen. Answers what the agent is told and what the chat shows.
+fn settle(
+    env: &dyn RunEnv,
+    watch: &mut StepWatch,
+    a: Asking,
+    when: When,
+    by_default: bool,
+    wait: i64,
+) -> (Flow, String) {
+    let _ = env.inbox_resolve(&a.key);
+    if when == When::NewStep {
+        watch.new_steps.push(ownermsg::NewStep {
+            title: a.title.clone(),
+            text: a.text.clone(),
+        });
+    }
+    watch.messages.push(ownermsg::Record {
+        at: a.at,
+        text: a.text.clone(),
+        kind: Kind::Change,
+        by: a.by,
+        handled: ownermsg::chosen_text(when, by_default, wait),
+    });
+    let said = if by_default {
+        ownermsg::default_text(wait)
+    } else {
+        ownermsg::when_text(when).to_string()
+    };
+    (Flow::Send(ownermsg::when_message(when, &a.text)), said)
+}
 
 /// One turn of an agent session (a new session, or a follow-up in one), waited for until it ends. Every event goes
 /// to `forward` (the window shows the step's chat from them).
@@ -311,6 +409,12 @@ pub fn turn(
     let mut last_limit_check = env.now_ms();
     let mut cost_seen = 0.0f64;
     let mut exited = false;
+    let mut asking: Option<Asking> = None;
+    let wait = if setup.message_wait_ms > 0 {
+        setup.message_wait_ms
+    } else {
+        ownermsg::WAIT_DEFAULT_MS
+    };
 
     let end = env.agent_turn(&req, &mut |event| {
         let now = env.now_ms();
@@ -366,8 +470,140 @@ pub fn turn(
         if late.iter().any(|t| now >= *t) {
             return Flow::Stop;
         }
-        // The step's limits (cost and time): over them, the turn stops and the run asks.
-        if now - last_limit_check >= LIMIT_CHECK_MS {
+        // The owner's words in the step's chat (R2c part 2): sorted first, then passed on as fits.
+        if let Some(text) = controls.take_said() {
+            if asking.is_some()
+                && let Some(when) = ownermsg::when_in_words(&text)
+                && let Some(a) = asking.take()
+            {
+                let (flow, said) = settle(env, watch, a, when, false, wait);
+                forward(&AgentEvent::Line {
+                    line: ownermsg::chat_line(&said),
+                });
+                return flow;
+            }
+            let sorted = sort_message(env, setup, title, &text);
+            let record = |handled: &str| ownermsg::Record {
+                at: now,
+                text: text.clone(),
+                kind: sorted.kind,
+                by: sorted.by.clone(),
+                handled: handled.to_string(),
+            };
+            let told = |handled: &str| {
+                ownermsg::chat_line(&format!("Taken as a {}: {handled}.", sorted.kind.word()))
+            };
+            let step_title = if sorted.title.is_empty() {
+                ownermsg::title_of(&text)
+            } else {
+                sorted.title.clone()
+            };
+            match sorted.kind {
+                Kind::Note | Kind::Question => {
+                    let handled = ownermsg::handled_text(sorted.kind);
+                    watch.messages.push(record(handled));
+                    forward(&AgentEvent::Line {
+                        line: told(handled),
+                    });
+                    return Flow::Send(if sorted.kind == Kind::Note {
+                        ownermsg::note_message(&text)
+                    } else {
+                        ownermsg::question_message(&text)
+                    });
+                }
+                Kind::Stop | Kind::Pause => {
+                    // As the buttons: the next look at the owner's asks does the rest.
+                    let handled = ownermsg::handled_text(sorted.kind);
+                    watch.messages.push(record(handled));
+                    forward(&AgentEvent::Line {
+                        line: told(handled),
+                    });
+                    if sorted.kind == Kind::Stop {
+                        controls.stop();
+                        return Flow::Hold;
+                    }
+                    controls.pause();
+                    return if watch.step_log.is_empty() {
+                        Flow::Go
+                    } else {
+                        Flow::Hold
+                    };
+                }
+                Kind::Change if asking.is_some() => {
+                    // One question at a time: a second change while one is asked becomes its own step (nothing lost).
+                    watch.messages.push(record(
+                        "another change was being asked about, so it was added as a new step after this one",
+                    ));
+                    watch.new_steps.push(ownermsg::NewStep {
+                        title: step_title,
+                        text: text.clone(),
+                    });
+                    forward(&AgentEvent::Line {
+                        line: ownermsg::chat_line(&format!(
+                            "Your change \"{text}\" becomes a new step after this one (another change is being asked about)."
+                        )),
+                    });
+                    return Flow::Go;
+                }
+                Kind::Change => {
+                    let key = format!(
+                        "msg:{}:{}:{now}",
+                        env.project_id(),
+                        id.clone().unwrap_or_else(|| title.to_string())
+                    );
+                    forward(&AgentEvent::Line {
+                        line: ownermsg::chat_line(&ownermsg::ask_text(&text, wait)),
+                    });
+                    let _ = env.inbox_add(&crate::inbox::NewItem {
+                        kind_of: "answer".into(),
+                        kind: "run".into(),
+                        title: format!("{title}: when should your change be done?"),
+                        text: text.clone(),
+                        key: Some(key.clone()),
+                        open: None,
+                        form: Some(ownermsg::form()),
+                        source: Some(serde_json::json!({"kind": "step-message",
+                            "projectId": env.project_id(), "session": id.clone(), "step": title})),
+                    });
+                    asking = Some(Asking {
+                        at: now,
+                        title: step_title,
+                        text: text.clone(),
+                        by: sorted.by.clone(),
+                        key,
+                        until: now + wait,
+                    });
+                    return Flow::Send(ownermsg::change_hold_message(&text));
+                }
+            }
+        }
+        // An open change question: answered in the Inbox, or its wait is over (the safe choice: a new step).
+        let answered = asking.as_ref().and_then(|a| {
+            let item = env.inbox_by_key(&a.key).ok().flatten()?;
+            if item.status != "answered" {
+                return None;
+            }
+            When::from_id(item.answer?.get("choice")?.as_str()?)
+        });
+        let over = asking.as_ref().is_some_and(|a| now >= a.until);
+        if (answered.is_some() || over)
+            && let Some(a) = asking.take()
+        {
+            let (flow, said) = settle(
+                env,
+                watch,
+                a,
+                answered.unwrap_or(When::NewStep),
+                answered.is_none(),
+                wait,
+            );
+            forward(&AgentEvent::Line {
+                line: ownermsg::chat_line(&said),
+            });
+            return flow;
+        }
+        // The step's limits (cost and time): over them, the turn stops and the run asks (not while the owner is asked).
+        if asking.is_none() && now - last_limit_check >= LIMIT_CHECK_MS {
             last_limit_check = now;
             let spent = watch.spent_before + (cost_seen - watch.attempt_base).max(0.0);
             let minutes = (now - watch.started_ms) as f64 / 60_000.0;
@@ -410,6 +646,10 @@ pub fn turn(
                 if st == "running" {
                     interrupt_wait = None;
                 }
+                // The agent waits for the owner's answer to a change question.
+                if asking.is_some() && st == "idle" {
+                    return Flow::Hold;
+                }
                 if st == "idle" && std::mem::take(&mut controls.asks().interrupted) {
                     // "Read my message now": this end is not the step's end; the agent reads the message and goes on.
                     interrupt_wait = Some(now + INTERRUPT_GRACE_MS);
@@ -428,6 +668,15 @@ pub fn turn(
         }
     });
 
+    // The turn ended while a change question was open (stopped, an error): the safe choice, nothing lost.
+    if let Some(a) = asking.take() {
+        let _ = settle(env, watch, a, When::NewStep, true, wait);
+        if let Some(m) = watch.messages.last_mut() {
+            m.handled =
+                "the turn ended before an answer, so it was added as a new step after this one"
+                    .into();
+        }
+    }
     let end = match end {
         Ok(e) => e,
         Err(e) => {
