@@ -154,6 +154,9 @@ import { memoryContext } from "./memory.svelte";
 const FINISHED = ["idle", "failed", "ended", "stopped"];
 /** After "Stop this command, read my message now" on a step: how long the runner waits for the agent to go on. */
 const INTERRUPT_GRACE_MS = 30_000;
+/** Sent when the agent stays quiet after the owner's message: it goes on with the step. */
+const INTERRUPT_GO_ON =
+  "(Qanuvi: the owner's message is taken into account. Go on with the step now from where you are; if the message changes what the step should do, follow it and say so in the step's log.)";
 
 class RunnerStore {
   run = $state<PlanRun | null>(null);
@@ -2413,10 +2416,30 @@ class RunnerStore {
           }
           if (st === "idle" && interrupted) {
             interrupted = false;
+            // Nothing went on after the owner's message: the step goes on (it used to count as paused by the owner,
+            // which left the run waiting). If the agent stops again, that end is the turn's end as usual.
             interruptWait = setTimeout(() => {
               interruptWait = null;
-              this.#pauseNow = true;
-              finish("stopped");
+              if (!id || this.#stopRequested || this.#pauseNow) return finish("stopped");
+              // With this turn's own handler: the session is idle, so whoever sends now gets its events.
+              api.agent
+                .start(
+                  project.id,
+                  id,
+                  INTERRUPT_GO_ON,
+                  agentModel,
+                  mode,
+                  s.baseUrl,
+                  s.effort,
+                  onEvent,
+                  lean,
+                  indexTools,
+                  s.browserTools,
+                  null,
+                  agentId,
+                  setupFor(agentId),
+                )
+                .catch(() => finish("stopped"));
             }, INTERRUPT_GRACE_MS);
             return;
           }

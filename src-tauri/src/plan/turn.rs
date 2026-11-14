@@ -24,6 +24,8 @@ pub const MAX_FIX_ROUNDS: u32 = 2;
 pub const CHECK_TIMEOUT: Duration = Duration::from_secs(600);
 /// After "read my message now", the agent has this long to go on before the step counts as paused by the owner.
 pub const INTERRUPT_GRACE_MS: i64 = 30_000;
+/// Sent when the agent stays quiet after the owner's message: it goes on with the step.
+pub const INTERRUPT_GO_ON: &str = "(Qanuvi: the owner's message is taken into account. Go on with the step now from where you are; if the message changes what the step should do, follow it and say so in the step's log.)";
 /// How often the step's limits are checked while a turn runs.
 pub const LIMIT_CHECK_MS: i64 = 15_000;
 /// An agent asked to write its progress note and stop (handover, pause, another model) is stopped after this long.
@@ -307,7 +309,6 @@ pub fn turn(
     let mut late: Vec<i64> = Vec::new();
     let mut interrupt_wait: Option<i64> = None;
     let mut last_limit_check = env.now_ms();
-    let mut ended_by_interrupt = false;
     let mut cost_seen = 0.0f64;
     let mut exited = false;
 
@@ -380,10 +381,10 @@ pub fn turn(
                 if let Some(at) = interrupt_wait
                     && now >= at
                 {
-                    // Nothing went on after the owner's message: the step is paused by the owner.
-                    watch.pause_now = true;
-                    ended_by_interrupt = true;
-                    return Flow::End;
+                    // Nothing went on after the owner's message: the step goes on (it used to count as paused by
+                    // the owner, which left the run waiting). If the agent stops again, that is the turn's end.
+                    interrupt_wait = None;
+                    return Flow::Send(INTERRUPT_GO_ON.into());
                 }
                 Flow::Go
             }
@@ -439,7 +440,7 @@ pub fn turn(
         }
     };
     let stop_asked = controls.stop_asked().is_some();
-    let outcome = if end.cut_short || ended_by_interrupt {
+    let outcome = if end.cut_short {
         TurnOutcome::Stopped
     } else if exited && !turn_over(&end.status) || end.status == "ended" {
         if stop_asked {

@@ -381,7 +381,7 @@ fn switching_to_the_same_model_changes_nothing() {
 }
 
 #[test]
-fn read_my_message_now_holds_the_turn_then_pauses_the_step() {
+fn read_my_message_now_holds_the_turn_then_tells_the_agent_to_go_on() {
     let env = FakeEnv::new();
     let c = Arc::new(Controls::default());
     let cc = c.clone();
@@ -392,10 +392,12 @@ fn read_my_message_now_holds_the_turn_then_pauses_the_step() {
     let mut w = watch(&env);
     let started = env.now_ms();
     let end = run(&env, &c, &mut w, &ask("npm test"));
-    // The idle end was held for the grace time; nothing went on, so the owner has paused the step.
+    // The idle end was held for the grace time; nothing went on, so the agent is told to go on (no pause).
     assert!(env.now_ms() - started >= INTERRUPT_GRACE_MS);
-    assert!(w.pause_now);
-    assert_eq!(end.attempt.outcome, Outcome::Stopped);
+    assert_eq!(env.sent().len(), 1);
+    assert_eq!(env.sent()[0].1, INTERRUPT_GO_ON);
+    assert!(!w.pause_now);
+    assert_eq!(end.attempt.outcome, Outcome::Open);
     assert!(env.stopped().is_empty());
 }
 
