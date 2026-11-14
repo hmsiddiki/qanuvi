@@ -369,6 +369,14 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
+    RESUME HERE (newest, 2026-11-14 17:06): 0.1.20 PUBLISHED on the dev channel (owner: "publish anyway"; release
+    rule skipped with QANUVI_RELEASE_ANYWAY=1 because Claude Code here is 2.1.318 and 2.1.325 is out: the owner runs
+    "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
+    storage, Inbox and desktop notifications (24u part 4), debugging for Node and PHP (15i part 3), split editor and
+    minimap (15i part 4), the new logo, the small fixes. Nothing unpublished. NEXT: the owner looked at obra/superpowers
+    (MIT skills library for coding agents; works with many agents, not only Claude) for ideas for the plan workflow;
+    proposals given in chat, nothing agreed yet. Start the next conversation by asking which proposal (if any) to plan,
+    else pick from the candidates below.
     CHECKPOINT 2026-11-14 (after 15i part 4): nothing open from 15i. NEXT: ask the owner what comes next (candidates:
     publish 0.1.20 when they say so; 15i LATER Phpactor; 24q agreed, not built; 24v/24w LATER; Linux/macOS checks of
     Milestone 1). Test scripts (ui.ps1 with a drag action, loadmon.ps1, crop.ps1) and the scratch project splitproj are
