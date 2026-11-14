@@ -364,7 +364,11 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
-    UPDATE 2026-11-14 (latest): 24s part 3 driven + both findings fixed (ccfcb00). 15i part 2 DRIVEN LIVE: works,
+    UPDATE 2026-11-14 (newest): 15i part 3 SESSION A BUILT (848dad2, unpublished, NOT driven live; verify green
+    358 + 169, Rust tests need -j 1 when memory is short). See 15i "Built (part 3, session A)". NEXT: drive it live
+    on a scratch Node project with a test build (installing js-debug downloads about 10 MB from GitHub: ask the owner
+    first), then session B (PHP / Xdebug). Owner: do NOT publish 0.1.20 yet.
+    UPDATE 2026-11-14 (before): 24s part 3 driven + both findings fixed (ccfcb00). 15i part 2 DRIVEN LIVE: works,
     five findings (a)-(e) in 15i "Driven live (2026-11-14)", ALL FIXED and driven live (unpublished). Phpactor
     added to 15i as LATER; 24k2 Free Claude Code added as LATER. NEXT: build 15i part 3 (debugging, PHP / Xdebug
     and Node first). Owner: do NOT publish 0.1.20 yet.
@@ -1428,6 +1432,16 @@ runs on or off; with it off nothing is sent anywhere.
     local models) and says so when short; each language can be turned off in Settings.
   - Order: 1. LSP for PHP, TypeScript / Svelte, Rust, with the Problems list. 2. Formatting, quick fixes, "Fix with
     agent". 3. Debugging (PHP / Xdebug and Node first). 4. Split editor, minimap.
+  - Built (part 3, session A, 2026-11-14; not driven live): src-tauri/src/dap.rs installs js-debug (latest GitHub
+    release of microsoft/vscode-js-debug, js-debug-dap-*.tar.gz, unpacked with the system tar into the data folder's
+    debug-adapters/node; the old copy is kept until the new one is whole) and runs it as a local-port server, one
+    connection per child session (its startDebugging request). Window: src/lib/dap (launch.json with comments and
+    ${...} variables, DAP client, breakpoint gutter that follows edits, paused line), src/lib/stores/dap.svelte.ts (one
+    session at a time; breakpoints, watch and picked configuration kept on this computer), "Run and debug" sidebar mode
+    (DebugPanel), "Debug console" bottom tab (DebugConsole). Keys as VS Code: F5, Shift+F5, Ctrl+Shift+F5, F6, F9,
+    F10, F11, Shift+F11. Without launch.json: "run the current file" and "attach (port 9229)"; the gear writes VS
+    Code's form. Not built: ${input:...} / ${command:...} (says so), runInTerminal, exception breakpoints UI, hover
+    values, logpoints UI, agent access to the debugger.
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),
