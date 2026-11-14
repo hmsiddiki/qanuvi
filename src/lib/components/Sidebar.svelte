@@ -395,14 +395,15 @@
       <Settings2 size={16} />
       {#if !collapsed}<span>Settings</span>{/if}
     </button>
+    <!-- Open: one line with Settings, the collapse button only an icon at its end. -->
     <button
       type="button"
-      class="item"
+      class="item fold"
       title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       onclick={() => layout.toggleSidebarCollapsed()}
     >
       <PanelLeft size={16} />
-      {#if !collapsed}<span>Collapse</span>{/if}
     </button>
   </div>
 </nav>
@@ -765,6 +766,17 @@
     margin-top: auto;
     padding-top: var(--qx-space-2);
     width: 100%;
+  }
+
+  .sidebar:not(.collapsed) .bottom {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .sidebar:not(.collapsed) .bottom .fold {
+    width: auto;
+    flex: none;
   }
 
   .collapsed .bottom {
