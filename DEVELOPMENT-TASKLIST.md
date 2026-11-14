@@ -1019,7 +1019,11 @@ runs on or off; with it off nothing is sent anywhere.
         line to the README itself. Not master-only. Proposal: an order decision of the check is written as a
         "- Needs: 1c" line under 1b (the plan already reads Needs lines), shown in the check's list so the owner sees it.
         OWNER DECISIONS 2026-11-15 (on (f)-(i) and masters):
-        - Masters need the Qanuvi account: a master is used only by the same account as the computer.
+        - Every Qanuvi needs the account, on every platform (PC, master, mobile): any PC can be a master and a phone
+          can hook into it, so they are the same. The account is not built yet: a placeholder that is bypassed for now.
+        - The account keeps the owner's behaviour and the data that syncs to every device, also separate ones.
+        - Workspaces never sync, in either mode: workspaces, plans, schedules, notes and automations belong to the
+          installed copy (the machine). Synced mode only adds shared information from both sides on top.
         - Two modes per master, chosen at setup, changeable later: SEPARATE (default) and SYNCED. Separate: this
           computer is only a window on the master; the master keeps its own history, memory, plan data and settings,
           and everything the window shows about it (model labels, costs, history) comes from the master. Synced: the
@@ -1029,6 +1033,7 @@ runs on or off; with it off nothing is sent anywhere.
           separate master knows the owner is still open: design it with the milestone.
         - (f) is covered by the modes: separate, the label reads the master's own history; synced, both have the same.
         - (g) agreed: an order decision of the pre-run check becomes a "- Needs:" line, shown in the check's list.
+        - (a)-(e) from part 1: fix all as proposed.
         - (h) the window title after a run ends: fix. The "heavy" bar at 26k was not a bug: the Chat handover setting
           (ask / auto / off and a size, default 150k) was set low in the test build.
         - (i) a step's chosen model goes into the plan's own data (plan memory), not into the plan file.
