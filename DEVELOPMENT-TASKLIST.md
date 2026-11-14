@@ -1018,6 +1018,21 @@ runs on or off; with it off nothing is sent anywhere.
         kept file order: 1b ran before 1c, its hold also held 1c ("1 step waits for it"), and 1c's agent had to add its
         line to the README itself. Not master-only. Proposal: an order decision of the check is written as a
         "- Needs: 1c" line under 1b (the plan already reads Needs lines), shown in the check's list so the owner sees it.
+        OWNER DECISIONS 2026-11-15 (on (f)-(i) and masters):
+        - Masters need the Qanuvi account: a master is used only by the same account as the computer.
+        - Two modes per master, chosen at setup, changeable later: SEPARATE (default) and SYNCED. Separate: this
+          computer is only a window on the master; the master keeps its own history, memory, plan data and settings,
+          and everything the window shows about it (model labels, costs, history) comes from the master. Synced: the
+          same account keeps learned model history, plan data, memory and rules the same on both; passwords and keys
+          never sync. Either machine can turn syncing off for itself.
+        - In both modes the owner's local brain (what Qanuvi knows of the owner) is shared through the account. How a
+          separate master knows the owner is still open: design it with the milestone.
+        - (f) is covered by the modes: separate, the label reads the master's own history; synced, both have the same.
+        - (g) agreed: an order decision of the pre-run check becomes a "- Needs:" line, shown in the check's list.
+        - (h) the window title after a run ends: fix. The "heavy" bar at 26k was not a bug: the Chat handover setting
+          (ask / auto / off and a size, default 150k) was set low in the test build.
+        - (i) a step's chosen model goes into the plan's own data (plan memory), not into the plan file.
+        - New milestone (to write out in parts, owner reviews before building): master accounts and the two modes.
         (h) Small: after a run ends the window title still names its first step ("Step 1a: ..."); the "This chat is
         heavy" banner shows at 26k context. (i) Note: a step's model picked in the Plan view is written into the plan
         file as "- Model: <id>" (set_step_model); in part 1 an agent read those lines as model attribution in the
