@@ -364,7 +364,11 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
-    UPDATE 2026-11-14 (newest): 15i part 3 SESSION A BUILT (848dad2, unpublished, NOT driven live; verify green
+    UPDATE 2026-11-14 (newest): 15i part 3 SESSION A DRIVEN LIVE: works; five small findings (a)-(e) in 15i
+    "Driven live (part 3, session A)", waiting for the owner. js-debug is installed in the test data folder. NEXT:
+    the owner decides on the findings, then session B (PHP / Xdebug; Xdebug install needs the owner's yes).
+    Owner: do NOT publish 0.1.20 yet.
+    UPDATE 2026-11-14 (before): 15i part 3 SESSION A BUILT (848dad2, unpublished, NOT driven live; verify green
     358 + 169, Rust tests need -j 1 when memory is short). See 15i "Built (part 3, session A)". NEXT: drive it live
     on a scratch Node project with a test build (installing js-debug downloads about 10 MB from GitHub: ask the owner
     first), then session B (PHP / Xdebug). Owner: do NOT publish 0.1.20 yet.
@@ -1442,6 +1446,18 @@ runs on or off; with it off nothing is sent anywhere.
     F10, F11, Shift+F11. Without launch.json: "run the current file" and "attach (port 9229)"; the gear writes VS
     Code's form. Not built: ${input:...} / ${command:...} (says so), runInTerminal, exception breakpoints UI, hover
     values, logpoints UI, agent access to the debugger.
+  - Driven live (part 3, session A, 2026-11-14, owner's yes for the js-debug download; release test build on a
+    scratch Node project): WORKS. The install offer showed on F5, Install took seconds and debugging started by
+    itself; F9 and gutter clicks add breakpoints (list in the sidebar); paused at app.js:13, Continue stopped at
+    line 4 with the right scopes and the paused arrow; watch (it.price * it.qty: 6, then 10), F10 step over, console
+    evaluate in the selected frame (sum * 10 = 60), run to the end ("total is 16", "Debugging ended."), no node
+    processes left; the gear writes a formatted VS Code launch.json and the dropdown switches to it. Peak about 650
+    MB. Findings for the owner (not fixed yet): (a) the breakpoint gutter is a narrow 14 px strip left of the line
+    numbers, easy to miss (a click on the number itself does nothing); (b) "Paused: breakpoint" and "Paused on
+    breakpoint" say the same thing twice; (c) the configuration dropdown cuts names ("Node: run the currer");
+    (d) a watch shows "not pa…" when not debugging; (e) once, launch.json read back from disk as one line right
+    after the gear and was formatted 30 s later; a repeat was formatted from the first write, not reproduced.
+    Not a bug: a stray click on an internal call-stack frame shows that frame's scopes without an arrow (correct).
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),
