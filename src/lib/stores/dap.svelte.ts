@@ -162,11 +162,14 @@ class DapStore {
   /** Checks PHP and the Xdebug a debug run gets (php.ini's own, or the file chosen in Settings). */
   async checkPhp(): Promise<PhpInfo> {
     const file = settings.value.languages.xdebugFile;
+    const oldNote = this.php?.note;
     try {
       this.php = { ...(await api.dap.php(file)), xdebugFile: file };
     } catch (e) {
       this.php = { php: "", version: "", build: "", xdebug: "", via: "", note: errorText(e), xdebugFile: file };
     }
+    // The sidebar's "no Xdebug" message goes once Settings fixed it.
+    if (oldNote && this.lastError === oldNote && this.php.note !== oldNote) this.lastError = this.php.note;
     return this.php;
   }
 
@@ -426,15 +429,19 @@ class DapStore {
   /** PHP's output without the "has been renamed" warnings; the old keys are named once per session. */
   #foldPhp(text: string): string {
     const f = foldRenamed(text);
-    const fresh = f.renamed.filter((k) => !this.#renamed.has(k));
-    if (fresh.length) {
+    if (f.renamed.length) {
       const first = this.#renamed.size === 0;
-      for (const k of fresh) this.#renamed.add(k);
+      for (const k of f.renamed) this.#renamed.add(k);
+      // PHP's warnings come in more than one piece: name them all once they stop coming.
       if (first) {
-        this.#info(
-          `php.ini still has Xdebug 2 settings that Xdebug 3 renamed (${fresh.join(", ")}); they do nothing now. ` +
-            "Qanuvi passes the Xdebug 3 settings itself. See xdebug.org/docs/upgrade_guide.",
-        );
+        const mine = this.#renamed;
+        setTimeout(() => {
+          if (this.#renamed !== mine) return; // a newer session started meanwhile
+          this.#info(
+            `php.ini still has Xdebug 2 settings that Xdebug 3 renamed (${[...mine].join(", ")}); they ` +
+              "do nothing now. Qanuvi passes the Xdebug 3 settings itself. See xdebug.org/docs/upgrade_guide.",
+          );
+        }, 400);
       }
     }
     return f.text;

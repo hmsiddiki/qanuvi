@@ -364,7 +364,12 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
-    UPDATE 2026-11-14 (newest): the owner agreed the fixes for findings (a)-(e); they are BUILT (4abc7de, unpublished,
+    UPDATE 2026-11-14 (newest): 15i part 3 SESSION B BUILT AND DRIVEN LIVE (bc0b0ae + the two fixes after it,
+    unpublished, verify 364 + 172): PHP debugging through PHP Debug v1.40.2 (owner's yes for the download), Xdebug
+    file per run, Debugging in Settings > Languages. The (a)-(e) fixes were driven in the same test build: all work.
+    See 15i "Built (part 3, session B)" and "Driven live (part 3, session B)". NEXT: 15i part 4 (split editor,
+    minimap) or what the owner picks; ask before publishing 0.1.20. Owner: do NOT publish 0.1.20 yet.
+    UPDATE 2026-11-14 (before): the owner agreed the fixes for findings (a)-(e); they are BUILT (4abc7de, unpublished,
     verify 358 + 169, NOT driven live). Xdebug 3.5.3 (8.2 NTS VS16 x64, SHA256 checked against xdebug.org) is in
     E:/DevTools/xdebug, owner's yes; php.ini NOT changed (Wnmp's PHP serves the live www folder), so it loads per run
     with php -d zend_extension=... NEXT: session B (PHP / Xdebug) in a fresh conversation; drive the (a)-(e) fixes in
@@ -1473,6 +1478,28 @@ runs on or off; with it off nothing is sent anywhere.
     Wnmp's PHP serves live sites). php.ini still holds Xdebug 2 keys (xdebug.remote_*), so Xdebug 3 prints
     "[Config] ... has been renamed" warnings on start: Qanuvi passes the Xdebug 3 settings itself (xdebug.mode=debug,
     xdebug.start_with_request=yes, xdebug.client_port=9003) and should keep those warnings out of the console.
+  - Built (part 3, session B, 2026-11-14, bc0b0ae): dap.rs knows a second adapter, "php" (xdebug/vscode-php-debug,
+    the .vsix of its latest GitHub release, about 2 MB, unpacked with the zip crate because Linux's tar cannot read
+    zip; entry extension/out/phpDebug.js over stdio). dap_php finds PHP (version, NTS/TS, x64) and its Xdebug: php.ini's
+    own, else the "Xdebug file" from Settings > Languages, tried with -d zend_extension and loaded for debug runs only
+    (php.ini untouched). A PHP run gets the found php, the file and xdebug.mode=debug, start_with_request=yes,
+    client_host=127.0.0.1, client_port=${port} (port 0: PHP Debug picks one), unless launch.json's runtimeArgs set
+    them. Defaults: "PHP: run the current file", "PHP: listen for Xdebug (port 9003)"; the gear writes VS Code's PHP
+    launch.json for a PHP file. The "has been renamed" warnings from php.ini's Xdebug 2 keys are taken out of the
+    console and named once in one note. Settings > Languages has a Debugging part: each debugger (Install, version)
+    and PHP / Xdebug with the file field and Check.
+  - Driven live (part 3, session B, 2026-11-14, release test build, scratch PHP project): WORKS. F5 offered PHP Debug,
+    Install took seconds (v1.40.2); without the Xdebug file the run stopped with the "no Xdebug, choose it in
+    Settings > Languages" text; with the file, Settings showed "PHP 8.2.3 NTS x64 · Xdebug 3.5.3 (from the file
+    below)". Paused at cart.php:15 (Locals), Continue stopped at line 6 inside total() (call stack total / {main}),
+    watch $sum 0 then 6 after F10, console $sum * 10 = 60, run to the end "total is 16", exit code 0, no php or
+    adapter left. Listen mode: PHP started from a shell with Xdebug stopped at line 15, Shift+F5 freed port 9003. The
+    (a)-(e) fixes all work: number click toggles, hover dot, one pause label ("Paused on breakpoint" / "Paused on
+    step"), full name on hover, "–" watch, gear's launch.json formatted at once. Peak about 630 MB (with
+    Intelephense). Two findings fixed and driven live: the renamed-settings note named only the first piece of
+    PHP's warnings (3 of 5 keys; now all, 400 ms after the first); the sidebar kept "no Xdebug" after Settings fixed
+    it (now cleared by the check). Left for the owner: the install offer says the debugger's name twice ("PHP
+    debugger (…) is needed. Downloads the latest release of PHP debugger (…)"), same for js-debug.
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),
