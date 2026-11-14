@@ -367,8 +367,9 @@ runs on or off; with it off nothing is sent anywhere.
     UPDATE 2026-11-14 (newest): 15i part 3 SESSION B BUILT AND DRIVEN LIVE (bc0b0ae + the two fixes after it,
     unpublished, verify 364 + 172): PHP debugging through PHP Debug v1.40.2 (owner's yes for the download), Xdebug
     file per run, Debugging in Settings > Languages. The (a)-(e) fixes were driven in the same test build: all work.
-    See 15i "Built (part 3, session B)" and "Driven live (part 3, session B)". NEXT: 15i part 4 (split editor,
-    minimap) or what the owner picks; ask before publishing 0.1.20. Owner: do NOT publish 0.1.20 yet.
+    See 15i "Built (part 3, session B)" and "Driven live (part 3, session B)". The install offer's doubled name is
+    shortened (owner's yes; not driven live, text only). NEXT (owner: "do as order"): 15i part 4, split editor and
+    minimap, in a fresh conversation. Owner: do NOT publish 0.1.20 yet.
     UPDATE 2026-11-14 (before): the owner agreed the fixes for findings (a)-(e); they are BUILT (4abc7de, unpublished,
     verify 358 + 169, NOT driven live). Xdebug 3.5.3 (8.2 NTS VS16 x64, SHA256 checked against xdebug.org) is in
     E:/DevTools/xdebug, owner's yes; php.ini NOT changed (Wnmp's PHP serves the live www folder), so it loads per run
@@ -1498,8 +1499,8 @@ runs on or off; with it off nothing is sent anywhere.
     step"), full name on hover, "–" watch, gear's launch.json formatted at once. Peak about 630 MB (with
     Intelephense). Two findings fixed and driven live: the renamed-settings note named only the first piece of
     PHP's warnings (3 of 5 keys; now all, 400 ms after the first); the sidebar kept "no Xdebug" after Settings fixed
-    it (now cleared by the check). Left for the owner: the install offer says the debugger's name twice ("PHP
-    debugger (…) is needed. Downloads the latest release of PHP debugger (…)"), same for js-debug.
+    it (now cleared by the check). The install offer said the debugger's name twice; owner agreed to shorten it:
+    now "<name> is needed. Downloads its latest release from GitHub (…)" (not driven live).
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),

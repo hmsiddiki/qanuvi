@@ -129,9 +129,9 @@ pub fn status(spec: &'static Spec) -> Status {
         version,
         install: if node {
             format!(
-                "Downloads the latest release of {} from GitHub (github.com/{}, {}) into Qanuvi's data folder; \
-                 nothing is installed for the whole computer.",
-                spec.label, spec.repo, spec.size
+                "Downloads its latest release from GitHub (github.com/{}, {}) into Qanuvi's data folder; nothing \
+                 is installed for the whole computer.",
+                spec.repo, spec.size
             )
         } else {
             String::new()
