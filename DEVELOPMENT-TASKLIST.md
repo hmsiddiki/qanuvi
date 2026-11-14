@@ -374,10 +374,14 @@ runs on or off; with it off nothing is sent anywhere.
     "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
     storage, Inbox and desktop notifications (24u part 4), debugging for Node and PHP (15i part 3), split editor and
     minimap (15i part 4), the new logo, the small fixes. Nothing unpublished.
-    NEXT (owner, 2026-11-14): core things first. The brain-training plan and extensions are ideas for later, kept in
-    docs/IDEAS-UPCOMING.md, NOT development items. Start the next conversation by asking the owner which core item
-    comes first: 24q (agreed: smaller steps and pacing), 24z step A (headless runner and queue: runs go on with the
-    window closed), Milestone 1 (Linux and macOS checks), or 10 (Stage 1 review).
+    NEXT (owner chose, 2026-11-14): 24z STEP A, the headless runner and queue (see item 24z: move the plan runner's
+    decisions and the decider out of the window into the core, so runs go on with the window closed and on a master
+    over SSH; a queue of tasks and whole plans; the window, phone and Inbox show and answer the same queue). Owner rule:
+    discuss before changes. First conversation: read 24z, map what stores/runner.svelte.ts and core/decider.ts do
+    today (which parts are pure plan/*.ts functions, which touch the window), propose the split (Rust core vs the
+    pure TypeScript run by the core) and the parts of step A, and get the owner's yes before any code. Live tests on
+    scratch projects only. The brain-training plan and extensions are ideas for later in docs/IDEAS-UPCOMING.md, NOT
+    development items; other core items after 24z: 24q, Milestone 1 checks, 10 Stage 1 review.
     CHECKPOINT 2026-11-14 (after 15i part 4): nothing open from 15i. NEXT: ask the owner what comes next (candidates:
     publish 0.1.20 when they say so; 15i LATER Phpactor; 24q agreed, not built; 24v/24w LATER; Linux/macOS checks of
     Milestone 1). Test scripts (ui.ps1 with a drag action, loadmon.ps1, crop.ps1) and the scratch project splitproj are
