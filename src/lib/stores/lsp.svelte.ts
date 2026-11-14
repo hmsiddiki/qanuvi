@@ -44,7 +44,7 @@ export interface Doc {
   path: string;
 }
 
-export type BottomView = "terminal" | "problems" | "references";
+export type BottomView = "terminal" | "problems" | "references" | "debug";
 
 const clientKey = (projectId: string, server: ServerId) => `${projectId}::${server}`;
 

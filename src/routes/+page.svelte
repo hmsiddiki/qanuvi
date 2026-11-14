@@ -18,6 +18,7 @@
   import { sidebarScreenWidth } from "$lib/layout/layout";
   import { platform } from "$lib/platform.svelte";
   import { matchShortcut } from "$lib/shortcuts";
+  import { debugKey } from "$lib/dap/run";
   import QuickOpen from "$lib/components/QuickOpen.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
   import ProjectSettings from "$lib/components/ProjectSettings.svelte";
@@ -168,6 +169,10 @@
   });
 
   function keydown(event: KeyboardEvent) {
+    if (debugKey(event)) {
+      event.preventDefault();
+      return;
+    }
     const action = matchShortcut(event, platform.isMac);
     if (action) {
       event.preventDefault();

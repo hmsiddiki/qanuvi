@@ -35,6 +35,8 @@
   } from "$lib/lsp/actions";
   import { serverFor } from "$lib/lsp/protocol";
   import { settings } from "$lib/stores/settings.svelte";
+  import { dap } from "$lib/stores/dap.svelte";
+  import { debugExtensions, setBreakpointMarks, setPausedLine } from "$lib/dap/codemirror";
 
   interface Props {
     tab: EditorTab;
@@ -247,8 +249,37 @@
     return true;
   }
 
+  /** F9: a breakpoint on the cursor's line, or none. */
+  function toggleBreakpoint(line?: number) {
+    const d = currentDoc();
+    if (!view || !d) return true;
+    dap.toggleBreakpoint(d.projectId, d.path, line ?? view.state.doc.lineAt(view.state.selection.main.head).number);
+    return true;
+  }
+
+  /** The shown file's breakpoints and paused line, from the debug store. */
+  function showDebug() {
+    const d = currentDoc();
+    if (!view || !d) return;
+    const here = dap.current && dap.current.projectId === d.projectId && dap.current.path === d.path;
+    view.dispatch({
+      effects: [
+        setBreakpointMarks.of(dap.shownBreakpoints(d.projectId, d.path)),
+        setPausedLine.of(here ? dap.current!.line : null),
+      ],
+    });
+  }
+
   function extensions() {
     return [
+      // Before basicSetup, so the breakpoint gutter sits left of the line numbers.
+      debugExtensions(
+        (line) => toggleBreakpoint(line),
+        (lines) => {
+          const d = currentDoc();
+          if (d) dap.moveBreakpoints(d.projectId, d.path, lines);
+        },
+      ),
       basicSetup,
       keymap.of([
         indentWithTab,
@@ -260,6 +291,7 @@
         { key: "Mod-.", run: quickFix, preventDefault: true },
         { key: "Shift-Alt-f", run: () => format(false), preventDefault: true },
         { key: "Mod-k Mod-f", run: () => format(true), preventDefault: true },
+        { key: "F9", run: () => toggleBreakpoint(), preventDefault: true },
       ]),
       gitGutter(),
       lintGutter(),
@@ -314,6 +346,7 @@
       const ext = await loadLanguage(t.language);
       if (shownKey === t.key && view) view.dispatch({ effects: language.reconfigure(ext) });
       reattach();
+      showDebug();
     }
     if (t.revealLine && view) {
       const n = Math.min(Math.max(1, t.revealLine), view.state.doc.lines);
@@ -387,6 +420,13 @@
     void lsp.problemsChanged;
     void tab.key;
     untrack(showProblems);
+  });
+
+  $effect(() => {
+    void dap.breakpointsChanged;
+    void dap.current;
+    void tab.key;
+    untrack(showDebug);
   });
 
   // Documents of closed tabs are closed in their servers too.

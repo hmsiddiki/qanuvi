@@ -34,6 +34,7 @@ pub struct AppState {
     db: store::Db,
     terminals: terminal::Terminals,
     languages: crate::lsp::Servers,
+    debuggers: crate::dap::Adapters,
     agents: agent::Agents,
     indexes: index::Indexes,
     inspector: preview::Inspector,
@@ -91,6 +92,7 @@ fn projects_add(state: State<AppState>, path: String) -> Res<projects::Project> 
 fn projects_remove(state: State<AppState>, id: String) -> Res<()> {
     state.terminals.kill_project(&id);
     state.languages.stop_project(&id);
+    state.debuggers.stop_project(&id);
     state.agents.stop_project(&id);
     projects::remove(&state.db, &id)
 }
@@ -508,6 +510,56 @@ fn lsp_stop(state: State<AppState>, key: String) {
 #[tauri::command]
 fn lsp_stop_window(window: tauri::Window, state: State<AppState>) {
     state.languages.stop_owner(window.label());
+}
+
+// Debug adapters (15i part 3) -----------------------------------------------------------------------------
+
+#[tauri::command]
+async fn dap_statuses() -> Res<Vec<crate::dap::Status>> {
+    blocking(|| Ok(crate::dap::statuses())).await
+}
+
+/// Installs an adapter; the window asked the user first.
+#[tauri::command]
+async fn dap_install(id: String) -> Res<crate::dap::Status> {
+    let spec = crate::dap::spec(&id)?;
+    blocking(move || crate::dap::install(spec)).await
+}
+
+#[tauri::command]
+async fn dap_start(
+    window: tauri::Window,
+    state: State<'_, AppState>,
+    project_id: String,
+    id: String,
+    on_event: Channel<crate::dap::DapEvent>,
+) -> Res<String> {
+    let root = project_root(&state, &project_id)?;
+    let adapters = state.debuggers.clone();
+    let owner = window.label().to_string();
+    blocking(move || adapters.start(&project_id, &owner, &root, &id, on_event.into())).await
+}
+
+#[tauri::command]
+async fn dap_connect(state: State<'_, AppState>, key: String) -> Res<u32> {
+    let adapters = state.debuggers.clone();
+    blocking(move || adapters.connect(&key)).await
+}
+
+#[tauri::command]
+fn dap_send(state: State<AppState>, key: String, conn: u32, text: String) -> Res<()> {
+    state.debuggers.send(&key, conn, &text)
+}
+
+#[tauri::command]
+fn dap_stop(state: State<AppState>, key: String) {
+    state.debuggers.stop(&key);
+}
+
+/// Stops this window's debuggers (before its interface reloads).
+#[tauri::command]
+fn dap_stop_window(window: tauri::Window, state: State<AppState>) {
+    state.debuggers.stop_owner(window.label());
 }
 
 // Git -------------------------------------------------------------------------------------------------------------
@@ -1929,6 +1981,7 @@ pub fn run() {
                 db,
                 terminals: terminal::Terminals::default(),
                 languages: crate::lsp::Servers::default(),
+                debuggers: crate::dap::Adapters::default(),
                 agents: agent::Agents::default(),
                 indexes: index::Indexes::default(),
                 inspector: preview::Inspector::default(),
@@ -1985,10 +2038,12 @@ pub fn run() {
                 if others {
                     state.terminals.kill_owner(window.label());
                     state.languages.stop_owner(window.label());
+                    state.debuggers.stop_owner(window.label());
                     return;
                 }
                 state.terminals.kill_all();
                 state.languages.stop_all();
+                state.debuggers.stop_all();
                 state.agents.stop_all();
                 // Only what Qanuvi started at start-up (a proxy it found already running stays).
                 state.startup.stop_all();
@@ -2102,6 +2157,13 @@ pub fn run() {
             lsp_send,
             lsp_stop,
             lsp_stop_window,
+            dap_statuses,
+            dap_install,
+            dap_start,
+            dap_connect,
+            dap_send,
+            dap_stop,
+            dap_stop_window,
             git_status,
             git_diff,
             git_stage,

@@ -27,6 +27,8 @@
   import Explorer from "./Explorer.svelte";
   import SearchPanel from "./SearchPanel.svelte";
   import SourceControl from "./SourceControl.svelte";
+  import DebugPanel from "./DebugPanel.svelte";
+  import Bug from "@lucide/svelte/icons/bug";
 
   /** views: false inside the sidebar, whose mode switch chooses Explorer, Search or Git. */
   let { project, views = true }: { project: Project; views?: boolean } = $props();
@@ -198,6 +200,13 @@
         title="Git"
         aria-label="Git"
         onclick={() => panel.show("git")}><GitBranch size={15} /></button
+      >
+      <button
+        type="button"
+        class:on={panel.view === "debug"}
+        title="Run and debug"
+        aria-label="Run and debug"
+        onclick={() => panel.show("debug")}><Bug size={15} /></button
       >
     {/if}
     <span class="spacer"></span>
@@ -414,6 +423,8 @@
     </div>
   {:else if panel.view === "search"}
     <div class="view"><SearchPanel bind:this={search} {project} /></div>
+  {:else if panel.view === "debug"}
+    <div class="view"><DebugPanel {project} /></div>
   {:else}
     <div class="view"><SourceControl {project} part="list" refreshToken={agent.turnsEnded} /></div>
   {/if}

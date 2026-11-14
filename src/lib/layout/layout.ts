@@ -21,7 +21,7 @@ export interface LayoutState {
   sidebarMode: SidebarMode;
 }
 
-export type SidebarMode = "workspace" | "explorer" | "search" | "git";
+export type SidebarMode = "workspace" | "explorer" | "search" | "git" | "debug";
 
 export const LIMITS = {
   sidebar: { min: 180, max: 380 },
@@ -108,7 +108,7 @@ export function normalizeLayout(raw: unknown): LayoutState {
     terminalMaximized: bool(r.terminalMaximized, d.terminalMaximized),
     agentSide: r.agentSide === "right" ? "right" : "left",
     sidebarMode:
-      r.sidebarMode === "explorer" || r.sidebarMode === "search" || r.sidebarMode === "git"
+      r.sidebarMode === "explorer" || r.sidebarMode === "search" || r.sidebarMode === "git" || r.sidebarMode === "debug"
         ? r.sidebarMode
         : "workspace",
   };

@@ -20,6 +20,9 @@
   import SourceControl from "./SourceControl.svelte";
   import TerminalView from "./TerminalView.svelte";
   import ProblemsPanel from "./ProblemsPanel.svelte";
+  import DebugConsole from "./DebugConsole.svelte";
+  import Bug from "@lucide/svelte/icons/bug";
+  import { dap } from "$lib/stores/dap.svelte";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import ListTree from "@lucide/svelte/icons/list-tree";
   import { lsp } from "$lib/stores/lsp.svelte";
@@ -302,6 +305,14 @@
               {/if}
             </button>
           </div>
+          {#if dap.session || dap.console.length || bottom === "debug"}
+            <div class="terminal-tab" class:active={bottom === "debug"}>
+              <button type="button" onclick={() => (lsp.bottom = "debug")}>
+                <Bug size={13} />
+                <span>Debug console</span>
+              </button>
+            </div>
+          {/if}
           {#if lsp.references}
             <div class="terminal-tab" class:active={bottom === "references"}>
               <button type="button" onclick={() => (lsp.bottom = "references")}>
@@ -373,7 +384,9 @@
             onexit={() => (t.ended = true)}
           />
         {/each}
-        {#if bottom !== "terminal"}
+        {#if bottom === "debug"}
+          <DebugConsole />
+        {:else if bottom !== "terminal"}
           <ProblemsPanel projectId={project?.id ?? null} view={bottom} />
         {:else if termTabs.length === 0}
           <div class="terminal-empty">

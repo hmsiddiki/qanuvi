@@ -8,6 +8,7 @@
   import Files from "@lucide/svelte/icons/files";
   import Search from "@lucide/svelte/icons/search";
   import GitBranch from "@lucide/svelte/icons/git-branch";
+  import Bug from "@lucide/svelte/icons/bug";
   import InboxView from "./InboxView.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
   import House from "@lucide/svelte/icons/house";
@@ -40,12 +41,13 @@
   import { terminals } from "$lib/stores/terminals.svelte";
   import { settings } from "$lib/stores/settings.svelte";
 
-  /** The sidebar's modes (15h): the workspace, or the current project's files, search and git. */
+  /** The sidebar's modes (15h): the workspace, or the current project's files, search, git and debugging. */
   const MODES = [
     { id: "workspace", label: "Workspace: projects, sessions, Inbox", icon: LayoutGrid },
     { id: "explorer", label: "Explorer: the project's files", icon: Files },
     { id: "search", label: "Search in the project", icon: Search },
     { id: "git", label: "Git: changes, commits, branches", icon: GitBranch },
+    { id: "debug", label: "Run and debug", icon: Bug },
   ] as const;
 
   function pickMode(id: PanelView) {

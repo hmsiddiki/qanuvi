@@ -12,6 +12,7 @@ pub mod browser;
 pub mod browser_mcp;
 pub mod checks;
 pub mod claude_update;
+pub mod dap;
 pub mod data_location;
 pub mod files;
 pub mod git;

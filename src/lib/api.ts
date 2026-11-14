@@ -80,6 +80,25 @@ export type TermEvent = { kind: "data"; data: string } | { kind: "exit"; code: n
 export type LspEvent =
   { kind: "message"; text: string } | { kind: "log"; text: string } | { kind: "exit"; code: number | null };
 
+/** What a debug adapter sends (15i part 3): messages per connection, its log, a closed connection, its end. */
+export type DapEvent =
+  | { kind: "message"; conn: number; text: string }
+  | { kind: "log"; text: string }
+  | { kind: "closed"; conn: number }
+  | { kind: "exit"; code: number | null };
+
+/** A debugger Qanuvi knows, and whether it is installed. */
+export interface DapStatus {
+  id: string;
+  label: string;
+  /** The launch.json `type` values it serves. */
+  types: string[];
+  installed: boolean;
+  version: string;
+  install: string;
+  missing: string;
+}
+
 /** A language server Qanuvi knows, and whether it is on this computer. */
 export interface LspStatus {
   id: string;
@@ -353,6 +372,20 @@ export const api = {
     stop: (key: string) => invoke<void>("lsp_stop", { key }),
     /** Stops this window's servers (before the interface reloads). */
     stopWindow: () => invoke<void>("lsp_stop_window"),
+  },
+  dap: {
+    statuses: () => invoke<DapStatus[]>("dap_statuses"),
+    install: (id: string) => invoke<DapStatus>("dap_install", { id }),
+    start: (projectId: string, id: string, onEvent: (e: DapEvent) => void) => {
+      const channel = new Channel<DapEvent>();
+      channel.onmessage = onEvent;
+      return invoke<string>("dap_start", { projectId, id, onEvent: channel });
+    },
+    /** One more connection to a server adapter (a child session). */
+    connect: (key: string) => invoke<number>("dap_connect", { key }),
+    send: (key: string, conn: number, text: string) => invoke<void>("dap_send", { key, conn, text }),
+    stop: (key: string) => invoke<void>("dap_stop", { key }),
+    stopWindow: () => invoke<void>("dap_stop_window"),
   },
   git: {
     status: (projectId: string) => invoke<GitStatus>("git_status", { projectId }),

@@ -1,9 +1,9 @@
 /**
- * The left sidebar's modes (15h): Workspace (projects, sessions, pages), Explorer, Search and Git; and the Explorer's
+ * The left sidebar's modes (15h): Workspace (projects, sessions, pages), Explorer, Search, Git and Run and debug; and the Explorer's
  * sections: their order, which are open, which are hidden, and their largest height. Kept on this computer.
  */
 
-export type PanelView = "workspace" | "explorer" | "search" | "git";
+export type PanelView = "workspace" | "explorer" | "search" | "git" | "debug";
 export type SectionId = "editors" | "files" | "outline" | "timeline" | "touched";
 
 export interface SectionState {
@@ -34,7 +34,8 @@ const DEFAULT: SectionState[] = [
 /** Reads a stored panel state, keeping only known sections and adding any that are new. */
 export function parsePanel(raw: unknown): { view: PanelView; sections: SectionState[] } {
   const r = (raw && typeof raw === "object" ? raw : {}) as { view?: unknown; sections?: unknown };
-  const view: PanelView = r.view === "explorer" || r.view === "search" || r.view === "git" ? r.view : "workspace";
+  const view: PanelView =
+    r.view === "explorer" || r.view === "search" || r.view === "git" || r.view === "debug" ? r.view : "workspace";
   const known = new Map(DEFAULT.map((d) => [d.id, d]));
   const out: SectionState[] = [];
   for (const s of Array.isArray(r.sections) ? (r.sections as Partial<SectionState>[]) : []) {
