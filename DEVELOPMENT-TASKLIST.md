@@ -375,6 +375,9 @@ runs on or off; with it off nothing is sent anywhere.
     drive on a scratch project is R2e. Agreed with the owner 2026-11-15 and written in: 24z2 (tidy code and write
     scope, after R2) and "R2d also: standing owner rules". NEXT: R2d wiring (commands, the qanuvi-run event, a thin
     RunnerStore, the step chat sending to the runner, the master's commands and run stream), in a fresh conversation.
+    24z2 also has safe code (sensitive paths, checks on every diff, release gate) and agent extras (part 11), all
+    written to suit any project and language, never one owner's stack. Owner's own qCommerce cleanup list (not
+    Qanuvi work): tinycode.md in the amirularham root.
     Test runs: `cargo test -j 1` with a `timeout`, output to a file, "running for over 60 seconds" kept visible (a hung
     test once looked like a slow build for 45 minutes). Check free RAM first (scratchpad room.ps1).
     RESUME HERE (before, 2026-11-15, after R2c part 1): R2c PART 1 DONE (see 24z "R2c part 1 DONE"): the run loop
@@ -950,9 +953,16 @@ runs on or off; with it off nothing is sent anywhere.
   - [ ] 10. Benchmark: sample projects in several languages that already have helpers and some unsafe spots, plans that
     tempt rewriting helpers, editing the core and adding weak fallbacks; checks on and off; count duplicates, outside
     edits, unsafe changes caught, and the extra tokens.
-  - Optional, never core (owner rule: no forced model, agent-only features optional): an agent's own review tools
-    (for example Claude Code's /security-review command) can be used by that agent's steps when present; the checks
-    above must work without them, on every agent and on free models.
+  - [ ] 11. Agent extras, optional, never core (owner agreed 2026-11-15; owner rule: no forced model, agent-only
+    features optional): an agent's own review tools can be used by that agent's steps when present (for Claude Code:
+    the /security-review command and the official claude-security plugin, which does nothing until it is called and
+    asks to confirm time and token cost). Qanuvi suggests one only when it helps (a project with sensitive paths
+    before a release, a plan that touched them), asking once in words; never installs by itself. On a yes it installs
+    for that one project only, in the per-project local scope so nothing is committed to the repo (confirm how the
+    agent's scopes behave when building this); runs it at the release gate ("scan the changes since the last
+    release") and feeds its findings into the same fix rounds; the project settings list it with Uninstall; an extra
+    unused for a long time is offered for removal. Works only when that agent runs the step (on the user's own plan
+    or key); free models and other agents get the checks above, which must always work without any extra.
 - [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
   reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
   TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
