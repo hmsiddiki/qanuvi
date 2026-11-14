@@ -377,7 +377,9 @@ runs on or off; with it off nothing is sent anywhere.
     Each part in its own fresh conversation, checkpoint after each. NEXT: R1 in a fresh conversation (start with
     decider.ts and the smallest plan/*.ts files; port each test file with its code; compare the TypeScript and Rust
     results on the same inputs before anything TypeScript is deleted). Discuss-before-changes is satisfied for R1-R5
-    as described; anything beyond it needs the owner's yes.
+    as described; anything beyond it needs the owner's yes. Owner (2026-11-14): build R1 onwards continuously, built
+    by hand in conversations (NOT as a Qanuvi plan run); ask only when truly needed (VPS use, downloads, design
+    changes). 24y records R1-R5 as the benchmark the plan runner must reach later.
     RESUME HERE (before, 2026-11-14 17:06): 0.1.20 PUBLISHED on the dev channel (owner: "publish anyway"; release
     rule skipped with QANUVI_RELEASE_ANYWAY=1 because Claude Code here is 2.1.318 and 2.1.325 is out: the owner runs
     "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
@@ -649,6 +651,28 @@ runs on or off; with it off nothing is sent anywhere.
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
       the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
     - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
+- [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
+  reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
+  TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
+  publishing. The owner decided R1 to R5 is built by hand this time because the runner is not mature enough yet; the
+  runner is ready when a plan like it runs to the end alone. What the runner lacks today (from the 2026-11-14
+  discussion):
+  - Standing answers per plan: a policy section (allowed: commit and push to the plan's branch, test builds on
+    scratch projects, named downloads; never: publish, certain folders) that the pre-run check and every ask read
+    first, so covered questions are decided by Qanuvi, not sent to the owner.
+  - A plan-level command allowlist (patterns, project-scoped: cargo test, npm run verify, builds, git on the plan's
+    branch) with a fixed never-list (deletes outside the project, publishing, credentials); risky commands asking
+    every time stops unattended runs today.
+  - A branch per plan, a commit per step; a failed step is rolled back by itself and set aside; main untouched until
+    the owner merges.
+  - Check commands per step on its Done line (besides the test command), with fix rounds.
+  - Test builds of the app: built into their own folder, never over the installed app, started with a separate data
+    folder on a copied scratch project, checked through a test-only core command (no mouse), closed after; host fit
+    check and memory guard built in.
+  - Checks that need eyes go to one review list in the Inbox instead of holding the run.
+  - Health watch: the proxy or a provider down pauses the run and notifies; it goes on when things are back.
+  - A report at the end: done, set aside and why, waiting for the owner.
+  Build these into the Rust runner (after R2), then run a plan of R1 to R5's size as the benchmark.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
