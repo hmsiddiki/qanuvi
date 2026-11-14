@@ -223,9 +223,37 @@ function fallbackWorker(s: StepBrief, priority: Priority): "free" | "paid" {
   return ["docs", "tests", "ui", "refactor"].includes(s.type) ? "free" : "paid";
 }
 
-/** The decider's look at a free model's change before it is accepted (quality first). */
-export function reviewPrompt(step: { title: string; details: string[] }, diff: string, tests: string): string {
+/**
+ * The decider's look at a free model's change before it is accepted (quality first). `home` is the plan's own folder
+ * and `done` the step's Done line: with them the reviewer searches where the work is, and an empty diff (the work came
+ * from an earlier try) is checked against the files instead of being taken as "nothing done" (PLAN-F 97a-2: a search
+ * from the root, where .gitignore hides the plugin, found nothing and complete work was turned down twice).
+ */
+export function reviewPrompt(
+  step: { title: string; details: string[] },
+  diff: string,
+  tests: string,
+  where: { home?: string; done?: string } = {},
+): string {
   const shown = diff.length > 12_000 ? `${diff.slice(0, 12_000)}\n… (cut)` : diff;
+  const home = where.home ?? "";
+  const done = (where.done ?? "").slice(0, 1500);
+  const place = home
+    ? [
+        "",
+        `The step's files are under ${home} (the plan's own folder). Search there by path: the project root's ignore rules`,
+        '(.gitignore) can hide that folder from a search of the whole tree, so "not found" from the root proves nothing.',
+      ]
+    : [];
+  const empty =
+    !shown && done
+      ? [
+          "(no change in this attempt: the work may come from an earlier try)",
+          "",
+          `The step's Done line, to check against the files themselves: ${done}`,
+          "Accept when the files really hold the work it names; reject only for what is missing or wrong.",
+        ]
+      : [shown || "(no change)"];
   return [
     "You are reviewing a change a free model made for one step of a plan. Is it correct and complete for the step,",
     "without breaking anything around it? Be strict but fair; style alone is not a reason to reject.",
@@ -235,9 +263,10 @@ export function reviewPrompt(step: { title: string; details: string[] }, diff: s
     ...step.details.slice(0, 6).map((d) => `- ${d}`),
     "",
     tests ? `Tests: ${tests}` : "Tests: none were run.",
+    ...place,
     "",
     "The change (git diff):",
-    shown || "(no change)",
+    ...empty,
   ].join("\n");
 }
 

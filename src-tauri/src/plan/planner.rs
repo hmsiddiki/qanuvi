@@ -226,7 +226,9 @@ pub fn free_labels(text: &str, archive: &str, number: Option<&str>, count: usize
 }
 
 /// Gives the steps of a block the given numbers in order, dropping every number or label a planner wrote before a
-/// title ("97b. 97a2. Schema" → "Schema"). Steps past the end of `labels` keep no number.
+/// title ("97b. 97a2. Schema", "97a-2a. Check" → "Schema", "Check"). Steps past the end of `labels` keep no number.
+/// The block's Needs lines follow: a planner's own label there becomes the step's new number (PLAN-F 97a: "Needs:
+/// 97a-2a" was left pointing at no step, and every step after it was skipped).
 pub fn renumber_with(block: &str, labels: &[String]) -> String {
     static LINE: LazyLock<Regex> = LazyLock::new(|| {
         let dot = js::DOT;
@@ -234,29 +236,58 @@ pub fn renumber_with(block: &str, labels: &[String]) -> String {
             r"^(- \[ \] )(?:\*\*({dot}+?)\*\*({dot}*)|({dot}+))$"
         ))
     });
-    static LABEL: LazyLock<Regex> =
-        LazyLock::new(|| re(&format!(r"^[0-9]+[a-z0-9]*(?:-[0-9]+)?\.{}+", js::S)));
+    static LABEL: LazyLock<Regex> = LazyLock::new(|| {
+        re(&format!(
+            r"^([0-9]+[a-z0-9]*(?:-[0-9]+[a-z0-9]*)*)\.{}+",
+            js::S
+        ))
+    });
+    static NEEDS: LazyLock<Regex> =
+        LazyLock::new(|| re(&format!(r"^({s}*- Needs:{s}*)(.*)$", s = js::S)));
     let mut i = 0;
-    block
+    let mut renamed: Vec<(String, String)> = Vec::new();
+    let lines: Vec<String> = block
         .split('\n')
         .map(|l| match LINE.captures(l) {
             None => l.to_string(),
             Some(m) => {
+                let label = labels.get(i).cloned();
+                i += 1;
                 let mut title =
                     js::trim(m.get(2).or(m.get(4)).map_or("", |x| x.as_str())).to_string();
-                loop {
-                    let next = LABEL.replace(&title, "").into_owned();
-                    if next == title {
-                        break;
+                while let Some(c) = LABEL.captures(&title) {
+                    let (old, all) = (c[1].to_string(), c[0].len());
+                    if let Some(new) = &label
+                        && !renamed.iter().any(|(o, _)| *o == old)
+                    {
+                        renamed.push((old, new.clone()));
                     }
-                    title = next;
+                    title = title[all..].to_string();
                 }
                 let title = js::trim(&title);
                 let rest = m.get(3).map_or("", |x| x.as_str());
-                let label = labels.get(i).map_or(String::new(), |l| format!("{l}. "));
-                i += 1;
+                let label = label.map_or(String::new(), |l| format!("{l}. "));
                 format!("{}**{label}{title}**{rest}", &m[1])
             }
+        })
+        .collect();
+    lines
+        .into_iter()
+        .map(|l| match NEEDS.captures(&l) {
+            Some(m) if !renamed.is_empty() => {
+                let needs: Vec<String> = m[2]
+                    .split(',')
+                    .map(|n| {
+                        let t = js::trim(n);
+                        renamed
+                            .iter()
+                            .find(|(o, _)| o == t)
+                            .map_or(t.to_string(), |(_, new)| new.clone())
+                    })
+                    .collect();
+                format!("{}{}", &m[1], needs.join(", "))
+            }
+            _ => l,
         })
         .collect::<Vec<_>>()
         .join("\n")

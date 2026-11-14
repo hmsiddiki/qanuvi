@@ -104,6 +104,32 @@ pub fn result_of(line: &str) -> Option<(String, bool)> {
     ))
 }
 
+/// The text blocks of one agent line of type "assistant" (None for any other line or no text).
+pub fn assistant_text(line: &str) -> Option<String> {
+    let msg: Value = serde_json::from_str(line).ok()?;
+    if msg.get("type")?.as_str()? != "assistant" {
+        return None;
+    }
+    let text: String = msg["message"]["content"]
+        .as_array()?
+        .iter()
+        .filter(|b| b["type"] == "text")
+        .filter_map(|b| b["text"].as_str())
+        .collect();
+    (!text.is_empty()).then_some(text)
+}
+
+/// The answer a turn gave: its result, unless a proxy that compresses context (Headroom) left a placeholder in it
+/// ("<<ccr:…>>"); then the agent's last text, which holds the real words (PLAN-F 97a-2: the review's reason was only
+/// a placeholder).
+pub fn final_text(result: String, last_assistant: &str) -> String {
+    if result.contains("<<ccr:") && !last_assistant.trim().is_empty() {
+        last_assistant.to_string()
+    } else {
+        result
+    }
+}
+
 pub trait RunEnv: Send + Sync {
     fn project_id(&self) -> &str;
     /// Milliseconds since 1970.
@@ -382,6 +408,7 @@ impl RunEnv for CoreEnv<'_> {
         let mut flow = on_event(Some(&AgentEvent::Session {
             session: Box::new(started),
         }));
+        let mut last_said = String::new();
         // Events until the turn is over; a closed channel means the session's process is gone.
         loop {
             match flow {
@@ -420,8 +447,11 @@ impl RunEnv for CoreEnv<'_> {
             flow = on_event(Some(&event));
             match &event {
                 AgentEvent::Line { line } => {
+                    if let Some(text) = assistant_text(line) {
+                        last_said = text;
+                    }
                     if let Some((text, is_error)) = result_of(line) {
-                        end.result = Some(text);
+                        end.result = Some(final_text(text, &last_said));
                         end.is_error = is_error;
                     }
                 }
@@ -523,5 +553,24 @@ impl RunEnv for CoreEnv<'_> {
         crate::memory::slice(&self.db, Some(&self.project.id), request, budget, true)
             .ok()
             .map(|s| s.text)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_placeholder_result_gives_way_to_the_agents_last_text() {
+        let line = serde_json::json!({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "{\"ok\": false, \"why\": \"the diff is empty\"}"}, {"type": "tool_use"}]}})
+        .to_string();
+        let said = assistant_text(&line).unwrap();
+        assert_eq!(said, "{\"ok\": false, \"why\": \"the diff is empty\"}");
+        let hidden = "{\"ok\":false,\"why\":\"<<ccr:d244e686c105,string,349B>>\"}".to_string();
+        assert_eq!(final_text(hidden.clone(), &said), said);
+        assert_eq!(final_text(hidden.clone(), ""), hidden);
+        assert_eq!(final_text("{\"ok\":true}".into(), &said), "{\"ok\":true}");
+        assert_eq!(assistant_text("{\"type\":\"user\"}"), None);
     }
 }

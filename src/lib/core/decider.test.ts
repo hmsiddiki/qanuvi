@@ -63,6 +63,20 @@ describe("the decider", () => {
     expect(parseAssignment("no idea", steps, "solve").map((x) => x.worker)).toEqual(["free", "paid", "paid"]);
   });
 
+  it("sends the reviewer to the plan's folder and checks an empty diff against the Done line (PLAN-F 97a-2)", () => {
+    const p = reviewPrompt({ title: "Schema 26", details: [] }, "", "", {
+      home: "content/plugins/qcommerce/",
+      done: "Done: upgradeRecoveryContact() src/Migration/TransactionalSchema.php:738",
+    });
+    expect(p).toContain("under content/plugins/qcommerce/");
+    expect(p).toContain(".gitignore");
+    expect(p).toContain("no change in this attempt");
+    expect(p).toContain("TransactionalSchema.php:738");
+    expect(p).not.toContain("(no change)\n");
+    // Without them the prompt is as before.
+    expect(reviewPrompt({ title: "t", details: [] }, "", "")).toMatch(/\(no change\)$/);
+  });
+
   it("accepts a free model's change only on a clear yes", () => {
     expect(reviewPrompt({ title: "t", details: [] }, "x".repeat(20_000), "")).toContain("(cut)");
     expect(parseReview('{"ok": true, "why": "fine"}')).toEqual({ ok: true, why: "fine" });

@@ -6,7 +6,16 @@ import { api, errorText, type AgentEvent, type Project } from "$lib/api";
 import { providerById, type AgentProvider } from "$lib/agents/providers";
 import { setupFor } from "./brain.svelte";
 import { archivePath } from "$lib/plan/housekeeping";
-import { appendSection, extractSteps, lastNumber, plannerPrompt, renumber, sectionTitleFrom } from "$lib/plan/planner";
+import {
+  appendSection,
+  assistantText,
+  extractSteps,
+  finalText,
+  lastNumber,
+  plannerPrompt,
+  renumber,
+  sectionTitleFrom,
+} from "$lib/plan/planner";
 import type { Step } from "$lib/plan/tasklist";
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
@@ -48,6 +57,7 @@ class PlannerStore {
       let text = "";
       let cost = 0;
       let settled = false;
+      let lastSaid = "";
       // Quiet: nothing shown, but the session's status still reaches the list (else it stays "running" after it
       // answered and was stopped, and the status bar keeps counting it as working).
       const show = opts.quiet
@@ -67,8 +77,10 @@ class PlannerStore {
         if (event.kind === "line") {
           try {
             const msg = JSON.parse(event.line);
+            const said = assistantText(msg);
+            if (said) lastSaid = said;
             if (msg.type === "result") {
-              text = typeof msg.result === "string" ? msg.result : "";
+              text = finalText(typeof msg.result === "string" ? msg.result : "", lastSaid);
               if (msg.is_error) done(text || "The planner stopped with an error.");
             }
           } catch {

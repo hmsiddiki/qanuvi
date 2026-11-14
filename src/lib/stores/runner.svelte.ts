@@ -2040,12 +2040,18 @@ class RunnerStore {
     if (verdict) return verdict;
     const parts = changed.parts;
     const tests = testsPassed === true ? "passed" : testsPassed === false ? "failed" : "";
+    // Where the work is, and what the agent says it did (the step as the plan has it now, after the attempt).
+    const home = file.includes("/") ? file.slice(0, file.lastIndexOf("/") + 1) : "";
+    const now = await api.files.read(project.id, file).catch(() => null);
+    const after = now && parsePlan(now.text).steps.find((s) => s.number === step.number && s.title === step.title);
+    const done = (after ? after.details : []).find((d) => /^Done:/i.test(d.trim())) ?? "";
+    const where = { home, done };
     try {
       // A short look at one step's diff: the agent's own default model, not the planner's bigger one.
       const model = settings.agent(provider.id).model || defaultPlannerModel(provider);
       const { text, costUsd } = await planner.ask(
         project,
-        reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests),
+        reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests, where),
         model,
         `Decider: review step ${stepRun.number ?? stepRun.title}`,
         { agentId: provider.id, lean: true },
@@ -2057,7 +2063,7 @@ class RunnerStore {
       try {
         const f = await freeDecide(
           "You review code changes. Answer with JSON only.",
-          reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests),
+          reviewPrompt({ title: step.title, details: step.details ?? [] }, parts.join("\n"), tests, where),
         );
         const r = parseReview(f.text);
         return { ok: r.ok, why: `${r.why} (reviewed by ${f.by}: ${provider.name} could not answer)` };

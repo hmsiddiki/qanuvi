@@ -792,7 +792,17 @@ runs on or off; with it off nothing is sent anywhere.
       - [ ] Right-click > Paste in the Inbox closes the Inbox: Sidebar.svelte closes the popover on any pointerdown
         outside `.inbox-pop`, and the right-click menu (`.cmenu`) is drawn outside it. Treat `.cmenu` as inside,
         and check that the pasted text lands in the answer box.
-      - [ ] PLAN-F rerun on 0.1.21 (22:01-22:17): the replan renamed the planner's 97a1-97a4 to 97a-1-97a-4 but
+      - [x] FIXED 2026-11-14 (late): PLAN-F was stuck again on 0.1.21 (every rerun "0/9 done, 9 skipped" in seconds).
+        Three causes, all fixed in TypeScript and Rust with tests and comparison cases (unpublished):
+        (1) the review of 97a-2 saw an empty diff (the work came from an earlier try) and searched from the root, where
+        .gitignore hides the plugin, so complete work was turned down twice; the review prompt now names the plan's
+        folder ("search there by path") and, with an empty diff, gives the step's Done line to check against the files;
+        (2) renumberWith did not strip labels like "97a-2a." and never rewrote Needs lines, so 97a-5..7 kept "Needs:
+        97a-2a" and everything after them was skipped; now each planner label maps to its new number in the block's
+        Needs lines; (3) the review's answer was a Headroom placeholder ("why": "<<ccr:...>>"), so nobody saw the
+        reason; a result with a placeholder gives way to the agent's last text (planner.svelte.ts and env.rs).
+        PLAN-F fixed by hand: 97a-2, 97a-6, 97a-7 marked [x] (97a-2's Done line proves the work), Skipped lines removed.
+        Was: PLAN-F rerun on 0.1.21 (22:01-22:17): the replan renamed the planner's 97a1-97a4 to 97a-1-97a-4 but
         left their Needs lines as "Needs: 97a1" etc., so 97a-2-97a-4 were skipped as "needs step 97a1, which is not
         done", and 97b-97z after them. The renumbering must rewrite Needs lines inside the replacement steps too
         (and accept the planner's own label as the same step). Add a scenario first.

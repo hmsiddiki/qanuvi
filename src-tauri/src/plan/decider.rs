@@ -344,7 +344,23 @@ fn fallback_worker(s: &StepBrief, priority: Priority) -> Worker {
 }
 
 /// The decider's look at a free model's change before it is accepted (quality first).
+/// `review_prompt_in` without the plan's folder and the Done line.
 pub fn review_prompt(title: &str, details: &[String], diff: &str, tests: &str) -> String {
+    review_prompt_in(title, details, diff, tests, "", "")
+}
+
+/// The review prompt with the plan's own folder (`home`) and the step's Done line: the reviewer searches where the work
+/// is, and an empty diff is checked against the files (PLAN-F 97a-2: a search from the root, where .gitignore hides
+/// the plugin, found nothing and complete work was turned down twice).
+pub fn review_prompt_in(
+    title: &str,
+    details: &[String],
+    diff: &str,
+    tests: &str,
+    home: &str,
+    done: &str,
+) -> String {
+    let done = js::cut(done, 1500);
     let shown = if js::len(diff) > 12_000 {
         format!("{}\n… (cut)", js::cut(diff, 12_000))
     } else {
@@ -364,13 +380,27 @@ pub fn review_prompt(title: &str, details: &[String], diff: &str, tests: &str) -
     } else {
         format!("Tests: {tests}")
     });
+    if !home.is_empty() {
+        out.push(String::new());
+        out.push(format!("The step's files are under {home} (the plan's own folder). Search there by path: the project root's ignore rules"));
+        out.push(r#"(.gitignore) can hide that folder from a search of the whole tree, so "not found" from the root proves nothing."#.into());
+    }
     out.push(String::new());
     out.push("The change (git diff):".into());
-    out.push(if shown.is_empty() {
-        "(no change)".into()
+    if shown.is_empty() && !done.is_empty() {
+        out.push("(no change in this attempt: the work may come from an earlier try)".into());
+        out.push(String::new());
+        out.push(format!(
+            "The step's Done line, to check against the files themselves: {done}"
+        ));
+        out.push("Accept when the files really hold the work it names; reject only for what is missing or wrong.".into());
     } else {
-        shown
-    });
+        out.push(if shown.is_empty() {
+            "(no change)".into()
+        } else {
+            shown
+        });
+    }
     out.join("\n")
 }
 

@@ -725,6 +725,13 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["renumberWith", ["- [ ] **  12b.   Spaced  **tail\n- [ ] ****", ["1"]]],
+  [
+    "renumberWith",
+    [
+      "- [ ] **97a-2a. Code**\n  - Needs: 97a-1\n- [ ] **97a-2b. 97a2b. Tests**\n  - Needs:  97a-2a ,97a2b\n- [ ] Docs\n   - Needs: 97a-2b, x",
+      ["97a-5", "97a-6"],
+    ],
+  ],
   ["sectionTitleFrom", ["Add coupons. Then test them."]],
   ["sectionTitleFrom", ["Add optional VAT to the cart total using addVat from src/tax.js, with tests."]],
   ["sectionTitleFrom", ["  "]],
@@ -1006,6 +1013,17 @@ const cases: [string, unknown[]][] = [
   ],
   ["reviewPrompt", [{ title: "Sort", details: ["a", "b", "c", "d", "e", "f", "g"] }, "x".repeat(12_005), ""]],
   ["reviewPrompt", [{ title: "Sort", details: [] }, "", "3 passed"]],
+  [
+    "reviewPrompt",
+    [
+      { title: "Schema", details: ["a"] },
+      "",
+      "",
+      { home: "content/plugins/qc/", done: "Done: all there, ü".repeat(120) },
+    ],
+  ],
+  ["reviewPrompt", [{ title: "Schema", details: [] }, "diff --git a/x", "passed", { home: "p/", done: "Done: y" }]],
+  ["reviewPrompt", [{ title: "Schema", details: [] }, "", "", { home: "", done: "Done: z" }]],
   ["parseReview", ['{"ok": true, "why": "fine"}']],
   ["parseReview", ['```json\n{"ok": "yes"}\n```']],
   ["parseReview", ['{"ok": false}']],

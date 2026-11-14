@@ -153,4 +153,43 @@ describe("freeLabels and renumberWith (PLAN-F 97a: replacements never take numbe
       "- [ ] **97a-1. Make it visible**\n  - d\n- [ ] **97a-2. Schema**\n- [ ] **97a-3. Plain 3. x**\n- [ ] **Plain numbered**",
     );
   });
+  it("drops a label with a part after a dash, and points the block's Needs lines at the new numbers", () => {
+    // PLAN-F 97a-2 (0.1.21): the planner wrote 97a-2a-97a-2c; they became 97a-5-97a-7 but "Needs: 97a-2a" stayed, so
+    // the steps after it were skipped as needing a step that is not done.
+    const block = [
+      "- [ ] **97a-2a. Check the code**",
+      "  - Needs: 97a-1",
+      "- [ ] **97a-2b. Check the tests**",
+      "  - Needs: 97a-2a",
+      "- [ ] **97a-2c. Check the docs**",
+      "  - Needs: 97a-2b, 97a-2a,97a-1",
+    ].join("\n");
+    expect(renumberWith(block, ["97a-5", "97a-6", "97a-7"])).toBe(
+      [
+        "- [ ] **97a-5. Check the code**",
+        "  - Needs: 97a-1",
+        "- [ ] **97a-6. Check the tests**",
+        "  - Needs: 97a-5",
+        "- [ ] **97a-7. Check the docs**",
+        "  - Needs: 97a-6, 97a-5, 97a-1",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("finalText (PLAN-F 97a-2: a review reason that was only a proxy placeholder)", async () => {
+  const { assistantText, finalText } = await import("./planner");
+  it("takes the agent's last text when the result holds a placeholder", () => {
+    const said = assistantText({
+      type: "assistant",
+      message: { content: [{ type: "text", text: '{"ok": false, "why": "the diff is empty"}' }, { type: "tool_use" }] },
+    });
+    expect(said).toBe('{"ok": false, "why": "the diff is empty"}');
+    expect(finalText('{"ok":false,"why":"<<ccr:d244e686c105,string,349B>>"}', said)).toBe(said);
+  });
+  it("keeps a plain result, and a placeholder when nothing else was said", () => {
+    expect(finalText('{"ok":true}', "other")).toBe('{"ok":true}');
+    expect(finalText("<<ccr:a,string,1B>>", "")).toBe("<<ccr:a,string,1B>>");
+    expect(assistantText({ type: "user", message: { content: [{ type: "text", text: "x" }] } })).toBe("");
+  });
 });

@@ -85,11 +85,13 @@ fn run(name: &str, a: &[Value]) -> Value {
                 &de::<Vec<String>>(&o["modelIds"]),
             ))
         }
-        "reviewPrompt" => json!(review_prompt(
+        "reviewPrompt" => json!(review_prompt_in(
             a[0]["title"].as_str().unwrap_or(""),
             &de::<Vec<String>>(&a[0]["details"]),
             &s(1),
-            &s(2)
+            &s(2),
+            a.get(3).and_then(|w| w["home"].as_str()).unwrap_or(""),
+            a.get(3).and_then(|w| w["done"].as_str()).unwrap_or("")
         )),
         "parseReview" => to(parse_review(&s(0))),
         "chatModelPrompt" => json!(chat_model_prompt(&s(0), &de::<Vec<ModelChoice>>(&a[1]))),

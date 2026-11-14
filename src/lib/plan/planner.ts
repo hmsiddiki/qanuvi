@@ -122,26 +122,41 @@ export function freeLabels(text: string, archive: string, number: string | null,
 }
 
 /** Gives the steps of a block the given numbers in order, dropping any number or label a planner wrote before a
- * title ("97a1. Make …" → "Make …"). Steps past the end of `labels` keep no number. */
+ * title ("97a1. Make …", "97a-2a. Check …" → "Make …", "Check …"). Steps past the end of `labels` keep no number.
+ * The block's Needs lines follow: a planner's own label there becomes the step's new number (PLAN-F 97a: "Needs:
+ * 97a-2a" was left pointing at no step, and every step after it was skipped). */
 export function renumberWith(block: string, labels: string[]): string {
   let i = 0;
-  // Every leading label goes ("97b. 97a2. Schema" → "Schema").
-  const strip = (t: string) => {
+  const renamed = new Map<string, string>();
+  // Every leading label goes ("97b. 97a2. Schema" → "Schema"); each one is remembered for the Needs lines.
+  const strip = (t: string, label: string | undefined) => {
     let s = t.trim();
     for (let prev = ""; prev !== s;) {
       prev = s;
-      s = s.replace(/^\d+[a-z0-9]*(?:-\d+)?\.\s+/, "");
+      const m = /^(\d+[a-z0-9]*(?:-\d+[a-z0-9]*)*)\.\s+/.exec(s);
+      if (m) {
+        if (label && !renamed.has(m[1])) renamed.set(m[1], label);
+        s = s.slice(m[0].length);
+      }
     }
     return s.trim();
   };
-  return block
-    .split("\n")
+  const lines = block.split("\n").map((l) => {
+    const m = /^(- \[ \] )(?:\*\*(.+?)\*\*(.*)|(.+))$/.exec(l);
+    if (!m) return l;
+    const label = labels[i++];
+    const title = strip((m[2] ?? m[4]).trim(), label);
+    return `${m[1]}**${label ? `${label}. ` : ""}${title}**${m[3] ?? ""}`;
+  });
+  return lines
     .map((l) => {
-      const m = /^(- \[ \] )(?:\*\*(.+?)\*\*(.*)|(.+))$/.exec(l);
-      if (!m) return l;
-      const title = strip((m[2] ?? m[4]).trim());
-      const label = labels[i++];
-      return `${m[1]}**${label ? `${label}. ` : ""}${title}**${m[3] ?? ""}`;
+      const m = /^(\s*- Needs:\s*)(.*)$/.exec(l);
+      if (!m || !renamed.size) return l;
+      const needs = m[2].split(",").map((n) => {
+        const t = n.trim();
+        return renamed.get(t) ?? t;
+      });
+      return `${m[1]}${needs.join(", ")}`;
     })
     .join("\n");
 }
@@ -189,4 +204,22 @@ export function sectionTitleFrom(request: string): string {
   const cut = sentence.slice(0, 60);
   const space = cut.lastIndexOf(" ");
   return `${(space > 30 ? cut.slice(0, space) : cut).replace(/[,;:]$/, "")}…`;
+}
+
+/** The text blocks of one agent line of type "assistant" ("" for any other line). */
+export function assistantText(msg: { type?: unknown; message?: { content?: unknown } }): string {
+  if (msg.type !== "assistant" || !Array.isArray(msg.message?.content)) return "";
+  return (msg.message.content as { type?: unknown; text?: unknown }[])
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text as string)
+    .join("");
+}
+
+/**
+ * The answer a turn gave: its result, unless a proxy that compresses context (Headroom) left a placeholder in it
+ * ("<<ccr:…>>"); then the agent's last text, which holds the real words (PLAN-F 97a-2: the review's reason was only a
+ * placeholder, so nobody saw why the step was turned down).
+ */
+export function finalText(result: string, lastAssistant: string): string {
+  return result.includes("<<ccr:") && lastAssistant.trim() ? lastAssistant : result;
 }
