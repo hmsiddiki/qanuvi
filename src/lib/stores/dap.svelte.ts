@@ -10,6 +10,7 @@ import {
   absPath,
   adapterFor,
   defaultConfigs,
+  foldRenamed,
   forAdapter,
   launchTemplate,
   readLaunch,
@@ -20,9 +21,11 @@ import {
   unsupported,
   type Breakpoint,
   type LaunchConfig,
+  type PhpInfo,
 } from "$lib/dap/protocol";
 import { editor } from "./editor.svelte";
 import { projects } from "./projects.svelte";
+import { settings } from "./settings.svelte";
 
 export interface Frame {
   id: number;
@@ -99,6 +102,8 @@ class DapStore {
   offer = $state<DapStatus | null>(null);
   installing = $state(false);
   installError = $state("");
+  /** PHP and its Xdebug, as last checked. */
+  php = $state<PhpInfo | null>(null);
 
   /** launch.json's configurations for the current project (or Qanuvi's defaults), and why it could not be read. */
   configs = $state<LaunchConfig[]>([]);
@@ -138,6 +143,8 @@ class DapStore {
   #root = "";
   #conns = new Map<number, Conn>();
   #resend = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Old Xdebug 2 keys PHP warned about in this session (told once). */
+  #renamed = new Set<string>();
 
   constructor() {
     // Debuggers a previous load of this window started (a reload) are not reachable any more.
@@ -150,6 +157,17 @@ class DapStore {
 
   async loadStatuses(): Promise<void> {
     this.statuses = await api.dap.statuses().catch(() => this.statuses);
+  }
+
+  /** Checks PHP and the Xdebug a debug run gets (php.ini's own, or the file chosen in Settings). */
+  async checkPhp(): Promise<PhpInfo> {
+    const file = settings.value.languages.xdebugFile;
+    try {
+      this.php = { ...(await api.dap.php(file)), xdebugFile: file };
+    } catch (e) {
+      this.php = { php: "", version: "", build: "", xdebug: "", via: "", note: errorText(e), xdebugFile: file };
+    }
+    return this.php;
   }
 
   // Configurations -----------------------------------------------------------------------------------------------
@@ -195,7 +213,8 @@ class DapStore {
         await api.files.create(projectId, ".vscode", true).catch(() => {});
         await api.files.create(projectId, ".vscode/launch.json", false);
         // Write, then read back: open only once the formatted text is on disk (one early read came back as one line).
-        const text = launchTemplate();
+        const shown = editor.active && editor.active.projectId === projectId ? editor.active.path : "";
+        const text = launchTemplate(shown);
         for (let i = 0; i < 3; i++) {
           await api.files.write(projectId, ".vscode/launch.json", text, null);
           if ((await api.files.read(projectId, ".vscode/launch.json")).text === text) break;
@@ -278,12 +297,30 @@ class DapStore {
       this.lastError = `"${config.name}" runs the shown file: open a file of this project first.`;
       return;
     }
+    // A PHP run needs PHP with Xdebug; listening only waits for a PHP that has its own.
+    const runsPhp = adapter === "php" && !!(config.program || config.runtimeArgs);
+    const php = adapter === "php" ? await this.checkPhp() : null;
+    if (runsPhp && php && !config.runtimeExecutable && (!php.php || !php.xdebug)) {
+      this.lastError = php.note || "PHP with Xdebug was not found.";
+      return;
+    }
 
     this.#root = project.path;
     this.#resetView();
     this.console = [];
+    this.#renamed = new Set();
     this.session = { projectId, name: config.name, adapter, status: "starting" };
     this.#info(`Starting "${config.name}"…`);
+    if (php && runsPhp) {
+      this.#info(
+        `PHP ${php.version} with Xdebug ${php.xdebug}${php.via === "file" ? " (loaded for this run only)" : ""}.`,
+      );
+    } else if (adapter === "php") {
+      this.#info(
+        `Listening for Xdebug on port ${config.port ?? 9003}. Start PHP with Xdebug on (xdebug.mode=debug and ` +
+          "xdebug.start_with_request=yes, or a trigger) and it stops at your breakpoints.",
+      );
+    }
     try {
       this.#key = await api.dap.start(projectId, adapter, (e) => this.#onAdapter(e));
     } catch (e) {
@@ -292,7 +329,7 @@ class DapStore {
       this.session = null;
       return;
     }
-    this.#open(0, false, config.request, forAdapter(adapter, filled));
+    this.#open(0, false, config.request, forAdapter(adapter, filled, php));
   }
 
   /** Opens a session on a connection: initialize, then launch or attach; breakpoints once it says it is ready. */
@@ -364,7 +401,8 @@ class DapStore {
       case "output": {
         const cat = body.category ?? "console";
         if (cat === "telemetry") break;
-        const text = String(body.output ?? "").replace(/\r?\n$/, "");
+        let text = String(body.output ?? "").replace(/\r?\n$/, "");
+        if (this.session?.adapter === "php") text = this.#foldPhp(text);
         if (text) this.#append({ kind: cat === "stderr" ? "err" : cat === "important" ? "info" : "out", text });
         break;
       }
@@ -383,6 +421,23 @@ class DapStore {
         }
         break;
     }
+  }
+
+  /** PHP's output without the "has been renamed" warnings; the old keys are named once per session. */
+  #foldPhp(text: string): string {
+    const f = foldRenamed(text);
+    const fresh = f.renamed.filter((k) => !this.#renamed.has(k));
+    if (fresh.length) {
+      const first = this.#renamed.size === 0;
+      for (const k of fresh) this.#renamed.add(k);
+      if (first) {
+        this.#info(
+          `php.ini still has Xdebug 2 settings that Xdebug 3 renamed (${fresh.join(", ")}); they do nothing now. ` +
+            "Qanuvi passes the Xdebug 3 settings itself. See xdebug.org/docs/upgrade_guide.",
+        );
+      }
+    }
+    return f.text;
   }
 
   /** After `initialized`: every breakpoint of the project, then configurationDone. */

@@ -4,6 +4,7 @@ import {
   adapterFor,
   defaultConfigs,
   errorOf,
+  foldRenamed,
   forAdapter,
   launchTemplate,
   readLaunch,
@@ -103,8 +104,91 @@ describe("configurations", () => {
   });
 
   it("offers to run the shown script", () => {
-    expect(defaultConfigs("src/a.ts").map((c) => c.request)).toEqual(["launch", "attach"]);
-    expect(defaultConfigs("index.php").map((c) => c.request)).toEqual(["attach"]);
+    expect(defaultConfigs("src/a.ts").map((c) => c.type)).toEqual(["node", "node", "php"]);
+    expect(defaultConfigs("index.php").map((c) => c.name)).toEqual([
+      "PHP: run the current file",
+      "PHP: listen for Xdebug (port 9003)",
+      "Node: attach (port 9229)",
+    ]);
+    expect(defaultConfigs("README.md").map((c) => c.request)).toEqual(["attach", "launch"]);
+  });
+
+  it("writes VS Code's PHP template for a PHP file", () => {
+    const r = readLaunch(launchTemplate("web/index.php"));
+    expect(r.configs.map((c) => c.name)).toEqual(["Listen for Xdebug", "Launch currently open script"]);
+    expect(r.configs[1]).toMatchObject({ type: "php", program: "${file}", port: 0 });
+  });
+
+  const php = {
+    php: "E:\\php\\php.exe",
+    version: "8.2.3",
+    build: "NTS x64",
+    xdebug: "3.5.3",
+    via: "file",
+    note: "",
+    xdebugFile: "E:\\x\\php_xdebug.dll",
+  };
+
+  it("gives a PHP run its PHP, the Xdebug file and the Xdebug settings", () => {
+    expect(adapterFor("php")).toBe("php");
+    const c = forAdapter("php", { name: "r", type: "php", request: "launch", program: "a.php", port: 0 }, php);
+    expect(c.runtimeExecutable).toBe("E:\\php\\php.exe");
+    expect(c.runtimeArgs).toEqual([
+      "-dzend_extension=E:\\x\\php_xdebug.dll",
+      "-dxdebug.mode=debug",
+      "-dxdebug.start_with_request=yes",
+      "-dxdebug.client_host=127.0.0.1",
+      "-dxdebug.client_port=${port}",
+    ]);
+  });
+
+  it("keeps the configuration's own PHP and settings", () => {
+    const c = forAdapter(
+      "php",
+      {
+        name: "r",
+        type: "php",
+        request: "launch",
+        program: "a.php",
+        runtimeExecutable: "php8",
+        runtimeArgs: ["-dxdebug.mode=debug,develop", "-n"],
+      },
+      { ...php, via: "ini" },
+    );
+    expect(c.runtimeExecutable).toBe("php8");
+    expect(c.runtimeArgs).toEqual([
+      "-dxdebug.start_with_request=yes",
+      "-dxdebug.client_host=127.0.0.1",
+      "-dxdebug.client_port=${port}",
+      "-dxdebug.mode=debug,develop",
+      "-n",
+    ]);
+  });
+
+  it("leaves a listen-only configuration alone", () => {
+    const listen = { name: "l", type: "php", request: "launch" as const, port: 9003 };
+    expect(forAdapter("php", listen, php)).toEqual(listen);
+  });
+
+  it("leaves ${port} for PHP Debug to fill", () => {
+    const { config, unknown } = substitute(
+      { name: "r", type: "php", request: "launch", runtimeArgs: ["-dxdebug.client_port=${port}"] },
+      ctx,
+    );
+    expect(unknown).toEqual([]);
+    expect(config.runtimeArgs).toEqual(["-dxdebug.client_port=${port}"]);
+  });
+});
+
+describe("Xdebug output", () => {
+  it("takes out the renamed-setting warnings and names the old keys", () => {
+    const out = [
+      "Xdebug: [Config] The setting 'xdebug.remote_enable' has been renamed, see the upgrading guide at https://x (See: y)",
+      "PHP Warning:  Xdebug: [Config] The setting 'xdebug.remote_port' has been renamed, see z",
+      "total is 16",
+    ].join("\n");
+    expect(foldRenamed(out)).toEqual({ text: "total is 16", renamed: ["xdebug.remote_enable", "xdebug.remote_port"] });
+    expect(foldRenamed("hello\n")).toEqual({ text: "hello\n", renamed: [] });
   });
 });
 

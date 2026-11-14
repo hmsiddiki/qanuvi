@@ -60,10 +60,10 @@ export interface Settings {
   /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
   updates: { autoDownload: boolean; claudeAuto?: boolean };
   /**
-   * Language servers (15i): servers turned off, servers not to offer again, minutes unused before one stops, and
-   * whether Ctrl+S formats the file through its server first.
+   * Language servers (15i): servers turned off, servers not to offer again, minutes unused before one stops, whether
+   * Ctrl+S formats the file through its server first, and an Xdebug file loaded for PHP debug runs only ("" for none).
    */
-  languages: { off: string[]; never: string[]; idleMinutes: number; formatOnSave: boolean };
+  languages: { off: string[]; never: string[]; idleMinutes: number; formatOnSave: boolean; xdebugFile: string };
   /**
    * Chat handover (24s): past `limit` tokens of context (0 = never) a chat goes on in a new session that starts from
    * a handover note. ask: a bar asks first; auto: it happens by itself; off: never.
@@ -198,7 +198,7 @@ const DEFAULTS: Settings = {
   approveMinutes: 10,
   appearance: { editorFontSize: 13, uiScale: 100 },
   updates: { autoDownload: false },
-  languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false },
+  languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false, xdebugFile: "" },
   chatHandover: { when: "ask", limit: CHAT_HANDOVER_LIMIT },
   chatCleanupDays: 60,
   notifications: DEFAULT_NOTIFICATIONS,
@@ -272,6 +272,7 @@ export function parseSettings(json: string | null): Settings {
       never: ids(lg.never),
       idleMinutes: Math.min(240, Math.max(1, Math.round(idle))),
       formatOnSave: lg.formatOnSave === true,
+      xdebugFile: typeof lg.xdebugFile === "string" ? lg.xdebugFile.trim().slice(0, 1000) : "",
     };
   }
   {

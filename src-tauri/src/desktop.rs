@@ -519,6 +519,12 @@ async fn dap_statuses() -> Res<Vec<crate::dap::Status>> {
     blocking(|| Ok(crate::dap::statuses())).await
 }
 
+/// PHP on this computer and its Xdebug (with the Xdebug file chosen in Settings).
+#[tauri::command]
+async fn dap_php(xdebug_file: String) -> Res<crate::dap::PhpInfo> {
+    blocking(move || Ok(crate::dap::php_info(&xdebug_file))).await
+}
+
 /// Installs an adapter; the window asked the user first.
 #[tauri::command]
 async fn dap_install(id: String) -> Res<crate::dap::Status> {
@@ -2158,6 +2164,7 @@ pub fn run() {
             lsp_stop,
             lsp_stop_window,
             dap_statuses,
+            dap_php,
             dap_install,
             dap_start,
             dap_connect,

@@ -2,6 +2,7 @@
 import { Channel } from "@tauri-apps/api/core";
 // Calls for a server's projects go to that server (Milestone 16); the rest to this PC.
 import { routed as invoke } from "./remote";
+import type { PhpInfo } from "./dap/protocol";
 
 export interface ProjectSettings {
   run_command: string;
@@ -376,6 +377,8 @@ export const api = {
   dap: {
     statuses: () => invoke<DapStatus[]>("dap_statuses"),
     install: (id: string) => invoke<DapStatus>("dap_install", { id }),
+    /** PHP on this computer and its Xdebug (with the Xdebug file chosen in Settings, "" for none). */
+    php: (xdebugFile: string) => invoke<PhpInfo>("dap_php", { xdebugFile }),
     start: (projectId: string, id: string, onEvent: (e: DapEvent) => void) => {
       const channel = new Channel<DapEvent>();
       channel.onmessage = onEvent;

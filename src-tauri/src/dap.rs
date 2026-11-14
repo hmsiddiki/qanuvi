@@ -28,6 +28,14 @@ pub enum Transport {
     Server,
 }
 
+/// How a release asset is packed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Archive {
+    TarGz,
+    /// A zip file (a VS Code extension's .vsix).
+    Zip,
+}
+
 /// A debug adapter Qanuvi knows how to install and start.
 pub struct Spec {
     pub id: &'static str,
@@ -37,22 +45,42 @@ pub struct Spec {
     /// The GitHub repository whose latest release holds it, and the start and end of the asset's name.
     pub repo: &'static str,
     pub asset: (&'static str, &'static str),
+    pub archive: Archive,
+    /// The download's size, in words.
+    pub size: &'static str,
     /// The script node runs, below the adapter's folder.
     pub entry: &'static str,
     pub transport: Transport,
     pub need_gb: f64,
 }
 
-pub const SPECS: &[Spec] = &[Spec {
-    id: "node",
-    label: "JavaScript debugger (js-debug)",
-    types: &["node", "pwa-node", "node-terminal"],
-    repo: "microsoft/vscode-js-debug",
-    asset: ("js-debug-dap-", ".tar.gz"),
-    entry: "js-debug/src/dapDebugServer.js",
-    transport: Transport::Server,
-    need_gb: 0.3,
-}];
+pub const SPECS: &[Spec] = &[
+    Spec {
+        id: "node",
+        label: "JavaScript debugger (js-debug)",
+        types: &["node", "pwa-node", "node-terminal"],
+        repo: "microsoft/vscode-js-debug",
+        asset: ("js-debug-dap-", ".tar.gz"),
+        archive: Archive::TarGz,
+        size: "about 10 MB",
+        entry: "js-debug/src/dapDebugServer.js",
+        transport: Transport::Server,
+        need_gb: 0.3,
+    },
+    // The adapter of VS Code's "PHP Debug" extension, made by the Xdebug project. It speaks to Xdebug inside PHP.
+    Spec {
+        id: "php",
+        label: "PHP debugger (PHP Debug, for Xdebug)",
+        types: &["php"],
+        repo: "xdebug/vscode-php-debug",
+        asset: ("php-debug-", ".vsix"),
+        archive: Archive::Zip,
+        size: "about 2 MB",
+        entry: "extension/out/phpDebug.js",
+        transport: Transport::Stdio,
+        need_gb: 0.15,
+    },
+];
 
 pub fn spec(id: &str) -> Result<&'static Spec, String> {
     SPECS
@@ -101,9 +129,9 @@ pub fn status(spec: &'static Spec) -> Status {
         version,
         install: if node {
             format!(
-                "Downloads the latest release of {} from GitHub (github.com/{}, about 10 MB) into Qanuvi's data \
-                 folder; nothing is installed for the whole computer.",
-                spec.label, spec.repo
+                "Downloads the latest release of {} from GitHub (github.com/{}, {}) into Qanuvi's data folder; \
+                 nothing is installed for the whole computer.",
+                spec.label, spec.repo, spec.size
             )
         } else {
             String::new()
@@ -213,23 +241,7 @@ pub fn install(spec: &'static Spec) -> Result<Status, String> {
         std::io::copy(&mut body, &mut out)
             .map_err(|e| format!("{name} could not be downloaded: {e}"))?;
     }
-    // The tar that comes with Windows 10+, macOS and Linux.
-    let mut cmd = Command::new("tar");
-    cmd.arg("-xzf")
-        .arg(&archive)
-        .arg("-C")
-        .arg(&fresh)
-        .stdin(Stdio::null());
-    hide(&mut cmd);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("Could not unpack {name}: {e}"))?;
-    if !out.status.success() {
-        return Err(format!(
-            "Unpacking {name} failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
-    }
+    unpack(spec.archive, &archive, &fresh).map_err(|e| format!("Unpacking {name} failed: {e}"))?;
     let _ = std::fs::remove_file(&archive);
     if !fresh.join(spec.entry).is_file() {
         return Err(format!(
@@ -243,6 +255,147 @@ pub fn install(spec: &'static Spec) -> Result<Status, String> {
     std::fs::rename(&fresh, &dir)
         .map_err(|e| format!("Could not move the debugger into place: {e}"))?;
     Ok(status(spec))
+}
+
+/// Unpacks a downloaded archive into a folder.
+fn unpack(kind: Archive, archive: &std::path::Path, into: &std::path::Path) -> Result<(), String> {
+    match kind {
+        Archive::TarGz => {
+            // The tar that comes with Windows 10+, macOS and Linux.
+            let mut cmd = Command::new("tar");
+            cmd.arg("-xzf")
+                .arg(archive)
+                .arg("-C")
+                .arg(into)
+                .stdin(Stdio::null());
+            hide(&mut cmd);
+            let out = cmd.output().map_err(|e| e.to_string())?;
+            if out.status.success() {
+                Ok(())
+            } else {
+                Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+            }
+        }
+        // Not the system tar: Linux's tar cannot read zip files. Names leaving the folder are refused.
+        Archive::Zip => {
+            let file = std::fs::File::open(archive).map_err(|e| e.to_string())?;
+            let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+            zip.extract(into).map_err(|e| e.to_string())
+        }
+    }
+}
+
+/// PHP on this computer and the Xdebug it can load, for the PHP debugger.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PhpInfo {
+    /// The php program's full path; empty when none was found.
+    pub php: String,
+    pub version: String,
+    /// "NTS x64" and the like: an Xdebug file must match it.
+    pub build: String,
+    /// The Xdebug version a debug run gets; empty when it gets none.
+    pub xdebug: String,
+    /// "ini" when PHP's own settings load Xdebug, "file" when Qanuvi loads the chosen file for debug runs only.
+    pub via: String,
+    /// What is wrong, in words.
+    pub note: String,
+}
+
+const PHP_MARK: &str = "@@qanuvi@@";
+
+/// Asks a php program for its version, build and Xdebug (with an extra Xdebug file loaded, when given).
+fn ask_php(php: &std::path::Path, xdebug_file: Option<&str>) -> Option<(String, String, String)> {
+    let mut cmd = Command::new(php);
+    if let Some(f) = xdebug_file {
+        cmd.arg("-d").arg(format!("zend_extension={f}"));
+    }
+    cmd.args(["-d", "xdebug.log_level=0", "-d", "xdebug.mode=off", "-r"])
+        .arg(format!(
+            "echo '{PHP_MARK}', PHP_VERSION, '|', (phpversion('xdebug') ?: ''), '|', (PHP_ZTS ? 'TS' : 'NTS'), ' ', \
+             (PHP_INT_SIZE * 8 == 64 ? 'x64' : 'x86'), PHP_EOL;"
+        ))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    hide(&mut cmd);
+    let out = cmd.output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text
+        .lines()
+        .find_map(|l| l.split_once(PHP_MARK).map(|(_, r)| r))?;
+    parse_php_line(line)
+}
+
+fn parse_php_line(line: &str) -> Option<(String, String, String)> {
+    let mut parts = line.trim().splitn(3, '|');
+    let version = parts.next()?.trim().to_string();
+    let xdebug = parts.next()?.trim().to_string();
+    let build = parts.next()?.trim().to_string();
+    (!version.is_empty()).then_some((version, xdebug, build))
+}
+
+/// Finds PHP and its Xdebug. `xdebug_file` is the Xdebug the user chose in Settings ("" for none); it is loaded
+/// only for debug runs, so PHP's own settings (php.ini) stay as they are.
+pub fn php_info(xdebug_file: &str) -> PhpInfo {
+    let Some(php) = crate::local_servers::find("php") else {
+        return PhpInfo {
+            note: "PHP is not on this computer's PATH. Install PHP (php.net) or add its folder to PATH.".into(),
+            ..Default::default()
+        };
+    };
+    let mut info = PhpInfo {
+        php: php.display().to_string(),
+        ..Default::default()
+    };
+    let Some((version, xdebug, build)) = ask_php(&php, None) else {
+        info.note = format!("{} did not answer.", info.php);
+        return info;
+    };
+    info.version = version;
+    info.build = build;
+    if !xdebug.is_empty() {
+        info.xdebug = xdebug;
+        info.via = "ini".into();
+        return info;
+    }
+    let file = xdebug_file.trim();
+    if file.is_empty() {
+        info.note = format!(
+            "PHP {} has no Xdebug. Download the Xdebug file for PHP {} {} from xdebug.org and choose it in \
+             Settings > Languages; Qanuvi loads it for debug runs only.",
+            info.version,
+            info.version
+                .split('.')
+                .take(2)
+                .collect::<Vec<_>>()
+                .join("."),
+            info.build
+        );
+        return info;
+    }
+    if !std::path::Path::new(file).is_file() {
+        info.note = format!("The Xdebug file {file} does not exist.");
+        return info;
+    }
+    match ask_php(&php, Some(file)) {
+        Some((_, x, _)) if !x.is_empty() => {
+            info.xdebug = x;
+            info.via = "file".into();
+        }
+        _ => {
+            info.note = format!(
+                "PHP {} could not load {file}: the Xdebug file must be made for PHP {} {}.",
+                info.version,
+                info.version
+                    .split('.')
+                    .take(2)
+                    .collect::<Vec<_>>()
+                    .join("."),
+                info.build
+            );
+        }
+    }
+    info
 }
 
 /// What an adapter sends to the window.
@@ -540,6 +693,56 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn picks_the_php_debug_asset() {
+        let release = serde_json::json!({
+            "tag_name": "v1.40.2",
+            "assets": [{"name": "php-debug-1.40.2.vsix", "browser_download_url": "https://github.com/x/p.vsix"}]
+        });
+        let php = spec("php").unwrap();
+        assert_eq!(php.archive, Archive::Zip);
+        assert_eq!(
+            pick_asset(&release, php).unwrap().1,
+            "php-debug-1.40.2.vsix"
+        );
+    }
+
+    #[test]
+    fn unpacks_a_zip() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive = dir.path().join("a.vsix");
+        {
+            let mut w = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+            w.start_file(
+                "extension/out/phpDebug.js",
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+            w.write_all(b"// adapter").unwrap();
+            w.finish().unwrap();
+        }
+        let into = dir.path().join("out");
+        std::fs::create_dir_all(&into).unwrap();
+        unpack(Archive::Zip, &archive, &into).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(into.join("extension/out/phpDebug.js")).unwrap(),
+            "// adapter"
+        );
+    }
+
+    #[test]
+    fn reads_php_answers() {
+        assert_eq!(
+            parse_php_line("8.2.3|3.5.3|NTS x64"),
+            Some(("8.2.3".into(), "3.5.3".into(), "NTS x64".into()))
+        );
+        assert_eq!(
+            parse_php_line("8.3.0||TS x64").map(|p| p.1),
+            Some(String::new())
+        );
+        assert_eq!(parse_php_line("|x|y"), None);
     }
 
     #[test]

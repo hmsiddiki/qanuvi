@@ -1,18 +1,39 @@
 <script lang="ts">
   /**
    * Settings → Languages (15i): the language servers Qanuvi knows, whether each is on this computer, Install (the
-   * click is the user's yes), on or off per language, and how long an unused server keeps running.
+   * click is the user's yes), on or off per language, how long an unused server keeps running; then the debuggers
+   * and the PHP / Xdebug check (15i part 3).
    */
   import { onMount } from "svelte";
   import { lsp } from "$lib/stores/lsp.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import type { ServerId } from "$lib/lsp/protocol";
+  import type { PhpInfo } from "$lib/dap/protocol";
+  import { dap } from "$lib/stores/dap.svelte";
 
   let l = $derived(settings.value.languages);
 
+  let xdebugDraft = $state(settings.value.languages.xdebugFile);
+
   onMount(() => {
     lsp.loadStatuses(true);
+    dap.loadStatuses();
+    dap.checkPhp();
   });
+
+  function saveXdebug() {
+    settings.set("languages", { ...l, xdebugFile: xdebugDraft.trim() });
+    dap.checkPhp();
+  }
+
+  const phpLine = (p: PhpInfo | null) => {
+    if (!p) return "Checking PHP…";
+    if (!p.php) return "PHP not found";
+    const x = p.xdebug
+      ? `Xdebug ${p.xdebug} ${p.via === "ini" ? "(loaded by php.ini)" : "(from the file below, for debug runs only)"}`
+      : "no Xdebug";
+    return `PHP ${p.version} ${p.build} · ${x}`;
+  };
 
   const where = (found: string) =>
     found === "qanuvi" ? "Installed by Qanuvi" : found === "path" ? "Found on this computer" : "Not installed";
@@ -85,6 +106,55 @@
       onchange={(e) => settings.set("languages", { ...l, idleMinutes: Number(e.currentTarget.value) })}
     />
   </label>
+</div>
+
+<h2 class="next">Debugging</h2>
+<p class="intro">
+  The debuggers VS Code uses, installed only when you click Install. One runs only while you debug (Run and debug in the
+  sidebar, F5).
+</p>
+<div class="rows">
+  {#each dap.statuses as s (s.id)}
+    <div class="row">
+      <div class="what">
+        <strong>{s.label}</strong>
+        <span class="muted"
+          >{s.installed ? `Installed by Qanuvi${s.version ? ` · ${s.version}` : ""}` : "Not installed"}</span
+        >
+        {#if !s.installed}<span class="muted small">{s.install || s.missing}</span>{/if}
+      </div>
+      {#if !s.installed && s.install}
+        <button type="button" disabled={dap.installing} onclick={() => dap.install(s.id)}
+          >{dap.installing ? "Installing…" : "Install"}</button
+        >
+      {/if}
+    </div>
+  {/each}
+  {#if dap.installError}<p class="error">{dap.installError}</p>{/if}
+
+  <div class="row">
+    <div class="what">
+      <strong>PHP and Xdebug</strong>
+      <span class="muted">{phpLine(dap.php)}</span>
+      {#if dap.php?.php}<span class="muted small">{dap.php.php}</span>{/if}
+      {#if dap.php?.note}<span class="muted small">{dap.php.note}</span>{/if}
+      <label class="file">
+        <span class="small"
+          >Xdebug file, when php.ini does not load one (Qanuvi loads it for debug runs only and leaves php.ini as it is)</span
+        >
+        <span class="pick">
+          <input
+            type="text"
+            spellcheck="false"
+            placeholder="e.g. C:\tools\php_xdebug-3.5.3-8.2-nts-vs16-x86_64.dll"
+            bind:value={xdebugDraft}
+            onkeydown={(e) => e.key === "Enter" && saveXdebug()}
+          />
+          <button type="button" onclick={saveXdebug}>Check</button>
+        </span>
+      </label>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -169,6 +239,32 @@
     display: grid;
     gap: 6px;
     margin-top: 8px;
+  }
+
+  .file {
+    display: grid;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .pick {
+    display: flex;
+    gap: 6px;
+  }
+
+  .pick input {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 6px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  h2.next {
+    margin-top: 26px;
   }
 
   .error {

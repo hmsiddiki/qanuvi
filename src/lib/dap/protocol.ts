@@ -25,7 +25,37 @@ const ADAPTERS: Record<string, string> = {
   node: "node",
   "pwa-node": "node",
   "node-terminal": "node",
+  php: "php",
 };
+
+/** PHP on this computer and the Xdebug a debug run gets (from the Rust side's check). */
+export interface PhpInfo {
+  php: string;
+  version: string;
+  build: string;
+  xdebug: string;
+  /** "ini": PHP's settings load Xdebug; "file": Qanuvi loads the chosen file for debug runs only; "": none. */
+  via: string;
+  note: string;
+  /** The Xdebug file chosen in Settings (added by the window). */
+  xdebugFile?: string;
+}
+
+const RENAMED = /^(?:PHP Warning:\s*)?Xdebug: \[Config\] The setting '([^']+)' has been renamed\b.*$/;
+
+/**
+ * Takes Xdebug 3's "setting has been renamed" warnings (old Xdebug 2 keys left in php.ini) out of PHP's output;
+ * answers the rest and the old keys, so the console can say it once.
+ */
+export function foldRenamed(text: string): { text: string; renamed: string[] } {
+  const renamed: string[] = [];
+  const kept = text.split(/\r?\n/).filter((line) => {
+    const m = RENAMED.exec(line.trim());
+    if (m) renamed.push(m[1]);
+    return !m;
+  });
+  return { text: kept.join("\n"), renamed };
+}
 
 export function adapterFor(type: string): string | null {
   return ADAPTERS[type] ?? null;
@@ -171,6 +201,8 @@ export function substitute(config: LaunchConfig, ctx: VarContext): { config: Lau
     pathSeparator: sep,
     "/": sep,
     userHome: ctx.home,
+    // PHP Debug fills this itself with the port it listens on (launch with "port": 0).
+    port: "${port}",
   };
   const fill = (s: string): string =>
     s.replace(/\$\{([^}]+)\}/g, (all, name: string) => {
@@ -189,29 +221,53 @@ export function substitute(config: LaunchConfig, ctx: VarContext): { config: Lau
 }
 
 const NODE_FILE = /\.(c|m)?(j|t)s$/i;
+const PHP_FILE = /\.(php|phtml|inc)$/i;
 
-/** The configurations offered when launch.json has none: run the shown file, attach to a running Node. */
+const PHP_RUN: LaunchConfig = {
+  name: "PHP: run the current file",
+  type: "php",
+  request: "launch",
+  program: "${file}",
+  cwd: "${fileDirname}",
+  port: 0,
+};
+const PHP_LISTEN: LaunchConfig = {
+  name: "PHP: listen for Xdebug (port 9003)",
+  type: "php",
+  request: "launch",
+  port: 9003,
+};
+const NODE_RUN: LaunchConfig = {
+  name: "Node: run the current file",
+  type: "node",
+  request: "launch",
+  program: "${file}",
+  cwd: "${workspaceFolder}",
+};
+const NODE_ATTACH: LaunchConfig = { name: "Node: attach (port 9229)", type: "node", request: "attach", port: 9229 };
+
+/** The configurations offered when launch.json has none: run the shown file, then listen or attach. */
 export function defaultConfigs(file: string): LaunchConfig[] {
-  const out: LaunchConfig[] = [];
-  if (NODE_FILE.test(file)) {
-    out.push({
-      name: "Node: run the current file",
-      type: "node",
-      request: "launch",
-      program: "${file}",
-      cwd: "${workspaceFolder}",
-    });
-  }
-  out.push({ name: "Node: attach (port 9229)", type: "node", request: "attach", port: 9229 });
-  return out;
+  if (PHP_FILE.test(file)) return [PHP_RUN, PHP_LISTEN, NODE_ATTACH];
+  if (NODE_FILE.test(file)) return [NODE_RUN, NODE_ATTACH, PHP_LISTEN];
+  return [NODE_ATTACH, PHP_LISTEN];
 }
 
-/** A new launch.json with Qanuvi's defaults, the same form VS Code writes. */
-export function launchTemplate(): string {
-  return `${JSON.stringify(
-    {
-      version: "0.2.0",
-      configurations: [
+/** A new launch.json with Qanuvi's defaults for the shown file, the same form VS Code writes. */
+export function launchTemplate(file = ""): string {
+  const configurations = PHP_FILE.test(file)
+    ? [
+        { name: "Listen for Xdebug", type: "php", request: "launch", port: 9003 },
+        {
+          name: "Launch currently open script",
+          type: "php",
+          request: "launch",
+          program: "${file}",
+          cwd: "${fileDirname}",
+          port: 0,
+        },
+      ]
+    : [
         {
           type: "node",
           request: "launch",
@@ -220,23 +276,43 @@ export function launchTemplate(): string {
           cwd: "${workspaceFolder}",
           skipFiles: ["<node_internals>/**"],
         },
-      ],
-    },
-    null,
-    2,
-  )}\n`;
+      ];
+  return `${JSON.stringify({ version: "0.2.0", configurations }, null, 2)}\n`;
 }
 
-/** A configuration in the form the debugger wants: js-debug names its Node type "pwa-node". */
-export function forAdapter(adapter: string, config: LaunchConfig): LaunchConfig {
+/** The Xdebug settings a PHP debug run needs; the configuration's own runtimeArgs win over them. */
+const XDEBUG_ARGS: [string, string][] = [
+  ["xdebug.mode", "debug"],
+  ["xdebug.start_with_request", "yes"],
+  ["xdebug.client_host", "127.0.0.1"],
+  ["xdebug.client_port", "${port}"],
+];
+
+/**
+ * A configuration in the form the debugger wants. js-debug names its Node type "pwa-node". A PHP run gets the PHP
+ * Qanuvi found, the chosen Xdebug file (loaded for this run only, php.ini untouched) and the Xdebug settings it needs.
+ */
+export function forAdapter(adapter: string, config: LaunchConfig, php?: PhpInfo | null): LaunchConfig {
   if (adapter === "node" && config.type === "node") return { ...config, type: "pwa-node" };
+  if (adapter === "php" && php && (config.program || config.runtimeArgs)) {
+    const own = Array.isArray(config.runtimeArgs) ? (config.runtimeArgs as unknown[]).map(String) : [];
+    const has = (key: string) => own.some((a) => a.replace(/^-d\s*/, "").startsWith(`${key}=`));
+    const extra: string[] = [];
+    if (php.via === "file" && !has("zend_extension")) extra.push(`-dzend_extension=${php.xdebugFile ?? ""}`);
+    for (const [k, v] of XDEBUG_ARGS) if (!has(k)) extra.push(`-d${k}=${v}`);
+    return {
+      ...config,
+      runtimeExecutable: config.runtimeExecutable ?? (php.php || undefined),
+      runtimeArgs: [...extra, ...own],
+    };
+  }
   return config;
 }
 
 /** Why Qanuvi cannot run a configuration yet, or "" when it can. */
 export function unsupported(config: LaunchConfig): string {
   if (!adapterFor(config.type)) {
-    return `Qanuvi has no debugger for "${config.type}" yet (Node.js works now; PHP with Xdebug comes next).`;
+    return `Qanuvi has no debugger for "${config.type}" yet (Node.js and PHP with Xdebug work now).`;
   }
   if (config.type === "node-terminal") return '"node-terminal" runs in VS Code\'s terminal; use "node" here.';
   return "";
