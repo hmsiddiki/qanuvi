@@ -364,6 +364,9 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
+    UPDATE 2026-11-14 (latest): 24s part 3 driven + both findings fixed (ccfcb00). 15i part 2 DRIVEN LIVE: works,
+    five findings (a)-(e) with proposals in 15i "Driven live (2026-11-14)", waiting for the owner's yes. Phpactor
+    added to 15i as LATER. NEXT: fix (a)-(e) once agreed, then build 15i part 3 (debugging).
     UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
     qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
     (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:
@@ -1409,6 +1412,10 @@ runs on or off; with it off nothing is sent anywhere.
     local models) and says so when short; each language can be turned off in Settings.
   - Order: 1. LSP for PHP, TypeScript / Svelte, Rust, with the Problems list. 2. Formatting, quick fixes, "Fix with
     agent". 3. Debugging (PHP / Xdebug and Node first). 4. Split editor, minimap.
+  - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
+    open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
+    on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),
+    so the install offer must check `php` first and say so. Choice per project or global; one PHP server at a time.
   - Built (part 1, 2026-11-13; live check open): src-tauri/src/lsp.rs starts a server per project and language
     (Intelephense, typescript-language-server, svelte-language-server, rust-analyzer, Pyright), frames the messages,
     below-normal priority, a job object, the free-memory check; stopped with its window, its project, or the last
@@ -1450,6 +1457,35 @@ runs on or off; with it off nothing is sent anywhere.
     gives quick fixes such as "Add missing match arm" and "Remove all unused imports" that resolve to edits. Open:
     drive it in the running app on a scratch project (menu at the cursor, hover box buttons, format on save, a
     rust-analyzer fix applied); agents seeing the project's problems by themselves is part of the later Qanuvi part.
+  - Driven live (2026-11-14, test build of 07:59, scratch project with cart.php and a Cargo project, $0, no agent
+    turn sent): WORKS: Ctrl+K Ctrl+F formatted only the selected line ("Formatted." note, tab unsaved), one Ctrl+Z
+    undid it (tab clean again); Shift+Alt+F formatted the whole PHP file (indent guessed as 2); format on save (off by
+    default, ticked in Settings > Languages) formatted cart.php with Intelephense and main.rs with rust-analyzer and
+    saved the edit too; free Intelephense: Ctrl+. menu says "Intelephense offers quick fixes only with its paid
+    licence" plus Fix with agent; Fix with agent (menu, hover box, Problems row, file header "Fix all with agent")
+    only fills the message box: place, message, server code, lines around one problem; nothing sent. rust-analyzer:
+    "Add missing match arm `Size::Large`" first in the menu, applied (todo!() arm), stale rustc error cleared on save
+    (same as VS Code); "remove the whole `use` item" applied cleanly; right-click menu has Quick fix, Fix these N
+    with agent, Format document / selection; Problems row menu: Open, Fix with agent, Copy, Copy with its place.
+    Both servers ended with the window. FINDINGS for the owner, not changed yet:
+    (a) BUG: Ctrl+. (or right-click Quick fix) with a SELECTION shows nothing at all. Cause: ContextMenu.svelte keys
+        items by label (`{#each group as item (item.label)}`); rust-analyzer then sends two fixes with the same title
+        ("remove the whole `use` item", one per import), Svelte throws on the duplicate key and no menu shows.
+        Proposed: key by position, and tell same-titled fixes apart by line ("... (line 2)").
+    (b) BUG: "Remove all unused imports" left all underlines across the whole file. rust-analyzer sends that fix as
+        a rewrite of most of the file (line 1 changed, 307 characters inserted at its end, lines 2-23 deleted); the
+        text comes out right, but the lint mark at the end of line 1 grows over the inserted text, and other marks
+        are lost (also after undo). Proposed: in changesFor, when the server's edits rewrite far more than the real
+        difference, apply the trimmed difference instead (common start and end cut off); renames keep their edits.
+    (c) Ctrl+. menu opens with nothing highlighted, so Ctrl+. then Enter does nothing (ContextMenu `focused = -1`).
+        Proposed: a menu opened from the keyboard highlights its first enabled item (VS Code does).
+    (d) The hover box stays open under the Ctrl+. menu (also from the hover's own Quick fix button) and covers the
+        code. Proposed: close the hover when the quick fix menu opens.
+    (e) rustc's help hints ("remove the whole `use` item", severity hint) show in the hover as problems with their
+        own buttons, and the right-click menu counts them ("Fix these 4 problems" where Problems says 2). Proposed:
+        hints stay out of the problem list in hover and counts (Fix all with agent already leaves them out).
+    Note: "Remove all unused imports" with the cursor on one import removes only that one (rust-analyzer works on
+    the range sent, VS Code sends the same); with both lines selected it offers to remove both (seen in a probe).
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:
