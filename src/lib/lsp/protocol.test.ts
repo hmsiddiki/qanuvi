@@ -10,10 +10,43 @@ import {
   serverFor,
   severity,
   snippetTemplate,
+  tightChanges,
   toOffset,
   toPosition,
   uriKey,
 } from "./protocol";
+
+describe("tightChanges", () => {
+  const at = (line: number, character: number) => ({ line, character });
+  const text = "use a::B;\nuse c::D;\n\nfn main() {\n    x();\n}\n";
+  it("turns a whole-file rewrite into the real change", () => {
+    // rust-analyzer's "Remove all unused imports" for the first line: line 1 rewritten, the rest inserted at its end,
+    // the old lines deleted.
+    const rest = "\n\nfn main() {\n    x();\n}";
+    const edits = [
+      { range: { start: at(0, 4), end: at(0, 8) }, newText: "c::D" },
+      { range: { start: at(0, 9), end: at(0, 9) }, newText: rest },
+      { range: { start: at(1, 0), end: at(6, 0) }, newText: "" },
+    ];
+    // Only "a::B;\nuse " goes: the marks on the later lines keep their places.
+    expect(tightChanges(text, edits)).toEqual([{ from: 4, to: 14, insert: "" }]);
+  });
+  it("keeps small edits in several places as they are", () => {
+    const edits = [
+      { range: { start: at(0, 7), end: at(0, 8) }, newText: "Bee" },
+      { range: { start: at(4, 4), end: at(4, 5) }, newText: "y" },
+    ];
+    expect(tightChanges(text, edits)).toEqual([
+      { from: 7, to: 8, insert: "Bee" },
+      { from: 37, to: 38, insert: "y" },
+    ]);
+  });
+  it("is empty when the edits change nothing", () => {
+    expect(
+      tightChanges(text, [{ range: { start: at(0, 0), end: at(2, 0) }, newText: "use a::B;\nuse c::D;\n" }]),
+    ).toEqual([]);
+  });
+});
 
 describe("language server helpers", () => {
   it("picks the server for a file", () => {

@@ -163,6 +163,32 @@ export function applyEdits(text: string, edits: TextEdit[]): string {
   return out;
 }
 
+/**
+ * Edits as editor changes (offsets in the text before them, in order). Some servers send a small fix as a rewrite of
+ * most of the file (rust-analyzer's "Remove all unused imports": the rest of the file inserted at the end of line 1,
+ * the old lines deleted); the editor's problem marks then stretch over the inserted text. When the edits rewrite far
+ * more than the real difference, the real difference goes instead: one change with the common start and end cut off.
+ * Edits that are already small (a rename in a few places) stay as they are.
+ */
+export function tightChanges(text: string, edits: TextEdit[]): { from: number; to: number; insert: string }[] {
+  const doc = linesOf(text);
+  const list = edits
+    .map((e) => ({ from: toOffset(doc, e.range.start), to: toOffset(doc, e.range.end), insert: e.newText }))
+    .sort((a, b) => a.from - b.from || a.to - b.to);
+  const size = list.reduce((n, e) => n + (e.to - e.from) + e.insert.length, 0);
+  const after = applyEdits(text, edits);
+  const max = Math.min(text.length, after.length);
+  let start = 0;
+  while (start < max && text.charCodeAt(start) === after.charCodeAt(start)) start++;
+  let end = 0;
+  while (end < max - start && text.charCodeAt(text.length - 1 - end) === after.charCodeAt(after.length - 1 - end))
+    end++;
+  const one = { from: start, to: text.length - end, insert: after.slice(start, after.length - end) };
+  const oneSize = one.to - one.from + one.insert.length;
+  if (oneSize >= size) return list;
+  return oneSize === 0 ? [] : [one];
+}
+
 /** The edits of a WorkspaceEdit by file address (both forms servers send). */
 export function editsByFile(edit: unknown): Map<string, TextEdit[]> {
   const out = new Map<string, TextEdit[]>();

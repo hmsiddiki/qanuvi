@@ -365,8 +365,9 @@ runs on or off; with it off nothing is sent anywhere.
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
     UPDATE 2026-11-14 (latest): 24s part 3 driven + both findings fixed (ccfcb00). 15i part 2 DRIVEN LIVE: works,
-    five findings (a)-(e) with proposals in 15i "Driven live (2026-11-14)", waiting for the owner's yes. Phpactor
-    added to 15i as LATER. NEXT: fix (a)-(e) once agreed, then build 15i part 3 (debugging).
+    five findings (a)-(e) in 15i "Driven live (2026-11-14)", ALL FIXED and driven live (unpublished). Phpactor
+    added to 15i as LATER; 24k2 Free Claude Code added as LATER. NEXT: build 15i part 3 (debugging, PHP / Xdebug
+    and Node first). Owner: do NOT publish 0.1.20 yet.
     UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
     qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
     (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:
@@ -1501,6 +1502,16 @@ runs on or off; with it off nothing is sent anywhere.
         hints stay out of the problem list in hover and counts (Fix all with agent already leaves them out).
     Note: "Remove all unused imports" with the cursor on one import removes only that one (rust-analyzer works on
     the range sent, VS Code sends the same); with both lines selected it offers to remove both (seen in a probe).
+  - ALL FIVE FIXED (owner: "continue", 2026-11-14; verify green 345 + 166) and driven live in a new test build:
+    (a) menu items keyed by place (ContextMenu), same titles told apart by line (fix.ts actionLabels): the selection
+    menu shows "remove the whole `use` item (line 1)" / "(line 2)"; (b) protocol.ts tightChanges: when a server's
+    edits rewrite far more than the real difference, the trimmed difference goes instead (renames keep their edits);
+    "Remove all unused imports" removed both imports, no stray underline, other marks moved with the text; (c) a menu
+    opened from a key marks its first enabled item (contextMenu `fromKeys`): Ctrl+. then Enter added the match arm;
+    (d) closeHoverTooltips when the quick fix menu opens: the hover closed; (e) hints get no buttons in the hover and
+    are left out of "Fix these N problems" (actions.ts realProblems): the menu said 2. Known, not changed (VS Code
+    alike): until the file is saved, problems keep the server's old lines, so a menu after a fix that moved lines
+    may miss "Fix with agent" for a stale problem; saving refreshes them.
 - [x] **15d. Own right-click menus** (added by the owner 2026-11-10; built 2026-11-11)
   - Today a right-click shows the WebView's browser menu (Back, Refresh, Save as, Print, More tools), which does not
     belong in an app, and its Refresh reloads the whole interface. Replace it with Qanuvi's own menus, by place:

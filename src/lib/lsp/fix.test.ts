@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { fixText, guessIndent, orderActions, touches } from "./fix";
+import { actionLabels, fixText, guessIndent, orderActions, touches } from "./fix";
+
+describe("actionLabels", () => {
+  const range = (line: number) => ({ start: { line, character: 0 }, end: { line: line + 1, character: 0 } });
+  it("adds the line only to titles that repeat", () => {
+    const labels = actionLabels([
+      { title: "Remove all unused imports" },
+      { title: "remove the whole `use` item", diagnostics: [{ range: range(0) }] },
+      {
+        title: "remove the whole `use` item",
+        edit: { changes: { "file:///a.rs": [{ range: range(1), newText: "" }] } },
+      },
+      { title: "Off", disabled: { reason: "not here" } },
+    ]);
+    expect(labels).toEqual([
+      "Remove all unused imports",
+      "remove the whole `use` item (line 1)",
+      "remove the whole `use` item (line 2)",
+      "Off (not here)",
+    ]);
+  });
+});
 
 const r = (l1: number, c1: number, l2: number, c2: number) => ({
   start: { line: l1, character: c1 },

@@ -18,24 +18,25 @@ type Maybe<T> = T | false | null | undefined | "";
 export type MenuGroups = Maybe<readonly Maybe<MenuItem>[]>[];
 
 class ContextMenuStore {
-  open = $state<{ x: number; y: number; groups: MenuItem[][] } | null>(null);
+  /** `fromKeys`: a key opened it (Ctrl+.), so its first item is marked and Enter runs it, as in VS Code. */
+  open = $state<{ x: number; y: number; groups: MenuItem[][]; fromKeys: boolean } | null>(null);
   prompt = $state<{ title: string; value: string; ok: string; done: (value: string) => unknown } | null>(null);
 
   /** Shows a menu where the mouse is; the browser's menu and outer menus do not show. */
   show(event: MouseEvent, groups: MenuGroups): void {
     event.preventDefault();
     event.stopPropagation();
-    this.showAt(event.clientX, event.clientY, groups);
+    this.showAt(event.clientX, event.clientY, groups, false);
   }
 
   /** Shows a menu at a point of the window (a key opened it, for example Ctrl+. at the cursor). */
-  showAt(x: number, y: number, groups: MenuGroups): void {
+  showAt(x: number, y: number, groups: MenuGroups, fromKeys = true): void {
     const clean = groups
       .filter((g): g is readonly Maybe<MenuItem>[] => !!g)
       .map((g) => g.filter((i): i is MenuItem => !!i))
       .filter((g) => g.length);
     if (!clean.length) return;
-    this.open = { x, y, groups: clean };
+    this.open = { x, y, groups: clean, fromKeys };
   }
 
   close(): void {

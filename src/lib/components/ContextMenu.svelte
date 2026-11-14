@@ -16,7 +16,7 @@
   $effect(() => {
     const o = contextMenu.open;
     if (!o) return;
-    focused = -1;
+    focused = o.fromKeys ? o.groups.flat().findIndex((i) => !i.disabled) : -1;
     pos = { x: o.x, y: o.y };
     tick().then(() => {
       if (!menu) return;
@@ -159,7 +159,8 @@
   >
     {#each contextMenu.open.groups as group, g (g)}
       {#if g > 0}<div class="sep" role="separator"></div>{/if}
-      {#each group as item (item.label)}
+      <!-- Keyed by place: a server can send two fixes with the same title. -->
+      {#each group as item, i (i)}
         {@const n = flat.indexOf(item)}
         <button
           type="button"

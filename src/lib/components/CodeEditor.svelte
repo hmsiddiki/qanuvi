@@ -27,6 +27,7 @@
     formatDocument,
     goToDefinition as lspDefinition,
     problemsAt,
+    realProblems,
     quickFixMenu,
     renameBlocked,
     renameSymbol,
@@ -76,7 +77,7 @@
     const lspFile = project && !!server && lsp.enabled(server);
     const lines = { from: v.state.doc.lineAt(s.from).number, to: v.state.doc.lineAt(s.to).number, text };
     const d = lspFile ? currentDoc() : null;
-    const here = d ? problemsAt(v, d) : [];
+    const here = d ? realProblems(problemsAt(v, d)) : [];
     const insert = (value: string) => {
       v.dispatch(v.state.replaceSelection(value));
       v.focus();
@@ -364,16 +365,20 @@
   function showProblems() {
     const d = currentDoc();
     if (!view || !d) return;
-    const buttons = (p: Problem) => [
-      {
-        name: "Quick fix",
-        apply: (v: EditorView, from: number) => {
-          v.dispatch({ selection: { anchor: from } });
-          quickFix();
-        },
-      },
-      { name: "Fix with agent", apply: () => fixWithAgent([p]) },
-    ];
+    // A hint (rustc's "remove the whole `use` item") is help for a problem, not one of its own: no buttons.
+    const buttons = (p: Problem) =>
+      p.severity === "hint"
+        ? []
+        : [
+            {
+              name: "Quick fix",
+              apply: (v: EditorView, from: number) => {
+                v.dispatch({ selection: { anchor: from } });
+                quickFix();
+              },
+            },
+            { name: "Fix with agent", apply: () => fixWithAgent([p]) },
+          ];
     const list = toDiagnostics(view.state, lsp.problemsFor(d.projectId, d.path), buttons);
     view.dispatch(setDiagnostics(view.state, list));
   }

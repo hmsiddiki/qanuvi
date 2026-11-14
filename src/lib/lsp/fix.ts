@@ -3,7 +3,7 @@
  * format request), the order quick fixes are offered in, which problems touch a range, and the request "Fix with
  * agent" puts in the message box.
  */
-import type { Range } from "./protocol";
+import { editsByFile, type Range } from "./protocol";
 
 /** The indent of a text as the protocol's FormattingOptions want it. */
 export function guessIndent(text: string): { tabSize: number; insertSpaces: boolean } {
@@ -60,6 +60,28 @@ export function orderActions(list: CodeAction[]): CodeAction[] {
         x.i - y.i,
     )
     .map((x) => x.a);
+}
+
+/** The first line (from 0) an action is about: its problem, else its first edit; null when it says neither. */
+function actionLine(a: CodeAction): number | null {
+  const d = a.diagnostics?.[0] as { range?: Range } | undefined;
+  if (d?.range) return d.range.start.line;
+  const first = editsByFile(a.edit).values().next().value?.[0];
+  return first ? first.range.start.line : null;
+}
+
+/**
+ * The menu labels of actions: a title that several actions share gets its line, so the two "remove the whole `use`
+ * item" fixes rust-analyzer offers for two imports read apart ("... (line 2)").
+ */
+export function actionLabels(actions: CodeAction[]): string[] {
+  const count = new Map<string, number>();
+  for (const a of actions) count.set(a.title, (count.get(a.title) ?? 0) + 1);
+  return actions.map((a) => {
+    const line = (count.get(a.title) ?? 0) > 1 ? actionLine(a) : null;
+    const title = line === null ? a.title : `${a.title} (line ${line + 1})`;
+    return a.disabled ? `${title} (${a.disabled.reason})` : title;
+  });
 }
 
 /** Whether a problem's range meets the lines from `from` to `to` (protocol lines, from 0). */

@@ -2,7 +2,7 @@
  * What the editor does with language server answers that reach beyond a plain lookup (15i): opening a definition,
  * listing references, applying a rename or a quick fix to every file it touches, formatting, and "Fix with agent".
  */
-import type { EditorView } from "@codemirror/view";
+import { closeHoverTooltips, type EditorView } from "@codemirror/view";
 import { api, errorText } from "$lib/api";
 import { editor, tabKey } from "$lib/stores/editor.svelte";
 import { lsp, type Doc, type Place, type Problem } from "$lib/stores/lsp.svelte";
@@ -17,12 +17,12 @@ import {
   linesOf,
   relativePath,
   serverFor,
-  toOffset,
+  tightChanges,
   toPosition,
   type Range,
   type TextEdit,
 } from "./protocol";
-import { fixText, guessIndent, orderActions, touches, type CodeAction } from "./fix";
+import { actionLabels, fixText, guessIndent, orderActions, touches, type CodeAction } from "./fix";
 
 const rootOf = (projectId: string) => projects.list.find((p) => p.id === projectId)?.path ?? "";
 
@@ -129,11 +129,9 @@ export async function renameSymbol(view: EditorView, doc: Doc, pos: number, name
   return skipped.length ? `Renamed in ${where}; not changed: ${skipped.join(", ")}` : `Renamed in ${where}.`;
 }
 
-/** Edits sorted for one CodeMirror change set (positions in the text before the change). */
-function changesFor(text: Parameters<typeof toOffset>[0], edits: TextEdit[]) {
-  return edits
-    .map((e) => ({ from: toOffset(text, e.range.start), to: toOffset(text, e.range.end), insert: e.newText }))
-    .sort((a, b) => a.from - b.from || a.to - b.to);
+/** Edits as one CodeMirror change set (positions in the text before the change; whole-file rewrites made tight). */
+function changesFor(doc: { toString(): string }, edits: TextEdit[]) {
+  return tightChanges(doc.toString(), edits);
 }
 
 /**
@@ -254,6 +252,11 @@ export function problemsAt(view: EditorView, doc: Doc): Problem[] {
   return all.filter((p) => p.range.start.line <= from.line && p.range.end.line >= from.line);
 }
 
+/** Problems without hints: hints still go to the server (its fixes hang on them), but are not counted or sent on. */
+export function realProblems(problems: Problem[]): Problem[] {
+  return problems.filter((p) => p.severity !== "hint");
+}
+
 type Client = NonNullable<Awaited<ReturnType<typeof lsp.clientFor>>>;
 
 /** The server's code actions for the selection and the problems there; null when it offers none at all. */
@@ -319,16 +322,20 @@ function noFix(found: unknown, doc: Doc): string {
 export async function quickFixMenu(view: EditorView, doc: Doc, note: (text: string) => void): Promise<void> {
   const problems = problemsAt(view, doc);
   const found = await codeActions(view, doc, problems);
+  const real = realProblems(problems);
   const actions = (found?.actions ?? []).slice(0, 25);
   if (!actions.length && !problems.length) {
     note(found ? "No quick fixes here." : noFix(found, doc));
     return;
   }
   const at = view.coordsAtPos(view.state.selection.main.head);
+  const labels = actionLabels(actions);
+  // The hover box (docs and problem) would stay over the code under the menu.
+  view.dispatch({ effects: closeHoverTooltips });
   contextMenu.showAt(at?.left ?? 200, (at?.bottom ?? 200) + 2, [
     found &&
-      actions.map((a) => ({
-        label: a.disabled ? `${a.title} (${a.disabled.reason})` : a.title,
+      actions.map((a, i) => ({
+        label: labels[i],
         disabled: !!a.disabled,
         action: async () => {
           const r = await runAction(found.client, doc.projectId, a);
@@ -337,10 +344,10 @@ export async function quickFixMenu(view: EditorView, doc: Doc, note: (text: stri
         },
       })),
     !actions.length && [{ label: noFix(found, doc), disabled: true, action: () => {} }],
-    problems.length > 0 && [
+    real.length > 0 && [
       {
-        label: problems.length === 1 ? "Fix with agent" : `Fix these ${problems.length} problems with agent`,
-        action: () => fixWithAgent(problems),
+        label: real.length === 1 ? "Fix with agent" : `Fix these ${real.length} problems with agent`,
+        action: () => fixWithAgent(real),
       },
     ],
   ]);
