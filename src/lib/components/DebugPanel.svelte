@@ -121,6 +121,7 @@
       onchange={(e) => dap.pick(project.id, e.currentTarget.value)}
       disabled={!!mine}
       aria-label="Debug configuration"
+      title={picked?.name ?? ""}
     >
       {#each dap.configs as c (c.name)}<option value={c.name}>{c.name}</option>{/each}
     </select>
@@ -187,7 +188,7 @@
       >
       <IconButton label="Stop" shortcut="Shift+F5" onclick={() => dap.stop()}><Square size={14} /></IconButton>
       <span class="state" class:paused>
-        {status[mine.status]}{#if paused && dap.stopped}: {dap.stopped.reason}{/if}
+        {paused && dap.stopped ? dap.stopped.label : status[mine.status]}
       </span>
     </div>
     {#if paused && dap.stopped?.text}<p class="note">{dap.stopped.text}</p>{/if}
@@ -231,7 +232,9 @@
             {@const r = dap.watchValues[w]}
             <li class="watch">
               <span class="name">{w}</span><span class="sep">:</span>
-              <span class="value" class:error={r?.error}>{paused ? (r?.value ?? "…") : "not paused"}</span>
+              <span class="value" class:error={r?.error} title={paused ? (r?.value ?? "") : "Not debugging"}
+                >{paused ? (r?.value ?? "…") : "–"}</span
+              >
               <button
                 type="button"
                 class="remove"
@@ -329,6 +332,7 @@
   .launch select {
     flex: 1;
     min-width: 0;
+    text-overflow: ellipsis;
     padding: 3px 6px;
     border: 1px solid var(--qx-border);
     border-radius: var(--qx-radius-button);

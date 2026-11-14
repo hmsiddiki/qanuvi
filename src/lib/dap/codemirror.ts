@@ -1,9 +1,9 @@
 /**
- * Debugging in the editor (15i part 3): a breakpoint gutter (click a line number's left to add or take away a
- * breakpoint), breakpoints that move with edits, and the line where the program is paused.
+ * Debugging in the editor (15i part 3): a breakpoint gutter (click the strip left of a line number, or the line
+ * number itself, to add or take away a breakpoint), breakpoints that move with edits, and the paused line.
  */
 import { RangeSet, StateEffect, StateField, type Extension } from "@codemirror/state";
-import { Decoration, EditorView, GutterMarker, gutter, type DecorationSet } from "@codemirror/view";
+import { Decoration, EditorView, GutterMarker, gutter, lineNumbers, type DecorationSet } from "@codemirror/view";
 
 export interface BreakpointMark {
   line: number;
@@ -44,6 +44,28 @@ class PausedMarker extends GutterMarker {
 }
 
 const pausedMarker = new PausedMarker();
+
+/** The faint dot shown in the strip while the mouse is over that line's number. */
+class HoverMarker extends GutterMarker {
+  toDOM(): Node {
+    const el = document.createElement("span");
+    el.className = "qx-bp-hover";
+    return el;
+  }
+}
+
+const hoverMarker = new HoverMarker();
+
+/** The line start under the mouse in the line numbers, or null. */
+const setHoverLine = StateEffect.define<number | null>();
+
+const hoverField = StateField.define<number | null>({
+  create: () => null,
+  update(pos, tr) {
+    for (const e of tr.effects) if (e.is(setHoverLine)) return e.value;
+    return pos === null || !tr.docChanged ? pos : null;
+  },
+});
 
 /** Replaces the shown breakpoints (from the store). */
 export const setBreakpointMarks = StateEffect.define<BreakpointMark[]>();
@@ -105,19 +127,50 @@ export function debugExtensions(toggle: (line: number) => void, moved: (lines: n
   return [
     breakpointField,
     pausedField,
+    hoverField,
     gutter({
       class: "qx-bp-gutter",
       markers: (v) => v.state.field(breakpointField),
       lineMarker: (v, line) => {
         const p = v.state.field(pausedField).pos;
-        return p !== null && p >= line.from && p <= line.to ? pausedMarker : null;
+        if (p !== null && p >= line.from && p <= line.to) return pausedMarker;
+        if (v.state.field(hoverField) !== line.from) return null;
+        let has = false;
+        v.state.field(breakpointField).between(line.from, line.from, () => {
+          has = true;
+          return false;
+        });
+        return has ? null : hoverMarker;
       },
-      lineMarkerChange: (u) => u.docChanged || u.transactions.some((t) => t.effects.some((e) => e.is(setPausedLine))),
+      lineMarkerChange: (u) =>
+        u.docChanged ||
+        u.transactions.some((t) =>
+          t.effects.some((e) => e.is(setPausedLine) || e.is(setHoverLine) || e.is(setBreakpointMarks)),
+        ),
       initialSpacer: () => pausedMarker,
       domEventHandlers: {
         mousedown(view, line) {
           toggle(view.state.doc.lineAt(line.from).number);
           return true;
+        },
+      },
+    }),
+    // A click on the line number itself also adds or takes away the breakpoint (the strip is narrow). This joins
+    // basicSetup's line numbers: their handlers are combined, the gutter is not added twice.
+    lineNumbers({
+      domEventHandlers: {
+        mousedown(view, line, event) {
+          if ((event as MouseEvent).button !== 0) return false;
+          toggle(view.state.doc.lineAt(line.from).number);
+          return true;
+        },
+        mousemove(view, line) {
+          if (view.state.field(hoverField) !== line.from) view.dispatch({ effects: setHoverLine.of(line.from) });
+          return false;
+        },
+        mouseleave(view) {
+          if (view.state.field(hoverField) !== null) view.dispatch({ effects: setHoverLine.of(null) });
+          return false;
         },
       },
     }),
@@ -134,6 +187,8 @@ export function debugExtensions(toggle: (line: number) => void, moved: (lines: n
         borderRadius: "50%",
         background: "#e5534b55",
       },
+      ".cm-lineNumbers .cm-gutterElement": { cursor: "pointer" },
+      ".qx-bp-hover": { width: "9px", height: "9px", borderRadius: "50%", background: "#e5534b55" },
       ".qx-bp": { width: "9px", height: "9px", borderRadius: "50%", background: "#e5534b" },
       ".qx-bp.unbound": { background: "transparent", border: "1.5px solid #9a9a9a", boxSizing: "border-box" },
       ".qx-bp.off": { background: "#9a9a9a" },

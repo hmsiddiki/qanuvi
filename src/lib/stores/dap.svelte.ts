@@ -114,7 +114,7 @@ class DapStore {
   } | null>(null);
   lastError = $state("");
   threads = $state<{ id: number; name: string }[]>([]);
-  stopped = $state<{ conn: number; threadId: number; reason: string; text: string } | null>(null);
+  stopped = $state<{ conn: number; threadId: number; reason: string; label: string; text: string } | null>(null);
   frames = $state<Frame[]>([]);
   frameId = $state<number | null>(null);
   scopes = $state<{ name: string; ref: number; expensive: boolean }[]>([]);
@@ -194,7 +194,12 @@ class DapStore {
       try {
         await api.files.create(projectId, ".vscode", true).catch(() => {});
         await api.files.create(projectId, ".vscode/launch.json", false);
-        await api.files.write(projectId, ".vscode/launch.json", launchTemplate(), null);
+        // Write, then read back: open only once the formatted text is on disk (one early read came back as one line).
+        const text = launchTemplate();
+        for (let i = 0; i < 3; i++) {
+          await api.files.write(projectId, ".vscode/launch.json", text, null);
+          if ((await api.files.read(projectId, ".vscode/launch.json")).text === text) break;
+        }
       } catch (e) {
         this.lastError = errorText(e);
         return;
@@ -473,7 +478,9 @@ class DapStore {
     const threadId: number = body.threadId ?? threads[0]?.id ?? 0;
     const reason = String(body.reason ?? "pause");
     this.threads = threads;
-    this.stopped = { conn: conn.id, threadId, reason, text: String(body.text ?? body.description ?? "") };
+    const label = String(body.description ?? "") || `Paused on ${reason}`;
+    const text = String(body.text ?? "");
+    this.stopped = { conn: conn.id, threadId, reason, label, text: text === label ? "" : text };
     this.session = { ...this.session, status: "stopped" };
     this.vars = {};
     this.expanded = {};
