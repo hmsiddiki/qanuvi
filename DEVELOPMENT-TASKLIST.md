@@ -357,6 +357,13 @@ runs on or off; with it off nothing is sent anywhere.
     the first turn ("the user's new message says what comes next; check only what it needs") and shows as their
     bubble. (b) the old session stays alive (idle, about 200 MB claude.exe) after the note is written and the new
     session started; proposed: stop it once the new session has started. Not driven: Resume as it was, Automatic.
+    BOTH FIXED (owner: "ok fix", verify green 341 + 166): on reopen the owner's message joins the first turn with
+    the note (chatResumePrompt `next`, parseResume reads it back, the chat shows it as the user's bubble under "New
+    session"); messages sent while the note is written join it too (#goOnFresh joinFirst); the old session is stopped
+    once the new one started (also after a plain handover). Driven live (two new 70k+ starred chats, restart, just
+    sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
+    old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
+    order was not driven again after the fix (same #goOnFresh path).
     UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
     qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
     (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:

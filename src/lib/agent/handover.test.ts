@@ -47,11 +47,27 @@ describe("request and resume", () => {
 
   it("reads the note and size back from the new session's first message", () => {
     const prompt = chatResumePrompt("Handover note\nGoal: totals.", "Fix the totals", 152_000);
-    expect(parseResume(prompt)).toEqual({ note: "Handover note\nGoal: totals.", was: 152_000 });
+    expect(parseResume(prompt)).toEqual({ note: "Handover note\nGoal: totals.", was: 152_000, next: "" });
     expect(parseResume("Fix the totals")).toBeNull();
     const [item] = reduceAll([JSON.stringify({ type: "qanuvi_user", text: prompt })]);
     expect(item).toMatchObject({ kind: "notice", note: "Handover note\nGoal: totals." });
     expect(item.kind === "notice" && item.text).toContain("was 152k");
+  });
+
+  it("puts a reopened chat's new message in the first turn and shows it as the user's", () => {
+    const prompt =
+      chatResumePrompt("Handover note\nGoal: totals.", "", 76_000, "What is the test word?") +
+      "\n\n(Private details: kept out of sight.)";
+    expect(prompt).toContain("do only what this message asks");
+    expect(prompt).not.toContain("go on with what is left");
+    expect(parseResume(prompt)).toEqual({
+      note: "Handover note\nGoal: totals.",
+      was: 76_000,
+      next: "What is the test word?",
+    });
+    const items = reduceAll([JSON.stringify({ type: "qanuvi_user", text: prompt })]);
+    expect(items.map((i) => i.kind)).toEqual(["notice", "user"]);
+    expect(items[1]).toMatchObject({ kind: "user", text: "What is the test word?" });
   });
 
   it("works without a last request", () => {

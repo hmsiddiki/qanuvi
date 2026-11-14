@@ -39,26 +39,46 @@ export function chatHandoverRequest(context: number): string {
   );
 }
 
-/** The new session's first message: the note, the last request, and how to go on. */
-export function chatResumePrompt(note: string, lastRequest: string, was: number): string {
+const NEXT_START = "\n\nThe user's new message, which says what comes next:\n\n";
+const NEXT_END = "\n\nUse the note as your memory of the earlier session.";
+
+/**
+ * The new session's first message: the note, the last request, and how to go on. With the user's new message
+ * (a reopened starred chat, 24s part 3) it is answered in this same turn; the note is background, not a task list.
+ */
+export function chatResumePrompt(note: string, lastRequest: string, was: number, next = ""): string {
+  const head = `${CHAT_RESUME_MARK} It handed over at about ${tokensK(was)} tokens of context.)\n\n${note.trim()}`;
+  if (next.trim())
+    return (
+      `${head}${NEXT_START}${next.trim()}${NEXT_END} Check what it calls done only where this message needs it, ` +
+      `and do only what this message asks.`
+    );
   return (
-    `${CHAT_RESUME_MARK} It handed over at about ${tokensK(was)} tokens of context.)\n\n` +
-    `${note.trim()}\n\n` +
+    `${head}\n\n` +
     (lastRequest.trim() ? `The user's last request in that session:\n\n${lastRequest.trim()}\n\n` : "") +
     `Read the files the note names and check that what it calls done really is (fix it if not). Then go on with ` +
     `what is left; do not redo what is done and correct. If nothing is left, say so briefly and wait for the user.`
   );
 }
 
-/** Reads a resume message back: the note and the size it handed over at (null: not a resume message). */
-export function parseResume(text: string): { note: string; was: number } | null {
+/**
+ * Reads a resume message back: the note, the size it handed over at, and the user's new message sent with it
+ * (empty when none). Null: not a resume message.
+ */
+export function parseResume(text: string): { note: string; was: number; next: string } | null {
   if (!text.startsWith(CHAT_RESUME_MARK)) return null;
   const was = Number(/about (\d+)k tokens/.exec(text)?.[1] ?? 0) * 1000;
   const body = text.slice(text.indexOf(")") + 1).trim();
+  const n = body.indexOf(NEXT_START);
+  if (n >= 0) {
+    const rest = body.slice(n + NEXT_START.length);
+    const e = rest.lastIndexOf(NEXT_END);
+    return { note: body.slice(0, n).trim(), was, next: (e >= 0 ? rest.slice(0, e) : rest).trim() };
+  }
   const end = body.indexOf("\n\nThe user's last request in that session:");
   const end2 = body.indexOf("\n\nRead the files the note names");
   const cut = end >= 0 ? end : end2 >= 0 ? end2 : body.length;
-  return { note: body.slice(0, cut).trim(), was };
+  return { note: body.slice(0, cut).trim(), was, next: "" };
 }
 
 /**

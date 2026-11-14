@@ -327,6 +327,8 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
       tone: "info",
       note: r.note,
     });
+    // A reopened starred chat: the user's message went in the same first turn and shows as theirs.
+    if (r.next) out.push({ kind: "user", id: `u${seq}`, text: r.next });
   } else if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
     const images: ShownImage[] = Array.isArray(msg.images)

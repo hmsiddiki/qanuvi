@@ -224,6 +224,7 @@ class AgentStore {
       h.was,
       h.queued,
       h.requestAt,
+      h.noteOnly,
     );
   }
 
@@ -249,11 +250,15 @@ class AgentStore {
     was: number,
     queued: string[],
     requestAt = this.items.length,
+    joinFirst = false,
   ): Promise<void> {
     const projectId = this.#projectId;
     if (!projectId) return;
+    // A reopened starred chat: the owner's message goes in the first turn with the note (joinFirst), so the new
+    // session answers it instead of first checking and going on with the note by itself.
+    const next = joinFirst ? queued.join("\n\n") : "";
     // A plan step's chat keeps the plan's logins in its new session (at the end: not part of the shown note).
-    const prompt = chatResumePrompt(note, request, was) + ((await this.privateNote?.(projectId, from.id)) ?? "");
+    const prompt = chatResumePrompt(note, request, was, next) + ((await this.privateNote?.(projectId, from.id)) ?? "");
     // The earlier part stays on screen, read only; the new session's lines follow it. Messages held for the new
     // session leave the old part: they are sent again below.
     const held = new Set(queued);
@@ -287,8 +292,10 @@ class AgentStore {
     }
     from.saved = false;
     this.handover = null;
+    // The old session is read only from now on: its agent process is ended to free its memory.
+    if (["running", "waiting", "idle"].includes(from.status)) api.agent.stop(from.id).catch(() => {});
     // Messages written during the handover go to the new session, in order (they join its first turn).
-    for (const text of queued) await this.send(projectId, text);
+    if (!joinFirst) for (const text of queued) await this.send(projectId, text);
   }
 
   /** Adds text to the message box (after what is there), for example a page or an element from the preview. */
@@ -532,7 +539,7 @@ ${text}`
       if (from && r.note !== null) {
         forgetNote(localStorage, r.id);
         this.busy = true;
-        await this.#goOnFresh(from, r.note, "", r.was, [text]);
+        await this.#goOnFresh(from, r.note, "", r.was, [text], this.items.length, true);
         return true;
       }
       if (from) await this.handOver(true);
