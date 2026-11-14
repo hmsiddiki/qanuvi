@@ -374,30 +374,10 @@ runs on or off; with it off nothing is sent anywhere.
     "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
     storage, Inbox and desktop notifications (24u part 4), debugging for Node and PHP (15i part 3), split editor and
     minimap (15i part 4), the new logo, the small fixes. Nothing unpublished.
-    NEXT (owner, 2026-11-14, newest): write a dedicated plan file "brain training" (not yet written, then agreed by the
-    owner before building): Qanuvi's brain (decisions, methods, model choice, checks, reviews; not model weights) is
-    trainable and upgradable over time instead of copying others' work. Proposed parts: (1) results record + versioned
-    brain (change log, roll back, export); (2) practice tasks from selected open-source repos: past changes with
-    tests, run on scratch copies, graded by the repo's own tests and compared with the real fix (no copying, no
-    pushing); methodology repos give ideas rewritten as candidate methods; (3) learning methods from results, a new
-    brain version promoted only when it does better on held-out tasks; (4) runs while the owner is away (task runner),
-    with a budget, free/local models first; what is learned from the owner's projects stays local unless shared;
-    later brain updates from qanuvi.com with the user's yes; (5) LATER, optional: LoRA adapters for small local models
-    (GPU limits; permissively licensed repos only). The Extensions plan and the Superpowers extension below are a
-    much LATER part (owner).
-    OWNER DECISION (2026-11-14): Superpowers (obra/superpowers, MIT, works with many agents) is NOT built into Qanuvi.
-    It becomes Qanuvi's FIRST EXTENSION. Qanuvi's own brain stays in charge and should one day be self-sufficient and
-    better than Superpowers. NEXT: write plan item "Extensions" in this tasklist, ask the owner to agree it, then build:
-    (1) the extension system: the core offers fixed hook points only (before the planner writes a plan, what a step's
-    agent receives per job type, the step-done gate, the review after a step, run start / end); text-only extensions
-    first (instructions, no code run), installed from a git address or a folder, on/off per project, updates with the
-    user's yes, licence and source shown; (2) the Superpowers extension on those hooks, adapted (brainstorming before
-    planning, plan format with a check line per step, check gate, optional tests-first, debugging method for fix steps,
-    decider's two-stage review, optional git worktree per run; Qanuvi's own ask sorting kept instead of "never stop",
-    "delete code written before tests" only as an option, its telemetry logo left out, MIT notice kept); short versions
-    for small / free models; not sent twice when Claude Code has the Superpowers plugin; (3) the brain measures runs
-    with and without the extension (step success, tokens, cost per model and project) and turns what works into its own
-    learned methods, so the extension is the benchmark to beat.
+    NEXT (owner, 2026-11-14): core things first. The brain-training plan and extensions are ideas for later, kept in
+    docs/IDEAS-UPCOMING.md, NOT development items. Start the next conversation by asking the owner which core item
+    comes first: 24q (agreed: smaller steps and pacing), 24z step A (headless runner and queue: runs go on with the
+    window closed), Milestone 1 (Linux and macOS checks), or 10 (Stage 1 review).
     CHECKPOINT 2026-11-14 (after 15i part 4): nothing open from 15i. NEXT: ask the owner what comes next (candidates:
     publish 0.1.20 when they say so; 15i LATER Phpactor; 24q agreed, not built; 24v/24w LATER; Linux/macOS checks of
     Milestone 1). Test scripts (ui.ps1 with a drag action, loadmon.ps1, crop.ps1) and the scratch project splitproj are
