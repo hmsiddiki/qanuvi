@@ -374,6 +374,17 @@ runs on or off; with it off nothing is sent anywhere.
     "claude update" before the next release). 0.1.20 has everything since 0.1.19: plan logins in step chats and masked
     storage, Inbox and desktop notifications (24u part 4), debugging for Node and PHP (15i part 3), split editor and
     minimap (15i part 4), the new logo, the small fixes. Nothing unpublished.
+    NEXT (owner, 2026-11-14, newest): write a dedicated plan file "brain training" (not yet written, then agreed by the
+    owner before building): Qanuvi's brain (decisions, methods, model choice, checks, reviews; not model weights) is
+    trainable and upgradable over time instead of copying others' work. Proposed parts: (1) results record + versioned
+    brain (change log, roll back, export); (2) practice tasks from selected open-source repos: past changes with
+    tests, run on scratch copies, graded by the repo's own tests and compared with the real fix (no copying, no
+    pushing); methodology repos give ideas rewritten as candidate methods; (3) learning methods from results, a new
+    brain version promoted only when it does better on held-out tasks; (4) runs while the owner is away (task runner),
+    with a budget, free/local models first; what is learned from the owner's projects stays local unless shared;
+    later brain updates from qanuvi.com with the user's yes; (5) LATER, optional: LoRA adapters for small local models
+    (GPU limits; permissively licensed repos only). The Extensions plan and the Superpowers extension below are a
+    much LATER part (owner).
     OWNER DECISION (2026-11-14): Superpowers (obra/superpowers, MIT, works with many agents) is NOT built into Qanuvi.
     It becomes Qanuvi's FIRST EXTENSION. Qanuvi's own brain stays in charge and should one day be self-sufficient and
     better than Superpowers. NEXT: write plan item "Extensions" in this tasklist, ask the owner to agree it, then build:
