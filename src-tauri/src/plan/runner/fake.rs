@@ -69,6 +69,10 @@ struct World {
     calls: Vec<String>,
     prompts: Vec<(String, String)>,
     requests: Vec<TurnRequest>,
+    /// Agent lines per session (what `session_lines` answers).
+    lines: HashMap<String, Vec<String>>,
+    /// The plan's private details.
+    private: Vec<String>,
     n: u64,
     clock: i64,
 }
@@ -202,6 +206,11 @@ impl FakeEnv {
     }
     pub fn runs(&self) -> Vec<RunRecord> {
         self.w().runs.values().cloned().collect()
+    }
+
+    /// Gives the plan private details (a login the owner added).
+    pub fn set_private(&self, details: &[&str]) {
+        self.w().private = details.iter().map(|d| d.to_string()).collect();
     }
 
     pub fn settings(&self) -> ProjectSettings {
@@ -416,6 +425,14 @@ impl RunEnv for FakeEnv {
             *t = (t.0 + 1000, t.1 + 100, t.2 + 2000);
             (c, *t)
         };
+        {
+            let mut w = self.w();
+            let kept = w.lines.entry(id.clone()).or_default();
+            kept.extend(reply.lines.iter().cloned());
+            if let Some(text) = &reply.result {
+                kept.push(serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}).to_string());
+            }
+        }
         let mut end = TurnEnd {
             session_id: id.clone(),
             status: "running".into(),
@@ -596,6 +613,40 @@ impl RunEnv for FakeEnv {
         self.call("projects_update");
         self.w().settings = settings.clone();
         Ok(())
+    }
+
+    fn session_lines(&self, session_id: &str) -> Vec<String> {
+        self.w().lines.get(session_id).cloned().unwrap_or_default()
+    }
+
+    fn plan_private(&self, _file: &str) -> Vec<String> {
+        self.w().private.clone()
+    }
+
+    fn plan_private_clear(&self, _file: &str) {
+        self.call("plan_private_clear");
+        self.w().private.clear();
+    }
+
+    fn outline(&self, _path: &str) -> Vec<crate::plan::packet::OutlineItem> {
+        Vec::new()
+    }
+
+    fn find_symbols(&self, _name: &str) -> Vec<crate::plan::packet::Location> {
+        Vec::new()
+    }
+
+    fn free_decide(
+        &self,
+        _setup: &str,
+        _system: &str,
+        _prompt: &str,
+    ) -> Result<(String, String), String> {
+        Err("no free models in the test world".into())
+    }
+
+    fn list_all_runs(&self, _limit: usize) -> Result<Vec<RunRecord>, String> {
+        Ok(self.runs())
     }
 }
 

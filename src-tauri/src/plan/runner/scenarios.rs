@@ -2,55 +2,72 @@
 //! the real plan logic, against the world from memory (`fake.rs`) with a scripted agent. Each scenario is a run that
 //! once went wrong or must keep working; every runner bug found in a real run gets one here first.
 //!
-//! Ported in R2a, before the run loop exists: `Run` below is the one place they meet it, and R2c connects it. Until
-//! then they are ignored (`cargo test -- --ignored` shows them failing at the hook); R2c removes the ignores, and the
-//! TypeScript runner goes (R2e) only when all of them pass here.
+//! `Run` below is the one place they meet the run loop (`plan::run`, R2c). The TypeScript runner goes (R2e) only
+//! when all of them pass here.
 
 use super::fake::{AgentCall, AgentReply, FakeEnv};
 use super::{
     FullChecks, OnLimit, PauseMode, PlanRun, RunOptions, RunStatus, RunStepStatus, RunTeam, StepWhy,
 };
+use crate::plan::env::RunEnv;
+use crate::plan::run::{Shared, run_plan, test_setup};
 use crate::projects::ProjectSettings;
 use serde_json::json;
 use std::sync::Arc;
+use std::time::Duration;
 
 const FILE: &str = "content/plugins/shop/PLAN.md";
 
 /// A run of the scenarios' plan on a thread: the owner's Stop, the Inbox questions it waits on, its end.
-struct Run;
+struct Run {
+    shared: Arc<Shared>,
+    thread: std::thread::JoinHandle<Result<PlanRun, String>>,
+}
 
 /// The owner's Stop button, usable from inside an agent's turn.
 #[derive(Clone)]
-struct Stop;
+struct Stop(Arc<Shared>);
 
 impl Stop {
     fn press(&self) {
-        todo!("R2c: the run loop's stop")
+        self.0.stop();
     }
 }
 
 impl Run {
-    fn start(_env: Arc<FakeEnv>, _file: &str, _opts: RunOptions, _stop: Stop) -> Run {
-        todo!("R2c: the run loop")
+    fn start(env: Arc<FakeEnv>, file: &str, opts: RunOptions, stop: Stop) -> Run {
+        let shared = stop.0.clone();
+        let sh = shared.clone();
+        let setup = test_setup(file, opts);
+        let thread = std::thread::spawn(move || run_plan(&*env, &sh, setup));
+        // The run has its record before anyone looks at it.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while shared.run().is_none() && !thread.is_finished() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Run { shared, thread }
     }
 
     /// Questions the run waits on now (held steps in the Inbox).
     fn waiting_answers(&self) -> usize {
-        todo!("R2c: the run loop")
+        self.shared.waiting_answers()
     }
 
     /// The run as it is now.
     fn now(&self) -> PlanRun {
-        todo!("R2c: the run loop")
+        self.shared.run().expect("the run has started")
     }
 
     fn wait(self) -> PlanRun {
-        todo!("R2c: the run loop")
+        self.thread
+            .join()
+            .expect("the run thread")
+            .expect("the run starts")
     }
 }
 
 fn stop_button() -> Stop {
-    Stop
+    Stop(Arc::new(Shared::new(Duration::from_millis(5))))
 }
 
 fn settings(changes_from: &str) -> ProjectSettings {
@@ -161,7 +178,6 @@ fn ok_review(c: &AgentCall) -> AgentReply {
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn runs_a_plain_plan_to_the_end() {
     let env =
         world("# Plan\n\n- [ ] **1. First**\n  - do it\n- [ ] **2. Second**\n  - then this\n");
@@ -190,7 +206,6 @@ fn runs_a_plain_plan_to_the_end() {
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn plan_f_97a_a_review_that_sees_no_diff_of_real_work_does_not_turn_the_step_down() {
     let env = world("# Plan\n\n- [ ] **97a. Storage design**\n  - schema 26\n");
     *env.blind_diff.lock().unwrap() = true; // what git did in the folder it ignores
@@ -227,7 +242,6 @@ fn plan_f_97a_a_review_that_sees_no_diff_of_real_work_does_not_turn_the_step_dow
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn a_review_sees_a_steps_change_in_an_ignored_plugin_folder_and_judges_it() {
     let env = world("# Plan\n\n- [ ] **3. Contact column**\n");
     env.set_agent(|c| {
@@ -263,7 +277,6 @@ fn a_review_sees_a_steps_change_in_an_ignored_plugin_folder_and_judges_it() {
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn plan_f_97a_replanned_steps_get_free_numbers_the_replaced_step_is_not_held_and_it_is_ticked_after_them()
  {
     let env = world(
@@ -324,7 +337,6 @@ fn plan_f_97a_replanned_steps_get_free_numbers_the_replaced_step_is_not_held_and
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn git_chosen_but_the_plans_folder_is_out_of_gits_sight_one_question_and_the_run_goes_on() {
     let env = world("# Plan\n\n- [ ] **1. One**\n- [ ] **2. Two**\n");
     env.set_settings(settings("git"));
@@ -359,12 +371,16 @@ fn git_chosen_but_the_plans_folder_is_out_of_gits_sight_one_question_and_the_run
     assert!(asks[0].text.contains("content/plugins/shop"));
     // The owner picks Qanuvi's snapshots: the project setting changes.
     env.answer(asks[0].key.as_deref().unwrap(), json!({"choice": "qanuvi"}));
-    // (R2c: the run's answer follower, or the window's, applies it.)
+    // The core's answer follower applies it (R2d calls it when an Inbox item is answered).
+    let answered = env
+        .inbox_by_key(asks[0].key.as_deref().unwrap())
+        .unwrap()
+        .unwrap();
+    crate::plan::run::on_answer(&*env, &answered);
     assert_eq!(env.settings().changes_from, "qanuvi");
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn a_blocked_step_goes_to_the_inbox_the_run_waits_and_an_answer_lets_it_go_on() {
     let env = world("# Plan\n\n- [ ] **1. Needs a key**\n- [ ] **2. Other**\n");
     let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
@@ -427,7 +443,6 @@ fn a_blocked_step_goes_to_the_inbox_the_run_waits_and_an_answer_lets_it_go_on() 
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn failing_tests_go_back_to_the_same_session_with_only_the_failures_then_pass() {
     let env = world("# Plan\n\n- [ ] **5. Coupon rule**\n");
     let fixed = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -476,7 +491,6 @@ fn failing_tests_go_back_to_the_same_session_with_only_the_failures_then_pass() 
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn pause_after_each_step_stops_after_a_whole_step_and_the_next_run_goes_on_from_the_next_one() {
     let env = world("# Plan\n\n- [ ] **1. One**\n- [ ] **2. Two**\n");
     env.set_agent(|c| {
@@ -508,7 +522,6 @@ fn pause_after_each_step_stops_after_a_whole_step_and_the_next_run_goes_on_from_
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn stopping_during_a_step_ends_the_run_as_stopped_and_the_step_stays_open() {
     let env = world("# Plan\n\n- [ ] **1. Long**\n- [ ] **2. Later**\n");
     // The owner presses Stop twice during the first turn (the second press stops at once). Only once: the gentle
@@ -530,7 +543,6 @@ fn stopping_during_a_step_ends_the_run_as_stopped_and_the_step_stays_open() {
 }
 
 #[test]
-#[ignore = "R2c: the run loop"]
 fn a_step_whose_needs_line_names_an_unfinished_step_in_another_plan_is_skipped_with_the_reason() {
     // A Needs line names another plan by its path in the project.
     let env = world(
@@ -564,4 +576,174 @@ fn a_step_whose_needs_line_names_an_unfinished_step_in_another_plan_is_skipped_w
         "1 done · 1 skipped: step 1 (needs step 4 of OTHER.md, which is not done)"
     );
     assert_eq!(step(&r, "2").status, RunStepStatus::Done);
+}
+
+// ---------- Added with the run loop in the core (R2c) ----------
+
+#[test]
+fn pausing_in_the_middle_of_a_step_keeps_its_session_for_resume() {
+    let env = world("# Plan\n\n- [ ] **1. Long**\n- [ ] **2. Later**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        if !planner(c) && c.turn == 1 {
+            sh.pause();
+        }
+        AgentReply::default()
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Paused);
+    assert!(r.message.starts_with("Paused in step 1."), "{}", r.message);
+    let paused = r
+        .paused_session
+        .as_ref()
+        .expect("the step's session is kept");
+    assert_eq!(paused.number.as_deref(), Some("1"));
+    // The agent was asked to write where it is, and its session was not stopped.
+    assert!(
+        env.sent()
+            .iter()
+            .any(|(_, t)| t.contains("the owner pauses the run now"))
+    );
+    assert!(!env.stopped().contains(&paused.session_id));
+    assert_eq!(step(&r, "1").attempts[0].note, "paused by the owner");
+    assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
+}
+
+#[test]
+fn a_usage_limit_waits_for_the_reset_and_the_step_is_tried_again() {
+    let env = world("# Plan\n\n- [ ] **1. One**\n");
+    let started = env.now_ms();
+    env.set_agent(|c| {
+        if c.turn == 1 && c.env.prompts().len() == 1 {
+            return AgentReply {
+                result: Some("You've hit your usage limit · resets 11pm (UTC)".into()),
+                is_error: true,
+                ..Default::default()
+            };
+        }
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(env.prompts().len(), 2);
+    // The fake clock moved on to the reset (it starts at 08:00 UTC).
+    assert!(
+        env.now_ms() - started >= 14 * 3_600_000,
+        "waited {} ms",
+        env.now_ms() - started
+    );
+    // The limit is no failed try.
+    assert_eq!(step(&r, "1").attempts.len(), 1);
+}
+
+#[test]
+fn the_owners_model_switch_hands_the_step_over_to_the_chosen_model() {
+    let env = world("# Plan\n\n- [ ] **1. Rework**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        if c.model == "claude-opus-5-5" {
+            sh.controls.switch_model("claude-sonnet-5-5");
+            return AgentReply::default();
+        }
+        assert!(c.prompt.contains("The owner switched this step to you"));
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    let tries = &step(&r, "1").attempts;
+    assert_eq!(tries.len(), 2);
+    assert_eq!(
+        tries[0].note,
+        "handed over to Sonnet 5.5 (the owner's choice)"
+    );
+    assert_eq!(tries[1].model, "claude-sonnet-5-5");
+    // The choice is kept in the step's Model line.
+    assert!(env.text(FILE).contains("claude-sonnet-5-5"));
+}
+
+#[test]
+fn private_details_reach_each_step_and_go_when_the_whole_plan_is_done() {
+    let env = world("# Plan\n\n- [ ] **1. Sign in**\n");
+    env.set_private(&["Test login: admin / test-pass-1"]);
+    env.set_agent(|c| {
+        assert!(c.prompt.contains("Test login: admin / test-pass-1"));
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(env.calls().iter().any(|c| c == "plan_private_clear"));
+}
+
+#[test]
+fn an_answer_given_in_the_inbox_while_no_run_went_on_counts_at_the_next_start() {
+    let env = world("# Plan\n\n- [ ] **1. Needs a key**\n- [ ] **2. Other**\n");
+    let blocked = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let b = blocked.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" && b.load(std::sync::atomic::Ordering::SeqCst) {
+            c.env.mark(FILE, "1", '!');
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    // The first run holds step 1 and is ended without the answer.
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let first = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop,
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(3);
+    while first.waiting_answers() == 0 {
+        assert!(std::time::Instant::now() < until, "the run never waited");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    sh.finish_without();
+    let r = first.wait();
+    assert_eq!(r.status, RunStatus::NeedsYou);
+    // Answered later, with no run going.
+    let q = env
+        .inbox()
+        .into_iter()
+        .find(|i| i.kind_of == "answer")
+        .expect("a question");
+    env.answer(
+        q.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "the key is set now"}),
+    );
+    blocked.store(false, std::sync::atomic::Ordering::SeqCst);
+    // The step is open again in the plan (the owner unblocked it), and the next run goes on with the answer.
+    let text = env.text(FILE).replace("- [!] **1.", "- [ ] **1.");
+    env.put(FILE, &text);
+    let r = run(
+        &env,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+    );
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(
+        env.prompts()
+            .last()
+            .unwrap()
+            .1
+            .contains("the key is set now")
+    );
+    assert_eq!(questions(&env), 0);
 }

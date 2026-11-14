@@ -188,7 +188,30 @@ pub trait RunEnv: Send + Sync {
     fn project_settings(&self) -> Result<ProjectSettings, String>;
     /// Changes them (the owner's answer "Use Qanuvi's snapshots" to the changes-from question).
     fn set_project_settings(&self, settings: &ProjectSettings) -> Result<(), String>;
+
+    // Added for the run loop (24z R2c).
+    /// A session's agent lines so far (its log, notes, a usage limit's reset time, its context size).
+    fn session_lines(&self, session_id: &str) -> Vec<String>;
+    /// The plan's private details (logins), kept in the credential store; empty when none or no store.
+    fn plan_private(&self, file: &str) -> Vec<String>;
+    /// The whole plan is done: its private details go.
+    fn plan_private_clear(&self, file: &str);
+    /// The code index's outline of a file (empty when not indexed).
+    fn outline(&self, path: &str) -> Vec<OutlineItem>;
+    /// Definitions with this name in the code index.
+    fn find_symbols(&self, name: &str) -> Vec<Location>;
+    /// Asks Qanuvi core's own models (the setup's, in order) for a decision; answers who answered and the text.
+    fn free_decide(
+        &self,
+        setup: &str,
+        system: &str,
+        prompt: &str,
+    ) -> Result<(String, String), String>;
+    /// The latest runs of every project (what earlier runs taught about models).
+    fn list_all_runs(&self, limit: usize) -> Result<Vec<RunRecord>, String>;
 }
+
+use crate::plan::packet::{Location, OutlineItem};
 
 /// Whether requests get the user's memory, and how much (Settings > Memory, sent with the run's start).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -288,6 +311,7 @@ pub type Notify = std::sync::Arc<dyn Fn(&str, Value) + Send + Sync>;
 pub struct CoreEnv<'a> {
     pub db: crate::store::Db,
     pub agents: &'a crate::agent::Agents,
+    pub indexes: &'a crate::index::Indexes,
     pub project: crate::projects::Project,
     pub notify: Notify,
 }
@@ -553,6 +577,66 @@ impl RunEnv for CoreEnv<'_> {
         crate::memory::slice(&self.db, Some(&self.project.id), request, budget, true)
             .ok()
             .map(|s| s.text)
+    }
+
+    fn session_lines(&self, session_id: &str) -> Vec<String> {
+        crate::agent::session_events(&self.db, session_id).unwrap_or_default()
+    }
+
+    fn plan_private(&self, file: &str) -> Vec<String> {
+        crate::secrets::plan_private(&self.project.id, file)
+    }
+
+    fn plan_private_clear(&self, file: &str) {
+        let _ = crate::secrets::plan_private_clear(&self.project.id, file);
+    }
+
+    fn outline(&self, path: &str) -> Vec<OutlineItem> {
+        self.indexes
+            .with(&self.root(), |idx| {
+                idx.outline(path)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|s| OutlineItem {
+                        name: s.name.clone(),
+                        kind: s.kind.to_string(),
+                        line: s.line as i64,
+                        container: s.container.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn find_symbols(&self, name: &str) -> Vec<Location> {
+        self.indexes
+            .with(&self.root(), |idx| {
+                idx.find(name, None, 80)
+                    .into_iter()
+                    .map(|f| Location {
+                        name: f.symbol.name,
+                        kind: f.symbol.kind.to_string(),
+                        path: f.path,
+                        line: f.symbol.line as i64,
+                        container: f.symbol.container,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn free_decide(
+        &self,
+        setup: &str,
+        system: &str,
+        prompt: &str,
+    ) -> Result<(String, String), String> {
+        let setup: crate::brain::Setup = serde_json::from_str(setup).map_err(|e| e.to_string())?;
+        crate::brain::decide(&setup, system, prompt)
+    }
+
+    fn list_all_runs(&self, limit: usize) -> Result<Vec<RunRecord>, String> {
+        crate::runs::list_all(&self.db, limit)
     }
 }
 

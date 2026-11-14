@@ -19,6 +19,7 @@ pub mod planstate;
 pub mod preflight;
 pub mod prompts;
 pub mod routing;
+pub mod run;
 pub mod runner;
 pub mod setaside;
 pub mod tasklist;

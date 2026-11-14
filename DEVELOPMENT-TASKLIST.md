@@ -369,7 +369,12 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 checkpoint): 0.1.22 PUBLISHED (owner: "publish anyway", release rule skipped):
+    RESUME HERE (newest, 2026-11-15, after R2c part 1): R2c PART 1 DONE (see 24z "R2c part 1 DONE"): the run loop
+    in the core (plan/run.rs) on RunEnv, all 10 ported scenarios un-ignored and passing, 5 new ones; 350 Rust tests
+    pass, clippy clean; TypeScript unchanged, nothing published. NEXT: R2c part 2, owner messages in step chats (24z
+    "Owner messages in step chats": scenario tests first, then the decider's sorting in the Rust runner), in a fresh
+    conversation; then R2d wiring. Check free RAM before builds and run the Rust parts on their own (guard.ps1).
+    RESUME HERE (before, 2026-11-15 checkpoint): 0.1.22 PUBLISHED (owner: "publish anyway", release rule skipped):
     PLAN-F stuck-again fixes (reviews search the plan's folder and check an empty diff against the Done line; replans
     rewrite Needs lines; Headroom "<<ccr:" placeholders give way to the agent's text), the "read my message now"
     stopgap (a quiet agent is told to go on, no more "paused by the owner"), R2b's process-tree stop. PLAN-F was fixed
@@ -797,6 +802,28 @@ runs on or off; with it off nothing is sent anywhere.
         checks::kill_group (taskkill /T on Windows, the process group elsewhere) in stop, stop_project and stop_all,
         with a test that starts a process with a child and checks both are gone. Seen live: 21 old agent chats in
         the owner's VS Code held about 5.5 GB (each with 4 MCP node processes).
+      - [x] R2c part 1 DONE 2026-11-15: plan/run.rs, the run loop (port of the window's `start` and its helpers):
+        steps in order with their Needs lines (other plans and the archive too), holds before a step, the model
+        choice (one model, Pick models, Model lines read fresh, rules, learned stats, budget), free first with the
+        decider's assignment, attempts through turn::attempt with the model ladder, handovers, the owner's model
+        switch and mode, pause in a step and after it, the step's limits, usage-limit waits (or free models until the
+        reset), reviews from Qanuvi's snapshots, the planner's rewrite, held/blocked/failed steps set aside with the
+        Inbox question and the plan's and decider's set-aside calls, closing steps run again, steps added mid-run,
+        notes, API.md, the step logs, private details, the end message and Inbox item. `Shared` is the running
+        loop's handle (Stop, Pause, answers, End the run here; Controls for model, mode, "read my message now"; run
+        and agent-event listeners for R2d). Answers come from the window or straight from the Inbox (looked at after
+        each step and while waiting), and a taken answer settles its question, so a step held again is asked anew.
+        `on_answer` applies the changes-from answer (R2d calls it when an item is answered). RunEnv gained
+        session_lines, plan_private(_clear), outline, find_symbols, free_decide and list_all_runs; CoreEnv gained
+        the code index. The 10 scenarios run on it unchanged except the changes-from one (calls on_answer). New
+        scenarios: pause mid-step keeps the session, usage-limit wait then retry, the owner's model switch hands
+        over, private details reach steps and go when the plan is done, an Inbox answer given while no run went on
+        counts at the next start. 350 Rust tests pass (1 old snapshot test ignored as before), clippy clean.
+        Fixed on the way (window runner bugs, not ported): a pause with carry-on off stopped the session kept for
+        Resume (closed before the pause was handled); the owner's model switch was taken for a context handover
+        (switchingTo was cleared by #attempt before the runner read it), so it counted against the handover limit
+        and got the wrong resume note; an answer given in the Inbox while no run went on was lost. Not in part 1:
+        the finishing pass (R2d, with its commands), owner messages (part 2).
       - [ ] Replaced steps get their own colour (owner agreed 2026-11-15): a step marked [!] only because the planner
         rewrote it (its "Replaced by steps ..." note, planner.ts replaceStep) shows in the Plan view with its own
         colour (not the red of a real block) and the label "replaced by 97a-1–97a-4"; it turns green when all its
