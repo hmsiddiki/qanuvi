@@ -5,10 +5,13 @@
 pub mod compare;
 pub mod costs;
 pub mod decider;
+pub mod finishing;
 pub mod holdask;
 pub mod js;
 pub mod limits;
 pub mod picks;
 pub mod prompts;
 pub mod routing;
+pub mod runner;
 pub mod setaside;
+pub mod tasklist;

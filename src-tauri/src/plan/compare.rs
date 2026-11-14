@@ -7,7 +7,11 @@ use serde_json::Value;
 use serde_json::json;
 
 #[cfg(test)]
-use super::{costs, decider, holdask, limits, picks, prompts, setaside};
+use super::{
+    costs, decider, finishing, holdask, limits, picks, prompts, routing, runner, setaside, tasklist,
+};
+#[cfg(test)]
+use std::collections::{HashMap, HashSet};
 
 /// One case through the Rust port: the function's name (the TypeScript one) and its arguments as JSON.
 #[cfg(test)]
@@ -20,6 +24,12 @@ fn run(name: &str, a: &[Value]) -> Value {
         serde_json::to_value(v).unwrap()
     }
     let s = |i: usize| a[i].as_str().unwrap_or_default().to_string();
+    let line = |v: &Value| v.as_u64().unwrap() as usize;
+    // An edit's text, or the error the TypeScript throws.
+    let tried = |r: Result<String, String>| match r {
+        Ok(t) => json!(t),
+        Err(e) => json!({ "error": e }),
+    };
     let ids = |v: &Value| -> Vec<String> {
         v.as_array()
             .into_iter()
@@ -140,6 +150,194 @@ fn run(name: &str, a: &[Value]) -> Value {
             &s(0),
             &prompts::CLAUDE_CODE_MODELS
         )),
+        "parsePlan" => to(tasklist::parse_plan(&s(0))),
+        "setStepStatus" => tried(tasklist::set_step_status(
+            &s(0),
+            line(&a[1]),
+            de(&a[2]),
+            a[3].as_str(),
+        )),
+        "setStepTitle" => tried(tasklist::set_step_title(
+            &s(0),
+            line(&a[1]),
+            &s(2),
+            a[3].as_str(),
+        )),
+        "setStepModel" => tried(tasklist::set_step_model(
+            &s(0),
+            line(&a[1]),
+            a[2].as_str(),
+            a[3].as_str(),
+        )),
+        "setStepSkipped" => tried(tasklist::set_step_skipped(
+            &s(0),
+            line(&a[1]),
+            a[2].as_str(),
+            a[3].as_str(),
+        )),
+        "nextStatus" => to(tasklist::next_status(de(&a[0]))),
+        "findTaskLists" => to(tasklist::find_task_lists(&de::<Vec<String>>(&a[0]))),
+        "clearStaleSkips" => json!(tasklist::clear_stale_skips(
+            &s(0),
+            &de::<Vec<String>>(&a[1])
+        )),
+        "jobType" => to(routing::job_type(&s(0))),
+        "learn" => {
+            let runs: Vec<Vec<runner::StepRun>> = a[0]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| de(&r["steps"]))
+                .collect();
+            to(routing::learn(
+                runs.iter().map(Vec::as_slice),
+                routing::job_type,
+            ))
+        }
+        "reliability" => json!(routing::reliability(
+            a[0]["tries"].as_u64().unwrap() as u32,
+            a[0]["successes"].as_u64().unwrap() as u32
+        )),
+        "learnedModel" => to(routing::learned_model(
+            &de(&a[0]),
+            de(&a[1]),
+            &de::<Vec<_>>(&a[2]),
+        )),
+        "modelProfiles" => to(routing::model_profiles(
+            &de(&a[0]),
+            de(&a[1]),
+            &de::<Vec<_>>(&a[2]),
+        )),
+        "budgetState" => to(routing::budget_state(de(&a[0]))),
+        "chooseModel" => {
+            let o = &a[0];
+            let rules: HashMap<routing::JobType, String> = de(&o["rules"]);
+            let stats: routing::Stats = de(&o["stats"]);
+            let models: Vec<routing::AgentModel> = de(&o["models"]);
+            let picked: Option<routing::Picked> = de(o.get("picked").unwrap_or(&Value::Null));
+            to(routing::choose_model(&routing::ChooseOptions {
+                step_model: o["stepModel"].as_str(),
+                job: de(&o["type"]),
+                rules: &rules,
+                stats: &stats,
+                models: &models,
+                default_model: o["defaultModel"].as_str().unwrap(),
+                budget: de(&o["budget"]),
+                picked: picked.as_ref(),
+            }))
+        }
+        "freeFirstFor" => json!(runner::free_first_for(
+            de(&a[0]),
+            a[1] == true,
+            a[2] == true
+        )),
+        "freeWantedButMissing" => json!(runner::free_wanted_but_missing(
+            de(&a[0]),
+            de(&a[1]),
+            a[2] == true,
+            a[3] == true
+        )),
+        "costRatio" => to(runner::cost_ratio(
+            &de::<Vec<_>>(&a[0]),
+            &de::<Vec<_>>(&a[1]),
+            &s(2),
+        )),
+        "stepsToRun" => {
+            let plan = tasklist::parse_plan(&s(0));
+            let ranges = runner::parse_ranges(a[3].as_str()).ranges;
+            let picked = runner::steps_to_run(&plan.steps, line(&a[1]), a[2] == true, &ranges);
+            to(picked.iter().map(|s| s.line).collect::<Vec<_>>())
+        }
+        "parseRanges" => to(runner::parse_ranges(a[0].as_str())),
+        "inRanges" => json!(runner::in_ranges(
+            a[0].as_str(),
+            &runner::parse_ranges(a[1].as_str()).ranges
+        )),
+        "unmetNeed" => {
+            let others: HashMap<String, HashSet<String>> = de(&a[2]);
+            to(runner::unmet_need(
+                &de::<Vec<_>>(&a[0]),
+                &de(&a[1]),
+                &others,
+            ))
+        }
+        "endStatus" => to(runner::end_status(&de::<Vec<_>>(&a[0]))),
+        "runSummary" => json!(runner::run_summary(&de::<Vec<_>>(&a[0]))),
+        "startModel" => json!(runner::start_model(a[0].as_str(), &s(1))),
+        "nextModel" => to(runner::next_model::<runner::Attempt>(
+            &de::<Vec<_>>(&a[0]),
+            &de::<Vec<_>>(&a[1]),
+            &s(2),
+            a[3].as_u64().unwrap() as u32,
+        )),
+        "stepOutcome" => to(runner::step_outcome(
+            &s(0),
+            a[1]["number"].as_str(),
+            a[1]["title"].as_str().unwrap(),
+        )),
+        "stepPrompt" => {
+            let plan = tasklist::parse_plan(&s(1));
+            json!(runner::step_prompt(
+                &s(0),
+                &plan.steps[line(&a[2])],
+                &de::<Vec<_>>(&a[3])
+            ))
+        }
+        "runTotals" => {
+            let calls: Option<Vec<runner::DeciderCall>> = de(&a[1]);
+            let finish: Option<finishing::FinishPass> = de(&a[2]);
+            let t = runner::run_totals(
+                &de::<Vec<_>>(&a[0]),
+                &calls.unwrap_or_default(),
+                finish.as_ref(),
+            );
+            let mut v = to(&t);
+            v["byModel"] =
+                Value::Object(t.by_model.iter().map(|(k, m)| (k.clone(), to(m))).collect());
+            v
+        }
+        "nextModelFreeFirst" => to(runner::next_model_free_first::<runner::Attempt>(
+            &de::<Vec<_>>(&a[0]),
+            &de::<Vec<_>>(&a[1]),
+            &s(2),
+            &s(3),
+            a[4].as_u64().unwrap() as u32,
+        )),
+        "freeSavings" => to(runner::free_savings(&de::<Vec<_>>(&a[0]), &de(&a[1]))),
+        "paidPerStep" => to(runner::paid_per_step(&de(&a[0]))),
+        "finishEstimate" => to(finishing::finish_estimate(&de::<Vec<_>>(&a[0]), de(&a[1]))),
+        "offersFinish" => {
+            let finish: Option<finishing::FinishPass> = de(&a[2]);
+            json!(finishing::offers_finish(
+                de(&a[0]),
+                &de::<Vec<_>>(&a[1]),
+                finish.as_ref()
+            ))
+        }
+        "finishReviewPrompt" => {
+            let checks: Option<finishing::Checks> = de(&a[3]);
+            json!(finishing::finish_review_prompt(
+                &s(0),
+                &de::<Vec<_>>(&a[1]),
+                &s(2),
+                checks.as_ref()
+            ))
+        }
+        "parseFinishReview" => to(finishing::parse_finish_review(&s(0))),
+        "finishFullPrompt" => {
+            let checks: Option<finishing::Checks> = de(&a[3]);
+            json!(finishing::finish_full_prompt(
+                &s(0),
+                &de::<Vec<_>>(&a[1]),
+                &de(&a[2]),
+                checks.as_ref(),
+                &de::<Vec<_>>(&a[4])
+            ))
+        }
+        "stillOpenIn" => to(finishing::still_open_in(&s(0))),
+        "doneNotes" => to(finishing::done_notes(&de::<Vec<_>>(&a[0]))),
+        "isPlanFile" => json!(finishing::is_plan_file(&s(0), &s(1), &s(2))),
+        "finishEntry" => json!(finishing::finish_entry(&de(&a[0]))),
         other => panic!("no Rust function for {other}"),
     }
 }

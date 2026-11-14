@@ -42,5 +42,12 @@ mod tests {
         let p = task_list_prompt("PLAN.md", &CLAUDE_CODE_MODELS);
         assert!(p.contains("PLAN.md"));
         assert!(p.contains("  - Model: claude-opus-5-5"));
+        // The example step is one Qanuvi itself can read.
+        let example = &p[p.find("## Section name").unwrap()..p.find("For each step").unwrap()];
+        let step = &crate::plan::tasklist::parse_plan(example).steps[0];
+        assert_eq!(step.number.as_deref(), Some("1"));
+        assert_eq!(step.title, "Step title");
+        assert_eq!(step.model.as_deref(), Some("claude-opus-5-5"));
+        assert_eq!(step.details.len(), 2);
     }
 }

@@ -369,7 +369,10 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 19:30): R1 PART 1 DONE (see 24z "R1 part 1"): src-tauri/src/plan/ with decider,
+    RESUME HERE (newest, 2026-11-14 20:30): R1 PART 2a DONE (see 24z "R1 part 2a"): tasklist, routing, runner and
+    finishing in Rust, 209 comparison cases all match. NEXT: R1 part 2b in a fresh conversation (preflight, packet,
+    planstate, housekeeping, guidance, planner), then R2 onwards continuously.
+    RESUME HERE (before, 2026-11-14 19:30): R1 PART 1 DONE (see 24z "R1 part 1"): src-tauri/src/plan/ with decider,
     limits, holdask, prompts, picks, costs, setaside, js helpers, and the TypeScript/Rust comparison check (88 cases,
     all match). NEXT: R1 part 2 in a fresh conversation (tasklist first, then routing, preflight, packet, planstate,
     housekeeping, finishing, guidance, planner, plan/runner.ts), then R2 onwards continuously.
@@ -656,9 +659,18 @@ runs on or off; with it off nothing is sent anywhere.
         the JSON (numbers by value). All 88 match; a changed output was checked to fail. Limit reset times use jiff
         (already in the lock file through another crate; its jiff-static part was fetched once) for time zones.
         Verify: 376 TypeScript + 201 Rust tests (Rust tests -j 1; the parallel run left a corrupt artifact).
-      - R1 part 2, NEXT: tasklist (parsePlan; then prompts' parsePlan test), routing (the rest: chooseModel,
-        modelProfiles), preflight, packet, planstate, housekeeping, finishing, guidance, planner, and plan/runner.ts
-        (pure decisions, 463 lines, not named above but pure) with handover.test.ts; add each to compare.test.ts.
+      - R1 part 2a DONE 2026-11-14: tasklist.rs (parse and edits; edits return Err with the TypeScript's message;
+        findTaskLists sorts like localeCompare for paths: punctuation in the default collation's order, then digits,
+        then letters, case only to break a tie), routing.rs (all of it; AgentModel lives here; monthStart takes a
+        jiff::Zoned), runner.rs (PlanRun, StepRun, Attempt, RunOptions and every decision; tests in runner/tests.rs),
+        finishing.rs (FinishPass and the pass's prompts and readers); prompts' parsePlan test ported; js::trim and
+        js::trim_start (JavaScript's white space: the byte order mark yes, U+0085 no). Comparison check: 209 cases,
+        all match (a changed output checked to fail). Stats is a HashMap: paidPerStep sums per type in another order
+        than the TypeScript Map, so cases use sums exact in binary. Verify: 376 TypeScript + 53 Rust plan tests,
+        clippy and svelte-check clean.
+      - R1 part 2b, NEXT: preflight, packet, planstate, housekeeping, guidance (with handover.test.ts), planner; add
+        each to compare.test.ts (build edit scripts with the Write tool: a heredoc turned "\r\n" in a script into a
+        real line break once).
     - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
       closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
       updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in

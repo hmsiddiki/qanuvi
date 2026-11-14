@@ -83,6 +83,21 @@ pub fn len(s: &str) -> usize {
     s.encode_utf16().count()
 }
 
+/// What JavaScript's `trim` takes off: Unicode white space and line ends, the byte order mark too, but not U+0085.
+fn js_space(c: char) -> bool {
+    (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
+}
+
+/// `s.trim()`.
+pub fn trim(s: &str) -> &str {
+    s.trim_matches(js_space)
+}
+
+/// `s.trimStart()`.
+pub fn trim_start(s: &str) -> &str {
+    s.trim_start_matches(js_space)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

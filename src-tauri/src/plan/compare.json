@@ -1652,5 +1652,4718 @@
    "PLAN.md"
   ],
   "out": "Write a task list for this project in PLAN.md, in this format so Qanuvi can show and run it:\n\n## Section name\n\n- [ ] **1. Step title** (optional short note)\n  - What the step does, one point per line.\n  - Validate: how to check it is done.\n  - Model: claude-opus-5-5\n\nFor each step choose the model that fits the work (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5): the strongest for money, security and hard design, a mid model for normal coding, the smallest for small edits and docs. If the file already exists, keep what is there and add to it. Ask me first if the goal is not clear from the project's files.\n\nGoal: "
+ },
+ {
+  "fn": "parsePlan",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+  ],
+  "out": {
+   "sections": [
+    {
+     "title": "Work map",
+     "level": 1,
+     "line": 0,
+     "steps": []
+    },
+    {
+     "title": "Stage 1",
+     "level": 2,
+     "line": 2,
+     "steps": [
+      {
+       "line": 3,
+       "status": "x",
+       "number": "1",
+       "title": "Project setup",
+       "note": "(a note that goes on)",
+       "details": [
+        "- Done on Windows.",
+        "  More detail."
+       ],
+       "model": null,
+       "needs": [],
+       "end": 7,
+       "section": "Stage 1"
+      },
+      {
+       "line": 8,
+       "status": "-",
+       "number": "2",
+       "title": "Layout",
+       "note": "(built)",
+       "details": [
+        "- Three panes.",
+        "- model: second-ignored",
+        "- Needs: 1, docs/OTHER.md#4 x",
+        "- Skipped: needs step 1"
+       ],
+       "model": "claude-opus-5-5",
+       "needs": [
+        "1",
+        "docs/OTHER.md#4",
+        "x"
+       ],
+       "end": 14,
+       "section": "Stage 1"
+      },
+      {
+       "line": 14,
+       "status": " ",
+       "number": "1b",
+       "title": "Updates",
+       "note": "",
+       "details": [],
+       "model": null,
+       "needs": [],
+       "end": 15,
+       "section": "Stage 1"
+      }
+     ]
+    },
+    {
+     "title": "Stage 2",
+     "level": 2,
+     "line": 16,
+     "steps": [
+      {
+       "line": 17,
+       "status": "x",
+       "number": null,
+       "title": "Plain step without bold",
+       "note": "",
+       "details": [],
+       "model": null,
+       "needs": [],
+       "end": 18,
+       "section": "Stage 2"
+      },
+      {
+       "line": 18,
+       "status": "!",
+       "number": "12-2",
+       "title": "Plain numbered",
+       "note": "",
+       "details": [
+        "* star detail"
+       ],
+       "model": null,
+       "needs": [],
+       "end": 20,
+       "section": "Stage 2"
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "line": 3,
+     "status": "x",
+     "number": "1",
+     "title": "Project setup",
+     "note": "(a note that goes on)",
+     "details": [
+      "- Done on Windows.",
+      "  More detail."
+     ],
+     "model": null,
+     "needs": [],
+     "end": 7,
+     "section": "Stage 1"
+    },
+    {
+     "line": 8,
+     "status": "-",
+     "number": "2",
+     "title": "Layout",
+     "note": "(built)",
+     "details": [
+      "- Three panes.",
+      "- model: second-ignored",
+      "- Needs: 1, docs/OTHER.md#4 x",
+      "- Skipped: needs step 1"
+     ],
+     "model": "claude-opus-5-5",
+     "needs": [
+      "1",
+      "docs/OTHER.md#4",
+      "x"
+     ],
+     "end": 14,
+     "section": "Stage 1"
+    },
+    {
+     "line": 14,
+     "status": " ",
+     "number": "1b",
+     "title": "Updates",
+     "note": "",
+     "details": [],
+     "model": null,
+     "needs": [],
+     "end": 15,
+     "section": "Stage 1"
+    },
+    {
+     "line": 17,
+     "status": "x",
+     "number": null,
+     "title": "Plain step without bold",
+     "note": "",
+     "details": [],
+     "model": null,
+     "needs": [],
+     "end": 18,
+     "section": "Stage 2"
+    },
+    {
+     "line": 18,
+     "status": "!",
+     "number": "12-2",
+     "title": "Plain numbered",
+     "note": "",
+     "details": [
+      "* star detail"
+     ],
+     "model": null,
+     "needs": [],
+     "end": 20,
+     "section": "Stage 2"
+    }
+   ],
+   "eol": "\r\n"
+  }
+ },
+ {
+  "fn": "parsePlan",
+  "args": [
+   ""
+  ],
+  "out": {
+   "sections": [],
+   "steps": [],
+   "eol": "\n"
+  }
+ },
+ {
+  "fn": "parsePlan",
+  "args": [
+   "﻿- [ ] **1. Bom**\n- [ ] ** 2.  Spaced  title **   after  "
+  ],
+  "out": {
+   "sections": [
+    {
+     "title": "",
+     "level": 0,
+     "line": -1,
+     "steps": [
+      {
+       "line": 1,
+       "status": " ",
+       "number": null,
+       "title": "2.  Spaced  title",
+       "note": "after",
+       "details": [],
+       "model": null,
+       "needs": [],
+       "end": 2,
+       "section": ""
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "line": 1,
+     "status": " ",
+     "number": null,
+     "title": "2.  Spaced  title",
+     "note": "after",
+     "details": [],
+     "model": null,
+     "needs": [],
+     "end": 2,
+     "section": ""
+    }
+   ],
+   "eol": "\n"
+  }
+ },
+ {
+  "fn": "setStepStatus",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   8,
+   "x",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [x] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepStatus",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   18,
+   " ",
+   "Plain numbered"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [ ] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepStatus",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   9,
+   "x",
+   null
+  ],
+  "out": {
+   "error": "The task list changed since it was shown. It has been reloaded; try again."
+  }
+ },
+ {
+  "fn": "setStepStatus",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   3,
+   "x",
+   "Wrong"
+  ],
+  "out": {
+   "error": "The task list changed since it was shown. It has been reloaded; try again."
+  }
+ },
+ {
+  "fn": "setStepTitle",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   3,
+   "  New\t**bold**  title ",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. New bold title** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepTitle",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   "Renamed",
+   "Updates"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Renamed**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepTitle",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   18,
+   "Renamed plain",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Renamed plain\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepTitle",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   17,
+   "Renamed",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Renamed\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepTitle",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   3,
+   " ** ",
+   null
+  ],
+  "out": {
+   "error": "A step needs a title."
+  }
+ },
+ {
+  "fn": "setStepModel",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   3,
+   "claude-haiku-5-5",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Model: claude-haiku-5-5\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepModel",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   8,
+   " claude-fable-5-2 ",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-fable-5-2\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepModel",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   8,
+   null,
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepModel",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   "",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepModel",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   "two words",
+   null
+  ],
+  "out": {
+   "error": "A model name has no spaces."
+  }
+ },
+ {
+  "fn": "setStepSkipped",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   8,
+   "  waits\nfor   you ",
+   "Layout"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: waits for you\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepSkipped",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   8,
+   null,
+   "Layout"
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepSkipped",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   "blocked",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n  - Skipped: blocked\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "setStepSkipped",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   3,
+   " ",
+   null
+  ],
+  "out": "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n"
+ },
+ {
+  "fn": "nextStatus",
+  "args": [
+   "!"
+  ],
+  "out": " "
+ },
+ {
+  "fn": "nextStatus",
+  "args": [
+   "-"
+  ],
+  "out": "x"
+ },
+ {
+  "fn": "findTaskLists",
+  "args": [
+   [
+    "docs/ROADMAP.md",
+    "README.md",
+    "DEVELOPMENT-TASKLIST.md",
+    "node_modules/x/TODO.md",
+    "notes/todo-list.md",
+    "QLOPY-CORE-UPGRADE-PLAN.md",
+    "content/plugins/shop/PLAN-D.md",
+    "b/plan.md",
+    "B/Plan.md",
+    "a_plan.md",
+    "a-plan.md",
+    "a1plan.md",
+    "PLAN-E.md",
+    "plan-e.md",
+    "old/PLAN.archive.md",
+    "x/.history/plan.md",
+    "Backup/plan.md"
+   ]
+  ],
+  "out": [
+   "a_plan.md",
+   "a-plan.md",
+   "a1plan.md",
+   "DEVELOPMENT-TASKLIST.md",
+   "plan-e.md",
+   "PLAN-E.md",
+   "QLOPY-CORE-UPGRADE-PLAN.md",
+   "b/plan.md",
+   "B/Plan.md",
+   "docs/ROADMAP.md",
+   "notes/todo-list.md",
+   "content/plugins/shop/PLAN-D.md"
+  ]
+ },
+ {
+  "fn": "clearStaleSkips",
+  "args": [
+   "- [x] **1. One**\n- [ ] **2. Two**\n  - Needs: 1\n  - Skipped: needs step 1\n- [ ] **3. Three**\n  - Needs: 2, 9\n  - Skipped: needs step 2\n- [ ] **4. Four**\n  - Needs: 1, P.md#2\n  - Skipped: other plan\n",
+   [
+    "9"
+   ]
+  ],
+  "out": "- [x] **1. One**\n- [ ] **2. Two**\n  - Needs: 1\n- [ ] **3. Three**\n  - Needs: 2, 9\n  - Skipped: needs step 2\n- [ ] **4. Four**\n  - Needs: 1, P.md#2\n  - Skipped: other plan\n"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Fix the refund docs and add tests"
+  ],
+  "out": "security"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Restyle the buttons"
+  ],
+  "out": "ui"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Update CHANGELOG.md"
+  ],
+  "out": "docs"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Add authentication_flow"
+  ],
+  "out": "security"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "prefix_tests"
+  ],
+  "out": "feature"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Rename CartService and move it"
+  ],
+  "out": "refactor"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Fixes for two crashes"
+  ],
+  "out": "bugfix"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Add a wishlist page"
+  ],
+  "out": "feature"
+ },
+ {
+  "fn": "jobType",
+  "args": [
+   "Ünïcode pay"
+  ],
+  "out": "security"
+ },
+ {
+  "fn": "learn",
+  "args": [
+   [
+    {
+     "steps": [
+      {
+       "line": 1,
+       "number": "1",
+       "title": "Update README",
+       "attempts": [
+        {
+         "model": "claude-haiku-5-5",
+         "sessionId": "s",
+         "outcome": "done",
+         "costUsd": 0.25,
+         "inputTokens": 100,
+         "outputTokens": 10,
+         "seconds": 2,
+         "note": ""
+        },
+        {
+         "model": "claude-haiku-5-5",
+         "sessionId": "s",
+         "outcome": "stopped",
+         "costUsd": 1,
+         "inputTokens": 100,
+         "outputTokens": 10,
+         "seconds": 2,
+         "note": ""
+        }
+       ],
+       "status": "done"
+      },
+      {
+       "line": 1,
+       "number": "2",
+       "title": "x",
+       "attempts": [
+        {
+         "model": "claude-haiku-5-5",
+         "sessionId": "s",
+         "outcome": "open",
+         "costUsd": 0.5,
+         "inputTokens": 100,
+         "outputTokens": 10,
+         "seconds": 2,
+         "note": ""
+        },
+        {
+         "model": "claude-sonnet-5-5",
+         "sessionId": "s",
+         "outcome": "done",
+         "costUsd": 0.75,
+         "inputTokens": 100,
+         "outputTokens": 10,
+         "seconds": 2,
+         "note": ""
+        }
+       ],
+       "status": "done",
+       "jobType": "security"
+      },
+      {
+       "line": 1,
+       "number": "3",
+       "title": "Fix the crash",
+       "attempts": [
+        {
+         "model": "claude-fable-5-2",
+         "sessionId": "s",
+         "outcome": "error",
+         "costUsd": 2,
+         "inputTokens": 333,
+         "outputTokens": 33.3,
+         "seconds": 1,
+         "note": ""
+        }
+       ],
+       "status": "failed"
+      }
+     ]
+    },
+    {
+     "steps": [
+      {
+       "line": 1,
+       "number": "4",
+       "title": "Add a page",
+       "attempts": [
+        {
+         "model": "qanuvi:auto",
+         "sessionId": "s",
+         "outcome": "done",
+         "costUsd": 0,
+         "inputTokens": 100,
+         "outputTokens": 10,
+         "seconds": 2,
+         "note": ""
+        }
+       ],
+       "status": "done"
+      }
+     ]
+    }
+   ]
+  ],
+  "out": {
+   "docs|claude-haiku-5-5": {
+    "tries": 1,
+    "successes": 1,
+    "costUsd": 0.25,
+    "tokens": 110
+   },
+   "security|claude-haiku-5-5": {
+    "tries": 1,
+    "successes": 0,
+    "costUsd": 0.5,
+    "tokens": 110
+   },
+   "security|claude-sonnet-5-5": {
+    "tries": 1,
+    "successes": 1,
+    "costUsd": 0.75,
+    "tokens": 110
+   },
+   "bugfix|claude-fable-5-2": {
+    "tries": 1,
+    "successes": 0,
+    "costUsd": 2,
+    "tokens": 366.3
+   },
+   "feature|qanuvi:auto": {
+    "tries": 1,
+    "successes": 1,
+    "costUsd": 0,
+    "tokens": 110
+   }
+  }
+ },
+ {
+  "fn": "reliability",
+  "args": [
+   {
+    "tries": 34,
+    "successes": 33
+   }
+  ],
+  "out": 0.8508409778365519
+ },
+ {
+  "fn": "reliability",
+  "args": [
+   {
+    "tries": 5,
+    "successes": 5
+   }
+  ],
+  "out": 0.565508505247919
+ },
+ {
+  "fn": "reliability",
+  "args": [
+   {
+    "tries": 0,
+    "successes": 0
+   }
+  ],
+  "out": 0
+ },
+ {
+  "fn": "learnedModel",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "docs",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": {
+   "model": "claude-sonnet-5-5",
+   "sure": 0.8508409778365519,
+   "perSuccess": 0.125,
+   "s": {
+    "tries": 34,
+    "successes": 33,
+    "costUsd": 4.125,
+    "tokens": 7000001
+   }
+  }
+ },
+ {
+  "fn": "learnedModel",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "security",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": {
+   "model": "claude-fable-5-2",
+   "sure": 0.5100999795960008,
+   "perSuccess": 1,
+   "s": {
+    "tries": 4,
+    "successes": 4,
+    "costUsd": 4,
+    "tokens": 250000
+   }
+  }
+ },
+ {
+  "fn": "learnedModel",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "feature",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": null
+ },
+ {
+  "fn": "modelProfiles",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "docs",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": [
+   {
+    "model": "claude-opus-5-5",
+    "tries": 2,
+    "successes": 2,
+    "tokensPerSuccess": 450000,
+    "costPerSuccess": 0.5,
+    "heavy": false
+   },
+   {
+    "model": "claude-sonnet-5-5",
+    "tries": 34,
+    "successes": 33,
+    "tokensPerSuccess": 212121,
+    "costPerSuccess": 0.125,
+    "heavy": true
+   },
+   {
+    "model": "claude-haiku-5-5",
+    "tries": 5,
+    "successes": 5,
+    "tokensPerSuccess": 10000,
+    "costPerSuccess": 0.05,
+    "heavy": false
+   }
+  ]
+ },
+ {
+  "fn": "modelProfiles",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "security",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": [
+   {
+    "model": "claude-fable-5-2",
+    "tries": 4,
+    "successes": 4,
+    "tokensPerSuccess": 62500,
+    "costPerSuccess": 1,
+    "heavy": false
+   },
+   {
+    "model": "claude-opus-5-5",
+    "tries": 4,
+    "successes": 3,
+    "tokensPerSuccess": 100000,
+    "costPerSuccess": 0.6666666666666666,
+    "heavy": true
+   }
+  ]
+ },
+ {
+  "fn": "modelProfiles",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   },
+   "feature",
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ]
+  ],
+  "out": [
+   {
+    "model": "claude-haiku-5-5",
+    "tries": 3,
+    "successes": 1,
+    "tokensPerSuccess": 0,
+    "costPerSuccess": 0.5,
+    "heavy": false
+   }
+  ]
+ },
+ {
+  "fn": "budgetState",
+  "args": [
+   {
+    "monthlyUsd": 10,
+    "spentUsd": 8
+   }
+  ],
+  "out": "tight"
+ },
+ {
+  "fn": "budgetState",
+  "args": [
+   {
+    "monthlyUsd": 10,
+    "spentUsd": 10
+   }
+  ],
+  "out": "over"
+ },
+ {
+  "fn": "budgetState",
+  "args": [
+   {
+    "monthlyUsd": 0,
+    "spentUsd": 99
+   }
+  ],
+  "out": "ok"
+ },
+ {
+  "fn": "chooseModel",
+  "args": [
+   {
+    "stepModel": " x ",
+    "type": "docs",
+    "rules": {},
+    "stats": {
+     "docs|claude-haiku-5-5": {
+      "tries": 5,
+      "successes": 5,
+      "costUsd": 0.25,
+      "tokens": 50000
+     },
+     "docs|claude-sonnet-5-5": {
+      "tries": 34,
+      "successes": 33,
+      "costUsd": 4.125,
+      "tokens": 7000001
+     },
+     "docs|claude-opus-5-5": {
+      "tries": 2,
+      "successes": 2,
+      "costUsd": 1,
+      "tokens": 900000
+     },
+     "security|claude-opus-5-5": {
+      "tries": 4,
+      "successes": 3,
+      "costUsd": 2,
+      "tokens": 300000
+     },
+     "security|claude-fable-5-2": {
+      "tries": 4,
+      "successes": 4,
+      "costUsd": 4,
+      "tokens": 250000
+     },
+     "feature|claude-haiku-5-5": {
+      "tries": 3,
+      "successes": 1,
+      "costUsd": 0.5,
+      "tokens": 0
+     },
+     "feature|qanuvi:auto": {
+      "tries": 3,
+      "successes": 3,
+      "costUsd": 0,
+      "tokens": 1
+     }
+    },
+    "models": [
+     {
+      "id": "claude-fable-5-2",
+      "label": "Fable 5.2",
+      "price": [
+       8,
+       40
+      ]
+     },
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "price": [
+       4,
+       20
+      ]
+     },
+     {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "price": [
+       2,
+       10
+      ]
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5",
+      "price": [
+       0.1,
+       0.5
+      ]
+     }
+    ],
+    "defaultModel": "claude-sonnet-5-5",
+    "budget": {
+     "monthlyUsd": 0,
+     "spentUsd": 0
+    }
+   }
+  ],
+  "out": {
+   "model": "x",
+   "reason": "set on the step"
+  }
+ },
+ {
+  "fn": "chooseModel",
+  "args": [
+   {
+    "stepModel": null,
+    "type": "docs",
+    "rules": {
+     "docs": ""
+    },
+    "stats": {
+     "docs|claude-haiku-5-5": {
+      "tries": 5,
+      "successes": 5,
+      "costUsd": 0.25,
+      "tokens": 50000
+     },
+     "docs|claude-sonnet-5-5": {
+      "tries": 34,
+      "successes": 33,
+      "costUsd": 4.125,
+      "tokens": 7000001
+     },
+     "docs|claude-opus-5-5": {
+      "tries": 2,
+      "successes": 2,
+      "costUsd": 1,
+      "tokens": 900000
+     },
+     "security|claude-opus-5-5": {
+      "tries": 4,
+      "successes": 3,
+      "costUsd": 2,
+      "tokens": 300000
+     },
+     "security|claude-fable-5-2": {
+      "tries": 4,
+      "successes": 4,
+      "costUsd": 4,
+      "tokens": 250000
+     },
+     "feature|claude-haiku-5-5": {
+      "tries": 3,
+      "successes": 1,
+      "costUsd": 0.5,
+      "tokens": 0
+     },
+     "feature|qanuvi:auto": {
+      "tries": 3,
+      "successes": 3,
+      "costUsd": 0,
+      "tokens": 1
+     }
+    },
+    "models": [
+     {
+      "id": "claude-fable-5-2",
+      "label": "Fable 5.2",
+      "price": [
+       8,
+       40
+      ]
+     },
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "price": [
+       4,
+       20
+      ]
+     },
+     {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "price": [
+       2,
+       10
+      ]
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5",
+      "price": [
+       0.1,
+       0.5
+      ]
+     }
+    ],
+    "defaultModel": "claude-sonnet-5-5",
+    "budget": {
+     "monthlyUsd": 10,
+     "spentUsd": 9
+    }
+   }
+  ],
+  "out": {
+   "model": "claude-haiku-5-5",
+   "reason": "learned: most reliable on docs and wording (33/34 done); one cheaper (monthly budget 80% used)"
+  }
+ },
+ {
+  "fn": "chooseModel",
+  "args": [
+   {
+    "stepModel": "  ",
+    "type": "ui",
+    "rules": {
+     "ui": "claude-opus-5-5"
+    },
+    "stats": {
+     "docs|claude-haiku-5-5": {
+      "tries": 5,
+      "successes": 5,
+      "costUsd": 0.25,
+      "tokens": 50000
+     },
+     "docs|claude-sonnet-5-5": {
+      "tries": 34,
+      "successes": 33,
+      "costUsd": 4.125,
+      "tokens": 7000001
+     },
+     "docs|claude-opus-5-5": {
+      "tries": 2,
+      "successes": 2,
+      "costUsd": 1,
+      "tokens": 900000
+     },
+     "security|claude-opus-5-5": {
+      "tries": 4,
+      "successes": 3,
+      "costUsd": 2,
+      "tokens": 300000
+     },
+     "security|claude-fable-5-2": {
+      "tries": 4,
+      "successes": 4,
+      "costUsd": 4,
+      "tokens": 250000
+     },
+     "feature|claude-haiku-5-5": {
+      "tries": 3,
+      "successes": 1,
+      "costUsd": 0.5,
+      "tokens": 0
+     },
+     "feature|qanuvi:auto": {
+      "tries": 3,
+      "successes": 3,
+      "costUsd": 0,
+      "tokens": 1
+     }
+    },
+    "models": [
+     {
+      "id": "claude-fable-5-2",
+      "label": "Fable 5.2",
+      "price": [
+       8,
+       40
+      ]
+     },
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "price": [
+       4,
+       20
+      ]
+     },
+     {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "price": [
+       2,
+       10
+      ]
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5",
+      "price": [
+       0.1,
+       0.5
+      ]
+     }
+    ],
+    "defaultModel": "claude-sonnet-5-5",
+    "budget": {
+     "monthlyUsd": 10,
+     "spentUsd": 9
+    }
+   }
+  ],
+  "out": {
+   "model": "claude-sonnet-5-5",
+   "reason": "project rule for interface and styling; one cheaper (monthly budget 80% used)"
+  }
+ },
+ {
+  "fn": "chooseModel",
+  "args": [
+   {
+    "stepModel": null,
+    "type": "security",
+    "rules": {},
+    "stats": {
+     "docs|claude-haiku-5-5": {
+      "tries": 5,
+      "successes": 5,
+      "costUsd": 0.25,
+      "tokens": 50000
+     },
+     "docs|claude-sonnet-5-5": {
+      "tries": 34,
+      "successes": 33,
+      "costUsd": 4.125,
+      "tokens": 7000001
+     },
+     "docs|claude-opus-5-5": {
+      "tries": 2,
+      "successes": 2,
+      "costUsd": 1,
+      "tokens": 900000
+     },
+     "security|claude-opus-5-5": {
+      "tries": 4,
+      "successes": 3,
+      "costUsd": 2,
+      "tokens": 300000
+     },
+     "security|claude-fable-5-2": {
+      "tries": 4,
+      "successes": 4,
+      "costUsd": 4,
+      "tokens": 250000
+     },
+     "feature|claude-haiku-5-5": {
+      "tries": 3,
+      "successes": 1,
+      "costUsd": 0.5,
+      "tokens": 0
+     },
+     "feature|qanuvi:auto": {
+      "tries": 3,
+      "successes": 3,
+      "costUsd": 0,
+      "tokens": 1
+     }
+    },
+    "models": [
+     {
+      "id": "claude-fable-5-2",
+      "label": "Fable 5.2",
+      "price": [
+       8,
+       40
+      ]
+     },
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "price": [
+       4,
+       20
+      ]
+     },
+     {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "price": [
+       2,
+       10
+      ]
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5",
+      "price": [
+       0.1,
+       0.5
+      ]
+     }
+    ],
+    "defaultModel": "claude-sonnet-5-5",
+    "budget": {
+     "monthlyUsd": 10,
+     "spentUsd": 9
+    },
+    "picked": {
+     "model": "claude-opus-5-5",
+     "why": ""
+    }
+   }
+  ],
+  "out": {
+   "model": "claude-opus-5-5",
+   "reason": "decider: picked for this step"
+  }
+ },
+ {
+  "fn": "chooseModel",
+  "args": [
+   {
+    "stepModel": null,
+    "type": "feature",
+    "rules": {},
+    "stats": {
+     "docs|claude-haiku-5-5": {
+      "tries": 5,
+      "successes": 5,
+      "costUsd": 0.25,
+      "tokens": 50000
+     },
+     "docs|claude-sonnet-5-5": {
+      "tries": 34,
+      "successes": 33,
+      "costUsd": 4.125,
+      "tokens": 7000001
+     },
+     "docs|claude-opus-5-5": {
+      "tries": 2,
+      "successes": 2,
+      "costUsd": 1,
+      "tokens": 900000
+     },
+     "security|claude-opus-5-5": {
+      "tries": 4,
+      "successes": 3,
+      "costUsd": 2,
+      "tokens": 300000
+     },
+     "security|claude-fable-5-2": {
+      "tries": 4,
+      "successes": 4,
+      "costUsd": 4,
+      "tokens": 250000
+     },
+     "feature|claude-haiku-5-5": {
+      "tries": 3,
+      "successes": 1,
+      "costUsd": 0.5,
+      "tokens": 0
+     },
+     "feature|qanuvi:auto": {
+      "tries": 3,
+      "successes": 3,
+      "costUsd": 0,
+      "tokens": 1
+     }
+    },
+    "models": [
+     {
+      "id": "claude-fable-5-2",
+      "label": "Fable 5.2",
+      "price": [
+       8,
+       40
+      ]
+     },
+     {
+      "id": "claude-opus-5-5",
+      "label": "Opus 5.5",
+      "price": [
+       4,
+       20
+      ]
+     },
+     {
+      "id": "claude-sonnet-5-5",
+      "label": "Sonnet 5.5",
+      "price": [
+       2,
+       10
+      ]
+     },
+     {
+      "id": "claude-haiku-5-5",
+      "label": "Haiku 5.5",
+      "price": [
+       0.1,
+       0.5
+      ]
+     }
+    ],
+    "defaultModel": "claude-haiku-5-5",
+    "budget": {
+     "monthlyUsd": 10,
+     "spentUsd": 9
+    },
+    "picked": {
+     "model": "gpt-9",
+     "why": "no"
+    }
+   }
+  ],
+  "out": {
+   "model": "claude-haiku-5-5",
+   "reason": "default model"
+  }
+ },
+ {
+  "fn": "freeFirstFor",
+  "args": [
+   null,
+   true,
+   true
+  ],
+  "out": true
+ },
+ {
+  "fn": "freeFirstFor",
+  "args": [
+   "free-only",
+   false,
+   true
+  ],
+  "out": false
+ },
+ {
+  "fn": "freeWantedButMissing",
+  "args": [
+   null,
+   "priority",
+   false,
+   false
+  ],
+  "out": true
+ },
+ {
+  "fn": "freeWantedButMissing",
+  "args": [
+   "free-only",
+   "direct",
+   false,
+   false
+  ],
+  "out": true
+ },
+ {
+  "fn": "costRatio",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    "claude-opus-5-5",
+    "claude-haiku-5-5"
+   ],
+   "claude-sonnet-5-5"
+  ],
+  "out": 0.975609756097561
+ },
+ {
+  "fn": "costRatio",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    "claude-haiku-5-5"
+   ],
+   "unknown"
+  ],
+  "out": null
+ },
+ {
+  "fn": "costRatio",
+  "args": [
+   [
+    {
+     "id": "a",
+     "label": "A",
+     "price": [
+      0,
+      0
+     ]
+    }
+   ],
+   [
+    "a"
+   ],
+   "a"
+  ],
+  "out": null
+ },
+ {
+  "fn": "stepsToRun",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   0,
+   false,
+   ""
+  ],
+  "out": [
+   8,
+   14
+  ]
+ },
+ {
+  "fn": "stepsToRun",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   9,
+   false,
+   ""
+  ],
+  "out": [
+   14
+  ]
+ },
+ {
+  "fn": "stepsToRun",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   true,
+   ""
+  ],
+  "out": [
+   14
+  ]
+ },
+ {
+  "fn": "stepsToRun",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   0,
+   false,
+   "1-2; 12"
+  ],
+  "out": [
+   8,
+   14
+  ]
+ },
+ {
+  "fn": "stepsToRun",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   14,
+   true,
+   "1-2"
+  ],
+  "out": [
+   14
+  ]
+ },
+ {
+  "fn": "parseRanges",
+  "args": [
+   " 2 - 6 ,, 10 to 15; 20, 9–7, x, 3-, 007"
+  ],
+  "out": {
+   "ranges": [
+    [
+     2,
+     6
+    ],
+    [
+     10,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     7,
+     9
+    ],
+    [
+     7,
+     7
+    ]
+   ],
+   "error": "Not a step range: x, 3-"
+  }
+ },
+ {
+  "fn": "parseRanges",
+  "args": [
+   null
+  ],
+  "out": {
+   "ranges": [],
+   "error": ""
+  }
+ },
+ {
+  "fn": "inRanges",
+  "args": [
+   "12b",
+   "10-12"
+  ],
+  "out": true
+ },
+ {
+  "fn": "inRanges",
+  "args": [
+   null,
+   "1-99"
+  ],
+  "out": false
+ },
+ {
+  "fn": "inRanges",
+  "args": [
+   "b2",
+   "1-99"
+  ],
+  "out": false
+ },
+ {
+  "fn": "unmetNeed",
+  "args": [
+   [
+    "1",
+    "docs/B.md#4"
+   ],
+   [
+    "1"
+   ],
+   {
+    "docs/B.md": [
+     "3"
+    ]
+   }
+  ],
+  "out": "needs step 4 of docs/B.md, which is not done"
+ },
+ {
+  "fn": "unmetNeed",
+  "args": [
+   [
+    "#5",
+    "2"
+   ],
+   [
+    "#5"
+   ],
+   {}
+  ],
+  "out": "needs step 2, which is not done"
+ },
+ {
+  "fn": "unmetNeed",
+  "args": [
+   [
+    "a#b#7"
+   ],
+   [],
+   {
+    "a#b": [
+     "7"
+    ]
+   }
+  ],
+  "out": null
+ },
+ {
+  "fn": "endStatus",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ]
+  ],
+  "out": "needs-you"
+ },
+ {
+  "fn": "endStatus",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    }
+   ]
+  ],
+  "out": "done"
+ },
+ {
+  "fn": "runSummary",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ]
+  ],
+  "out": "3 done · 1 skipped: step 4 (needs step 2, which is not done) · 1 blocked: Step x · 1 failed: step 9 (tests kept failing) · 1 waiting for your answer: step 6 (it pushes to the live server) · 2 set aside: step 7 (waits for 6); step 8"
+ },
+ {
+  "fn": "runSummary",
+  "args": [
+   []
+  ],
+  "out": "0 done"
+ },
+ {
+  "fn": "startModel",
+  "args": [
+   " m ",
+   "d"
+  ],
+  "out": "m"
+ },
+ {
+  "fn": "startModel",
+  "args": [
+   null,
+   "d"
+  ],
+  "out": "d"
+ },
+ {
+  "fn": "nextModel",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "claude-haiku-5-5",
+     "sessionId": "s",
+     "outcome": "open",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    },
+    {
+     "model": "claude-haiku-5-5",
+     "sessionId": "s",
+     "outcome": "done",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    },
+    {
+     "model": "claude-haiku-5-5",
+     "sessionId": "s",
+     "outcome": "error",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "claude-haiku-5-5",
+   2
+  ],
+  "out": "claude-sonnet-5-5"
+ },
+ {
+  "fn": "nextModel",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "claude-haiku-5-5",
+     "sessionId": "s",
+     "outcome": "blocked",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "claude-sonnet-5-5",
+   0
+  ],
+  "out": "claude-sonnet-5-5"
+ },
+ {
+  "fn": "nextModel",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "claude-opus-5-5",
+     "sessionId": "s",
+     "outcome": "open",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "claude-haiku-5-5",
+   0
+  ],
+  "out": "claude-fable-5-2"
+ },
+ {
+  "fn": "stepOutcome",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": "2",
+    "title": "Layout"
+   }
+  ],
+  "out": "open"
+ },
+ {
+  "fn": "stepOutcome",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": null,
+    "title": "Plain step without bold"
+   }
+  ],
+  "out": "done"
+ },
+ {
+  "fn": "stepOutcome",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": "1",
+    "title": "Project setup"
+   }
+  ],
+  "out": "done"
+ },
+ {
+  "fn": "stepOutcome",
+  "args": [
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   {
+    "number": "9",
+    "title": "Nope"
+   }
+  ],
+  "out": "missing"
+ },
+ {
+  "fn": "stepPrompt",
+  "args": [
+   "PLAN.md",
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   1,
+   [
+    {
+     "number": null,
+     "title": "T0"
+    },
+    {
+     "number": "1",
+     "title": "T1"
+    },
+    {
+     "number": "2",
+     "title": "T2"
+    },
+    {
+     "number": null,
+     "title": "T3"
+    },
+    {
+     "number": "4",
+     "title": "T4"
+    },
+    {
+     "number": "5",
+     "title": "T5"
+    },
+    {
+     "number": null,
+     "title": "T6"
+    },
+    {
+     "number": "7",
+     "title": "T7"
+    },
+    {
+     "number": "8",
+     "title": "T8"
+    },
+    {
+     "number": null,
+     "title": "T9"
+    },
+    {
+     "number": "10",
+     "title": "T10"
+    },
+    {
+     "number": "11",
+     "title": "T11"
+    }
+   ]
+  ],
+  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nAlready done in this run (for context only):\n- 2. T2\n- T3\n- 4. T4\n- 5. T5\n- T6\n- 7. T7\n- 8. T8\n- T9\n- 10. T10\n- 11. T11\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add the reason under it."
+ },
+ {
+  "fn": "stepPrompt",
+  "args": [
+   "PLAN.md",
+   "# Work map\r\n\r\n## Stage 1 ##\r\n- [x] **1. Project setup** (a note that\r\n  goes on)\r\n  - Done on Windows.\r\n    More detail.\r\n\r\n- [-] **2. Layout** (built)\r\n  - Three panes.\r\n  - Model: claude-opus-5-5\r\n  - model: second-ignored\r\n  - Needs: 1, docs/OTHER.md#4 x\r\n  - Skipped: needs step 1\r\n- [ ] **1b. Updates**\r\n1. not a step\r\n## Stage 2\r\n- [X] Plain step without bold\r\n - [!] 12-2. Plain numbered\r\n  * star detail\r\nSome paragraph.\r\n",
+   2,
+   []
+  ],
+  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**1b. Updates**\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add the reason under it."
+ },
+ {
+  "fn": "runTotals",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   [
+    {
+     "model": "claude-sonnet-5-5",
+     "costUsd": 0.125
+    }
+   ],
+   {
+    "level": "full",
+    "status": "done",
+    "model": "claude-opus-5-5",
+    "startedAt": 1794683130000,
+    "endedAt": null,
+    "costUsd": 1.125,
+    "seconds": 90.5,
+    "checks": {
+     "command": "npm test",
+     "ok": false,
+     "summary": "2 failed"
+    },
+    "findings": [
+     "a.ts: debug log left",
+     "b.ts: name differs"
+    ],
+    "stillOpen": [
+     "set the SMTP login"
+    ],
+    "note": "ran twice"
+   }
+  ],
+  "out": {
+   "costUsd": 3.5,
+   "inputTokens": 600,
+   "outputTokens": 60,
+   "seconds": 340.5,
+   "byModel": {
+    "claude-haiku-5-5": {
+     "attempts": 1,
+     "costUsd": 0.25,
+     "inputTokens": 100,
+     "outputTokens": 10
+    },
+    "claude-sonnet-5-5": {
+     "attempts": 1,
+     "costUsd": 0.5,
+     "inputTokens": 100,
+     "outputTokens": 10
+    },
+    "qanuvi:auto": {
+     "attempts": 3,
+     "costUsd": 0,
+     "inputTokens": 300,
+     "outputTokens": 30
+    },
+    "claude-opus-5-5": {
+     "attempts": 1,
+     "costUsd": 1.5,
+     "inputTokens": 100,
+     "outputTokens": 10
+    },
+    "decider:claude-sonnet-5-5": {
+     "attempts": 1,
+     "costUsd": 0.125,
+     "inputTokens": 0,
+     "outputTokens": 0
+    },
+    "finish:claude-opus-5-5": {
+     "attempts": 1,
+     "costUsd": 1.125,
+     "inputTokens": 0,
+     "outputTokens": 0
+    }
+   }
+  }
+ },
+ {
+  "fn": "runTotals",
+  "args": [
+   [],
+   null,
+   null
+  ],
+  "out": {
+   "costUsd": 0,
+   "inputTokens": 0,
+   "outputTokens": 0,
+   "seconds": 0,
+   "byModel": {}
+  }
+ },
+ {
+  "fn": "nextModelFreeFirst",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "qanuvi:auto",
+     "sessionId": "s",
+     "outcome": "open",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    },
+    {
+     "model": "qanuvi:auto",
+     "sessionId": "s",
+     "outcome": "error",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "qanuvi:auto",
+   "claude-sonnet-5-5",
+   2
+  ],
+  "out": "claude-sonnet-5-5"
+ },
+ {
+  "fn": "nextModelFreeFirst",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "qanuvi:auto",
+     "sessionId": "s",
+     "outcome": "done",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "qanuvi:auto",
+   "claude-sonnet-5-5",
+   1
+  ],
+  "out": "qanuvi:auto"
+ },
+ {
+  "fn": "nextModelFreeFirst",
+  "args": [
+   [
+    {
+     "id": "claude-fable-5-2",
+     "label": "Fable 5.2",
+     "price": [
+      8,
+      40
+     ]
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Opus 5.5",
+     "price": [
+      4,
+      20
+     ]
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Sonnet 5.5",
+     "price": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Haiku 5.5",
+     "price": [
+      0.1,
+      0.5
+     ]
+    }
+   ],
+   [
+    {
+     "model": "qanuvi:auto",
+     "sessionId": "s",
+     "outcome": "open",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    },
+    {
+     "model": "claude-fable-5-2",
+     "sessionId": "s",
+     "outcome": "open",
+     "costUsd": 0,
+     "inputTokens": 100,
+     "outputTokens": 10,
+     "seconds": 2,
+     "note": ""
+    }
+   ],
+   "qanuvi:auto",
+   "claude-sonnet-5-5",
+   1
+  ],
+  "out": null
+ },
+ {
+  "fn": "freeSavings",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   {
+    "docs": 0.5
+   }
+  ],
+  "out": {
+   "steps": 2,
+   "estimateUsd": 0.875
+  }
+ },
+ {
+  "fn": "freeSavings",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    }
+   ],
+   {}
+  ],
+  "out": {
+   "steps": 2,
+   "estimateUsd": null
+  }
+ },
+ {
+  "fn": "freeSavings",
+  "args": [
+   [],
+   {}
+  ],
+  "out": {
+   "steps": 0,
+   "estimateUsd": 0
+  }
+ },
+ {
+  "fn": "paidPerStep",
+  "args": [
+   {
+    "docs|claude-haiku-5-5": {
+     "tries": 5,
+     "successes": 5,
+     "costUsd": 0.25,
+     "tokens": 50000
+    },
+    "docs|claude-sonnet-5-5": {
+     "tries": 34,
+     "successes": 33,
+     "costUsd": 4.125,
+     "tokens": 7000001
+    },
+    "docs|claude-opus-5-5": {
+     "tries": 2,
+     "successes": 2,
+     "costUsd": 1,
+     "tokens": 900000
+    },
+    "security|claude-opus-5-5": {
+     "tries": 4,
+     "successes": 3,
+     "costUsd": 2,
+     "tokens": 300000
+    },
+    "security|claude-fable-5-2": {
+     "tries": 4,
+     "successes": 4,
+     "costUsd": 4,
+     "tokens": 250000
+    },
+    "feature|claude-haiku-5-5": {
+     "tries": 3,
+     "successes": 1,
+     "costUsd": 0.5,
+     "tokens": 0
+    },
+    "feature|qanuvi:auto": {
+     "tries": 3,
+     "successes": 3,
+     "costUsd": 0,
+     "tokens": 1
+    }
+   }
+  ],
+  "out": {
+   "docs": 0.134375,
+   "security": 0.8571428571428571,
+   "feature": 0.5
+  }
+ },
+ {
+  "fn": "finishEstimate",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   "light"
+  ],
+  "out": {
+   "costUsd": 0.375,
+   "seconds": 20
+  }
+ },
+ {
+  "fn": "finishEstimate",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   "full"
+  ],
+  "out": {
+   "costUsd": 1.35,
+   "seconds": 72
+  }
+ },
+ {
+  "fn": "finishEstimate",
+  "args": [
+   [],
+   "full"
+  ],
+  "out": {
+   "costUsd": null,
+   "seconds": null
+  }
+ },
+ {
+  "fn": "offersFinish",
+  "args": [
+   "done",
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   null
+  ],
+  "out": true
+ },
+ {
+  "fn": "offersFinish",
+  "args": [
+   "done",
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   {
+    "level": "full",
+    "status": "done",
+    "model": "claude-opus-5-5",
+    "startedAt": 1794683130000,
+    "endedAt": null,
+    "costUsd": 1.125,
+    "seconds": 90.5,
+    "checks": {
+     "command": "npm test",
+     "ok": false,
+     "summary": "2 failed"
+    },
+    "findings": [
+     "a.ts: debug log left",
+     "b.ts: name differs"
+    ],
+    "stillOpen": [
+     "set the SMTP login"
+    ],
+    "note": "ran twice"
+   }
+  ],
+  "out": false
+ },
+ {
+  "fn": "offersFinish",
+  "args": [
+   "needs-you",
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   null
+  ],
+  "out": false
+ },
+ {
+  "fn": "finishReviewPrompt",
+  "args": [
+   "P.md",
+   [
+    {
+     "number": "3",
+     "title": "Add the cart",
+     "done": [
+      "- Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "two",
+      "three",
+      "four",
+      "five"
+     ]
+    },
+    {
+     "number": null,
+     "title": "No number",
+     "done": []
+    }
+   ],
+   "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+   {
+    "command": "npm test",
+    "ok": false,
+    "summary": "2 failed"
+   }
+  ],
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own; you look\nat the whole once, before the run is called done. Look for:\n- leftovers: debug output, commented-out code, temporary files, TODOs the steps added and did not resolve;\n- steps whose changes do not fit together (one changes what another relies on, names or formats that disagree);\n- a Done note that claims more than the diff shows;\n- bugs a reviewer of the whole would catch. Style alone is no finding.\nAnswer JSON only: {\"ok\": true or false, \"findings\": [\"file: what is wrong, and the fix\"], \"stillOpen\": [\"what\nthe owner still has to do or decide\"]}. Empty lists when there is nothing. Short, concrete items.\n\nSteps done in this run:\n- 3. Add the cart\n    - Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n    two\n    three\n    four\n- No number\n\nThe project's full checks (npm test): FAILED\n2 failed\n\nThe run's changes (git diff; the task list and its logs left out):\ndddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n… (cut: the diff is longer)"
+ },
+ {
+  "fn": "finishReviewPrompt",
+  "args": [
+   "P.md",
+   [],
+   "",
+   null
+  ],
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own; you look\nat the whole once, before the run is called done. Look for:\n- leftovers: debug output, commented-out code, temporary files, TODOs the steps added and did not resolve;\n- steps whose changes do not fit together (one changes what another relies on, names or formats that disagree);\n- a Done note that claims more than the diff shows;\n- bugs a reviewer of the whole would catch. Style alone is no finding.\nAnswer JSON only: {\"ok\": true or false, \"findings\": [\"file: what is wrong, and the fix\"], \"stillOpen\": [\"what\nthe owner still has to do or decide\"]}. Empty lists when there is nothing. Short, concrete items.\n\nSteps done in this run:\n\nThe project has no test command: no checks were run.\n\nThe run's changes (git diff; the task list and its logs left out):\n(no change)"
+ },
+ {
+  "fn": "finishReviewPrompt",
+  "args": [
+   "P.md",
+   [
+    {
+     "number": "3",
+     "title": "Add the cart",
+     "done": [
+      "- Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "two",
+      "three",
+      "four",
+      "five"
+     ]
+    },
+    {
+     "number": null,
+     "title": "No number",
+     "done": []
+    }
+   ],
+   "diff",
+   {
+    "command": "npm test",
+    "ok": true,
+    "summary": ""
+   }
+  ],
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own; you look\nat the whole once, before the run is called done. Look for:\n- leftovers: debug output, commented-out code, temporary files, TODOs the steps added and did not resolve;\n- steps whose changes do not fit together (one changes what another relies on, names or formats that disagree);\n- a Done note that claims more than the diff shows;\n- bugs a reviewer of the whole would catch. Style alone is no finding.\nAnswer JSON only: {\"ok\": true or false, \"findings\": [\"file: what is wrong, and the fix\"], \"stillOpen\": [\"what\nthe owner still has to do or decide\"]}. Empty lists when there is nothing. Short, concrete items.\n\nSteps done in this run:\n- 3. Add the cart\n    - Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n    two\n    three\n    four\n- No number\n\nThe project's full checks (npm test): passed\n\nThe run's changes (git diff; the task list and its logs left out):\ndiff"
+ },
+ {
+  "fn": "parseFinishReview",
+  "args": [
+   "{\"ok\": true, \"findings\": [\" a \", \"\", null, 3, {\"x\": 1}], \"stillOpen\": \"no\"}"
+  ],
+  "out": {
+   "ok": true,
+   "findings": [
+    "a",
+    "3",
+    "[object Object]"
+   ],
+   "stillOpen": []
+  }
+ },
+ {
+  "fn": "parseFinishReview",
+  "args": [
+   "{\"ok\": \"yes\"}"
+  ],
+  "out": {
+   "ok": false,
+   "findings": [
+    "The review's answer could not be read; its reply is in the agent pane."
+   ],
+   "stillOpen": []
+  }
+ },
+ {
+  "fn": "parseFinishReview",
+  "args": [
+   "nothing"
+  ],
+  "out": {
+   "ok": false,
+   "findings": [
+    "The review's answer could not be read; its reply is in the agent pane."
+   ],
+   "stillOpen": []
+  }
+ },
+ {
+  "fn": "finishFullPrompt",
+  "args": [
+   "P.md",
+   [
+    {
+     "number": "3",
+     "title": "Add the cart",
+     "done": [
+      "- Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "two",
+      "three",
+      "four",
+      "five"
+     ]
+    },
+    {
+     "number": null,
+     "title": "No number",
+     "done": []
+    }
+   ],
+   {
+    "findings": [
+     "a"
+    ],
+    "stillOpen": [
+     "b",
+     "c"
+    ]
+   },
+   {
+    "command": "npm test",
+    "ok": false,
+    "summary": "2 failed"
+   },
+   [
+    "f0.ts",
+    "f1.ts",
+    "f2.ts",
+    "f3.ts",
+    "f4.ts",
+    "f5.ts",
+    "f6.ts",
+    "f7.ts",
+    "f8.ts",
+    "f9.ts",
+    "f10.ts",
+    "f11.ts",
+    "f12.ts",
+    "f13.ts",
+    "f14.ts",
+    "f15.ts",
+    "f16.ts",
+    "f17.ts",
+    "f18.ts",
+    "f19.ts",
+    "f20.ts",
+    "f21.ts",
+    "f22.ts",
+    "f23.ts",
+    "f24.ts",
+    "f25.ts",
+    "f26.ts",
+    "f27.ts",
+    "f28.ts",
+    "f29.ts",
+    "f30.ts",
+    "f31.ts",
+    "f32.ts",
+    "f33.ts",
+    "f34.ts",
+    "f35.ts",
+    "f36.ts",
+    "f37.ts",
+    "f38.ts",
+    "f39.ts",
+    "f40.ts",
+    "f41.ts",
+    "f42.ts",
+    "f43.ts",
+    "f44.ts",
+    "f45.ts",
+    "f46.ts",
+    "f47.ts",
+    "f48.ts",
+    "f49.ts",
+    "f50.ts",
+    "f51.ts",
+    "f52.ts",
+    "f53.ts",
+    "f54.ts",
+    "f55.ts",
+    "f56.ts",
+    "f57.ts",
+    "f58.ts",
+    "f59.ts",
+    "f60.ts",
+    "f61.ts"
+   ]
+  ],
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with a section headed exactly `Still open:` and one `- ` line per thing the owner still has\nto do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n- 3. Add the cart\n    - Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n    two\n    three\n    four\n- No number\n\nFiles the run changed:\n- f0.ts\n- f1.ts\n- f2.ts\n- f3.ts\n- f4.ts\n- f5.ts\n- f6.ts\n- f7.ts\n- f8.ts\n- f9.ts\n- f10.ts\n- f11.ts\n- f12.ts\n- f13.ts\n- f14.ts\n- f15.ts\n- f16.ts\n- f17.ts\n- f18.ts\n- f19.ts\n- f20.ts\n- f21.ts\n- f22.ts\n- f23.ts\n- f24.ts\n- f25.ts\n- f26.ts\n- f27.ts\n- f28.ts\n- f29.ts\n- f30.ts\n- f31.ts\n- f32.ts\n- f33.ts\n- f34.ts\n- f35.ts\n- f36.ts\n- f37.ts\n- f38.ts\n- f39.ts\n- f40.ts\n- f41.ts\n- f42.ts\n- f43.ts\n- f44.ts\n- f45.ts\n- f46.ts\n- f47.ts\n- f48.ts\n- f49.ts\n- f50.ts\n- f51.ts\n- f52.ts\n- f53.ts\n- f54.ts\n- f55.ts\n- f56.ts\n- f57.ts\n- f58.ts\n- f59.ts\n\nThe project's full checks (npm test) before this pass: FAILED\n2 failed\n\nThe review of the whole diff found:\n- a\n\nIt left open:\n- b\n- c"
+ },
+ {
+  "fn": "finishFullPrompt",
+  "args": [
+   "P.md",
+   [],
+   {
+    "findings": [],
+    "stillOpen": []
+   },
+   null,
+   []
+  ],
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with a section headed exactly `Still open:` and one `- ` line per thing the owner still has\nto do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n\nFiles the run changed:\n- (none found)\n\nThe project has no test command set.\n\nThe review of the whole diff found:\n- nothing"
+ },
+ {
+  "fn": "stillOpenIn",
+  "args": [
+   "Done.\r\n\r\n### **Still open:** first thing\r\n- second\r\n  * third\r\n- None.\r\n3) fourth\r\nEnd."
+  ],
+  "out": [
+   "first thing",
+   "second",
+   "third",
+   "fourth"
+  ]
+ },
+ {
+  "fn": "stillOpenIn",
+  "args": [
+   "Still open: none\nStill open\n- last heading wins"
+  ],
+  "out": [
+   "last heading wins"
+  ]
+ },
+ {
+  "fn": "stillOpenIn",
+  "args": [
+   "still open\n\n- after a blank"
+  ],
+  "out": [
+   "after a blank"
+  ]
+ },
+ {
+  "fn": "stillOpenIn",
+  "args": [
+   "Nothing here"
+  ],
+  "out": null
+ },
+ {
+  "fn": "doneNotes",
+  "args": [
+   [
+    "  - Done: x ",
+    "- DONE: y",
+    "-Done: z",
+    "  - Model: m"
+   ]
+  ],
+  "out": [
+   "- Done: x",
+   "- DONE: y"
+  ]
+ },
+ {
+  "fn": "isPlanFile",
+  "args": [
+   "sub\\docs\\PLAN.md",
+   "docs\\PLAN.md",
+   "logs"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isPlanFile",
+  "args": [
+   "docs/PLAN.ARCHIVE.md",
+   "docs/PLAN.MD",
+   "logs"
+  ],
+  "out": false
+ },
+ {
+  "fn": "isPlanFile",
+  "args": [
+   "logs/x.md",
+   "P.md",
+   "logs"
+  ],
+  "out": true
+ },
+ {
+  "fn": "isPlanFile",
+  "args": [
+   "logsx/x.md",
+   "P.md",
+   "logs"
+  ],
+  "out": false
+ },
+ {
+  "fn": "finishEntry",
+  "args": [
+   {
+    "level": "full",
+    "status": "done",
+    "model": "claude-opus-5-5",
+    "startedAt": 1794683130000,
+    "endedAt": null,
+    "costUsd": 1.125,
+    "seconds": 90.5,
+    "checks": {
+     "command": "npm test",
+     "ok": false,
+     "summary": "2 failed"
+    },
+    "findings": [
+     "a.ts: debug log left",
+     "b.ts: name differs"
+    ],
+    "stillOpen": [
+     "set the SMTP login"
+    ],
+    "note": "ran twice"
+   }
+  ],
+  "out": "## Finishing pass (full), 2026-11-14 19:05: done\n- Model: claude-opus-5-5; cost $1.13; 91 s\n- Checks (npm test): failed\n- Found:\n  - a.ts: debug log left\n  - b.ts: name differs\n- Still open:\n  - set the SMTP login\n- Note: ran twice\n\n"
+ },
+ {
+  "fn": "finishEntry",
+  "args": [
+   {
+    "level": "full",
+    "status": "done",
+    "model": "claude-opus-5-5",
+    "startedAt": 1794683130000,
+    "endedAt": null,
+    "costUsd": 0.125,
+    "seconds": 2.5,
+    "checks": null,
+    "findings": [],
+    "stillOpen": [],
+    "note": ""
+   }
+  ],
+  "out": "## Finishing pass (full), 2026-11-14 19:05: done\n- Model: claude-opus-5-5; cost $0.13; 3 s\n- Checks: no test command\n- Found: nothing\n- Still open: nothing\n\n"
  }
 ]
