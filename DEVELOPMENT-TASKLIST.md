@@ -340,7 +340,10 @@ runs on or off; with it off nothing is sent anywhere.
     secrets.rs (keyring), 8 errors, already before session B (keyring is only in the desktop feature, but agent.rs
     calls secrets::env in the master too); proposed to the owner, not built yet: without desktop, env/names return
     empty and saving says "this build has no credential store"; an encrypted file store on servers later if wanted.
-    NEXT: ask the owner about publishing 0.1.20 (unpublished: 779bf51, session A f523130, session B 07d8e38). After that: drive
+    UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
+    qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
+    (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:
+    ask the owner about publishing 0.1.20 (unpublished: 779bf51, session A f523130, session B 07d8e38). After that: drive
     24t, 24s part 3, 15i part 2, then 15i part 3. Earlier text of this checkpoint:
     (session A) 24u part 4 session A DRIVEN LIVE on a
     scratch project (test build, Haiku 5.5, $0.01), no fixes needed. PLAN-I: 1a set to "Wait for me" in the check,
@@ -595,7 +598,11 @@ runs on or off; with it off nothing is sent anywhere.
     too, since their process is alive; VACUUM after 5,000+ lines removed), command agent_clean_up, setting
     chatCleanupDays (default 60), Settings card with "Clean up now", start-up call in the main window only (keeps
     the chat open now and the session each project's workspace reopens), one inbox line "Removed N chats ...".
-    Rust test in sessions_are_stored_renamed_listed_and_deleted. Not driven live yet.
+    Rust test in sessions_are_stored_renamed_listed_and_deleted.
+  - Driven live 2026-11-14 (test build; test DB backed up first; six sessions set 90 days back): at start-up the
+    plain chat went; kept as designed: the starred plan-step chat, a plan step, a handover chain whose newest part
+    is recent, and scratch-project's only chat (the session its saved workspace reopens). Inbox: "Removed 1 chat
+    not opened for 60 days". "Clean up now" afterwards: "Nothing to remove." No fixes needed.
 - [ ] **24s. Handover in plain chat, bookmarks, reopening from the note (owner, 2026-11-13; agreed 2026-11-13,
   lean form chosen over a container layer)**: in plain chat the context grows until each tool call re-reads 150k+
   tokens. A separate container table under every chat was weighed and left out: edit and resend, rewind, branches,
