@@ -319,7 +319,27 @@ runs on or off; with it off nothing is sent anywhere.
     the README now names slugify. The re-run note now also says Qanuvi opened the step on purpose (the live 1z agent
     wondered who changed its [x]); that wording change is not driven live.
   - 24u part 2 built and driven live 2026-11-14, with the closing-step catch-up across runs (see Part 2 below).
-    RESUME HERE (new conversation, checkpoint 2026-11-14 night, later): 24u part 4 session A DRIVEN LIVE on a
+    RESUME HERE (new conversation, checkpoint 2026-11-14, session B done): 24u part 4 session B BUILT AND CHECKED
+    LIVE on Windows (07d8e38, unpublished, verify green 340 + 166). New Inbox items show as desktop notifications
+    (core decides in src-tauri/src/notify.rs: which items, quiet hours, items within 3 s told as one; showing and
+    clicks in desktop_notify.rs); Settings > Notifications (on/off, questions / + problems / everything, several as
+    one, quiet hours, test button); a click opens the Inbox at the item (ui.inboxFocus, marked 4 s). Windows: an
+    installed Qanuvi sends under its own app id (shortcut AUMID dev.qanuvi.desktop, checked) with a protocol launch
+    qanuvi://inbox/<id>; the NSIS installer registers qanuvi:// (checked in HKCU\Software\Classes\qanuvi); single
+    instance (installed builds only, test builds run beside it) forwards the link; restarts (Restart, Restart to
+    update) go through app_restart, which waits for the old instance, because a plain relaunch would hand over to the
+    old one and quit. Test builds send under PowerShell's app id and read the banner click in the process. Driven
+    live 2026-11-14 with the build installed over D:\qanuvi (owner's yes): qanuvi://inbox while running = one
+    process, window to front, Inbox open; owner clicked the test notification on the banner, in the notification
+    centre after the time-out, and with Qanuvi closed: all three opened the Inbox. NOT driven live: opening at one
+    question's item (link with an id, same path; parse_link tested), a real held step notifying, bundling, quiet
+    hours, the restart change. Linux: notification code cross-builds with zigbuild in a throwaway crate; click not
+    tested (Zorin laptop). macOS: code review only. The Linux server build (--no-default-features) fails in
+    secrets.rs (keyring), 8 errors, already before session B. NEXT: on a scratch project in the test build, a held
+    step raises a question, its notification opens the Inbox at that item (banner click while it shows); then ask
+    the owner about publishing 0.1.20 (unpublished: 779bf51, session A f523130, session B 07d8e38). After that: drive
+    24t, 24s part 3, 15i part 2, then 15i part 3. Earlier text of this checkpoint:
+    (session A) 24u part 4 session A DRIVEN LIVE on a
     scratch project (test build, Haiku 5.5, $0.01), no fixes needed. PLAN-I: 1a set to "Wait for me" in the check,
     the run waited ("Needs your answer (1)", 1b waits as the same step number), the Inbox showed the question with
     Go ahead / Let Qanuvi decide / Skip / Open the plan; answered "Go ahead" + a note from the Inbox: the DB row went
