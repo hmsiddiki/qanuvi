@@ -418,10 +418,7 @@ pub fn turn(
 
     let end = env.agent_turn(&req, &mut |event| {
         let now = env.now_ms();
-        if let Some(e) = event {
-            forward(e);
-        }
-        // The owner's asks.
+        // The owner's asks (the session is known first, so listeners hear each event with its session).
         let (stop, pause, switch) = {
             let mut a = controls.asks();
             if let Some(AgentEvent::Session { session }) = event {
@@ -429,6 +426,9 @@ pub fn turn(
             }
             (a.stop, a.pause, a.switch_to.take())
         };
+        if let Some(e) = event {
+            forward(e);
+        }
         if let Some(AgentEvent::Session { session }) = event {
             id = Some(session.id.clone());
             cost_seen = session.cost_usd;

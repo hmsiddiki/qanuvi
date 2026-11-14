@@ -369,7 +369,14 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2c part 2): R2c PART 2 DONE (see 24z "R2c part 2 DONE"): owner messages
+    RESUME HERE (newest, 2026-11-15, after R2d part 1): R2d PART 1 DONE (see 24z "R2d part 1 DONE"): the core side of
+    the wiring (plan/live.rs run handles and finishing pass, desktop_runs.rs commands and events, master_runs.rs
+    commands and run stream). 371 Rust tests pass, clippy and fmt clean, nothing published. NEXT: R2d part 2, the
+    window: a thin RunnerStore with the same exports over plan_run_* and "qanuvi-run"/"qanuvi-run-agent", the step
+    chat sending to plan_run_message, the runner's notices kept in the session's lines, standing owner rules; in a
+    fresh conversation. Still open, small: replaced steps get their own colour (24z). Map runner.svelte.ts's coupling
+    with the agent store (onPlanChange, notice, planSessionId) first.
+    RESUME HERE (before, 2026-11-15, after R2c part 2): R2c PART 2 DONE (see 24z "R2c part 2 DONE"): owner messages
     in step chats in the core (sorted, passed on, change asked with a safe default). 365 Rust tests pass, clippy and fmt
     clean, nothing published. No live check yet: the window does not call the Rust runner until R2d, and the live
     drive on a scratch project is R2e. Agreed with the owner 2026-11-15 and written in: 24z2 (tidy code and write
@@ -857,6 +864,35 @@ runs on or off; with it off nothing is sent anywhere.
         clippy and fmt clean; events test 35/35. For R2d: the window's chat on a running step sends to the runner
         (not api.agent.send), shows the owner's own message, and keeps the runner's notices in the session's lines
         (today they reach only the live listeners).
+      - R2d split (2026-11-15, the size of R2c): part 1 the core side (run handles, commands, events, the finishing
+        pass, the master's commands and stream); part 2 the window (a thin RunnerStore with the same exports over the
+        commands, the step chat sending to the runner, the runner's notices kept in the session's lines, standing
+        owner rules); part 3 what part 2 leaves (the master's Inbox, see below). R2e drives it live.
+      - [x] R2d part 1 DONE 2026-11-15 (core side; the window still runs its TypeScript runner until part 2):
+        plan/live.rs: `Runs`, one `Shared` per project, a run or a finishing pass on its own thread, one at a time
+        per project ("A plan run is going on in this project."); `RunView` (the run, running/finishing, waits, the
+        model at work, notices, pausing, stopping, checking, the step's session, messages not taken yet, the last
+        error); `Tell` (where the view and the steps' agent events go, each event with its session, reviews and
+        planner turns too); `RunStart`, the start as the window sends it (camelCase, Settings > Team as stored,
+        rules by job name, empty or unknown ones left out); `last_run` from the records. The finishing pass ported
+        (`finish_pass`: full checks, the paid agent's review of the run's diff from its start snapshot, free models
+        when it cannot answer, the full level's own session with the run's step limits, its Still open list,
+        FINISH.md, the Inbox item; Stop at any point ends it as stopped). Shared tells listeners when its waits,
+        model or notices change (`touch`), not only when the run is saved. Desktop (desktop_runs.rs): commands
+        plan_run_start / finish / state / active / stop / pause / finish_without / answer / message / interrupt /
+        model / mode; events "qanuvi-run" (the view) and "qanuvi-run-agent" ({projectId, sessionId, event}); an
+        Inbox answer calls run::on_answer for its project; the core's new Inbox questions show a desktop
+        notification (only new ones: CoreEnv's notice now says `new`). Master (master_runs.rs): the same plan_run_*
+        commands plus plan_run_watch; a run goes on when the desktop disconnects; watching connections get
+        {"kind": "view" | "agent" | "event", ...} on their stream until they go; keys are the master's own
+        (QANUVI_KEY_..., as agent_start). Fixed on the way: a turn's first event reached listeners before its session
+        id was known. Tests: plan::live (thread, one at a time, views and agent events; light pass; full pass; Stop
+        during the checks; the window's start shape) and a master run streamed to a watching connection.
+        Not ported, on purpose: the window's per-file git diff for a run with no snapshot (very old runs; the review
+        goes by the files and Done notes). Left for part 3: the master has no Inbox commands, so a master run's held
+        steps wait in the master's own Inbox, which the desktop does not show yet.
+        371 Rust tests pass (1 old ignored as before), clippy clean on the desktop and the master-only build, fmt
+        clean. TypeScript unchanged, nothing published, no live check (the window calls none of it until part 2).
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work

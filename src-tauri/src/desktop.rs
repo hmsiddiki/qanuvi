@@ -10,6 +10,9 @@ use std::path::PathBuf;
 use tauri::ipc::Channel;
 use tauri::{Manager, State};
 
+#[path = "desktop_runs.rs"]
+mod plan_runs;
+
 /// Basic facts about the running app, shown in the interface and used by later milestones (updates, diagnostics).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AppInfo {
@@ -41,6 +44,7 @@ pub struct AppState {
     remotes: crate::remote::Remotes,
     accounts: crate::account::Accounts,
     startup: crate::startup::Startup,
+    runs: std::sync::Arc<crate::plan::live::Runs>,
 }
 
 type Res<T> = Result<T, String>;
@@ -1779,6 +1783,7 @@ fn inbox_answer(
     };
     if let Some(item) = &done {
         inbox_changed(&app, "answer", Some(item));
+        plan_runs::answered(&app, item);
     }
     Ok(done)
 }
@@ -2068,6 +2073,7 @@ pub fn run() {
                 remotes: crate::remote::Remotes::default(),
                 accounts: crate::account::Accounts::default(),
                 startup: crate::startup::Startup::default(),
+                runs: std::sync::Arc::default(),
             });
             // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
             // when the last good one is a day old.
@@ -2286,6 +2292,18 @@ pub fn run() {
             plan_data_list,
             plan_data_set,
             plan_data_import,
+            plan_runs::plan_run_start,
+            plan_runs::plan_run_finish,
+            plan_runs::plan_run_state,
+            plan_runs::plan_run_active,
+            plan_runs::plan_run_stop,
+            plan_runs::plan_run_pause,
+            plan_runs::plan_run_finish_without,
+            plan_runs::plan_run_answer,
+            plan_runs::plan_run_message,
+            plan_runs::plan_run_interrupt,
+            plan_runs::plan_run_model,
+            plan_runs::plan_run_mode,
             agent_usage_since,
             agent_config_list,
             agent_config_read,

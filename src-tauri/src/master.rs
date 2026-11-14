@@ -22,12 +22,18 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[path = "master_runs.rs"]
+mod plan_runs;
+
 /// What a running master shares with its connections.
 pub struct Master {
     db: Db,
     terminals: Terminals,
     agents: Agents,
     indexes: index::Indexes,
+    /// Plan runs on this master, and the connections that follow them.
+    runs: Arc<crate::plan::live::Runs>,
+    watchers: Arc<plan_runs::Watchers>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -87,6 +93,8 @@ impl Master {
             terminals: Terminals::default(),
             agents: Agents::default(),
             indexes: index::Indexes::default(),
+            runs: Arc::default(),
+            watchers: Arc::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
         })
@@ -421,6 +429,7 @@ impl Master {
             }
             "runs_list" => to(runs::list(db, &s(args, "projectId"))),
             "runs_list_all" => to(runs::list_all(db, n(args, "limit").max(1) as usize)),
+            c if c.starts_with("plan_run_") => self.plan_run(c, args, stream),
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
     }
@@ -758,5 +767,71 @@ mod tests {
         let v: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(v["id"], 7);
         assert_eq!(v["ok"]["name"], "Qanuvi master");
+    }
+
+    #[test]
+    fn runs_a_plan_on_the_master_and_streams_its_views_to_a_watching_connection() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        // Every step is done already: the run ends at once and starts no agent.
+        std::fs::write(
+            project.path().join("PLAN.md"),
+            "# Plan\n\n- [x] **1. Done**\n",
+        )
+        .unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+        let heard: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let h = heard.clone();
+        let streams = move |name: &str| {
+            let (h, name) = (h.clone(), name.to_string());
+            Sink::new(move |v: Value| {
+                h.lock().unwrap().push((name.clone(), v));
+                true
+            })
+        };
+        let start = json!({"projectId": id, "onEvent": "r1", "start": {"file": "PLAN.md", "projectName": "Shop"}});
+        m.dispatch(
+            "plan_run_start",
+            &start,
+            &streams,
+            &Mutex::new(HashSet::new()),
+        )
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        while !call(&m, "plan_run_active", json!({}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+        {
+            assert!(Instant::now() < until, "the run did not end");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let state = call(&m, "plan_run_state", json!({"projectId": id})).unwrap();
+        assert_eq!(state["running"], false);
+        assert_eq!(state["run"]["status"], "done");
+        assert_eq!(state["run"]["message"], "No open steps to run.");
+        let heard = heard.lock().unwrap();
+        assert!(heard.iter().all(|(n, _)| n == "r1"));
+        let last = &heard.last().expect("the views came on the stream").1;
+        assert_eq!(last["kind"], "view");
+        assert_eq!(last["view"]["run"]["status"], "done");
+        // An unknown run command is said plainly, and so is a start that does not read.
+        let e = call(&m, "plan_run_nothing", json!({"projectId": id})).unwrap_err();
+        assert!(e.contains("does not know the command plan_run_nothing"));
+        let bad = call(
+            &m,
+            "plan_run_start",
+            json!({"projectId": id, "start": {"file": 5}}),
+        )
+        .unwrap_err();
+        assert!(bad.contains("start is not valid"));
     }
 }

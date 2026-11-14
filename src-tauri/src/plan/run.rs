@@ -197,8 +197,13 @@ impl Shared {
         self.wake.notify_all();
     }
 
-    fn publish(&self, run: &PlanRun) {
+    /// The run changed: kept as the one shown, and told to whoever listens.
+    pub(crate) fn publish(&self, run: &PlanRun) {
         self.live().run = Some(run.clone());
+        self.tell(run);
+    }
+
+    fn tell(&self, run: &PlanRun) {
         let hook = self
             .on_run
             .lock()
@@ -209,7 +214,32 @@ impl Shared {
         }
     }
 
-    fn forward(&self, e: &AgentEvent) {
+    /// Something around the run changed (its waits, the model at work, a notice): listeners hear the run again.
+    pub(crate) fn touch(&self) {
+        let run = self.live().run.clone();
+        if let Some(r) = run {
+            self.tell(&r);
+        }
+    }
+
+    pub(crate) fn set_current_model(&self, model: &str) {
+        self.live().current_model = model.to_string();
+        self.touch();
+    }
+
+    /// A run (or a finishing pass) starts on this handle: what the last one left is cleared.
+    pub(crate) fn begin(&self) {
+        self.controls.reset();
+        let mut live = self.live();
+        live.waiting_answers = 0;
+        live.waiting_until = None;
+        live.answers.clear();
+        live.finish_without = false;
+        live.notices.clear();
+        live.current_model.clear();
+    }
+
+    pub(crate) fn forward(&self, e: &AgentEvent) {
         let hook = self
             .on_event
             .lock()
@@ -222,6 +252,7 @@ impl Shared {
 
     fn notice(&self, text: String) {
         self.live().notices.push(text);
+        self.touch();
     }
 
     /// Waits up to `poll` for a wake-up (an answer, Pause, Stop, End the run here).
@@ -250,7 +281,7 @@ fn find(text: &str, number: Option<&str>, title: &str) -> Option<Step> {
         .find(|s| s.number.as_deref() == number && s.title == title)
 }
 
-fn status_word(s: RunStatus) -> String {
+pub(crate) fn status_word(s: RunStatus) -> String {
     serde_json::to_value(s)
         .ok()
         .and_then(|v| v.as_str().map(String::from))
@@ -398,15 +429,7 @@ impl<'a> Loop<'a> {
                 done_set.insert(n);
             }
         }
-        sh.controls.reset();
-        {
-            let mut live = sh.live();
-            live.waiting_answers = 0;
-            live.waiting_until = None;
-            live.answers.clear();
-            live.finish_without = false;
-            live.notices.clear();
-        }
+        sh.begin();
         let now = env.now_ms();
         let run = PlanRun {
             id: uuid::Uuid::new_v4().to_string(),
@@ -1315,6 +1338,7 @@ impl<'a> Loop<'a> {
                 self.sh.nap();
             }
             self.sh.live().waiting_answers = 0;
+            self.sh.touch();
             self.answered = false;
             if self.stop_asked() {
                 self.finish(RunStatus::Stopped, STOPPED);
@@ -1660,7 +1684,7 @@ impl<'a> Loop<'a> {
                 self.s.options.mode = m.clone();
                 self.patch_run_settings(json!({"mode": m}));
             }
-            self.sh.live().current_model = model.clone();
+            self.sh.set_current_model(&model);
             let title = format!(
                 "Step {}{}{}",
                 st.number
@@ -2267,15 +2291,19 @@ impl<'a> Loop<'a> {
     /// Waits until the moment (Stop or Pause ends it); answers false when the owner stopped or paused the run.
     fn wait_until(&self, at: i64) -> bool {
         self.sh.live().waiting_until = Some(at);
-        while self.env.now_ms() < at {
+        self.sh.touch();
+        let reached = loop {
+            if self.env.now_ms() >= at {
+                break true;
+            }
             if self.stop_asked() || self.pausing() {
-                self.sh.live().waiting_until = None;
-                return false;
+                break false;
             }
             self.env.sleep(Duration::from_secs(5));
-        }
+        };
         self.sh.live().waiting_until = None;
-        !self.stop_asked()
+        self.sh.touch();
+        reached && !self.stop_asked()
     }
 
     // ---------- The step's log and the plan's knowledge ----------

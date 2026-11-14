@@ -523,10 +523,11 @@ impl RunEnv for CoreEnv<'_> {
     }
 
     fn inbox_add(&self, item: &NewItem) -> Result<InboxItem, String> {
-        let (added, _) = crate::inbox::add_new(&self.db, item)?;
+        let (added, new) = crate::inbox::add_new(&self.db, item)?;
+        // `new`: not an update of an item with the same key (the desktop shows a notification only then).
         (self.notify)(
             "qanuvi-inbox",
-            serde_json::json!({"change": "add", "item": added}),
+            serde_json::json!({"change": "add", "item": added, "new": new}),
         );
         Ok(added)
     }
