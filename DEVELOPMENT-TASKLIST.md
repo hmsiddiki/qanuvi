@@ -369,7 +369,11 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 night): R2a DONE (see 24z "R2a DONE"). PLAN-F reran on 0.1.21: 97a-1 done, the
+    RESUME HERE (newest, 2026-11-14, later night): R2b DONE (see 24z "R2b DONE"): the agent turn and its fix
+    rounds in Rust (plan/turn.rs) and the process-tree stop. NEXT: R2c (the run loop on RunEnv: step order, attempts
+    through turn::attempt, reviews, replans, holds through the Inbox, closing steps, limit waits; un-ignore the 10
+    scenarios) in a fresh conversation; check free RAM before builds and run verify in parts (guard.ps1).
+    RESUME HERE (before, 2026-11-14 night): R2a DONE (see 24z "R2a DONE"). PLAN-F reran on 0.1.21: 97a-1 done, the
     rest skipped by the Needs-label bug (R2 findings); the plan file was fixed by hand (Needs point at 97a-1...97a-4,
     old skip lines removed) and the owner reruns it. NEXT: R2b (the agent turn and its fix rounds on RunEnv, plus
     the process-tree stop agreed today) in a
@@ -759,7 +763,23 @@ runs on or off; with it off nothing is sent anywhere.
         in memory). runner/scenarios.rs: the 10 scenarios ported, #[ignore] until R2c connects the `Run` hook.
         Verify: 400 TS + 312 Rust (11 ignored), clippy and svelte-check clean. Runs were done under a memory guard
         (scratchpad guard.ps1): the first full verify hit low virtual memory and blacked out the installed Qanuvi.
-      - [ ] R2b also (owner agreed 2026-11-14): stopping an agent session stops its whole process tree. Today
+      - [x] R2b DONE 2026-11-14: plan/turn.rs (port of the window's #turn and #attempt). `Controls` holds the owner's
+        asks to the running step (stop gently then at once, pause, another model, "read my message now", mode),
+        set by the commands later (R2d); `StepWatch` holds what happened to the step (limits, handover, over limit,
+        pause now, the switched model) for the run loop. `turn` sends a turn and steers it: limits every 15 s,
+        handover on a big context, pause/switch/stop messages with their late stops (3 min, 1 min for Stop), the
+        30 s hold after an interrupt; a stop asked before a turn starts no agent. `attempt` = turn plus up to two
+        fix rounds in the same session (live model and mode kept), Attempt with the step's own share of cost,
+        tokens and time. RunEnv's agent turn is now steerable: its callback hears every event and a quiet tick
+        about once a second and answers a `Flow` (Go, Hold, Send, Stop, End); CoreEnv sends mid-turn messages on
+        the same channel and keeps "process gone" (only the session's sinks hold the sender); TurnEnd carries
+        tokens and time. Fake: scripted lines and quiet seconds, messages sent into turns kept. Fixed on the way
+        (window runner bug, not ported): a pause during a step with tests ran the tests and sent a fix round; now a
+        paused step stops where it was paused. 22 new tests (21 turn, 1 process tree); 334 Rust tests pass (11
+        ignored until R2c), clippy clean. TypeScript unchanged.
+      - [x] R2b also (owner agreed 2026-11-14), DONE: stopping an agent session stops its whole process tree
+        (Agents::stop uses checks::kill_tree; on Unix the agent starts in its own process group). Test: a parent
+        with a child, both gone after the stop. Was: Today
         Agents::stop does child.kill(), which on Windows ends only the agent process; a non-lean session's MCP
         servers (node: Playwright, web research) stay running after idle close (10 min), Stop and app exit. Use
         checks::kill_group (taskkill /T on Windows, the process group elsewhere) in stop, stop_project and stop_all,

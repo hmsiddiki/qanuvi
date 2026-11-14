@@ -57,6 +57,27 @@ pub struct TurnEnd {
     pub result: Option<String>,
     /// The final answer was an error.
     pub is_error: bool,
+    /// The session's totals so far (all its turns): tokens and the agent's working time.
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub duration_ms: i64,
+    /// The runner ended the turn itself (`Flow::Stop` or `Flow::End`), not the agent.
+    pub cut_short: bool,
+}
+
+/// What the runner wants while a turn runs, answered to every event and to every quiet second (`None`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Flow {
+    /// Keep waiting; a turn that is over ends.
+    Go,
+    /// Keep waiting, also when the turn looks over (the agent stopped to read the owner's message and goes on).
+    Hold,
+    /// Send this message to the session now; it joins the turn (a pause, a handover, a stop request).
+    Send(String),
+    /// Stop the session and end the turn.
+    Stop,
+    /// End the turn and leave the session as it is.
+    End,
 }
 
 /// A session status that ends a turn.
@@ -107,11 +128,13 @@ pub trait RunEnv: Send + Sync {
         skip: Option<&str>,
     ) -> Result<Changes, String>;
 
-    /// Sends a message and waits until the turn is over; every event goes to `on_event` on the way.
+    /// Sends a message and waits until the turn is over. `on_event` hears every event (first the session as it
+    /// started, so its id is known at once) and, while nothing comes, about once a second `None`; what it answers
+    /// steers the turn.
     fn agent_turn(
         &self,
         req: &TurnRequest,
-        on_event: &mut dyn FnMut(&AgentEvent),
+        on_event: &mut dyn FnMut(Option<&AgentEvent>) -> Flow,
     ) -> Result<TurnEnd, String>;
     fn agent_stop(&self, session_id: &str);
 
@@ -142,7 +165,7 @@ pub trait RunEnv: Send + Sync {
 }
 
 /// Whether requests get the user's memory, and how much (Settings > Memory, sent with the run's start).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MemoryUse {
     pub on: bool,
     pub budget: usize,
@@ -202,7 +225,12 @@ pub fn ask_planner(
         setup: ask.setup.clone(),
         title: Some(ask.title.clone()).filter(|t| !t.is_empty()),
     };
-    let end = env.agent_turn(&req, on_event);
+    let end = env.agent_turn(&req, &mut |e| {
+        if let Some(e) = e {
+            on_event(e);
+        }
+        Flow::Go
+    });
     if let Ok(e) = &end {
         env.agent_stop(&e.session_id);
     }
@@ -298,31 +326,46 @@ impl RunEnv for CoreEnv<'_> {
     fn agent_turn(
         &self,
         req: &TurnRequest,
-        on_event: &mut dyn FnMut(&AgentEvent),
+        on_event: &mut dyn FnMut(Option<&AgentEvent>) -> Flow,
     ) -> Result<TurnEnd, String> {
+        use std::sync::mpsc::RecvTimeoutError;
         let (tx, rx) = std::sync::mpsc::channel::<AgentEvent>();
-        let sink = crate::sink::Sink::new(move |e| tx.send(e).is_ok());
-        let started = self.agents.start(
-            &self.db,
-            &self.project,
+        // Only the session's sinks hold the sender: when the agent's process is gone, the channel closes.
+        let tx = std::sync::Arc::new(tx);
+        let weak = std::sync::Arc::downgrade(&tx);
+        let agent = if req.agent.is_empty() {
+            "claude-code"
+        } else {
+            &req.agent
+        };
+        let send = |tx: std::sync::Arc<std::sync::mpsc::Sender<AgentEvent>>,
+                    session_id: Option<&str>,
+                    prompt: &str,
+                    context: Option<&str>| {
+            self.agents.start(
+                &self.db,
+                &self.project,
+                session_id,
+                prompt,
+                &req.model,
+                &req.mode,
+                req.base_url.as_deref(),
+                req.effort.as_deref(),
+                req.lean,
+                req.index_tools,
+                req.browser_tools,
+                context,
+                &[],
+                agent,
+                req.setup.as_deref(),
+                crate::sink::Sink::new(move |e| tx.send(e).is_ok()),
+            )
+        };
+        let started = send(
+            tx,
             req.session_id.as_deref(),
             &req.prompt,
-            &req.model,
-            &req.mode,
-            req.base_url.as_deref(),
-            req.effort.as_deref(),
-            req.lean,
-            req.index_tools,
-            req.browser_tools,
             req.context.as_deref(),
-            &[],
-            if req.agent.is_empty() {
-                "claude-code"
-            } else {
-                &req.agent
-            },
-            req.setup.as_deref(),
-            sink,
         )?;
         if let Some(title) = &req.title {
             let _ = crate::agent::rename(&self.db, &started.id, title);
@@ -331,11 +374,50 @@ impl RunEnv for CoreEnv<'_> {
             session_id: started.id.clone(),
             status: started.status.clone(),
             cost_usd: started.cost_usd,
+            input_tokens: started.input_tokens,
+            output_tokens: started.output_tokens,
+            duration_ms: started.duration_ms,
             ..Default::default()
         };
+        let mut flow = on_event(Some(&AgentEvent::Session {
+            session: Box::new(started),
+        }));
         // Events until the turn is over; a closed channel means the session's process is gone.
-        while let Ok(event) = rx.recv() {
-            on_event(&event);
+        loop {
+            match flow {
+                Flow::Go | Flow::Hold => {}
+                Flow::Send(text) => {
+                    // A message that cannot be sent (the agent just ended) changes nothing: its end comes as an event.
+                    if let Some(tx) = weak.upgrade() {
+                        let _ = send(tx, Some(&end.session_id), &text, None);
+                    }
+                }
+                Flow::Stop => {
+                    self.agents.stop(&end.session_id);
+                    crate::agent::mark_stopped(&self.db, &end.session_id);
+                    end.status = "stopped".into();
+                    end.cut_short = true;
+                    break;
+                }
+                Flow::End => {
+                    end.cut_short = true;
+                    break;
+                }
+            }
+            let event = match rx.recv_timeout(Duration::from_secs(1)) {
+                Ok(e) => e,
+                Err(RecvTimeoutError::Timeout) => {
+                    flow = on_event(None);
+                    continue;
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    if !turn_over(&end.status) {
+                        end.status = "ended".into();
+                    }
+                    break;
+                }
+            };
+            flow = on_event(Some(&event));
             match &event {
                 AgentEvent::Line { line } => {
                     if let Some((text, is_error)) = result_of(line) {
@@ -346,7 +428,11 @@ impl RunEnv for CoreEnv<'_> {
                 AgentEvent::Session { session } => {
                     end.status = session.status.clone();
                     end.cost_usd = session.cost_usd;
-                    if turn_over(&session.status) {
+                    end.input_tokens = session.input_tokens;
+                    end.output_tokens = session.output_tokens;
+                    end.duration_ms = session.duration_ms;
+                    // What the runner answered to the end still counts (it may keep waiting: an interrupt).
+                    if turn_over(&session.status) && flow == Flow::Go {
                         break;
                     }
                 }

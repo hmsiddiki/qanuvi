@@ -43,7 +43,7 @@ fn shell(command: &str) -> Command {
 }
 
 /// Stops a command and everything it started (a test runner may start other programs that keep running).
-fn kill_tree(child: &mut std::process::Child) {
+pub fn kill_tree(child: &mut std::process::Child) {
     let pid = child.id().to_string();
     if cfg!(windows) {
         let mut k = Command::new("taskkill");
@@ -199,6 +199,100 @@ mod tests {
         assert!(r.timed_out);
         assert!(!r.ok);
         assert!(r.duration_ms < 10_000);
+    }
+
+    /// Whether a process with this id is still running.
+    fn alive(pid: u32) -> bool {
+        if cfg!(windows) {
+            let mut c = Command::new("tasklist");
+            c.args(["/NH", "/FI", &format!("PID eq {pid}")]);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                c.creation_flags(0x0800_0000);
+            }
+            c.output()
+                .map(|o| {
+                    String::from_utf8_lossy(&o.stdout)
+                        .split_whitespace()
+                        .any(|w| w == pid.to_string())
+                })
+                .unwrap_or(false)
+        } else {
+            #[cfg(unix)]
+            {
+                // SAFETY: signal 0 only checks that the process exists.
+                unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+            }
+            #[cfg(not(unix))]
+            false
+        }
+    }
+
+    #[test]
+    fn kill_tree_stops_the_process_and_what_it_started() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("child.pid");
+        // A parent that starts a long-running child, writes the child's id and waits for it.
+        let mut cmd = if cfg!(windows) {
+            let mut c = Command::new("powershell");
+            c.args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "$p = Start-Process ping -ArgumentList '-n','60','127.0.0.1' -PassThru -WindowStyle Hidden; \
+                     Set-Content -Path '{}' -Value $p.Id; Start-Sleep 60",
+                    pid_file.display()
+                ),
+            ]);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                c.creation_flags(0x0800_0000);
+            }
+            c
+        } else {
+            let mut c = Command::new("sh");
+            c.args([
+                "-c",
+                &format!("sleep 60 & echo $! > '{}'; wait", pid_file.display()),
+            ]);
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::CommandExt;
+                c.process_group(0);
+            }
+            c
+        };
+        let mut parent = cmd
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let child = loop {
+            if let Some(pid) = std::fs::read_to_string(&pid_file)
+                .ok()
+                .and_then(|s| s.trim().parse::<u32>().ok())
+            {
+                break pid;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the child never started"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        };
+        assert!(alive(child));
+        let parent_pid = parent.id();
+        kill_tree(&mut parent);
+        // A stopped process can linger a moment before the system clears it.
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while (alive(child) || alive(parent_pid)) && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(!alive(parent_pid), "the parent is still running");
+        assert!(!alive(child), "the child is still running");
     }
 
     #[test]

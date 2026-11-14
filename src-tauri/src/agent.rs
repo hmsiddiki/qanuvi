@@ -134,7 +134,7 @@ pub struct AgentInfo {
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Session {
     pub id: String,
     pub project_id: String,
@@ -1103,6 +1103,12 @@ impl Agents {
             }
         }
         no_window(&mut cmd);
+        // Its own process group, so stopping the session also stops what the agent started (MCP servers...).
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
         let mut child = cmd.spawn().map_err(|e| {
             if own {
                 format!("Qanuvi's agent could not start: {e}")
@@ -1506,8 +1512,8 @@ impl Agents {
             .unwrap_or_else(|e| e.into_inner())
             .remove(session_id);
         if let Some(mut r) = running {
-            let _ = r.child.kill();
-            let _ = r.child.wait();
+            // The whole tree: a plain kill ends only the agent and leaves its MCP servers running.
+            crate::checks::kill_tree(&mut r.child);
         }
     }
 

@@ -5,7 +5,7 @@
 use crate::agent::{AgentEvent, Usage};
 use crate::checks::CheckResult;
 use crate::inbox::{InboxItem, NewItem};
-use crate::plan::env::{FileText, RunEnv, TurnEnd, TurnRequest};
+use crate::plan::env::{FileText, Flow, RunEnv, TurnEnd, TurnRequest};
 use crate::plan_data::Kind;
 use crate::projects::ProjectSettings;
 use crate::runs::RunRecord;
@@ -29,13 +29,18 @@ pub struct AgentCall<'a> {
     pub env: &'a FakeEnv,
 }
 
-/// How the scripted turn ended (defaults: idle, $0.01, no final answer).
+/// How the scripted turn ended (defaults: idle, $0.01, no final answer). Each turn adds 1000 input and 100 output
+/// tokens and 2 seconds of work to its session.
 #[derive(Clone, Debug, Default)]
 pub struct AgentReply {
     pub status: Option<&'static str>,
     pub cost: Option<f64>,
     pub result: Option<String>,
     pub is_error: bool,
+    /// Agent lines sent before the end (a usage line, say).
+    pub lines: Vec<String>,
+    /// Quiet seconds before the end (the clock moves one second each).
+    pub ticks: u32,
 }
 
 type AgentScript = Arc<dyn Fn(&AgentCall) -> AgentReply + Send + Sync>;
@@ -55,6 +60,10 @@ struct World {
     turns: HashMap<String, u32>,
     costs: HashMap<String, f64>,
     stopped: Vec<String>,
+    /// Messages sent into running turns: session and text.
+    sent: Vec<(String, String)>,
+    /// Per session: input tokens, output tokens, working milliseconds.
+    tokens: HashMap<String, (i64, i64, i64)>,
     runs: BTreeMap<String, RunRecord>,
     settings: ProjectSettings,
     calls: Vec<String>,
@@ -176,6 +185,11 @@ impl FakeEnv {
 
     pub fn stopped(&self) -> Vec<String> {
         self.w().stopped.clone()
+    }
+
+    /// Messages sent into running turns, in order: (session, text).
+    pub fn sent(&self) -> Vec<(String, String)> {
+        self.w().sent.clone()
     }
 
     pub fn inbox(&self) -> Vec<InboxItem> {
@@ -366,7 +380,7 @@ impl RunEnv for FakeEnv {
     fn agent_turn(
         &self,
         req: &TurnRequest,
-        on_event: &mut dyn FnMut(&AgentEvent),
+        on_event: &mut dyn FnMut(Option<&AgentEvent>) -> Flow,
     ) -> Result<TurnEnd, String> {
         self.call("agent_start");
         let (id, turn) = {
@@ -393,25 +407,100 @@ impl RunEnv for FakeEnv {
             turn,
             env: self,
         });
-        let cost = {
+        let (cost, tokens) = {
             let mut w = self.w();
             let c = w.costs.entry(id.clone()).or_insert(0.0);
             *c += reply.cost.unwrap_or(0.01);
-            *c
+            let c = *c;
+            let t = w.tokens.entry(id.clone()).or_insert((0, 0, 0));
+            *t = (t.0 + 1000, t.1 + 100, t.2 + 2000);
+            (c, *t)
         };
+        let mut end = TurnEnd {
+            session_id: id.clone(),
+            status: "running".into(),
+            cost_usd: cost,
+            input_tokens: tokens.0,
+            output_tokens: tokens.1,
+            duration_ms: tokens.2,
+            ..Default::default()
+        };
+        let session = |status: &str| AgentEvent::Session {
+            session: Box::new(crate::agent::Session {
+                id: id.clone(),
+                status: status.into(),
+                cost_usd: cost,
+                input_tokens: tokens.0,
+                output_tokens: tokens.1,
+                duration_ms: tokens.2,
+                model: req.model.clone(),
+                mode: req.mode.clone(),
+                ..Default::default()
+            }),
+        };
+        // What the runner answered: a message is kept, a stop or an end finishes the turn here.
+        let steer = |flow: Flow, end: &mut TurnEnd| -> bool {
+            match flow {
+                Flow::Go | Flow::Hold => false,
+                Flow::Send(text) => {
+                    self.w().sent.push((id.clone(), text));
+                    false
+                }
+                Flow::Stop => {
+                    self.w().stopped.push(id.clone());
+                    end.status = "stopped".into();
+                    end.cut_short = true;
+                    true
+                }
+                Flow::End => {
+                    end.cut_short = true;
+                    true
+                }
+            }
+        };
+        if steer(on_event(Some(&session("running"))), &mut end) {
+            return Ok(end);
+        }
+        for line in &reply.lines {
+            if steer(
+                on_event(Some(&AgentEvent::Line { line: line.clone() })),
+                &mut end,
+            ) {
+                return Ok(end);
+            }
+        }
+        for _ in 0..reply.ticks {
+            self.w().clock += 1000;
+            if steer(on_event(None), &mut end) {
+                return Ok(end);
+            }
+        }
         if let Some(text) = &reply.result {
             let line =
                 serde_json::json!({"type": "result", "result": text, "is_error": reply.is_error})
                     .to_string();
-            on_event(&AgentEvent::Line { line });
+            if steer(on_event(Some(&AgentEvent::Line { line })), &mut end) {
+                return Ok(end);
+            }
         }
-        Ok(TurnEnd {
-            session_id: id,
-            status: reply.status.unwrap_or("idle").into(),
-            cost_usd: cost,
-            result: reply.result,
-            is_error: reply.is_error,
-        })
+        end.result = reply.result.clone();
+        end.is_error = reply.is_error;
+        end.status = reply.status.unwrap_or("idle").into();
+        let flow = on_event(Some(&session(&end.status)));
+        let hold = flow == Flow::Hold;
+        if steer(flow, &mut end) {
+            return Ok(end);
+        }
+        // Held at its end (an interrupt): quiet seconds until the runner ends the turn.
+        if hold {
+            for _ in 0..1000 {
+                self.w().clock += 1000;
+                if steer(on_event(None), &mut end) {
+                    return Ok(end);
+                }
+            }
+        }
+        Ok(end)
     }
 
     fn agent_stop(&self, session_id: &str) {
@@ -604,7 +693,7 @@ mod tests {
                     prompt: "a".into(),
                     ..Default::default()
                 },
-                &mut |_| {},
+                &mut |_| Flow::Go,
             )
             .unwrap();
         let again = TurnRequest {
@@ -614,7 +703,7 @@ mod tests {
             agent: "claude-code".into(),
             ..Default::default()
         };
-        let second = env.agent_turn(&again, &mut |_| {}).unwrap();
+        let second = env.agent_turn(&again, &mut |_| Flow::Go).unwrap();
         assert_eq!(
             second.result.as_deref(),
             Some(format!("turn 2 {} m claude-code", first.session_id).as_str())
