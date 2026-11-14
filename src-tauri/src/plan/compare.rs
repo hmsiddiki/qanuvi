@@ -264,6 +264,12 @@ fn run(name: &str, a: &[Value]) -> Value {
         }
         "endStatus" => to(runner::end_status(&de::<Vec<_>>(&a[0]))),
         "runSummary" => json!(runner::run_summary(&de::<Vec<_>>(&a[0]))),
+        "reviewWithoutDiff" => to(runner::review_without_diff(
+            &de(&a[0]),
+            &de::<Vec<String>>(&a[1]),
+            a[2].as_bool(),
+        )),
+        "replacementsDone" => json!(runner::replacements_done(&de::<Vec<_>>(&a[0]), &s(1))),
         "startModel" => json!(runner::start_model(a[0].as_str(), &s(1))),
         "nextModel" => to(runner::next_model::<runner::Attempt>(
             &de::<Vec<_>>(&a[0]),
@@ -491,6 +497,13 @@ fn run_2b(name: &str, a: &[Value]) -> Value {
             Err(e) => json!({ "error": e }),
         },
         "labelRange" => json!(planner::label_range(&s(0))),
+        "freeLabels" => json!(planner::free_labels(
+            &s(0),
+            &s(1),
+            a[2].as_str(),
+            a[3].as_u64().unwrap_or(0) as usize
+        )),
+        "renumberWith" => json!(planner::renumber_with(&s(0), &de::<Vec<String>>(&a[1]))),
         "sectionTitleFrom" => json!(planner::section_title_from(&s(0))),
         "guidanceNote" => json!(guidance::guidance_note(&s(0), &s(1))),
         "withoutGuidance" => json!(guidance::without_guidance(&s(0))),

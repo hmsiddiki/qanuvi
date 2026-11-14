@@ -49,6 +49,17 @@ fn opt(args: &Value, k: &str) -> Option<String> {
     args[k].as_str().map(String::from)
 }
 
+fn list(args: &Value, k: &str) -> Vec<String> {
+    args[k]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn b(args: &Value, k: &str) -> bool {
     args[k].as_bool().unwrap_or(false)
 }
@@ -167,6 +178,20 @@ impl Master {
                 Ok(json!({"files": list, "truncated": truncated}))
             }
             "files_read" => to(files::read_file(&self.root(args)?, &s(args, "path"))),
+            "snapshots_take" => to(crate::snapshots::take(
+                &self.root(args)?,
+                &list(args, "also"),
+            )),
+            "snapshots_changes" => {
+                let skip = s(args, "skip");
+                to(crate::snapshots::changes(
+                    &self.root(args)?,
+                    &s(args, "before"),
+                    &list(args, "also"),
+                    b(args, "git"),
+                    &|p| !skip.is_empty() && p == skip,
+                ))
+            }
             "files_create" => to(files::create(
                 &self.root(args)?,
                 &s(args, "path"),

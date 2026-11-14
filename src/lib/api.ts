@@ -8,6 +8,27 @@ export interface ProjectSettings {
   run_command: string;
   test_command: string;
   preview_url: string;
+  /** Where plan steps' changes come from for reviews: "" / "qanuvi" (own snapshots) or "git". */
+  changes_from?: string;
+}
+
+/** Qanuvi's own record of a project's files (git or not). */
+export interface SnapshotTaken {
+  id: string;
+  files: number;
+  stored: number;
+  truncated: boolean;
+  ms: number;
+  /** The `also` folders no git repository sees. */
+  git_blind: string[];
+}
+
+export interface SnapshotChanges {
+  changes: { path: string; kind: "added" | "changed" | "deleted"; diff: string }[];
+  /** With git chosen: changed files git cannot see (shown from Qanuvi's snapshot). */
+  unseen: string[];
+  /** The snapshot taken now. */
+  after: string;
 }
 
 export interface Project {
@@ -307,6 +328,11 @@ export const api = {
     /** Files modified since a moment (ms since 1970): what a plan step changed. */
     changedSince: (projectId: string, sinceMs: number) =>
       invoke<string[]>("files_changed_since", { projectId, sinceMs: Math.floor(sinceMs) }),
+    /** Qanuvi's own snapshot of the project's files; `also`: folders followed whatever ignore rules say. */
+    snapshot: (projectId: string, also: string[] = []) => invoke<SnapshotTaken>("snapshots_take", { projectId, also }),
+    /** What changed since a snapshot (each file's diff); `git`: the user chose git's diffs where git sees a file. */
+    changesSince: (projectId: string, before: string, also: string[], git: boolean, skip: string | null = null) =>
+      invoke<SnapshotChanges>("snapshots_changes", { projectId, before, also, git, skip }),
     /** Adds to a plan step's log (under .qanuvi/plan-logs). */
     logAppend: (projectId: string, path: string, text: string) =>
       invoke<void>("files_log_append", { projectId, path, text }),

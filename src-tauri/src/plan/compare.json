@@ -4212,6 +4212,121 @@
   "out": ""
  },
  {
+  "fn": "freeLabels",
+  "args": [
+   "- [!] **97a. Storage design**\n- [ ] **97b. Phone mode**\n- [ ] **97c. Texts**\n- [ ] **97d. Custom field**\n- [ ] **97z. Docs**\n- [ ] **98. Next**\n- [ ] **98a. Next part**",
+   "",
+   "97a",
+   4
+  ],
+  "out": [
+   "97a-1",
+   "97a-2",
+   "97a-3",
+   "97a-4"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "- [!] **97a. Storage design**\n- [ ] **97b. Phone mode**\n- [ ] **97c. Texts**\n- [ ] **97d. Custom field**\n- [ ] **97z. Docs**\n- [ ] **98. Next**\n- [ ] **98a. Next part**\n- [ ] **97a-2. Old**",
+   "- [x] **97a-1. A**",
+   "97a",
+   2
+  ],
+  "out": [
+   "97a-3",
+   "97a-4"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "- [!] **97a. Storage design**\n- [ ] **97b. Phone mode**\n- [ ] **97c. Texts**\n- [ ] **97d. Custom field**\n- [ ] **97z. Docs**\n- [ ] **98. Next**\n- [ ] **98a. Next part**",
+   "",
+   "97a-2",
+   2
+  ],
+  "out": [
+   "97a-1",
+   "97a-2"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "- [!] **97a. Storage design**\n- [ ] **97b. Phone mode**\n- [ ] **97c. Texts**\n- [ ] **97d. Custom field**\n- [ ] **97z. Docs**\n- [ ] **98. Next**\n- [ ] **98a. Next part**",
+   "",
+   "98",
+   3
+  ],
+  "out": [
+   "98b",
+   "98c",
+   "98d"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "- [ ] **5a. S**\n- [ ] **5b. S**\n- [ ] **5c. S**\n- [ ] **5d. S**\n- [ ] **5e. S**\n- [ ] **5f. S**\n- [ ] **5g. S**\n- [ ] **5h. S**\n- [ ] **5i. S**\n- [ ] **5j. S**\n- [ ] **5k. S**\n- [ ] **5l. S**\n- [ ] **5m. S**\n- [ ] **5n. S**\n- [ ] **5o. S**\n- [ ] **5p. S**\n- [ ] **5q. S**\n- [ ] **5r. S**\n- [ ] **5s. S**\n- [ ] **5t. S**\n- [ ] **5u. S**\n- [ ] **5v. S**\n- [ ] **5w. S**\n- [ ] **5x. S**\n- [ ] **5y. S**\n- [ ] **5z. S**",
+   "",
+   "5",
+   2
+  ],
+  "out": [
+   "5-1",
+   "5-2"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "- [!] **97a. Storage design**\n- [ ] **97b. Phone mode**\n- [ ] **97c. Texts**\n- [ ] **97d. Custom field**\n- [ ] **97z. Docs**\n- [ ] **98. Next**\n- [ ] **98a. Next part**",
+   "- [x] **120. Old**",
+   null,
+   2
+  ],
+  "out": [
+   "121",
+   "122"
+  ]
+ },
+ {
+  "fn": "freeLabels",
+  "args": [
+   "",
+   "",
+   "",
+   1
+  ],
+  "out": [
+   "1"
+  ]
+ },
+ {
+  "fn": "renumberWith",
+  "args": [
+   "- [ ] **97a1. Make it visible**\n  - d\n- [ ] **97b. 97a2. Schema**\n- [ ] Plain 3. x\n- [ ] 12. Plain numbered\nnot a step",
+   [
+    "97a-1",
+    "97a-2",
+    "97a-3"
+   ]
+  ],
+  "out": "- [ ] **97a-1. Make it visible**\n  - d\n- [ ] **97a-2. Schema**\n- [ ] **97a-3. Plain 3. x**\n- [ ] **Plain numbered**\nnot a step"
+ },
+ {
+  "fn": "renumberWith",
+  "args": [
+   "- [ ] **  12b.   Spaced  **tail\n- [ ] ****",
+   [
+    "1"
+   ]
+  ],
+  "out": "- [ ] **1. Spaced**tail\n- [ ] ********"
+ },
+ {
   "fn": "sectionTitleFrom",
   "args": [
    "Add coupons. Then test them."
@@ -4606,6 +4721,40 @@
    ]
   ],
   "out": []
+ },
+ {
+  "fn": "reopenedSteps",
+  "args": [
+   [
+    {
+     "line": 0,
+     "number": "7",
+     "title": "Skip me",
+     "attempts": [],
+     "status": "skipped"
+    },
+    {
+     "line": 2,
+     "number": "8",
+     "title": "Back",
+     "attempts": [],
+     "status": "skipped"
+    },
+    {
+     "line": 3,
+     "number": "9",
+     "title": "Blocked",
+     "attempts": [],
+     "status": "blocked"
+    }
+   ],
+   "- [ ] **7. Skip me**\n  - Skipped: needs x\n- [ ] **8. Back**\n- [ ] **9. Blocked**\n  -skipped: not for a blocked one",
+   []
+  ],
+  "out": [
+   2,
+   3
+  ]
  },
  {
   "fn": "stepKey",
@@ -9878,6 +10027,306 @@
    []
   ],
   "out": "0 done"
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": [
+     "--- a\n+x"
+    ]
+   },
+   [
+    "a"
+   ],
+   true
+  ],
+  "out": null
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": []
+   },
+   [],
+   null
+  ],
+  "out": null
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": []
+   },
+   [
+    "src/A.php",
+    "src/B.php",
+    "src/C.php",
+    "src/D.php"
+   ],
+   true
+  ],
+  "out": {
+   "ok": true,
+   "why": "not reviewed: the step changed 4 files (src/A.php, src/B.php, src/C.php and 1 more) but no diff could be shown; the tests passed, so it counts as done"
+  }
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": []
+   },
+   [
+    "x"
+   ],
+   false
+  ],
+  "out": {
+   "ok": false,
+   "why": "the tests failed, and the step changed a file (x) but no diff could be shown"
+  }
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": []
+   },
+   [
+    "x"
+   ],
+   null
+  ],
+  "out": {
+   "ok": true,
+   "why": "not reviewed: the step changed a file (x) but no diff could be shown; no tests ran, so it counts as done"
+  }
+ },
+ {
+  "fn": "reviewWithoutDiff",
+  "args": [
+   {
+    "parts": [],
+    "error": "The snapshot is gone"
+   },
+   [],
+   null
+  ],
+  "out": {
+   "ok": true,
+   "why": "not reviewed: the changes could not be read (The snapshot is gone); no tests ran, so it counts as done"
+  }
+ },
+ {
+  "fn": "replacementsDone",
+  "args": [
+   [
+    {
+     "line": 0,
+     "number": "97a",
+     "title": "t",
+     "attempts": [],
+     "status": "blocked",
+     "replacedBy": "97a-1–97a-2"
+    },
+    {
+     "line": 1,
+     "number": "97a-1",
+     "title": "a",
+     "attempts": [],
+     "status": "done",
+     "replaces": "97a"
+    },
+    {
+     "line": 2,
+     "number": "97a-2",
+     "title": "b",
+     "attempts": [],
+     "status": "done",
+     "replaces": "97a"
+    }
+   ],
+   "97a"
+  ],
+  "out": true
+ },
+ {
+  "fn": "replacementsDone",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "97a-1",
+     "title": "a",
+     "attempts": [],
+     "status": "done",
+     "replaces": "97a"
+    },
+    {
+     "line": 2,
+     "number": "97a-2",
+     "title": "b",
+     "attempts": [],
+     "status": "held",
+     "replaces": "97a"
+    }
+   ],
+   "97a"
+  ],
+  "out": false
+ },
+ {
+  "fn": "replacementsDone",
+  "args": [
+   [
+    {
+     "line": 1,
+     "number": "1",
+     "title": "Step 1",
+     "attempts": [
+      {
+       "model": "claude-haiku-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.25,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 30,
+       "note": ""
+      },
+      {
+       "model": "claude-sonnet-5-5",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 90,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "2",
+     "title": "Step 2",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 10,
+       "note": ""
+      },
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 20,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "docs"
+    },
+    {
+     "line": 1,
+     "number": "3",
+     "title": "Step 3",
+     "attempts": [
+      {
+       "model": "qanuvi:auto",
+       "sessionId": "s",
+       "outcome": "done",
+       "costUsd": 0,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 40,
+       "note": ""
+      }
+     ],
+     "status": "done",
+     "jobType": "ui"
+    },
+    {
+     "line": 1,
+     "number": "4",
+     "title": "Step 4",
+     "attempts": [],
+     "status": "skipped",
+     "reason": "needs step 2, which is not done"
+    },
+    {
+     "line": 1,
+     "number": null,
+     "title": "Step x",
+     "attempts": [],
+     "status": "blocked",
+     "reason": ""
+    },
+    {
+     "line": 1,
+     "number": "6",
+     "title": "Step 6",
+     "attempts": [],
+     "status": "held",
+     "held": {
+      "kind": "hold",
+      "why": "it pushes to the live server"
+     }
+    },
+    {
+     "line": 1,
+     "number": "7",
+     "title": "Step 7",
+     "attempts": [],
+     "status": "set-aside",
+     "waitsFor": {
+      "step": "6",
+      "why": "uses its file"
+     }
+    },
+    {
+     "line": 1,
+     "number": "8",
+     "title": "Step 8",
+     "attempts": [],
+     "status": "set-aside"
+    },
+    {
+     "line": 1,
+     "number": "9",
+     "title": "Step 9",
+     "attempts": [
+      {
+       "model": "claude-opus-5-5",
+       "sessionId": "s",
+       "outcome": "open",
+       "costUsd": 1.5,
+       "inputTokens": 100,
+       "outputTokens": 10,
+       "seconds": 60,
+       "note": ""
+      }
+     ],
+     "status": "failed",
+     "reason": "tests kept failing"
+    }
+   ],
+   "97a"
+  ],
+  "out": false
  },
  {
   "fn": "startModel",

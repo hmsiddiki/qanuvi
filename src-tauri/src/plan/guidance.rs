@@ -136,7 +136,15 @@ pub fn reopened_steps<'a>(
     };
     use RunStepStatus::*;
     let passed = keys(&|s| matches!(s, Blocked | Failed | Skipped));
+    let skipped = keys(&|s| s == Skipped);
     let waiting = keys(&|s| s == Waiting);
+    // A step the run skipped stays open in the plan with its "Skipped:" note: back only once the note is gone.
+    let note = |d: &String| {
+        let t = js::trim(d);
+        let t = t.strip_prefix('-').map_or(t, js::trim_start);
+        t.get(..8)
+            .is_some_and(|p| p.eq_ignore_ascii_case("skipped:"))
+    };
     now.iter()
         .filter(|s| {
             let k = key_of(s);
@@ -144,6 +152,7 @@ pub fn reopened_steps<'a>(
                 && passed.contains(&k)
                 && !waiting.contains(&k)
                 && !reopened.contains(&k)
+                && !(skipped.contains(&k) && s.details.iter().any(note))
         })
         .collect()
 }

@@ -151,6 +151,17 @@ fn valid_rel(rel: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether the repository at `dir` ignores `rel` (git's own answer, its ignore files and global rules included).
+pub fn is_ignored(dir: &Path, rel: &str) -> bool {
+    valid_rel(rel).is_ok() && git(dir, &["check-ignore", "-q", "--", rel]).is_ok()
+}
+
+/// Runs git for tests in other modules.
+#[cfg(test)]
+pub(crate) fn run_for_test(dir: &Path, args: &[&str]) -> Result<String, String> {
+    git(dir, args)
+}
+
 /// The unified diff of one file against the last commit (staged and unstaged changes together). An untracked file is
 /// shown as entirely added.
 pub fn diff(dir: &Path, rel: &str) -> Result<String, String> {

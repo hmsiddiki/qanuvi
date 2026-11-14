@@ -369,7 +369,12 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 21:15): R1 DONE (part 2b: preflight, packet, planstate, housekeeping, planner,
+    RESUME HERE (newest, 2026-11-14 late): R2 PRE-FIX DONE (see 24z "R2 PRE-FIX"): reviews from Qanuvi's own
+    snapshots (git optional per project), empty-diff rule, free replan numbers, replaced steps never held, skip-twice
+    fix, and the standing runner scenarios (10) + snapshot layout tests. NOT PUBLISHED (the installed app still has
+    the old runner; the owner's PLAN-F run waits on 97a: stop it, clean PLAN-F lines 88-146, then rerun from 97a on
+    a new version). NEXT: R2a in a fresh conversation (split and decisions in 24z R2).
+    RESUME HERE (before, 2026-11-14 21:15): R1 DONE (part 2b: preflight, packet, planstate, housekeeping, planner,
     guidance in Rust; see 24z "R1 part 2b"); comparison check 429 cases, all match. NEXT: R2 (the runner in Rust) in
     a fresh conversation: map stores/runner.svelte.ts onto the plan module first, then split R2 into parts.
     RESUME HERE (before, 2026-11-14 20:30): R1 PART 2a DONE (see 24z "R1 part 2a"): tasklist, routing, runner and
@@ -683,10 +688,53 @@ runs on or off; with it off nothing is sent anywhere.
         mentions are 2-80 characters in Rust, 2-80 UTF-16 units in TypeScript (differs only outside the BMP).
         Comparison check: 429 cases (220 new), all match; three changed outputs checked to fail. Verify: 376
         TypeScript + 286 Rust tests (114 plan tests), clippy and svelte-check clean. R1 is complete.
+    - [x] R2 PRE-FIX DONE 2026-11-14 (owner: PLAN-F stalled at its first step in the installed app): git is the
+      user's choice, never a must. Causes found in the PLAN-F record: the review took its diff from the outer repo,
+      which ignores /content/plugins/* (qCommerce is its own repo inside), saw nothing and rejected real work twice
+      ($5.05); the replan numbered 97a's replacements 97a-97d next to the real 97b-97d; the replaced step was held in
+      the Inbox itself and its own replacements waited for it; a replaced step never counted as done. Built:
+      - snapshots.rs (core, also in qanuvi-master): Qanuvi's own snapshot of the project's files (size, time,
+        fingerprint; texts stored once by fingerprint in the data folder, two weeks kept) and unified diffs from it
+        (own Myers line diff, no new crate). Follows the file tree's files (nested repos found by themselves) plus the
+        plan's folder whatever ignore rules say. Measured on amirularham (about 2,000 files): first 23 s in a debug
+        build, 28 MB; every later one 0.3 s. git_blind: the plan folders no repository sees.
+      - Project settings "Plan step changes from": Qanuvi's snapshots (default) or git (each file's own repository
+        against its last commit); with git, files git cannot see still come from the snapshots, and the run asks
+        once in the Inbox (Keep git / Use Qanuvi's snapshots), the run goes on meanwhile. Checked before the first
+        step (git_blind), and in each review (unseen).
+      - Reviews: reviewWithoutDiff: no diff of files the step changed, or changes that cannot be read, never reject a
+        step alone; the tests decide and the reason is said. The chat's free-model review uses the snapshots too.
+      - Replans: freeLabels + renumberWith (97a → 97a-1, 97a-2, …; every label a planner wrote before a title is
+        dropped); the replaced step is not held and nothing waits for it; once all its replacements are done it is
+        ticked (replaces / replacementsDone). The run's start snapshot is kept in the run record (finishing pass
+        after a restart).
+      - Found by the new scenarios: reopenedSteps took a step the run skipped for an unmet Needs line (still open,
+        with its Skipped note) as sent back by the owner, so it was skipped twice and listed twice in the summary.
+      - All rules in TypeScript and Rust; comparison check gained the cases, all match.
+      - THE STANDING TEST SET (owner: "a running feature must not break while a new one is made"):
+        src/lib/stores/runner.scenarios.test.ts drives the real runner store, the real plan logic and changes.ts
+        against a fake core (src/lib/stores/testing/fakeCore.ts: files, snapshots, scripted agent sessions, checks,
+        run records; an unknown command fails loudly). 10 scenarios: plain run; PLAN-F empty-diff review; review of
+        a change in an ignored plugin folder; PLAN-F replan numbering and the replaced step; git-blind question;
+        blocked step through the Inbox and answer; failing tests and the fix round; pause after each step; stop
+        mid-step; Needs on another plan. snapshots/tests.rs covers the four layouts (no git, ignored folder, nested
+        repo, plain repo). Each fix was checked by putting the bug back: every one fails a scenario.
+        RULE: every runner bug found in a real run gets a scenario before its fix; a runner change is done only
+        when npm run verify (with the scenarios) passes. R2 ports these scenarios to the Rust runner's tests first,
+        so the Rust runner must pass the same runs.
+      Not yet: a new version for the installed app (publishing waits for the owner).
     - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
       closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
       updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in
-      qanuvi-master; the TypeScript runner deleted.
+      qanuvi-master; the TypeScript runner deleted. Split agreed 2026-11-14 (owner: "i agree on them"): R2a
+      foundations (migration 9 for picks, plan state, plan notes and run settings with a one-time import from
+      localStorage; Rust memory slice and planner call; a RunEnv trait with stand-ins; the scenarios above ported
+      first), R2b the agent turn and its fix rounds, R2c the run loop, R2d wiring (commands, a qanuvi-run event, a
+      thin RunnerStore with the same exports, the master's commands and a run stream), R2e drive live on a scratch
+      project and delete the TypeScript runner. Decided: run settings go with the start and on change (not all
+      settings into Rust now); master runs without a credential store say so in the step and go on (a master store
+      later); the TypeScript plan files and the comparison check stay until nothing imports them. Note: migration 8 is
+      the Inbox, so the queue (R3) is migration 10.
     - [ ] R3: the queue (DB table, migration 8): tasks and whole plans, one after another per project, side by side
       across projects, holds and answers per plan, a hook for the paid monitor (24e, built later).
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,

@@ -147,6 +147,39 @@ async fn files_changed_since(
     blocking(move || files::changed_since(&root, since, 200)).await
 }
 
+/// Qanuvi's own record of the project's files before a piece of work (git or not). `also`: folders followed even
+/// where ignore rules leave them out (the plan's folder).
+#[tauri::command]
+async fn snapshots_take(
+    state: State<'_, AppState>,
+    project_id: String,
+    also: Vec<String>,
+) -> Res<crate::snapshots::Taken> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || crate::snapshots::take(&root, &also)).await
+}
+
+/// What changed since a snapshot, with each file's change; `git`: the user chose git's diffs where git sees the file.
+/// `skip`: a path left out (the plan file itself).
+#[tauri::command]
+async fn snapshots_changes(
+    state: State<'_, AppState>,
+    project_id: String,
+    before: String,
+    also: Vec<String>,
+    git: bool,
+    skip: Option<String>,
+) -> Res<crate::snapshots::Changes> {
+    let root = project_root(&state, &project_id)?;
+    blocking(move || {
+        let skip = skip.unwrap_or_default();
+        crate::snapshots::changes(&root, &before, &also, git, &|p| {
+            !skip.is_empty() && p == skip
+        })
+    })
+    .await
+}
+
 /// Adds to a plan step's log (under .qanuvi/plan-logs).
 #[tauri::command]
 async fn files_log_append(
@@ -2141,6 +2174,8 @@ pub fn run() {
             files_markdown,
             files_log_append,
             files_changed_since,
+            snapshots_take,
+            snapshots_changes,
             files_replace,
             files_read,
             files_write,

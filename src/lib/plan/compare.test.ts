@@ -125,6 +125,16 @@ const RUNS = [
   },
   { steps: [sr("4", "done", [att("qanuvi:auto", "done", 0)], { title: "Add a page" })] },
 ];
+const FREE_PLAN = [
+  "- [!] **97a. Storage design**",
+  "- [ ] **97b. Phone mode**",
+  "- [ ] **97c. Texts**",
+  "- [ ] **97d. Custom field**",
+  "- [ ] **97z. Docs**",
+  "- [ ] **98. Next**",
+  "- [ ] **98a. Next part**",
+].join("\n");
+
 const RUN_STEPS = [
   sr("1", "done", [att(H5, "done", 0.25, 30), att(S5, "done", 0.5, 90)], { jobType: "docs" }),
   sr("2", "done", [att("qanuvi:auto", "open", 0, 10), att("qanuvi:auto", "done", 0, 20)], { jobType: "docs" }),
@@ -225,6 +235,8 @@ const fns: Record<string, (...a: any[]) => unknown> = {
     ),
   endStatus: (steps) => runner.endStatus({ steps }),
   runSummary: (steps) => runner.runSummary({ steps }),
+  reviewWithoutDiff: runner.reviewWithoutDiff,
+  replacementsDone: (steps, key) => runner.replacementsDone({ steps }, key),
   startModel: (model, d) => runner.startModel({ model }, d),
   nextModel: runner.nextModel,
   stepOutcome: runner.stepOutcome,
@@ -283,6 +295,8 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   appendSection: planner.appendSection,
   replaceStep: (t, step, block, labels) => tried(() => planner.replaceStep(t, step, block, labels)),
   labelRange: planner.labelRange,
+  freeLabels: planner.freeLabels,
+  renumberWith: planner.renumberWith,
   sectionTitleFrom: planner.sectionTitleFrom,
   guidanceNote: guidance.guidanceNote,
   withoutGuidance: guidance.withoutGuidance,
@@ -693,6 +707,24 @@ const cases: [string, unknown[]][] = [
   ["labelRange", ["- [ ] **12a. A**\n- [ ] **12b. B**\n- [ ] **12c. C**"]],
   ["labelRange", ["- [ ] **5. A**"]],
   ["labelRange", ["- [ ] Plain"]],
+  ["freeLabels", [FREE_PLAN, "", "97a", 4]],
+  ["freeLabels", [`${FREE_PLAN}\n- [ ] **97a-2. Old**`, "- [x] **97a-1. A**", "97a", 2]],
+  ["freeLabels", [FREE_PLAN, "", "97a-2", 2]],
+  ["freeLabels", [FREE_PLAN, "", "98", 3]],
+  [
+    "freeLabels",
+    [Array.from({ length: 26 }, (_, i) => `- [ ] **5${String.fromCharCode(97 + i)}. S**`).join("\n"), "", "5", 2],
+  ],
+  ["freeLabels", [FREE_PLAN, "- [x] **120. Old**", null, 2]],
+  ["freeLabels", ["", "", "", 1]],
+  [
+    "renumberWith",
+    [
+      "- [ ] **97a1. Make it visible**\n  - d\n- [ ] **97b. 97a2. Schema**\n- [ ] Plain 3. x\n- [ ] 12. Plain numbered\nnot a step",
+      ["97a-1", "97a-2", "97a-3"],
+    ],
+  ],
+  ["renumberWith", ["- [ ] **  12b.   Spaced  **tail\n- [ ] ****", ["1"]]],
   ["sectionTitleFrom", ["Add coupons. Then test them."]],
   ["sectionTitleFrom", ["Add optional VAT to the cart total using addVat from src/tax.js, with tests."]],
   ["sectionTitleFrom", ["  "]],
@@ -735,6 +767,18 @@ const cases: [string, unknown[]][] = [
   ["addedSteps", [PLAN, []]],
   ["reopenedSteps", [RUN_REOPEN, PLAN, []]],
   ["reopenedSteps", [RUN_REOPEN, PLAN, ["2|Layout"]]],
+  [
+    "reopenedSteps",
+    [
+      [
+        { line: 0, number: "7", title: "Skip me", attempts: [], status: "skipped" },
+        { line: 2, number: "8", title: "Back", attempts: [], status: "skipped" },
+        { line: 3, number: "9", title: "Blocked", attempts: [], status: "blocked" },
+      ],
+      "- [ ] **7. Skip me**\n  - Skipped: needs x\n- [ ] **8. Back**\n- [ ] **9. Blocked**\n  -skipped: not for a blocked one",
+      [],
+    ],
+  ],
   ["stepKey", [{ number: null, title: "T" }]],
   ["stepKey", [{ number: "4", title: "T|x" }]],
   ["notesBlock", [["use the shop currency", "run php 8.2"]]],
@@ -1284,6 +1328,34 @@ const cases: [string, unknown[]][] = [
   ["endStatus", [RUN_STEPS.slice(0, 4)]],
   ["runSummary", [RUN_STEPS]],
   ["runSummary", [[]]],
+  ["reviewWithoutDiff", [{ parts: ["--- a\n+x"] }, ["a"], true]],
+  ["reviewWithoutDiff", [{ parts: [] }, [], null]],
+  ["reviewWithoutDiff", [{ parts: [] }, ["src/A.php", "src/B.php", "src/C.php", "src/D.php"], true]],
+  ["reviewWithoutDiff", [{ parts: [] }, ["x"], false]],
+  ["reviewWithoutDiff", [{ parts: [] }, ["x"], null]],
+  ["reviewWithoutDiff", [{ parts: [], error: "The snapshot is gone" }, [], null]],
+  [
+    "replacementsDone",
+    [
+      [
+        { line: 0, number: "97a", title: "t", attempts: [], status: "blocked", replacedBy: "97a-1–97a-2" },
+        { line: 1, number: "97a-1", title: "a", attempts: [], status: "done", replaces: "97a" },
+        { line: 2, number: "97a-2", title: "b", attempts: [], status: "done", replaces: "97a" },
+      ],
+      "97a",
+    ],
+  ],
+  [
+    "replacementsDone",
+    [
+      [
+        { line: 1, number: "97a-1", title: "a", attempts: [], status: "done", replaces: "97a" },
+        { line: 2, number: "97a-2", title: "b", attempts: [], status: "held", replaces: "97a" },
+      ],
+      "97a",
+    ],
+  ],
+  ["replacementsDone", [RUN_STEPS, "97a"]],
   ["startModel", [" m ", "d"]],
   ["startModel", [null, "d"]],
   ["nextModel", [priced, [att(H5, "open", 0), att(H5, "done", 0), att(H5, "error", 0)], H5, 2]],

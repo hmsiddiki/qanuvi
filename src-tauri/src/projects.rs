@@ -11,6 +11,9 @@ pub struct ProjectSettings {
     pub run_command: String,
     pub test_command: String,
     pub preview_url: String,
+    /// Where plan steps' changes come from for reviews: "" or "qanuvi" (Qanuvi's own snapshots, git or not), or
+    /// "git" (each file's repository, against its last commit; files git cannot see still use the snapshots).
+    pub changes_from: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

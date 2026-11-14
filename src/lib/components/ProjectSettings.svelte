@@ -16,6 +16,7 @@
   let run = $state("");
   let test = $state("");
   let preview = $state("");
+  let changesFrom = $state("qanuvi");
   let error = $state("");
 
   /** Secrets: names shown, values never (they go to the credential store and to the agents' environment). */
@@ -57,6 +58,7 @@
     run = project.settings.run_command;
     test = project.settings.test_command;
     preview = project.settings.preview_url;
+    changesFrom = project.settings.changes_from === "git" ? "git" : "qanuvi";
   });
 
   async function save(event: SubmitEvent) {
@@ -66,6 +68,7 @@
       run_command: run.trim(),
       test_command: test.trim(),
       preview_url: preview.trim(),
+      changes_from: changesFrom,
     });
     if (!error) onclose();
   }
@@ -96,6 +99,16 @@
           spellcheck="false"
         /></label
       >
+      <label
+        >Plan step changes from <select bind:value={changesFrom}>
+          <option value="qanuvi">Qanuvi's own snapshots (works with or without git)</option>
+          <option value="git">Git (each file's repository, against its last commit)</option>
+        </select></label
+      >
+      <p class="note">
+        What a plan step's review looks at. With git, files no repository sees (no git, or a folder it ignores) still
+        come from Qanuvi's snapshots, and the run tells you which.
+      </p>
 
       <h3>Secrets</h3>
       <p class="note">

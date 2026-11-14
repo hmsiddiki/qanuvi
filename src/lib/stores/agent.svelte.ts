@@ -11,7 +11,7 @@ import { modelLabel, paidAgent, providerById, type AgentProvider } from "$lib/ag
 import { chatModelPrompt, deciderSeat, overruleNote, parseChatModel, strongerModel } from "$lib/core/decider";
 import { itemsToMarkdown } from "$lib/agent/events";
 import { freeDecide, ownSetup, setupFor } from "./brain.svelte";
-import { snapshotChanges } from "./changes";
+import { snapshotChanges, type Snap } from "./changes";
 import { branchPreamble } from "$lib/agent/sessionTools";
 import { contextSize } from "$lib/plan/guidance";
 import {
@@ -699,7 +699,7 @@ ${text}`
   }
 
   /** A free chat turn the paid agent reviews when it ends: the request and the changed files before it. */
-  freeTurn: { projectId: string; request: string; before: Map<string, string> } | null = null;
+  freeTurn: { projectId: string; request: string; before: Snap | null } | null = null;
 
   /** Adds a line from Qanuvi core to the conversation. */
   notice(text: string, model = ""): void {

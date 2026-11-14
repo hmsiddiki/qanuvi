@@ -85,6 +85,8 @@ import {
   unmetNeed,
   endStatus,
   runSummary,
+  reviewWithoutDiff,
+  replacementsDone,
 } from "$lib/plan/runner";
 import { clearStaleSkips, parsePlan, setStepModel, type Step } from "$lib/plan/tasklist";
 import { archivePath, doneNumbers as doneIn } from "$lib/plan/housekeeping";
@@ -113,9 +115,9 @@ import {
   type DecisionRecord,
 } from "$lib/core/decider";
 import { setStepSkipped, setStepStatus } from "$lib/plan/tasklist";
-import { extractSteps, labelRange, lastNumber, renumber, replaceStep, replanPrompt } from "$lib/plan/planner";
+import { extractSteps, freeLabels, labelRange, renumberWith, replaceStep, replanPrompt } from "$lib/plan/planner";
 import { defaultPlannerModel, planner } from "./planner.svelte";
-import { changesSince, snapshotChanges } from "./changes";
+import { changesSince, folderOf, snapshotChanges, wantsGit, type Snap } from "./changes";
 import { failureSummary, fixPrompt, locationBlock, mentions, packetPrompt, type Location } from "$lib/plan/packet";
 import {
   doneNotes,
@@ -267,7 +269,7 @@ class RunnerStore {
   /** The finishing pass over a finished run is at work (24o). */
   finishing = $state(false);
   /** What differed from the last commit when the run started, so the pass sees only the run's own changes. */
-  #runBefore: { id: string; snap: Map<string, string> } | null = null;
+  #runBefore: { id: string; snap: Snap | null } | null = null;
   /** The agent a turn goes to when it is not the run's own (the finishing pass runs on the paid decider). */
   #agentOverride: string | null = null;
 
@@ -794,7 +796,11 @@ class RunnerStore {
     // Keep a reference to this run: the rest of the run works on it, whatever else is shown meanwhile.
     const run = this.run;
     // The finishing pass compares with this, so changes from before the run are not taken for the run's (24o).
-    this.#runBefore = steps.length ? { id: run.id, snap: await snapshotChanges(project.id) } : null;
+    // Qanuvi's own snapshot, git or not; the plan's folder is followed even where ignore rules leave it out.
+    const startSnap = steps.length ? await snapshotChanges(project.id, [folderOf(file)]) : null;
+    this.#runBefore = steps.length ? { id: run.id, snap: startSnap } : null;
+    if (startSnap) run.snapshot = { id: startSnap.id, also: startSnap.also };
+    if (steps.length) this.#checkChangesSeen(project, run, startSnap);
     // The plan's notes from earlier runs: the owner's instructions hold for every run of this plan.
     run.notes = [];
     {
@@ -1212,7 +1218,8 @@ class RunnerStore {
             prompt += `\n\n${isFree(rejected.model) ? "A free model" : "An earlier try"} already worked on this step, but the review turned it down: ${rejected.note.slice(8)}\nCheck its changes and finish the step properly.`;
           if (extra !== undefined)
             prompt += `\n\nThis step goes ahead with extra checks (${extra}): the full tests must pass and the decider reviews your diff before it counts as done. Keep the change small and easy to check.`;
-          const before = isFree(model) || extra !== undefined ? await this.#snapshot(project) : null;
+          const reviewed = isFree(model) || extra !== undefined;
+          const before = reviewed ? await this.#snapshot(project, file) : null;
           if (options.packets) prompt = packetPrompt(prompt, await this.#context(project, fresh, file), testCommand);
           // Same model, same section, still small: the step continues the last step's session (it knows the work).
           const section = fresh.section ?? "";
@@ -1377,7 +1384,7 @@ class RunnerStore {
           }
           // Quality first: a free model's "done" is checked by the decider before it counts.
           // A step with extra checks goes through the same review, also on the paid agent (24u part 3).
-          if (attempt.outcome === "done" && before && (freeFirst || extra !== undefined)) {
+          if (attempt.outcome === "done" && reviewed && (freeFirst || extra !== undefined)) {
             const review = await this.#review(project, provider, stepRun, fresh, before, attempt.testsPassed);
             this.#decide(run, {
               kind: "review",
@@ -1446,7 +1453,15 @@ class RunnerStore {
         await this.#takeAdded(project, file, run, stepRun, steps, known, reopened);
         await this.#collectNotes(run, stepRun);
         await this.#updateApi(project, file, stepRun);
-        if (run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed")) {
+        // A step the planner just rewrote is not the owner's problem: its replacement steps do its work, nothing
+        // waits for it, and it is ticked once they are all done.
+        const replaced =
+          stepRun.status === "blocked" &&
+          !!stepRun.replacedBy &&
+          run.steps.some((s) => s.replaces === this.#key(stepRun));
+        if (replaced) stepRun.reason = `replaced by steps ${stepRun.replacedBy}`;
+        if (stepRun.status === "done" && stepRun.replaces) await this.#closeReplaced(project, file, run, stepRun);
+        if (!replaced && run.status === "running" && (stepRun.status === "blocked" || stepRun.status === "failed")) {
           const kind = stepRun.status;
           await this.#setAside(project, file, run, stepRun, kind, stepRun.reason ?? "it needs you", provider, steps);
         }
@@ -1692,11 +1707,12 @@ class RunnerStore {
     const dir = logDir(run.file);
     const skip = (path: string) => isPlanFile(path, run.file, dir);
     const files = [...new Set(run.steps.flatMap((s) => s.changed ?? []))].filter((f) => !skip(f));
-    const parts =
-      this.#runBefore?.id === run.id
-        ? await changesSince(project.id, this.#runBefore.snap, skip)
-        : // After a restart the run's start is not known: the files' diffs against the last commit.
-          await Promise.all(files.slice(0, 40).map((f) => api.git.diff(project.id, f).catch(() => "")));
+    // The run's start snapshot (kept with the record, so a restart still has it).
+    const snap = this.#runBefore?.id === run.id ? this.#runBefore.snap : (run.snapshot ?? null);
+    const changed = await changesSince(project, snap, skip);
+    if (!changed.error) return { diff: changed.parts.join("\n"), files };
+    // No snapshot (an older run, or it expired): each file's diff against its repository's last commit, if any.
+    const parts = await Promise.all(files.slice(0, 40).map((f) => api.git.diff(project.id, f).catch(() => "")));
     return { diff: parts.filter(Boolean).join("\n"), files };
   }
 
@@ -1925,12 +1941,82 @@ class RunnerStore {
   }
 
   /**
-   * The text of the files that differ from the last commit now, to see later what one step changed (earlier steps'
-   * changes are not committed yet, so a diff against the commit would show them too).
+   * Qanuvi's snapshot of the project's files now, to see later what one step changed (git or not; the plan's folder
+   * is followed even where ignore rules leave it out).
    */
-  async #snapshot(project: Project): Promise<Map<string, string>> {
-    return snapshotChanges(project.id);
+  async #snapshot(project: Project, file: string): Promise<Snap | null> {
+    return snapshotChanges(project.id, [folderOf(file)]);
   }
+
+  /** Git chosen for this project but git cannot see some changed files: asked once per run (the run goes on). */
+  #askedChangesFrom = new Set<string>();
+
+  /**
+   * Before the first step: can the reviews see what the steps change? No snapshot (the core could not record the
+   * files) or, with git chosen, plan folders git cannot see: said in the run's decisions now, and with git a question
+   * in the Inbox; the run goes on with Qanuvi's snapshots meanwhile.
+   */
+  #checkChangesSeen(project: Project, run: PlanRun, snap: Snap | null): void {
+    if (!snap) {
+      this.#decide(run, {
+        kind: "decided",
+        by: "Qanuvi",
+        subject: "Changes for reviews",
+        decision: "Qanuvi could not record the project's files before the run",
+        why: "Reviews cannot show what a step changed, so a step is never turned down for an empty diff alone; tests decide.",
+      });
+      return;
+    }
+    if (snap.truncated)
+      this.#decide(run, {
+        kind: "decided",
+        by: "Qanuvi",
+        subject: "Changes for reviews",
+        decision: `only the first ${snap.files} files are followed`,
+        why: "The project has more files than a snapshot keeps; the plan's folder is followed first.",
+      });
+    if (wantsGit(project) && snap.gitBlind?.length) this.#askChangesFrom(project, run, snap.gitBlind, "folders");
+  }
+
+  #askChangesFrom(project: Project, run: PlanRun, paths: string[], what: "folders" | "files"): void {
+    if (this.#askedChangesFrom.has(run.id)) return;
+    this.#askedChangesFrom.add(run.id);
+    const list = paths
+      .slice(0, 5)
+      .map((p) => p || "(the project's top folder)")
+      .join(", ");
+    const more = paths.length > 5 ? ` and ${paths.length - 5} more` : "";
+    this.#decide(run, {
+      kind: "decided",
+      by: "Qanuvi",
+      subject: "Changes for reviews",
+      decision: `git cannot see ${list}${more}: Qanuvi's own snapshots show their changes`,
+      why: "This project uses git for reviews, but no repository sees these (none, or one that ignores them).",
+    });
+    inbox.add({
+      type: "answer",
+      kind: "run",
+      title: `${project.name}: git cannot see some of the plan's ${what}`,
+      text: `${list}${more}. The run goes on and shows their changes from Qanuvi's own snapshots. Keep git for the rest, or use Qanuvi's snapshots for this whole project?`,
+      key: `changes-from:${project.id}`,
+      form: {
+        choices: [
+          { id: "keep", label: "Keep git for the rest" },
+          { id: "qanuvi", label: "Use Qanuvi's snapshots", hint: "For every file of this project, git or not" },
+        ],
+      },
+      source: { kind: "changes-from", projectId: project.id },
+      open: { label: "Open the plan", view: "plan", projectId: project.id },
+    });
+  }
+
+  /** The owner's answer to "git cannot see": Qanuvi's snapshots for the whole project, from now on. */
+  #fromChangesFrom = inbox.onAnswer((item) => {
+    const s = item.source;
+    if (s?.kind !== "changes-from" || item.answer?.choice !== "qanuvi") return;
+    const p = projects.list.find((x) => x.id === s.projectId);
+    if (p) void projects.update(p.id, p.name, { ...p.settings, changes_from: "qanuvi" });
+  });
 
   /** The decider's look at what a free model changed for a step (diff since the step started, tests). */
   async #review(
@@ -1938,11 +2024,20 @@ class RunnerStore {
     provider: AgentProvider,
     stepRun: StepRun,
     step: Step,
-    before: Map<string, string>,
+    before: Snap | null,
     testsPassed: boolean | null | undefined,
   ): Promise<{ ok: boolean; why: string }> {
     const file = this.run?.file ?? "";
-    const parts = await changesSince(project.id, before, (path) => !!file && path.endsWith(file));
+    const skip = (path: string) => !!file && isPlanFile(path, file, logDir(file));
+    const changed = await changesSince(project, before, skip);
+    if (changed.unseen.length && this.run) this.#askChangesFrom(project, this.run, changed.unseen, "files");
+    const verdict = reviewWithoutDiff(
+      changed,
+      (stepRun.changed ?? []).filter((p) => !skip(p)),
+      testsPassed,
+    );
+    if (verdict) return verdict;
+    const parts = changed.parts;
     const tests = testsPassed === true ? "passed" : testsPassed === false ? "failed" : "";
     try {
       // A short look at one step's diff: the agent's own default model, not the planner's bigger one.
@@ -1992,6 +2087,27 @@ class RunnerStore {
     }
   }
 
+  /** A replacement step is done: once all of them are, the step they replace is ticked too (what needs it can go on). */
+  async #closeReplaced(project: Project, file: string, run: PlanRun, done: StepRun): Promise<void> {
+    const key = done.replaces;
+    if (!key || !replacementsDone(run, key)) return;
+    const old = run.steps.find((s) => this.#key(s) === key && s.replacedBy);
+    if (!old) return;
+    const now = await api.files.read(project.id, file).catch(() => null);
+    const step = now && parsePlan(now.text).steps.find((s) => s.number === old.number && s.title === old.title);
+    if (now && step) {
+      try {
+        await api.files.write(project.id, file, setStepStatus(now.text, step.line, "x", step.title), now.hash);
+      } catch {
+        // The list changed meanwhile: the step stays as it is in the file; the run still counts it done.
+      }
+    }
+    old.status = "done";
+    old.reason = `done through its replacement steps ${old.replacedBy}`;
+    this.changed++;
+    await this.#save(run);
+  }
+
   /**
    * Asks the planner to rewrite a step that failed on every model, writes the new steps after it (the step is marked
    * blocked with a note), and adds them to the run. Returns the new steps, or none when the planner gave none.
@@ -2022,15 +2138,12 @@ class RunnerStore {
       );
       const { block } = extractSteps(answer.text);
       if (!block) return [];
-      const numbered = step.number
-        ? renumber(block, step.number.replace(/[a-z]$/, ""))
-        : renumber(
-            block,
-            Math.max(
-              lastNumber(current.text),
-              lastNumber((await api.files.read(project.id, archivePath(file)).catch(() => null))?.text ?? ""),
-            ) + 1,
-          );
+      // Numbers no other step has, in the plan or its archive (97a → 97a-1, 97a-2, …).
+      const archive = (await api.files.read(project.id, archivePath(file)).catch(() => null))?.text ?? "";
+      const numbered = renumberWith(
+        block,
+        freeLabels(current.text, archive, step.number, parsePlan(block).steps.length),
+      );
       const labels = labelRange(numbered);
       const next = replaceStep(current.text, step, numbered, labels);
       await api.files.write(project.id, file, next, current.hash);
@@ -2047,6 +2160,7 @@ class RunnerStore {
           title: s.title,
           attempts: [],
           status: "waiting" as const,
+          replaces: this.#key(stepRun),
         })),
       );
       this.changed++;

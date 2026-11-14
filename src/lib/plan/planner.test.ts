@@ -118,3 +118,39 @@ describe("sectionTitleFrom", () => {
     expect(sectionTitleFrom("  ")).toBe("Planned work");
   });
 });
+
+describe("freeLabels and renumberWith (PLAN-F 97a: replacements never take numbers in use)", async () => {
+  const { freeLabels, renumberWith } = await import("./planner");
+  const plan = [
+    "- [!] **97a. Storage design**",
+    "- [ ] **97b. Phone mode**",
+    "- [ ] **97c. Texts**",
+    "- [ ] **97d. Custom field**",
+    "- [ ] **97z. Docs**",
+    "- [ ] **98. Next**",
+    "- [ ] **98a. Next part**",
+  ].join("\n");
+  it("numbers a lettered step's replacements under it, skipping what is taken", () => {
+    expect(freeLabels(plan, "", "97a", 4)).toEqual(["97a-1", "97a-2", "97a-3", "97a-4"]);
+    expect(freeLabels(`${plan}\n- [ ] **97a-2. Old**`, "", "97a", 2)).toEqual(["97a-1", "97a-3"]);
+    expect(freeLabels(plan, "- [x] **97a-1. Archived**", "97a", 2)).toEqual(["97a-2", "97a-3"]);
+  });
+  it("gives a replacement of a replacement the next free number under the same step", () => {
+    expect(freeLabels(`${plan}\n- [ ] **97a-1. A**\n- [ ] **97a-2. B**`, "", "97a-2", 2)).toEqual(["97a-3", "97a-4"]);
+  });
+  it("uses free letters for a whole-numbered step, then -1, -2", () => {
+    expect(freeLabels(plan, "", "98", 3)).toEqual(["98b", "98c", "98d"]);
+    const all = Array.from({ length: 26 }, (_, i) => `- [ ] **5${String.fromCharCode(97 + i)}. S**`).join("\n");
+    expect(freeLabels(all, "", "5", 2)).toEqual(["5-1", "5-2"]);
+  });
+  it("goes after the highest whole number for a step without one", () => {
+    expect(freeLabels(plan, "- [x] **120. Old**", null, 2)).toEqual(["121", "122"]);
+  });
+  it("drops any label the planner wrote before a title", () => {
+    const block =
+      "- [ ] **97a1. Make it visible**\n  - d\n- [ ] **97b. 97a2. Schema**\n- [ ] Plain 3. x\n- [ ] 12. Plain numbered";
+    expect(renumberWith(block, ["97a-1", "97a-2", "97a-3"])).toBe(
+      "- [ ] **97a-1. Make it visible**\n  - d\n- [ ] **97a-2. Schema**\n- [ ] **97a-3. Plain 3. x**\n- [ ] **Plain numbered**",
+    );
+  });
+});

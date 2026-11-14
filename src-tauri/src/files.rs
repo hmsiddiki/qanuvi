@@ -63,7 +63,7 @@ pub fn fingerprint(bytes: &[u8]) -> String {
     format!("{:016x}-{}", h.finish(), bytes.len())
 }
 
-fn rel_string(root: &Path, path: &Path) -> String {
+pub(crate) fn rel_string(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .unwrap_or(path)
         .components()
@@ -174,7 +174,7 @@ pub fn markdown_files(root: &Path) -> Result<Vec<String>, String> {
 }
 
 /// Every file Qanuvi works with: the project's own (by its ignore rules), then those of hidden nested repositories.
-fn walk_files(root: &Path) -> impl Iterator<Item = ignore::DirEntry> {
+pub(crate) fn walk_files(root: &Path) -> impl Iterator<Item = ignore::DirEntry> {
     std::iter::once(root.to_path_buf())
         .chain(hidden_repos(root))
         .flat_map(|dir| walker(&dir).build().flatten())
@@ -234,7 +234,7 @@ pub fn list_files(root: &Path) -> Result<(Vec<String>, bool), String> {
     Ok((files, false))
 }
 
-fn looks_binary(bytes: &[u8]) -> bool {
+pub(crate) fn looks_binary(bytes: &[u8]) -> bool {
     bytes.iter().take(8000).any(|b| *b == 0)
 }
 

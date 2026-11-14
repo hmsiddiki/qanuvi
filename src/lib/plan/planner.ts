@@ -91,6 +91,61 @@ export function renumber(block: string, start: number | string): string {
     .join("\n");
 }
 
+/**
+ * Numbers for `count` replacement steps of the step `number` that no step in the plan or its archive has (PLAN-F,
+ * 2026-11-14: 97a's replacements were numbered 97a–97d next to the real 97b–97d and everything waited on 97a).
+ * "12" → 12a, 12b, … (letters in use skipped; past z, 12-1, 12-2, …); "97a" → 97a-1, 97a-2, …; "97a-2" (itself a
+ * replacement) → the next free 97a-n; no number → after the highest whole number.
+ */
+export function freeLabels(text: string, archive: string, number: string | null, count: number): string[] {
+  const used = new Set(
+    [...parsePlan(text).steps, ...parsePlan(archive).steps].map((s) => s.number).filter(Boolean) as string[],
+  );
+  const out: string[] = [];
+  const take = (l: string) => {
+    if (used.has(l) || out.includes(l)) return;
+    out.push(l);
+  };
+  if (!number) {
+    let n = Math.max(lastNumber(text), lastNumber(archive)) + 1;
+    while (out.length < count) take(String(n++));
+    return out;
+  }
+  if (/^\d+$/.test(number)) {
+    for (let c = 0; c < 26 && out.length < count; c++) take(`${number}${String.fromCharCode(97 + c)}`);
+    for (let k = 1; out.length < count; k++) take(`${number}-${k}`);
+    return out;
+  }
+  const base = number.replace(/-\d+$/, "");
+  for (let k = 1; out.length < count; k++) take(`${base}-${k}`);
+  return out;
+}
+
+/** Gives the steps of a block the given numbers in order, dropping any number or label a planner wrote before a
+ * title ("97a1. Make …" → "Make …"). Steps past the end of `labels` keep no number. */
+export function renumberWith(block: string, labels: string[]): string {
+  let i = 0;
+  // Every leading label goes ("97b. 97a2. Schema" → "Schema").
+  const strip = (t: string) => {
+    let s = t.trim();
+    for (let prev = ""; prev !== s;) {
+      prev = s;
+      s = s.replace(/^\d+[a-z0-9]*(?:-\d+)?\.\s+/, "");
+    }
+    return s.trim();
+  };
+  return block
+    .split("\n")
+    .map((l) => {
+      const m = /^(- \[ \] )(?:\*\*(.+?)\*\*(.*)|(.+))$/.exec(l);
+      if (!m) return l;
+      const title = strip((m[2] ?? m[4]).trim());
+      const label = labels[i++];
+      return `${m[1]}**${label ? `${label}. ` : ""}${title}**${m[3] ?? ""}`;
+    })
+    .join("\n");
+}
+
 /** Adds a block of steps as a new section at the end of a task list, keeping its line endings. */
 export function appendSection(text: string, title: string, block: string): string {
   const { eol } = splitLines(text);

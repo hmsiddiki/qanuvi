@@ -240,6 +240,9 @@ pub struct StepRun {
     /// The planner rewrote this step into the steps named here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replaced_by: Option<String>,
+    /// This step is one of the planner's replacements for the step with this number (or title).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<String>,
     /// Files the step changed (modified while it ran).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changed: Option<Vec<String>>,
@@ -301,6 +304,10 @@ pub struct PlanRun {
     /// The decider's own calls (assignment, reviews): they count in the run's cost (24e).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decider_calls: Option<Vec<DeciderCall>>,
+    /// Qanuvi's snapshot of the project when the run started (kept so the finishing pass still sees only the run's
+    /// own changes after a restart).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<RunSnapshot>,
     /// The finishing pass over the whole run (24o), once it ran or runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finish: Option<FinishPass>,
@@ -481,6 +488,82 @@ pub fn end_status(steps: &[StepRun]) -> RunStatus {
     } else {
         RunStatus::Done
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RunSnapshot {
+    pub id: String,
+    pub also: Vec<String>,
+}
+
+/// What a review read: the diffs, or why they could not be read.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+pub struct ReadChanges {
+    #[serde(default)]
+    pub parts: Vec<String>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Verdict {
+    pub ok: bool,
+    pub why: String,
+}
+
+/// A review that cannot see the change must never turn a step down for that alone (PLAN-F 97a, 2026-11-14). The
+/// changes could not be read, or the step changed files but no diff came back: the tests decide, and the reason is
+/// said. None: the review goes ahead.
+pub fn review_without_diff(
+    changed: &ReadChanges,
+    touched: &[String],
+    tests_passed: Option<bool>,
+) -> Option<Verdict> {
+    let cause = if let Some(e) = &changed.error {
+        format!("the changes could not be read ({e})")
+    } else if changed.parts.is_empty() && !touched.is_empty() {
+        let mut names = touched
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        if touched.len() > 3 {
+            names.push_str(&format!(" and {} more", touched.len() - 3));
+        }
+        let what = if touched.len() == 1 {
+            "a file".to_string()
+        } else {
+            format!("{} files", touched.len())
+        };
+        format!("the step changed {what} ({names}) but no diff could be shown")
+    } else {
+        return None;
+    };
+    if tests_passed == Some(false) {
+        return Some(Verdict {
+            ok: false,
+            why: format!("the tests failed, and {cause}"),
+        });
+    }
+    let tests = if tests_passed == Some(true) {
+        "the tests passed"
+    } else {
+        "no tests ran"
+    };
+    Some(Verdict {
+        ok: true,
+        why: format!("not reviewed: {cause}; {tests}, so it counts as done"),
+    })
+}
+
+/// Whether every replacement step of the step `key` is done (false when it has none).
+pub fn replacements_done(steps: &[StepRun], key: &str) -> bool {
+    let mut mine = steps
+        .iter()
+        .filter(|s| s.replaces.as_deref() == Some(key))
+        .peekable();
+    mine.peek().is_some() && mine.all(|s| s.status == RunStepStatus::Done)
 }
 
 /// The end-of-run report (24f): what was done, and what was skipped or left, with why.

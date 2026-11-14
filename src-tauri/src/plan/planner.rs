@@ -176,6 +176,92 @@ pub fn renumber(block: &str, start: Start) -> String {
         .join("\n")
 }
 
+/// Numbers for `count` replacement steps of the step `number` that no step in the plan or its archive has (PLAN-F,
+/// 2026-11-14). "12" → 12a, 12b, … (letters in use skipped; past z, 12-1, …); "97a" → 97a-1, 97a-2, …; "97a-2" →
+/// the next free 97a-n; no number → after the highest whole number.
+pub fn free_labels(text: &str, archive: &str, number: Option<&str>, count: usize) -> Vec<String> {
+    static WHOLE: LazyLock<Regex> = LazyLock::new(|| re(r"^[0-9]+$"));
+    static TAIL: LazyLock<Regex> = LazyLock::new(|| re(r"-[0-9]+$"));
+    let used: std::collections::HashSet<String> = parse_plan(text)
+        .steps
+        .into_iter()
+        .chain(parse_plan(archive).steps)
+        .filter_map(|s| s.number.filter(|n| !n.is_empty()))
+        .collect();
+    let mut out: Vec<String> = Vec::new();
+    let take = |l: String, out: &mut Vec<String>| {
+        if !used.contains(&l) && !out.contains(&l) {
+            out.push(l);
+        }
+    };
+    let Some(number) = number.filter(|n| !n.is_empty()) else {
+        let mut n = last_number(text).max(last_number(archive)) + 1;
+        while out.len() < count {
+            take(n.to_string(), &mut out);
+            n += 1;
+        }
+        return out;
+    };
+    if WHOLE.is_match(number) {
+        for c in 0..26u8 {
+            if out.len() >= count {
+                break;
+            }
+            take(format!("{number}{}", (b'a' + c) as char), &mut out);
+        }
+        let mut k = 1;
+        while out.len() < count {
+            take(format!("{number}-{k}"), &mut out);
+            k += 1;
+        }
+        return out;
+    }
+    let base = TAIL.replace(number, "").into_owned();
+    let mut k = 1;
+    while out.len() < count {
+        take(format!("{base}-{k}"), &mut out);
+        k += 1;
+    }
+    out
+}
+
+/// Gives the steps of a block the given numbers in order, dropping every number or label a planner wrote before a
+/// title ("97b. 97a2. Schema" → "Schema"). Steps past the end of `labels` keep no number.
+pub fn renumber_with(block: &str, labels: &[String]) -> String {
+    static LINE: LazyLock<Regex> = LazyLock::new(|| {
+        let dot = js::DOT;
+        re(&format!(
+            r"^(- \[ \] )(?:\*\*({dot}+?)\*\*({dot}*)|({dot}+))$"
+        ))
+    });
+    static LABEL: LazyLock<Regex> =
+        LazyLock::new(|| re(&format!(r"^[0-9]+[a-z0-9]*(?:-[0-9]+)?\.{}+", js::S)));
+    let mut i = 0;
+    block
+        .split('\n')
+        .map(|l| match LINE.captures(l) {
+            None => l.to_string(),
+            Some(m) => {
+                let mut title =
+                    js::trim(m.get(2).or(m.get(4)).map_or("", |x| x.as_str())).to_string();
+                loop {
+                    let next = LABEL.replace(&title, "").into_owned();
+                    if next == title {
+                        break;
+                    }
+                    title = next;
+                }
+                let title = js::trim(&title);
+                let rest = m.get(3).map_or("", |x| x.as_str());
+                let label = labels.get(i).map_or(String::new(), |l| format!("{l}. "));
+                i += 1;
+                format!("{}**{label}{title}**{rest}", &m[1])
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Adds a block of steps as a new section at the end of a task list, keeping its line endings.
 pub fn append_section(text: &str, title: &str, block: &str) -> String {
     static SPACES: LazyLock<Regex> = LazyLock::new(|| re(&format!("{}+", js::S)));

@@ -40,6 +40,7 @@ pub mod relay_server;
 pub mod runs;
 pub mod secrets;
 pub mod sink;
+pub mod snapshots;
 pub mod startup;
 pub mod store;
 pub mod terminal;

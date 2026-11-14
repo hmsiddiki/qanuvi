@@ -149,14 +149,24 @@ export function looksSecret(text: string): boolean {
  */
 export function reopenedSteps<
   R extends { number: string | null; title: string; status: string },
-  S extends { number: string | null; title: string; status: string },
+  S extends { number: string | null; title: string; status: string; details?: string[] },
 >(runSteps: R[], now: S[], reopened: Set<string>): S[] {
   const passed = new Set(
     runSteps.filter((r) => ["blocked", "failed", "skipped"].includes(r.status)).map((r) => stepKey(r)),
   );
+  const skipped = new Set(runSteps.filter((r) => r.status === "skipped").map((r) => stepKey(r)));
   const waiting = new Set(runSteps.filter((r) => r.status === "waiting").map((r) => stepKey(r)));
+  // A step the run skipped stays open in the plan with its "Skipped:" note: it is back only once the note is gone
+  // (before 2026-11-14 it came back right away and the summary listed it twice).
+  const stillSkipped = (s: S) =>
+    skipped.has(stepKey(s)) && (s.details ?? []).some((d) => /^(?:-\s*)?Skipped:/i.test(d.trim()));
   return now.filter(
-    (s) => s.status === " " && passed.has(stepKey(s)) && !waiting.has(stepKey(s)) && !reopened.has(stepKey(s)),
+    (s) =>
+      s.status === " " &&
+      passed.has(stepKey(s)) &&
+      !waiting.has(stepKey(s)) &&
+      !reopened.has(stepKey(s)) &&
+      !stillSkipped(s),
   );
 }
 

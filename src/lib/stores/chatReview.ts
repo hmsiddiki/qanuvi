@@ -17,7 +17,12 @@ export async function reviewFreeTurn(project: Project): Promise<void> {
   agent.freeTurn = null;
   const paid = paidAgent();
   if (!turn || !paid || turn.projectId !== project.id) return;
-  const parts = await changesSince(project.id, turn.before);
+  const changed = await changesSince(project, turn.before);
+  if (changed.error) {
+    agent.notice(`The free change could not be reviewed: its changes could not be read (${changed.error}).`);
+    return;
+  }
+  const parts = changed.parts;
   if (!parts.length) return;
   const model = settings.agent(paid.id).model || defaultPlannerModel(paid);
   try {

@@ -289,3 +289,35 @@ describe("how a run ends", () => {
     expect(endStatus({ steps: [step("done"), step("skipped")] })).toBe("done");
   });
 });
+
+describe("reviewWithoutDiff (PLAN-F 97a: a review that cannot see the change never rejects it alone)", async () => {
+  const { reviewWithoutDiff, replacementsDone } = await import("./runner");
+  it("lets the review go ahead when there is a diff, or when nothing changed at all", () => {
+    expect(reviewWithoutDiff({ parts: ["--- a\n+x"] }, ["a"], true)).toBeNull();
+    expect(reviewWithoutDiff({ parts: [] }, [], null)).toBeNull();
+  });
+  it("lets the tests decide when files changed but no diff came back", () => {
+    const files = ["src/A.php", "src/B.php", "src/C.php", "src/D.php"];
+    expect(reviewWithoutDiff({ parts: [] }, files, true)).toEqual({
+      ok: true,
+      why: "not reviewed: the step changed 4 files (src/A.php, src/B.php, src/C.php and 1 more) but no diff could be shown; the tests passed, so it counts as done",
+    });
+    expect(reviewWithoutDiff({ parts: [] }, ["x"], false)?.ok).toBe(false);
+    expect(reviewWithoutDiff({ parts: [] }, ["x"], null)?.why).toContain("a file (x)");
+    expect(reviewWithoutDiff({ parts: [] }, ["x"], null)?.why).toContain("no tests ran");
+  });
+  it("says why when the changes could not be read", () => {
+    const r = reviewWithoutDiff({ parts: [], error: "The snapshot is gone" }, [], undefined);
+    expect(r).toEqual({
+      ok: true,
+      why: "not reviewed: the changes could not be read (The snapshot is gone); no tests ran, so it counts as done",
+    });
+  });
+  it("knows when every replacement of a step is done", () => {
+    const s = (status: string, replaces?: string) =>
+      ({ line: 0, number: null, title: "t", attempts: [], status, replaces }) as never;
+    expect(replacementsDone({ steps: [s("blocked"), s("done", "97a"), s("done", "97a")] }, "97a")).toBe(true);
+    expect(replacementsDone({ steps: [s("done", "97a"), s("held", "97a")] }, "97a")).toBe(false);
+    expect(replacementsDone({ steps: [s("done")] }, "97a")).toBe(false);
+  });
+});

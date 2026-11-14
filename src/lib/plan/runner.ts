@@ -133,6 +133,8 @@ export interface StepRun {
   choice?: string;
   /** The planner rewrote this step into the steps named here. */
   replacedBy?: string;
+  /** This step is one of the planner's replacements for the step with this number (or title). */
+  replaces?: string;
   /** Files the step changed (modified while it ran). */
   changed?: string[];
   /** Why the run skipped, or could not finish, the step (24f). */
@@ -158,6 +160,9 @@ export interface PlanRun {
   notes?: string[];
   /** The decider's own calls (assignment, reviews): they count in the run's cost (24e). */
   deciderCalls?: { model: string; costUsd: number }[];
+  /** Qanuvi's snapshot of the project when the run started (its id and followed folders), kept with the record so
+   * the finishing pass still sees only the run's own changes after a restart. */
+  snapshot?: { id: string; also: string[] };
   /** The finishing pass over the whole run (24o), once it ran or runs. */
   finish?: import("./finishing").FinishPass;
 }
@@ -271,6 +276,37 @@ export function unmetNeed(
  */
 export function endStatus(run: Pick<PlanRun, "steps">): "done" | "needs-you" {
   return run.steps.some((s) => s.status === "held" || s.status === "set-aside") ? "needs-you" : "done";
+}
+
+/**
+ * A review that cannot see the change must never turn a step down for that alone (PLAN-F 97a, 2026-11-14: git saw no
+ * diff in a folder it ignores and real work was rejected twice). The changes could not be read, or the step changed
+ * files but no diff came back: the tests decide, and the reason is said. Null: the review goes ahead (a truly empty
+ * change is the reviewer's to judge).
+ */
+export function reviewWithoutDiff(
+  changed: { parts: string[]; error?: string },
+  touched: string[],
+  testsPassed: boolean | null | undefined,
+): { ok: boolean; why: string } | null {
+  let cause = "";
+  if (changed.error) cause = `the changes could not be read (${changed.error})`;
+  else if (!changed.parts.length && touched.length) {
+    const names = touched.slice(0, 3).join(", ") + (touched.length > 3 ? ` and ${touched.length - 3} more` : "");
+    cause = `the step changed ${touched.length === 1 ? "a file" : `${touched.length} files`} (${names}) but no diff could be shown`;
+  }
+  if (!cause) return null;
+  if (testsPassed === false) return { ok: false, why: `the tests failed, and ${cause}` };
+  return {
+    ok: true,
+    why: `not reviewed: ${cause}; ${testsPassed === true ? "the tests passed" : "no tests ran"}, so it counts as done`,
+  };
+}
+
+/** Whether every replacement step of the step `key` is done (false when it has none). */
+export function replacementsDone(run: Pick<PlanRun, "steps">, key: string): boolean {
+  const mine = run.steps.filter((s) => s.replaces === key);
+  return mine.length > 0 && mine.every((s) => s.status === "done");
 }
 
 /** The end-of-run report (24f): what was done, and what was skipped or left, with why. */

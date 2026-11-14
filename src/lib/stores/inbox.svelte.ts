@@ -27,7 +27,9 @@ export interface AnswerForm {
 }
 
 /** What a question belongs to; "hold" is a plan step a run set aside for the owner. */
-export interface InboxSource {
+export type InboxSource = HoldSource | ChangesFromSource;
+
+export interface HoldSource {
   kind: "hold";
   projectId: string;
   file: string;
@@ -35,6 +37,12 @@ export interface InboxSource {
   step: string;
   /** The held step's kind: a hold for the owner, a blocked step or one that did not finish. */
   held?: "hold" | "blocked" | "failed";
+}
+
+/** "Git cannot see some of the plan's files": the answer picks where this project's reviews get changes from. */
+export interface ChangesFromSource {
+  kind: "changes-from";
+  projectId: string;
 }
 
 export interface InboxItem {

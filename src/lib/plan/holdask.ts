@@ -4,7 +4,8 @@
  */
 import type { HeldKind } from "./setaside";
 
-export type AnswerChoice = "go" | "skip" | "decide";
+/** "keep" / "qanuvi": the answer to "git cannot see some of the plan's files" (which changes the reviews use). */
+export type AnswerChoice = "go" | "skip" | "decide" | "keep" | "qanuvi";
 
 export interface InboxAnswer {
   choice: AnswerChoice;
