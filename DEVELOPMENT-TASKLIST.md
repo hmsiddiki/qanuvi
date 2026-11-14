@@ -366,8 +366,13 @@ runs on or off; with it off nothing is sent anywhere.
     order was not driven again after the fix (same #goOnFresh path).
     UPDATE 2026-11-14 (newest): 15i PART 4 BUILT AND DRIVEN LIVE (split editor + minimap, unpublished, verify
     375 + 172), plus the owner's NEW LOGO everywhere (54fa123: purple tile with a cut square; icons, title-bar logo,
-    favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Two small findings wait for
-    the owner (listed there). With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT publish 0.1.20 yet.
+    favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
+    "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
+    publish 0.1.20 yet.
+    CHECKPOINT 2026-11-14 (after 15i part 4): nothing open from 15i. NEXT: ask the owner what comes next (candidates:
+    publish 0.1.20 when they say so; 15i LATER Phpactor; 24q agreed, not built; 24v/24w LATER; Linux/macOS checks of
+    Milestone 1). Test scripts (ui.ps1 with a drag action, loadmon.ps1, crop.ps1) and the scratch project splitproj are
+    in the scratchpad of session 69585bb6.
     UPDATE 2026-11-14 (before): 15i part 3 SESSION B BUILT AND DRIVEN LIVE (bc0b0ae + the two fixes after it,
     unpublished, verify 364 + 172): PHP debugging through PHP Debug v1.40.2 (owner's yes for the download), Xdebug
     file per run, Debugging in Settings > Languages. The (a)-(e) fixes were driven in the same test build: all work.
@@ -1537,6 +1542,11 @@ runs on or off; with it off nothing is sent anywhere.
     in both; proposed: show it in the focused group only. (b) a tab given back after a restart (or shown from a kept
     state) has its cursor line in the status (Ln 83) but the view stays at the top (as before part 4); proposed: scroll
     the cursor into view when a kept state is shown.
+    BOTH FIXED (owner: "do as you suggested", verify 375 + 172) and driven live in a new release test build: with
+    long.js in both groups only the focused group shows the install offer; a file opened in the other group (Ctrl+\)
+    shows its cursor line in the middle; switching tabs in a group and back returns to the same scroll place (line 203
+    stayed on top). How: each editor keeps a scroll snapshot per file when it leaves it (dropped when the text length
+    changed since), else scrolls the cursor into view for a kept state.
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),

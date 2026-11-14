@@ -9,7 +9,7 @@
   import { ui } from "$lib/stores/ui.svelte";
   import { onDestroy, onMount, untrack } from "svelte";
   import { basicSetup } from "codemirror";
-  import { EditorState, type Extension } from "@codemirror/state";
+  import { EditorState, type Extension, type StateEffect } from "@codemirror/state";
   import { EditorView, keymap } from "@codemirror/view";
   import { indentWithTab } from "@codemirror/commands";
   import { editor, type EditorTab } from "$lib/stores/editor.svelte";
@@ -66,6 +66,8 @@
   let shownVersion = 0;
   /** Marks the states this editor built: their extensions call back into this component. */
   const owner = Symbol("editor");
+  /** Where each file was scrolled in this editor when it was left, to come back to the same place. */
+  const scrolls = new Map<string, { at: StateEffect<unknown>; length: number }>();
   let mapCanvas: HTMLCanvasElement | undefined = $state();
   let minimap: Minimap | null = null;
   let minimapOn = $derived(settings.value.appearance.minimap);
@@ -376,11 +378,28 @@
     if (shownKey !== t.key || reloaded) {
       if (shownKey && shownKey !== t.key) {
         editor.states.set(shownKey, view.state);
+        scrolls.set(shownKey, { at: view.scrollSnapshot(), length: view.state.doc.length });
         hiding(shownKey, owner);
       }
+      const kept = !reloaded && (!!otherView(t.key, owner) || editor.states.has(t.key));
       shownKey = t.key;
       shownVersion = version;
       view.setState(stateFor(t, reloaded));
+      // A kept state comes back where this editor left it, else with its cursor in view (a state has no scroll
+      // position of its own, so it would otherwise show the top of the file).
+      if (kept && !t.revealLine) {
+        // A text changed since (in the other group, or by an agent) makes the old place unreliable: the cursor then.
+        const saved = scrolls.get(t.key);
+        const back = saved && saved.length === view.state.doc.length ? saved.at : null;
+        const v = view;
+        try {
+          v.dispatch({
+            effects: back ?? EditorView.scrollIntoView(v.state.selection.main.head, { y: "center" }),
+          });
+        } catch {
+          v.dispatch({ effects: EditorView.scrollIntoView(v.state.selection.main.head, { y: "center" }) });
+        }
+      }
       // Mark the tab as having a live state, so later updates do not rebuild it from the saved text.
       editor.states.set(t.key, view.state);
       showing(t.key, owner, view);
@@ -501,7 +520,13 @@
     untrack(() => lsp.sync(keys));
   });
 
-  let offer = $derived(lsp.offer && !tab.config && serverFor(tab.path) === lsp.offer.server ? lsp.offer : null);
+  /** The same file shown in both groups: the offer shows once, in the group worked in. */
+  let inBoth = $derived(editor.groups.filter((g) => g.active === tab.key).length > 1);
+  let offer = $derived(
+    lsp.offer && !tab.config && serverFor(tab.path) === lsp.offer.server && (!inBoth || editor.focused === group)
+      ? lsp.offer
+      : null,
+  );
 
   /** The current text of the shown tab (for Save from the menu or before closing). */
   export function currentText(): string | null {
