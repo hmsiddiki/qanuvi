@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   calls: [] as { cmd: string; args: Record<string, unknown> }[],
   rows: [] as Record<string, unknown>[],
+  masterRows: [] as Record<string, unknown>[],
   fail: false,
   listener: null as null | ((e: { payload: unknown }) => void),
 }));
@@ -12,8 +13,10 @@ vi.mock("@tauri-apps/api/core", () => ({
     h.calls.push({ cmd, args });
     if (h.fail) throw "core is gone";
     if (cmd === "plan_data_list") return h.rows;
+    if (cmd === "remote_call" && args.cmd === "plan_data_list") return h.masterRows;
     return null;
   }),
+  Channel: class {},
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async (_name: string, fn: (e: { payload: unknown }) => void) => {
@@ -41,6 +44,7 @@ async function fresh() {
 beforeEach(() => {
   h.calls = [];
   h.rows = [];
+  h.masterRows = [];
   h.fail = false;
   h.listener = null;
   store.clear();
@@ -111,5 +115,32 @@ describe("plan data", () => {
     planData.removeItem("qanuvi.picks.p1.PLAN.md");
     expect(planData.getItem("qanuvi.picks.p1.PLAN.md")).toBeNull();
     expect(h.calls.at(-1)?.args).toMatchObject({ kind: "picks", value: null });
+  });
+  // R2e part 2: a master project's plan data (holds, picks, run settings) lives on the master, where its runner reads
+  // it; it went to this computer before.
+  it("keeps a master project's plan data on that master and follows its runner's changes", async () => {
+    const planData = await fresh();
+    const { own } = await import("$lib/remote");
+    own("pm", "m1");
+    h.masterRows = [{ project_id: "pm", file: "PLAN-M.md", kind: "run", value: { holds: { "1b": "wait" } } }];
+    await planData.start();
+    await planData.loadMaster("m1");
+    expect(planData.getItem("qanuvi.run.pm.PLAN-M.md")).toBe('{"holds":{"1b":"wait"}}');
+    planData.setItem("qanuvi.run.pm.PLAN-M.md", '{"holds":{"1b":"go"}}');
+    await Promise.resolve();
+    const sent = h.calls.filter((c) => c.cmd === "remote_call");
+    expect(sent.at(-1)?.args).toMatchObject({
+      master: "m1",
+      cmd: "plan_data_set",
+      args: { projectId: "pm", file: "PLAN-M.md", kind: "run", value: { holds: { "1b": "go" } } },
+    });
+    expect(h.calls.some((c) => c.cmd === "plan_data_set")).toBe(false);
+    // The master sends no echo for the window's own write: its runner's next change is still taken.
+    await new Promise((r) => setTimeout(r, 0));
+    planData.heard({ project_id: "pm", file: "PLAN-M.md", kind: "run", value: { holds: {} } });
+    expect(planData.getItem("qanuvi.run.pm.PLAN-M.md")).toBe('{"holds":{}}');
+    // This computer's projects still write here.
+    planData.setItem("qanuvi.run.p1.PLAN.md", '{"budget":1}');
+    expect(h.calls.at(-1)).toMatchObject({ cmd: "plan_data_set", args: { projectId: "p1" } });
   });
 });

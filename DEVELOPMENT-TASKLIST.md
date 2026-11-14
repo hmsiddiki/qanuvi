@@ -369,7 +369,16 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2e part 1): R2e PART 1 DONE (see 24z "R2e part 1 DONE"): the Rust runner
+    RESUME HERE (newest, 2026-11-15, after R2e part 2): R2e PART 2 DONE (see 24z "R2e part 2 DONE"): the master
+    paths driven live with a "This PC" master (target local) on a scratch project, one run (3 steps, about $0.22 plus
+    the pre-run check): pre-run check, a step held ("Wait for me") answered in this window's Inbox and the run went on
+    on the master, disconnecting while a step worked (the run finished on the master), reconnecting (finished run and
+    finishing pass offer shown). Fixed: the Plan view of a master project found no task list (the master lacked
+    files_markdown and other Plan view commands), and a master project's plan data went to this computer. Two
+    findings for the owner (proposals in the 24z entry): the master chose models from its own (empty) run history, and
+    the pre-run check's "run 1b after 1c" is not acted on. Nothing published. NEXT: the owner's choice on the two
+    findings and the small ones from part 1 (a)-(e), then delete what is left of the TypeScript runner.
+    RESUME HERE (before, 2026-11-15, after R2e part 1): R2e PART 1 DONE (see 24z "R2e part 1 DONE"): the Rust runner
     driven live on a scratch project in a test build (4 runs, about $0.60): start, pre-run check, held step answered
     in the Inbox, step chat note / question / rule / change (answered "as a new step"), Pause and Resume, model
     switch, finishing pass, closing and reopening the window. Three bugs found and fixed (scenario or test first):
@@ -984,6 +993,35 @@ runs on or off; with it off nothing is sent anywhere.
         (c) "Pausing (finishing its edit)…" squeezes the plan header so the file name and Open file wrap; (d) a
         change made into a step keeps the "Change:" prefix and an ellipsis in its title; (e) "(try 2)" still shows
         during a step's after-work (notes, checks) once its first attempt is recorded.
+      - [x] R2e part 2 DONE 2026-11-15 (master paths, driven live with a "This PC" master): Servers, SSH address
+        "local", a scratch folder added as a server project (PLAN-M.md, 3 steps; 1b deletes README.md). Worked: the run
+        started on the master (its agent a child of the master service), the window followed it (step chat, Pause and
+        Stop, spinners), 1b "Wait for me" held it, the question showed in this window's Inbox (and a desktop
+        notification), "Go ahead" there reached the master and the run went on; Disconnect while 1c worked: the
+        project left the sidebar, the master finished the run alone; Connect again: the finished run, its cost and the
+        finishing pass offer shown. Fixed (test first): (1) "This master does not know the command files_markdown":
+        the master now answers files_markdown, files_changed_since, files_log_append, files_replace, files_search with
+        the window's options (whole word, include, exclude), plan_data_list and plan_data_set (its own database, where
+        its runner reads them) and plan_private, plan_private_add and plan_private_clear (its own credential store; a
+        server build has none and says so); master test "answers_the_plan_views_file_and_plan_data_commands".
+        (2) planData.svelte.ts called this computer's core for every project, so holds, picks and run settings set in
+        the Plan view of a master project never reached the master's runner: it now sends them to the master that owns
+        the project, takes that master's plan data on connect (masters.svelte.ts) and its runner's changes from the run
+        stream (runner.svelte.ts, "qanuvi-plan-data"); vitest in planData.test.ts. (3) Sidebar: many projects ran
+        under the Settings row (the projects group did not scroll); it scrolls now (rebuilt and seen in the test build).
+        Findings for the owner (not built, proposals):
+        (f) The master chose Sonnet for steps the Plan view showed as "Auto · Haiku 5.5": the label learns from this
+        computer's runs, the runner from the runs of the machine it runs on (a new master has none, so the default
+        model). Proposal: the run's start carries the window's learned model stats (and month's spend) to the master,
+        so a run chooses the same models on any machine and the label stays true; the master adds its own runs to them.
+        (g) The pre-run check decided "run 1b after 1a and 1c" (README must list the final exports), but the runner
+        kept file order: 1b ran before 1c, its hold also held 1c ("1 step waits for it"), and 1c's agent had to add its
+        line to the README itself. Not master-only. Proposal: an order decision of the check is written as a
+        "- Needs: 1c" line under 1b (the plan already reads Needs lines), shown in the check's list so the owner sees it.
+        (h) Small: after a run ends the window title still names its first step ("Step 1a: ..."); the "This chat is
+        heavy" banner shows at 26k context. (i) Note: a step's model picked in the Plan view is written into the plan
+        file as "- Model: <id>" (set_step_model); in part 1 an agent read those lines as model attribution in the
+        project. Keep it in the file, or move it into plan data?
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work

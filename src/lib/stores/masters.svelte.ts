@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
 import { callMaster, disown, forgetMaster, own } from "$lib/remote";
+import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
 import { projects } from "./projects.svelte";
 import { runner } from "./runner.svelte";
@@ -78,6 +79,8 @@ class MastersStore {
       for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
       projects.addRemote(m.id, list);
       this.#set(m.id, { state: "on", info });
+      // Its plans' kept data (holds, picks, run settings) lives there, where its runner reads it.
+      void planData.loadMaster(m.id);
       // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
       void inbox.followMaster(m.id);
       // A run going on there (it goes on when no computer is connected) is shown.

@@ -21,7 +21,7 @@ import { factsPath, looksSecret, privateBlock, savePlanNotes } from "$lib/plan/g
 import { parsePlan, setStepStatus, type Step } from "$lib/plan/tasklist";
 import { jobType, learn, modelProfiles, type JobType, type ModelStats } from "$lib/plan/routing";
 import { savePicks, type SavedPicks } from "$lib/plan/picks";
-import { planData } from "$lib/plan/planData.svelte";
+import { planData, type Entry } from "$lib/plan/planData.svelte";
 import { freeWorks, parsePicks, pickPrompt, type Assignment, type Profiles, type StepBrief } from "$lib/core/decider";
 import { defaultPlannerModel, planner } from "./planner.svelte";
 import type { FinishLevel } from "$lib/plan/finishing";
@@ -162,7 +162,9 @@ class RunnerStore {
     events.onmessage = (m) => {
       if (m.kind === "view") this.#take(m.view);
       else if (m.kind === "agent") this.#agentEvent({ projectId, sessionId: m.sessionId, event: m.event });
-      // "event": the master's Inbox changes come on its own Inbox stream (inbox.svelte.ts).
+      // The master runner's plan data (holds, state, notes) as it changes there; its Inbox changes come on its own
+      // Inbox stream (inbox.svelte.ts).
+      else if (m.kind === "event" && m.event === "qanuvi-plan-data") planData.heard(m.value as Entry);
     };
     try {
       this.#take(await callMaster<RunView>(master, "plan_run_watch", { projectId, onEvent: events }));

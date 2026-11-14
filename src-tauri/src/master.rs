@@ -222,12 +222,71 @@ impl Master {
                 &s(args, "text"),
                 opt(args, "expectedHash").as_deref(),
             )),
-            "files_search" => to(files::search(
+            // The window's search options (whole words, files to include and leave out) when it sends them.
+            "files_search" => {
+                let o = match args.get("options").filter(|o| o.is_object()) {
+                    Some(o) => serde_json::from_value(o.clone()).map_err(|e| e.to_string())?,
+                    None => files::SearchOptions {
+                        regex: b(args, "regex"),
+                        case_sensitive: b(args, "caseSensitive"),
+                        ..Default::default()
+                    },
+                };
+                to(files::search_with(
+                    &self.root(args)?,
+                    &s(args, "query"),
+                    &o,
+                    5000,
+                ))
+            }
+            "files_replace" => {
+                let o: files::SearchOptions =
+                    serde_json::from_value(args["options"].clone()).map_err(|e| e.to_string())?;
+                let paths = args["paths"].is_array().then(|| list(args, "paths"));
+                to(files::replace_with(
+                    &self.root(args)?,
+                    &s(args, "query"),
+                    &o,
+                    &s(args, "replacement"),
+                    paths.as_deref(),
+                ))
+            }
+            // The Plan view: the task lists, files changed during a step, and the step logs.
+            "files_markdown" => to(files::markdown_files(&self.root(args)?)),
+            "files_changed_since" => {
+                let since =
+                    std::time::UNIX_EPOCH + std::time::Duration::from_millis(n(args, "sinceMs"));
+                to(files::changed_since(&self.root(args)?, since, 200))
+            }
+            "files_log_append" => to(files::log_append(
                 &self.root(args)?,
-                &s(args, "query"),
-                b(args, "regex"),
-                b(args, "caseSensitive"),
-                2000,
+                &s(args, "path"),
+                &s(args, "text"),
+            )),
+            // What a plan keeps between runs, in this master's database, where its runner reads it.
+            "plan_data_list" => to(crate::plan_data::list(db)),
+            "plan_data_set" => {
+                let id = s(args, "projectId");
+                projects::get(db, &id)?;
+                let kind: crate::plan_data::Kind =
+                    serde_json::from_value(args["kind"].clone()).map_err(|e| e.to_string())?;
+                crate::plan_data::set(db, &id, &s(args, "file"), kind, &args["value"])?;
+                Ok(Value::Null)
+            }
+            // Private details given during a plan's run, in this master's credential store (a server build has
+            // none and says so).
+            "plan_private" => to(Ok(crate::secrets::plan_private(
+                &s(args, "projectId"),
+                &s(args, "file"),
+            ))),
+            "plan_private_add" => to(crate::secrets::plan_private_add(
+                &s(args, "projectId"),
+                &s(args, "file"),
+                &s(args, "text"),
+            )),
+            "plan_private_clear" => to(crate::secrets::plan_private_clear(
+                &s(args, "projectId"),
+                &s(args, "file"),
             )),
             "index_find" => {
                 let root = self.root(args)?;
@@ -692,6 +751,101 @@ mod tests {
                 .unwrap_err()
                 .contains("does not know")
         );
+    }
+
+    // R2e part 2: the Plan view of a master project found no task list ("does not know the command files_markdown"),
+    // and its plan data (holds, picks, run settings) went to this computer, where the master's runner never reads it.
+    #[test]
+    fn answers_the_plan_views_file_and_plan_data_commands() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        std::fs::write(
+            project.path().join("PLAN-M.md"),
+            "## Step 1\n- [ ] 1a. Add cat\n",
+        )
+        .unwrap();
+        std::fs::write(project.path().join("a.js"), "cat catalog\n").unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+
+        let md = call(&m, "files_markdown", json!({"projectId": id})).unwrap();
+        assert!(
+            md.as_array().unwrap().iter().any(|f| f == "PLAN-M.md"),
+            "{md}"
+        );
+        let changed = call(
+            &m,
+            "files_changed_since",
+            json!({"projectId": id, "sinceMs": 0}),
+        )
+        .unwrap();
+        assert!(
+            changed.as_array().unwrap().iter().any(|f| f == "a.js"),
+            "{changed}"
+        );
+        call(
+            &m,
+            "files_log_append",
+            json!({"projectId": id, "path": ".qanuvi/plan-logs/PLAN-M/1a.md", "text": "tried once\n"}),
+        )
+        .unwrap();
+        let log =
+            std::fs::read_to_string(project.path().join(".qanuvi/plan-logs/PLAN-M/1a.md")).unwrap();
+        assert!(log.contains("tried once"));
+
+        // Search with the window's options (whole words), then replace with them.
+        let opts = json!({"regex": false, "caseSensitive": true, "wholeWord": true});
+        let found = call(
+            &m,
+            "files_search",
+            json!({"projectId": id, "query": "cat", "regex": false, "caseSensitive": true, "options": opts}),
+        )
+        .unwrap();
+        assert_eq!(
+            found["matches"].as_array().unwrap().len(),
+            2,
+            "whole word 'cat' once in a.js and once in PLAN-M.md: {found}"
+        );
+        let done = call(
+            &m,
+            "files_replace",
+            json!({"projectId": id, "query": "cat", "options": opts, "replacement": "dog", "paths": ["a.js"]}),
+        )
+        .unwrap();
+        assert_eq!(done["replacements"], 1);
+        assert_eq!(
+            std::fs::read_to_string(project.path().join("a.js")).unwrap(),
+            "dog catalog\n"
+        );
+
+        // Plan data lives in the master's own database, where its runner reads it.
+        let hold = json!({"holds": {"1a": "wait"}});
+        call(
+            &m,
+            "plan_data_set",
+            json!({"projectId": id, "file": "PLAN-M.md", "kind": "run", "value": hold}),
+        )
+        .unwrap();
+        assert_eq!(
+            crate::plan_data::get(&m.db, &id, "PLAN-M.md", crate::plan_data::Kind::Run).unwrap(),
+            Some(hold.clone())
+        );
+        let all = call(&m, "plan_data_list", json!({})).unwrap();
+        assert_eq!(all[0]["project_id"], id);
+        assert_eq!(all[0]["value"], hold);
+        call(
+            &m,
+            "plan_data_set",
+            json!({"projectId": id, "file": "PLAN-M.md", "kind": "run", "value": null}),
+        )
+        .unwrap();
+        assert_eq!(call(&m, "plan_data_list", json!({})).unwrap(), json!([]));
     }
 
     struct Captured(Arc<Mutex<Vec<u8>>>);

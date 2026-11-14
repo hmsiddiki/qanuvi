@@ -199,7 +199,7 @@
     </ul>
 
     {#if !collapsed}
-      <section class="group">
+      <section class="group projects-group">
         <header>
           <span>Projects</span>
           <button
@@ -524,6 +524,11 @@
   .sessions {
     flex: 1;
     overflow: auto;
+  }
+
+  /* Many projects scroll inside their group instead of running under Settings at the bottom. */
+  .projects-group {
+    overflow-y: auto;
   }
 
   .group header {

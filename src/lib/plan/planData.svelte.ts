@@ -2,14 +2,16 @@
  * What a plan keeps between runs (24z R2a): the decider's model picks, the plan state, the plan's notes and its run
  * settings. Kept in the core's database (plan_data), so a run going on in the core reads and writes the same; the
  * window keeps a copy that reads at once and writes through. It answers the same keys localStorage had, so the
- * callers stay as they were; the first start brings the old localStorage values in and removes them.
+ * callers stay as they were; the first start brings the old localStorage values in and removes them. A project on a
+ * master keeps its plan data in that master's database, where the master's runner reads it (R2e part 2).
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { callMaster, ownerOf } from "$lib/remote";
 
 export type PlanDataKind = "picks" | "state" | "notes" | "run";
 
-interface Entry {
+export interface Entry {
   project_id: string;
   file: string;
   kind: PlanDataKind;
@@ -74,12 +76,33 @@ class PlanData {
   #send(at: Omit<Entry, "value">, value: unknown): void {
     const key = keyOf(at);
     this.#pending.set(key, (this.#pending.get(key) ?? 0) + 1);
-    Promise.resolve(invoke("plan_data_set", { projectId: at.project_id, file: at.file, kind: at.kind, value })).catch(
-      () => {
-        // No echo comes for it; the copy here holds it for this window and the next change writes again.
-        this.#echoed(key);
-      },
-    );
+    const args = { projectId: at.project_id, file: at.file, kind: at.kind, value };
+    const master = ownerOf(at.project_id);
+    if (master) {
+      // A master sends no echo of the window's own write; its answer stands for it.
+      const done = () => void this.#echoed(key);
+      Promise.resolve(callMaster(master, "plan_data_set", args)).then(done, done);
+      return;
+    }
+    Promise.resolve(invoke("plan_data_set", args)).catch(() => {
+      // No echo comes for it; the copy here holds it for this window and the next change writes again.
+      this.#echoed(key);
+    });
+  }
+
+  /** Takes a master's kept values (on connecting to it). */
+  async loadMaster(master: string): Promise<void> {
+    try {
+      const rows = await callMaster<Entry[]>(master, "plan_data_list", {});
+      for (const e of rows) if (!this.#pending.has(keyOf(e))) this.#take(e, false);
+    } catch {
+      // An older master without plan data: its projects' plans show without it, as before.
+    }
+  }
+
+  /** A change made on a master (its runner), heard on the run stream the window follows. */
+  heard(e: Entry): void {
+    if (e && typeof e.project_id === "string" && typeof e.file === "string" && e.kind) this.#take(e);
   }
 
   /** Writes of this window whose echo has not come back yet, per key: an older echo must not undo a newer write. */
