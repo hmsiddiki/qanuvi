@@ -371,9 +371,10 @@ runs on or off; with it off nothing is sent anywhere.
     publish 0.1.20 yet.
     RESUME HERE (newest, 2026-11-14 late): R2 PRE-FIX DONE (see 24z "R2 PRE-FIX"): reviews from Qanuvi's own
     snapshots (git optional per project), empty-diff rule, free replan numbers, replaced steps never held, skip-twice
-    fix, and the standing runner scenarios (10) + snapshot layout tests. NOT PUBLISHED (the installed app still has
-    the old runner; the owner's PLAN-F run waits on 97a: stop it, clean PLAN-F lines 88-146, then rerun from 97a on
-    a new version). NEXT: R2a in a fresh conversation (split and decisions in 24z R2).
+    fix, and the standing runner scenarios (10) + snapshot layout tests. Driven live in a test build, then PUBLISHED
+    0.1.21 on the dev channel (owner: "test then publish anyway"; QANUVI_RELEASE_ANYWAY=1). PLAN-F cleaned (colliding
+    steps removed, 97a open again with its Done line); the owner stops the old waiting run, updates to 0.1.21 and
+    reruns from 97a. NEXT: R2a in a fresh conversation (split and decisions in 24z R2).
     RESUME HERE (before, 2026-11-14 21:15): R1 DONE (part 2b: preflight, packet, planstate, housekeeping, planner,
     guidance in Rust; see 24z "R1 part 2b"); comparison check 429 cases, all match. NEXT: R2 (the runner in Rust) in
     a fresh conversation: map stores/runner.svelte.ts onto the plan module first, then split R2 into parts.
@@ -722,7 +723,12 @@ runs on or off; with it off nothing is sent anywhere.
         RULE: every runner bug found in a real run gets a scenario before its fix; a runner change is done only
         when npm run verify (with the scenarios) passes. R2 ports these scenarios to the Rust runner's tests first,
         so the Rust runner must pass the same runs.
-      Not yet: a new version for the installed app (publishing waits for the owner).
+      Driven live 2026-11-14 (test build, scratch site like amirularham: the outer repo ignores /content/plugins/*,
+      the plugin has its own repo and the plan): the "Plan step changes from" setting saves and reloads (git chosen);
+      the pre-run check set the schema step to extra checks; the run did 2 of 2 ($0.06); the review's prompt held the
+      nested repo's real diff of src/Schema.php and accepted the step; the run record kept its start snapshot and
+      the light finishing pass used it. Finding (older, not from this change): the finishing pass offer said about
+      $0.0038 and cost $0.15 (it ran on Opus 5.5); the estimate needs the pass's real model. Published as 0.1.21.
     - [ ] R2: the runner in Rust (step order, attempts, test-and-fix rounds, reviews, replans, holds through the Inbox,
       closing steps, handovers, limit waits; a Rust agent turn that waits for idle/stopped/error); the window gets run
       updates as events and sends pause/stop/model-switch; picks move from localStorage to the DB; the same runner in
