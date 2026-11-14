@@ -346,6 +346,17 @@ runs on or off; with it off nothing is sent anywhere.
     saved run never saw the end. Now it changes run.finish; a restored run with a pass still "running" shows it
     stopped with a note. Done-line rule now says: edit with the file edit tool, never a shell/regex replace (96b's
     note lost "$45"/"$0" amounts that way). Not driven live yet: watch the next finishing pass end in the panel.
+    24s PART 3 DRIVEN LIVE 2026-11-14 (test build, scratch project, Sonnet 5.5, $0.43 in all): a chat read
+    prices.js (115 KB) to 76k, starred, Qanuvi closed and started again: the chat reopened with the bar "Starred chat,
+    76k of context ... Write the note now / Resume as it was", no tokens spent by opening. Write the note now: the old
+    session wrote it ($0.02), the editable panel showed it; a line added by hand ("blue-kiwi") reached the new session,
+    which answered the test word and the count at 12k ($0.06). One linked session in the DB, the star moved to it.
+    Findings for the owner, not changed yet: (a) the note went as a turn of its own (chatResumePrompt with no request:
+    "check what the note calls done, go on with what is left"), so the new session re-checked the count with Grep and
+    said "nothing left" before the owner's message ran as a second turn; proposed: on reopen the owner's message joins
+    the first turn ("the user's new message says what comes next; check only what it needs") and shows as their
+    bubble. (b) the old session stays alive (idle, about 200 MB claude.exe) after the note is written and the new
+    session started; proposed: stop it once the new session has started. Not driven: Resume as it was, Automatic.
     UPDATE 2026-11-14 (later): fixed in 6afe00c (store module in secrets.rs, stub without desktop; Linux
     qanuvi-master cross-builds). Owner: do NOT publish 0.1.20 yet. 24t driven live, fine. NEXT: drive 24s part 3
     (starred chat at 40k+ reopens fresh from its note), then 15i part 2, then build 15i part 3. Earlier next:
