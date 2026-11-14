@@ -388,23 +388,41 @@
       if (runner.run) {
         await runner.addPrivate(project.id, runner.run.file, text);
         // The chat and the database get a placeholder; the agent gets the detail in the plan's private block (masked
-        // where stored), never as a plain message.
+        // where stored), never as a plain message and never through the model that sorts messages.
         const note =
+          "(I gave a private detail for this plan: it is in the private details below.)" +
           guidanceNote(step.number ?? step.title, runner.run.file) +
           (await runner.privateFor(project.id, session?.id ?? ""));
-        if (
-          !(await agent.send(
-            project.id,
-            "(I gave a private detail for this plan: it is in the private details below.)",
-            note,
-          ))
-        )
+        try {
+          await runner.tell(project.id, note);
+        } catch (e) {
           agent.draft = text;
+          agent.error = errorText(e);
+        }
         return;
       }
-    } else if (step) runner.addNote(text);
-    const note = step && runner.run ? guidanceNote(step.number ?? step.title, runner.run.file) : "";
-    if (!(await agent.send(project.id, text, note))) agent.draft = text;
+    }
+    if (step) {
+      // Files cannot go through the runner: the step's agent would get them outside the run.
+      if (agent.attachments.length) {
+        agent.draft = text;
+        agent.notice(
+          "Files cannot be added to a running plan step. Send the message without them, or attach them after the run.",
+        );
+        return;
+      }
+      // The runner sorts it first (a note, a rule for the whole plan, a question, a change, stop or pause words) and
+      // passes it on as fits; the chat shows the owner's words at once.
+      agent.showOwn(text.trim());
+      try {
+        await runner.message(project.id, text.trim());
+      } catch (e) {
+        agent.draft = text;
+        agent.error = errorText(e);
+      }
+      return;
+    }
+    if (!(await agent.send(project.id, text))) agent.draft = text;
   }
 
   function keydown(event: KeyboardEvent) {

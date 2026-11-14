@@ -667,6 +667,14 @@ impl RunEnv for FakeEnv {
         self.w().lines.get(session_id).cloned().unwrap_or_default()
     }
 
+    fn keep_line(&self, session_id: &str, line: &str) {
+        self.w()
+            .lines
+            .entry(session_id.to_string())
+            .or_default()
+            .push(line.to_string());
+    }
+
     fn plan_private(&self, _file: &str) -> Vec<String> {
         self.w().private.clone()
     }

@@ -525,3 +525,29 @@ fn a_second_change_while_one_is_asked_becomes_its_own_step_and_the_first_waits_i
     assert!(said[2].contains("No answer in 1 minute"), "{}", said[2]);
     assert!(env.inbox().is_empty());
 }
+
+#[test]
+fn words_for_the_agent_from_the_window_go_as_they_are_and_no_model_sorts_them() {
+    let env = FakeEnv::new();
+    let c = Arc::new(Controls::default());
+    let cc = c.clone();
+    env.set_agent(move |call| {
+        if call.turn == 1 {
+            cc.tell_agent("(the owner gave a private detail)\n\nPrivate details: db login");
+            return AgentReply {
+                ticks: 2,
+                ..Default::default()
+            };
+        }
+        AgentReply::default()
+    });
+    let mut w = watch(&env);
+    attempt(&env, &c, &mut w, &quick_wait(), &ask(""), &mut |_| {});
+    let sent: Vec<String> = env.sent().into_iter().map(|(_, t)| t).collect();
+    assert_eq!(
+        sent,
+        ["(the owner gave a private detail)\n\nPrivate details: db login"]
+    );
+    assert!(!env.calls().iter().any(|c| c == "free_decide"));
+    assert!(w.messages.is_empty(), "not an owner message to log");
+}

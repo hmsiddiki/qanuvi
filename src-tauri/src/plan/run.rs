@@ -17,6 +17,7 @@ use super::finishing::is_plan_file;
 use super::guidance::{self as g, Carry, Recent};
 use super::holdask::{self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply};
 use super::housekeeping::{archive_path, done_numbers};
+use super::js;
 use super::limits::{is_limit, limit_reset_at};
 use super::ownermsg;
 use super::packet::{self, Outline, packet_prompt};
@@ -2368,6 +2369,21 @@ impl<'a> Loop<'a> {
                 m.kind.word(),
                 &format!("\"{}\": {}", m.text, m.handled),
             );
+            // A standing rule (24z2): the plan's memory keeps it for every later step and run, on any model.
+            let rule = js::cut(
+                &m.text.split_whitespace().collect::<Vec<_>>().join(" "),
+                400,
+            )
+            .to_string();
+            if m.kind == ownermsg::Kind::Rule && !rule.is_empty() && !g::looks_secret(&rule) {
+                let notes = self.run.notes.get_or_insert_with(Vec::new);
+                if !notes.contains(&rule) {
+                    notes.push(rule.clone());
+                    let _ = self
+                        .env
+                        .log_append(&g::facts_path(&self.s.file), &ownermsg::rule_fact(&rule));
+                }
+            }
         }
         let archive = self
             .env

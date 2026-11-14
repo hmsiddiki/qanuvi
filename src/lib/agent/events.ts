@@ -6,7 +6,7 @@
 
 import { withoutOverruleNote } from "$lib/core/decider";
 import { withoutGuidance } from "$lib/plan/guidance";
-import { withoutWithdrawn } from "./waiting";
+import { runnerWords, withoutWithdrawn } from "./waiting";
 import type { Edit } from "./diff";
 import { CHAT_HANDOVER_MARK, parseResume, tokensK } from "./handover";
 
@@ -329,6 +329,12 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     });
     // A reopened starred chat: the user's message went in the same first turn and shows as theirs.
     if (r.next) out.push({ kind: "user", id: `u${seq}`, text: r.next });
+  } else if (type === "qanuvi_user" && runnerWords(str(msg.text)) !== null) {
+    // The runner passed the owner's chat message on to the step's agent (24z R2c): the chat shows the owner's own
+    // words, once (the copy shown when they typed it stays).
+    const words = runnerWords(str(msg.text))!;
+    if (!out.some((x) => x.kind === "user" && x.waiting && x.text === words))
+      out.push({ kind: "user", id: `u${seq}`, text: words, during: true });
   } else if (type === "qanuvi_user") {
     const attachments = Array.isArray(msg.attachments) ? msg.attachments.map(str).filter(Boolean) : [];
     const images: ShownImage[] = Array.isArray(msg.images)

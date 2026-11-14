@@ -701,6 +701,19 @@ ${text}`
   /** A free chat turn the paid agent reviews when it ends: the request and the changed files before it. */
   freeTurn: { projectId: string; request: string; before: Snap | null } | null = null;
 
+  /**
+   * Shows the owner's message in the chat without sending it to the agent: a running plan step's runner takes it and
+   * passes it on as fits (its copy to the agent then shows as the same message, not twice).
+   */
+  showOwn(text: string): void {
+    this.items = reduce(
+      this.items,
+      JSON.stringify({ type: "qanuvi_user", text, during: true }),
+      ++this.#seq,
+      nowSeconds(),
+    );
+  }
+
   /** Adds a line from Qanuvi core to the conversation. */
   notice(text: string, model = ""): void {
     this.items = reduce(

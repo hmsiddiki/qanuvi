@@ -259,6 +259,31 @@ export function errorText(e: unknown): string {
   return String(e);
 }
 
+/** A project's plan run as the core shows it (`plan_run_state`, the "qanuvi-run" event). */
+export interface RunView {
+  projectId: string;
+  run: import("./plan/runner").PlanRun | null;
+  /** A run goes on (its steps, its waits). */
+  running: boolean;
+  /** A finishing pass goes on. */
+  finishing: boolean;
+  waitingAnswers: number;
+  /** Milliseconds: the run waits for a usage limit to reset. */
+  waitingUntil: number | null;
+  currentModel: string;
+  notices: string[];
+  pausing: boolean;
+  stopping: boolean;
+  /** Qanuvi runs the project's checks now. */
+  checking: boolean;
+  /** The step's agent session at work. */
+  sessionId: string | null;
+  /** Owner messages typed into the step's chat that its turn has not taken yet. */
+  waitingMessages: number;
+  /** The last run or pass could not start, or ended with an error. */
+  error: string | null;
+}
+
 export interface AgentView {
   url: string;
   title: string;
@@ -590,6 +615,26 @@ export const api = {
         "runs_list",
         { projectId },
       ),
+  },
+  /** Plan runs in the core (24z R2d): the window starts them and sends the owner's asks; "qanuvi-run" brings the view. */
+  planRun: {
+    start: (projectId: string, start: unknown) => invoke<void>("plan_run_start", { projectId, start }),
+    finish: (projectId: string, start: unknown, level: "light" | "full") =>
+      invoke<void>("plan_run_finish", { projectId, start, level }),
+    state: (projectId: string) => invoke<RunView>("plan_run_state", { projectId }),
+    active: () => invoke<string[]>("plan_run_active"),
+    stop: (projectId: string) => invoke<void>("plan_run_stop", { projectId }),
+    pause: (projectId: string) => invoke<void>("plan_run_pause", { projectId }),
+    finishWithout: (projectId: string) => invoke<void>("plan_run_finish_without", { projectId }),
+    answer: (projectId: string, step: string, choice: "go" | "skip", text: string) =>
+      invoke<void>("plan_run_answer", { projectId, step, choice, text }),
+    /** The owner typed into the running step's chat: the runner sorts it first. */
+    message: (projectId: string, text: string) => invoke<void>("plan_run_message", { projectId, text }),
+    /** Words for the step's agent as they are (the plan's private details), never sorted by a model. */
+    tell: (projectId: string, text: string) => invoke<void>("plan_run_tell", { projectId, text }),
+    interrupt: (projectId: string) => invoke<void>("plan_run_interrupt", { projectId }),
+    model: (projectId: string, model: string) => invoke<void>("plan_run_model", { projectId, model }),
+    mode: (projectId: string, mode: string) => invoke<void>("plan_run_mode", { projectId, mode }),
   },
   agentConfig: {
     list: (provider: string, projectId: string | null) =>

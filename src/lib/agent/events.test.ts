@@ -197,6 +197,29 @@ describe("live text and the model at work", () => {
       { kind: "notice", id: expect.any(String), text: "Taken as a note: passed to the agent.", tone: "info" },
     ]);
   });
+
+  it("shows the owner's own words, once, for a message the runner passed on to the step's agent", () => {
+    // The wording of src-tauri/src/plan/ownermsg.rs (note, rule, question and change messages).
+    const wrapped = [
+      '(Qanuvi: a note from the owner for this step: "use "lib/money.php"". Take it into account and go on with the step.)',
+      '(Qanuvi: a standing rule from the owner for the whole plan: "always follow WordPress core style". Follow it from now on, in this step and after; Qanuvi keeps it in the plan\x27s FACTS.md for every later step.)',
+      '(Qanuvi: the owner asks: "why sqlite?". Answer briefly in the chat, in a few sentences, then go on with the step from where you were.)',
+      '(Qanuvi: the owner asks for a change: "also add a CSV export". Do not start it yet. Finish only the edit in hand, then answer "Waiting for the owner" and stop; Qanuvi asks the owner when it should be done.)',
+    ];
+    const items = reduceAll(wrapped.map((text) => JSON.stringify({ type: "qanuvi_user", text })));
+    expect(items.map((i) => (i.kind === "user" ? i.text : i.kind))).toEqual([
+      'use "lib/money.php"',
+      "always follow WordPress core style",
+      "why sqlite?",
+      "also add a CSV export",
+    ]);
+    // Shown when typed: the passed-on copy does not show it twice.
+    const typed = reduceAll([
+      JSON.stringify({ type: "qanuvi_user", text: "why sqlite?", during: true }),
+      JSON.stringify({ type: "qanuvi_user", text: wrapped[2] }),
+    ]);
+    expect(typed.filter((i) => i.kind === "user")).toHaveLength(1);
+  });
 });
 
 describe("elapsedLabel", () => {

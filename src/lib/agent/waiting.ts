@@ -24,3 +24,15 @@ export function withoutWithdrawn(text: string): string {
   const i = text.indexOf(WITHDRAWN_MARK);
   return i >= 0 ? text.slice(0, i) : text;
 }
+
+/**
+ * How the runner passes the owner's chat message on to a running plan step's agent (src-tauri/src/plan/ownermsg.rs:
+ * a note, a rule for the whole plan, a question, a change asked about).
+ */
+const RUNNER_WRAP =
+  /^\(Qanuvi: (?:a note from the owner for this step|a standing rule from the owner for the whole plan|the owner asks for a change|the owner asks): "([\s\S]*)"\. (?:Take it into account|Follow it from now on|Do not start it yet|Answer briefly)/;
+
+/** The owner's own words in a message the runner passed on to the step's agent; null for any other message. */
+export function runnerWords(text: string): string | null {
+  return RUNNER_WRAP.exec(text)?.[1] ?? null;
+}

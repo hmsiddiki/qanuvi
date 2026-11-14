@@ -192,6 +192,9 @@ pub trait RunEnv: Send + Sync {
     // Added for the run loop (24z R2c).
     /// A session's agent lines so far (its log, notes, a usage limit's reset time, its context size).
     fn session_lines(&self, session_id: &str) -> Vec<String>;
+    /// Keeps a line of Qanuvi's own in the session's stored events (what the runner told the owner in the step's
+    /// chat), so the chat shows it when opened again later, not only while it is watched.
+    fn keep_line(&self, session_id: &str, line: &str);
     /// The plan's private details (logins), kept in the credential store; empty when none or no store.
     fn plan_private(&self, file: &str) -> Vec<String>;
     /// The whole plan is done: its private details go.
@@ -582,6 +585,10 @@ impl RunEnv for CoreEnv<'_> {
 
     fn session_lines(&self, session_id: &str) -> Vec<String> {
         crate::agent::session_events(&self.db, session_id).unwrap_or_default()
+    }
+
+    fn keep_line(&self, session_id: &str, line: &str) {
+        crate::agent::append_event(&self.db, session_id, line);
     }
 
     fn plan_private(&self, file: &str) -> Vec<String> {

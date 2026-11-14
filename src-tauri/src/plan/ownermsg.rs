@@ -28,6 +28,8 @@ pub const WORD_RULES: &str = "Qanuvi (word rules)";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Note,
+    /// A standing rule for the whole plan ("always follow WordPress core style"): kept in the plan's memory.
+    Rule,
     Question,
     Change,
     Stop,
@@ -38,6 +40,7 @@ impl Kind {
     pub fn word(self) -> &'static str {
         match self {
             Kind::Note => "note",
+            Kind::Rule => "rule",
             Kind::Question => "question",
             Kind::Change => "change",
             Kind::Stop => "stop",
@@ -48,6 +51,7 @@ impl Kind {
     fn from_word(w: &str) -> Option<Kind> {
         Some(match w.trim().to_lowercase().as_str() {
             "note" | "correction" | "fact" => Kind::Note,
+            "rule" | "standing rule" => Kind::Rule,
             "question" => Kind::Question,
             "change" | "scope" | "plan" => Kind::Change,
             "stop" => Kind::Stop,
@@ -159,6 +163,25 @@ pub fn guess(text: &str) -> Kind {
     if text.trim_end().ends_with('?') || ASKS.contains(&first) {
         return Kind::Question;
     }
+    // Words that set how all the work goes, not this step only ("always ...", "from now on ...").
+    const RULES: [&str; 9] = [
+        "always ",
+        "never ",
+        "from now on",
+        "in every step",
+        "for every step",
+        "in all steps",
+        "for all steps",
+        "each step ",
+        "every time ",
+    ];
+    let spaced = format!(" {w} ");
+    if first == "always"
+        || first == "never"
+        || RULES.iter().any(|r| spaced.contains(&format!(" {r}")))
+    {
+        return Kind::Rule;
+    }
     const CHANGES: [&str; 12] = [
         "also ",
         "as well",
@@ -203,10 +226,13 @@ pub fn sort_prompt(step: &str, text: &str) -> String {
     format!(
         "The owner typed a message into the chat of a running plan step. Sort it.\n\nStep: {step}\nMessage: \
          \"{text}\"\n\nKinds:\n- note: a correction or a fact for this step; the agent takes it into account and goes \
-         on.\n- question: the owner asks something; the agent answers briefly and goes on.\n- change: the owner wants \
+         on.\n- rule: a standing rule for the whole plan, not only this step (how all the work should be done, e.g. \
+         \"always follow the core code style\", \"check the other plugins before adding helpers\"); every later step \
+         gets it.\n- question: the owner asks something; the agent answers briefly and goes on.\n- change: the owner wants \
          something this step does not cover, or a change of the plan or its scope.\n- stop: the owner wants the run \
          stopped.\n- pause: the owner wants the run paused.\n\nWhen unsure between note and change, answer change. \
-         Answer with JSON only: {{\"kind\": \"note|question|change|stop|pause\", \"title\": \"for a change: a short \
+         When unsure between note and rule, answer note. Answer with JSON only: {{\"kind\": \
+         \"note|rule|question|change|stop|pause\", \"title\": \"for a change: a short \
          title for it as a plan step\"}}"
     )
 }
@@ -250,6 +276,18 @@ pub fn note_message(text: &str) -> String {
     format!(
         "(Qanuvi: a note from the owner for this step: \"{text}\". Take it into account and go on with the step.)"
     )
+}
+
+pub fn rule_message(text: &str) -> String {
+    format!(
+        "(Qanuvi: a standing rule from the owner for the whole plan: \"{text}\". Follow it from now on, in this step \
+         and after; Qanuvi keeps it in the plan's FACTS.md for every later step.)"
+    )
+}
+
+/// The rule's line in the plan's FACTS.md.
+pub fn rule_fact(text: &str) -> String {
+    format!("- Owner rule: {text}\n")
 }
 
 pub fn question_message(text: &str) -> String {
@@ -325,6 +363,7 @@ pub fn default_text(wait_ms: i64) -> String {
 pub fn handled_text(kind: Kind) -> &'static str {
     match kind {
         Kind::Note => "passed to the agent as a note for this step",
+        Kind::Rule => "kept as a rule for the whole plan (FACTS.md), every later step gets it",
         Kind::Question => "the agent answers it in the chat, then goes on",
         Kind::Stop => "taken as Stop: the agent finishes the edit in hand, then the run stops",
         Kind::Pause => "taken as Pause: the agent finishes the edit in hand and writes where it is",
@@ -427,6 +466,13 @@ mod tests {
         assert_eq!(guess("do the export in JSON instead"), Kind::Change);
         assert_eq!(guess("the price helper is in lib/money.php"), Kind::Note);
         assert_eq!(guess("stop"), Kind::Stop);
+        assert_eq!(guess("always follow WordPress core style"), Kind::Rule);
+        assert_eq!(
+            guess("From now on check the other plugins before adding helpers"),
+            Kind::Rule
+        );
+        assert_eq!(guess("never edit the vendor folder"), Kind::Rule);
+        assert_eq!(guess("always add tests?"), Kind::Question);
     }
 
     #[test]

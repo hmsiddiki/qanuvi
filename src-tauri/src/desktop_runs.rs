@@ -42,6 +42,14 @@ impl Tell for WindowTell {
     }
 }
 
+/// The agent setups the window sends get the keys from this computer's credential store (the window never has them).
+fn with_keys(mut start: RunStart) -> Res<RunStart> {
+    for setup in start.turns.setups.values_mut() {
+        *setup = crate::brain::with_keys(setup, super::model_key)?;
+    }
+    Ok(start)
+}
+
 /// Runs `f` with the project's `RunEnv` (on the run's own thread).
 fn with_env<T>(app: &AppHandle, project_id: &str, f: impl FnOnce(&CoreEnv) -> T) -> Res<T> {
     let state = app.state::<AppState>();
@@ -64,6 +72,7 @@ pub(super) fn plan_run_start(
     start: RunStart,
 ) -> Res<()> {
     projects::get(&state.db, &project_id)?;
+    let start = with_keys(start)?;
     let tell: Arc<dyn Tell> = Arc::new(WindowTell(app.clone()));
     let pid = project_id.clone();
     let setup = start.setup();
@@ -81,6 +90,7 @@ pub(super) fn plan_run_finish(
     start: RunStart,
     level: FinishLevel,
 ) -> Res<()> {
+    let start = with_keys(start)?;
     let shown = state
         .runs
         .shared(&project_id)
@@ -155,6 +165,13 @@ pub(super) fn plan_run_answer(
 #[tauri::command]
 pub(super) fn plan_run_message(state: State<AppState>, project_id: String, text: String) {
     state.runs.shared(&project_id).owner_message(&text);
+}
+
+/// Words for the running step's agent as they are, never sorted by a model (the plan's private details after the owner
+/// gave one in the chat).
+#[tauri::command]
+pub(super) fn plan_run_tell(state: State<AppState>, project_id: String, text: String) {
+    state.runs.shared(&project_id).controls.tell_agent(&text);
 }
 
 /// "Read my message now": the step's agent is interrupted so the waiting message goes in at once.

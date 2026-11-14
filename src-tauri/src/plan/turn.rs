@@ -56,6 +56,8 @@ struct Asks {
     checking: bool,
     /// The owner's messages in the step's chat, not taken by a turn yet.
     said: std::collections::VecDeque<String>,
+    /// Words for the agent that go as they are, never sorted by a model (a private detail the owner gave).
+    direct: std::collections::VecDeque<String>,
 }
 
 /// The owner's asks to the running step, set by the commands and read by the turn (and later the run loop).
@@ -110,6 +112,18 @@ impl Controls {
         if !t.is_empty() {
             self.asks().said.push_back(t.to_string());
         }
+    }
+
+    /// Words the window built for the step's agent (the plan's private details after the owner gave one): they go to
+    /// the agent as they are, never to the model that sorts messages.
+    pub fn tell_agent(&self, text: &str) {
+        if !text.trim().is_empty() {
+            self.asks().direct.push_back(text.to_string());
+        }
+    }
+
+    fn take_direct(&self) -> Option<String> {
+        self.asks().direct.pop_front()
     }
 
     /// Messages not taken yet.
@@ -362,8 +376,18 @@ pub fn turn(
     model: &str,
     mode: &str,
     title: &str,
-    forward: &mut dyn FnMut(&AgentEvent),
+    outer: &mut dyn FnMut(&AgentEvent),
 ) -> Turn {
+    // What the runner says in the step's chat is kept in the session too (opened later, the chat still shows it).
+    let mut forward = |e: &AgentEvent| {
+        if let AgentEvent::Line { line } = e
+            && line.contains("\"qanuvi_runner\"")
+            && let Some(sid) = controls.session_id()
+        {
+            env.keep_line(&sid, line);
+        }
+        outer(e);
+    };
     // Stop asked before this turn began: nothing is half-way, so no agent starts.
     if controls.stop_asked().is_some() {
         return Turn {
@@ -470,6 +494,9 @@ pub fn turn(
         if late.iter().any(|t| now >= *t) {
             return Flow::Stop;
         }
+        if let Some(text) = controls.take_direct() {
+            return Flow::Send(text);
+        }
         // The owner's words in the step's chat (R2c part 2): sorted first, then passed on as fits.
         if let Some(text) = controls.take_said() {
             if asking.is_some()
@@ -499,16 +526,16 @@ pub fn turn(
                 sorted.title.clone()
             };
             match sorted.kind {
-                Kind::Note | Kind::Question => {
+                Kind::Note | Kind::Rule | Kind::Question => {
                     let handled = ownermsg::handled_text(sorted.kind);
                     watch.messages.push(record(handled));
                     forward(&AgentEvent::Line {
                         line: told(handled),
                     });
-                    return Flow::Send(if sorted.kind == Kind::Note {
-                        ownermsg::note_message(&text)
-                    } else {
-                        ownermsg::question_message(&text)
+                    return Flow::Send(match sorted.kind {
+                        Kind::Note => ownermsg::note_message(&text),
+                        Kind::Rule => ownermsg::rule_message(&text),
+                        _ => ownermsg::question_message(&text),
                     });
                 }
                 Kind::Stop | Kind::Pause => {

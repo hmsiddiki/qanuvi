@@ -186,9 +186,11 @@ impl Runs {
         let pid = project_id.to_string();
         let (t_view, t_agent) = (tell.clone(), tell.clone());
         let (r_view, p_agent) = (runs.clone(), pid.clone());
-        let p_view = pid.clone();
+        let (r_agent, p_view) = (runs.clone(), pid.clone());
         // Each turn's events start with its session (steps, reviews and the planner alike).
         let session: Mutex<Option<String>> = Mutex::new(None);
+        // The step session the view showed last: a new one is told at once (the window's chat follows it).
+        let shown: Mutex<Option<String>> = Mutex::new(None);
         sh.listen(
             Some(Arc::new(move |_run: &PlanRun| {
                 t_view.view(&r_view.view(&p_view));
@@ -201,6 +203,15 @@ impl Runs {
                 let sid = s.clone();
                 drop(s);
                 t_agent.agent(&p_agent, sid.as_deref(), e);
+                if matches!(e, AgentEvent::Session { .. }) {
+                    let view = r_agent.view(&p_agent);
+                    let mut last = shown.lock().unwrap_or_else(|e| e.into_inner());
+                    if view.session_id.is_some() && view.session_id != *last {
+                        *last = view.session_id.clone();
+                        drop(last);
+                        t_agent.view(&view);
+                    }
+                }
             })),
         );
         tell.view(&self.view(project_id));

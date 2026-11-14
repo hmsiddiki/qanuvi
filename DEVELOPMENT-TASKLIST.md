@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2d part 1): R2d PART 1 DONE (see 24z "R2d part 1 DONE"): the core side of
+    RESUME HERE (newest, 2026-11-15, after R2d part 2): R2d PART 2 DONE (see 24z "R2d part 2 DONE"): the window runs
+    no runner of its own any more. stores/runner.svelte.ts is a thin store (same exports) over the plan_run_*
+    commands and the "qanuvi-run" / "qanuvi-run-agent" events; a running step's chat goes to plan_run_message (a
+    private detail to the new plan_run_tell, never sorted by a model); runner lines are kept in the step session's
+    stored events; standing owner rules (a "rule" kind) go into FACTS.md and the run's notes. 373 Rust tests and
+    396 TS tests pass, clippy (desktop and master-only), fmt, prettier and svelte-check clean. Nothing published,
+    NOT driven live yet. NEXT: R2d part 3 (the master's Inbox commands, so a master run's held steps show on the
+    desktop), then R2e: drive it live on a scratch project in a test build (start, step chat note/rule/question/
+    change/stop, Pause and Resume, model switch, a held step answered in the Inbox, the finishing pass, closing and
+    reopening the window while a run goes on). Still open, small: replaced steps get their own colour (24z).
+    RESUME HERE (before, 2026-11-15, after R2d part 1): R2d PART 1 DONE (see 24z "R2d part 1 DONE"): the core side of
     the wiring (plan/live.rs run handles and finishing pass, desktop_runs.rs commands and events, master_runs.rs
     commands and run stream). 371 Rust tests pass, clippy and fmt clean, nothing published. NEXT: R2d part 2, the
     window: a thin RunnerStore with the same exports over plan_run_* and "qanuvi-run"/"qanuvi-run-agent", the step
@@ -893,6 +903,23 @@ runs on or off; with it off nothing is sent anywhere.
         steps wait in the master's own Inbox, which the desktop does not show yet.
         371 Rust tests pass (1 old ignored as before), clippy clean on the desktop and the master-only build, fmt
         clean. TypeScript unchanged, nothing published, no live check (the window calls none of it until part 2).
+      - [x] R2d part 2 DONE 2026-11-15 (window side): stores/runner.svelte.ts rewritten as a thin store over the core
+        (about 640 lines instead of 2,600; same exports for RunPanel, PlanView, AgentPane, PlannerDialog). start and
+        finishPass send a RunStart built from this window's settings (agent, models and labels, Team, rules, monthly
+        budget, memory, effort, Qanuvi's own model setup; plan_run_start/finish fill in the keys from the credential
+        store, as the master does); Stop, Pause, answers, End the run here, model and mode pickers, "read my message
+        now" go to their commands; the view ("qanuvi-run") sets the panel's state, puts new notices in the chat once,
+        and the chat follows the new step session (live.rs now tells the view when a step session starts). Agent
+        events ("qanuvi-run-agent") go to the chat; a session not open there (reviews, planner) is only listed, so its
+        end no longer ends the open chat's turn. Resume of a paused step and "continue" in a stopped step's chat go
+        as the start's resume (paused: Qanuvi's note; continue: the owner's words). Pick models, learned stats and
+        private details stay in the window. Step chat: the owner's words show at once (agent.showOwn) and go to
+        plan_run_message; the runner's copy to the agent shows as the same message, once (events.ts unwraps the
+        ownermsg wordings; test with Rust's exact texts); files cannot go to a running step (said in the chat); a
+        login typed there goes to the plan's private details and plan_run_tell (new: Controls::tell_agent, sent as
+        it is, no model sorts it). Runner lines ("Taken as a note ...") are kept in the step session's stored events
+        (RunEnv::keep_line), so a chat opened later still shows them. The old TypeScript runner's scenario test and
+        fake core are gone (R2 ported the scenarios to Rust). Not driven live (R2e).
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
@@ -923,7 +950,10 @@ runs on or off; with it off nothing is sent anywhere.
         left their Needs lines as "Needs: 97a1" etc., so 97a-2-97a-4 were skipped as "needs step 97a1, which is not
         done", and 97b-97z after them. The renumbering must rewrite Needs lines inside the replacement steps too
         (and accept the planner's own label as the same step). Add a scenario first.
-    - [ ] R2d also (owner agreed 2026-11-15, part of 24z2): standing owner rules. A note in a step's chat that is a
+    - [x] DONE 2026-11-15 (R2d part 2; ownermsg Kind::Rule, word rules for "always/never/from now on/every step",
+      the decider's prompt names it; kept in FACTS.md as "- Owner rule: ..." and in the run's notes, secrets never;
+      scenario: a rule said in step 1 reaches step 3's prompt on another model, a one-off note does not).
+      R2d also (owner agreed 2026-11-15, part of 24z2): standing owner rules. A note in a step's chat that is a
       rule for the whole plan ("always follow WordPress core style", "check the other plugins before adding helpers")
       is saved into the plan's memory (FACTS.md, "Owner rules"), so every later step and model sees it, not only that
       session; a one-off correction stays with its step. The decider tells them apart (one more kind in
@@ -957,7 +987,7 @@ runs on or off; with it off nothing is sent anywhere.
     step from Qanuvi's own snapshots (no git needed): a change outside the scope is undone and kept aside, one
     question: keep or drop. Stopped at write time too where the agent's permission hook allows (check per agent).
     Project permissions listed in the project settings, removable.
-  - [ ] 3. Standing owner rules from chat notes into plan memory: built in R2d (see 24z R2).
+  - [x] 3. Standing owner rules from chat notes into plan memory: built in R2d part 2 (see 24z R2).
   - [ ] 4. Step prompt rules (reuse first; new shared code where this project keeps it; what the step may write) and a
     find_similar tool for every agent, the Qanuvi agent included.
   - [ ] 5. Tidy check after each step, no model unless a candidate is found: new functions like existing ones (name

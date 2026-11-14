@@ -1030,3 +1030,86 @@ fn stop_typed_in_the_chat_stops_the_run_like_the_button_without_asking_a_model()
     assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
     assert_eq!(messages_decided(&r)[0].1, "stop");
 }
+
+// ---------- Standing owner rules (R2d, 24z2) ----------
+
+#[test]
+fn a_rule_said_in_step_1_reaches_step_3_on_another_model_and_a_one_off_note_stays_with_its_step() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Prices**\n- [ ] **2. Cart**\n- [ ] **3. Export**\n  - Model: claude-sonnet-5-5\n",
+    );
+    env.set_decide(|prompt| {
+        let kind = if prompt.contains("always follow WordPress core style") {
+            "rule"
+        } else {
+            "note"
+        };
+        Ok(("Free model".into(), json!({"kind": kind}).to_string()))
+    });
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        if n == "1" {
+            sh.owner_message("always follow WordPress core style");
+            sh.owner_message("the price helper is in lib/money.php");
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply {
+            ticks: if n == "1" { 3 } else { 0 },
+            ..Default::default()
+        }
+    });
+    // No one model for the run: each step goes as the plan says (step 3 names its own).
+    let opts = RunOptions {
+        model: None,
+        ..options()
+    };
+    let r = with_free(&env, opts, stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    // Step 1's agent heard the rule at once, as a rule for the whole plan.
+    assert!(
+        sent_texts(&env)
+            .iter()
+            .any(|t| t == &ownermsg::rule_message("always follow WordPress core style"))
+    );
+    // Kept in the plan's memory and the run's notes.
+    let facts = env.text(&crate::plan::guidance::facts_path(FILE));
+    assert!(
+        facts.contains("Owner rule: always follow WordPress core style"),
+        "{facts}"
+    );
+    assert!(
+        !facts.contains("lib/money.php"),
+        "a one-off note is no rule: {facts}"
+    );
+    assert!(
+        r.notes
+            .clone()
+            .unwrap_or_default()
+            .iter()
+            .any(|n| n.contains("always follow WordPress core style"))
+    );
+    // Step 3 runs on another model in its own session and still has the rule in its request.
+    let (model, prompt) = env
+        .prompts()
+        .into_iter()
+        .rfind(|(_, p)| step_of(p, &["1", "2", "3"]) == "3")
+        .expect("step 3 ran");
+    assert_eq!(model, "claude-sonnet-5-5");
+    assert!(
+        prompt.contains("always follow WordPress core style"),
+        "{prompt}"
+    );
+    assert!(!prompt.contains("lib/money.php"), "{prompt}");
+    let kinds: Vec<String> = messages_decided(&r).into_iter().map(|m| m.1).collect();
+    assert_eq!(kinds, ["rule", "note"]);
+    // What the runner said in step 1's chat is kept in its session (the chat shows it when opened again).
+    let sid = step(&r, "1").attempts[0].session_id.clone();
+    let kept = crate::plan::env::RunEnv::session_lines(&*env, &sid);
+    assert!(
+        kept.iter()
+            .any(|l| l.contains("qanuvi_runner") && l.contains("Taken as a rule")),
+        "{kept:?}"
+    );
+}

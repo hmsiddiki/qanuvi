@@ -2302,6 +2302,7 @@ pub fn run() {
             plan_runs::plan_run_answer,
             plan_runs::plan_run_message,
             plan_runs::plan_run_interrupt,
+            plan_runs::plan_run_tell,
             plan_runs::plan_run_model,
             plan_runs::plan_run_mode,
             agent_usage_since,

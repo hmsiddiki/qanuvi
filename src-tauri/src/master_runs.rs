@@ -174,6 +174,10 @@ impl Master {
                 sh().owner_message(&s(args, "text"));
                 Ok(Value::Null)
             }
+            "plan_run_tell" => {
+                sh().controls.tell_agent(&s(args, "text"));
+                Ok(Value::Null)
+            }
             "plan_run_interrupt" => {
                 sh().controls.interrupt();
                 Ok(Value::Null)
