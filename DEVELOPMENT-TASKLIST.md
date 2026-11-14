@@ -789,6 +789,21 @@ runs on or off; with it off nothing is sent anywhere.
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so
   every Qanuvi knows it. Headroom can sit in front of it for the free models too (`--openai-api-url`), to be tested.
+- [ ] **24k2. Free Claude Code (FCC) as a second free provider (owner, 2026-11-14, later)**: github.com/alishahryar1/
+  free-claude-code, a local router (127.0.0.1:8082, own Admin page, Windows tray app) to 61 providers with free tiers,
+  about 1.3 billion free tokens a month. For people who cannot pay: weaker models still give real help (questions,
+  explanations, simple edits, plans); Qanuvi offers it and says plainly what to expect, never pushes it.
+  - What it adds next to OmniRoute: it can stand in for Anthropic's server, so the Claude Code agent Qanuvi drives
+    can run plan steps on free models (today those steps are paid only). For Qanuvi's own agent it is an
+    OpenAI-compatible address (/v1) like OmniRoute, so an alternative there, not something new.
+  - Scope: a setup guide like OmniRoute's (guides.ts, setup wizard); run Claude Code steps through FCC per plan step
+    or per project (base URL set only for that agent process); the step label says it runs on a free model; a
+    check that FCC is running (and a clear note when it is not); its models listed for the Pick models button.
+  - Watch: needs Python 3.14 through uv (its installer brings it); AGPL v3, so only talked to as a separate
+    program, none of its code copied in; the owner's Claude Code already goes through Headroom (8787) and FCC has its
+    own Headroom option, so the order must be clear; some free tiers keep or train on what is sent (say so in the
+    guide); free models are weaker (owner: code quality over token saving), so suggested for light steps only.
+  - First: try it on a scratch project and compare free models with Haiku 5.5 on the same small plan.
 - [x] **1f. Qanuvi's own resource use (done 2026-11-12)**: the status bar shows Qanuvi's total memory and CPU (qanuvi.exe, its
   WebView2 processes and the agents it started); Task Manager lists WebView2 apart (1e).
 - [ ] **15e3. Temp files follow the data folder (owner, 2026-11-12, later)**: measured on the owner's PC, Temp on C:
