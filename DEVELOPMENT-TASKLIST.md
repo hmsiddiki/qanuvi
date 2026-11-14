@@ -364,7 +364,11 @@ runs on or off; with it off nothing is sent anywhere.
     sending, $0.10 for both new sessions): one turn each, answered straight from the note with no file read, 11k;
     old sessions "stopped" in the DB, only the two new agent processes left. The "write the note first, then send"
     order was not driven again after the fix (same #goOnFresh path).
-    UPDATE 2026-11-14 (newest): 15i part 3 SESSION B BUILT AND DRIVEN LIVE (bc0b0ae + the two fixes after it,
+    UPDATE 2026-11-14 (newest): 15i PART 4 BUILT AND DRIVEN LIVE (split editor + minimap, unpublished, verify
+    375 + 172), plus the owner's NEW LOGO everywhere (54fa123: purple tile with a cut square; icons, title-bar logo,
+    favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Two small findings wait for
+    the owner (listed there). With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT publish 0.1.20 yet.
+    UPDATE 2026-11-14 (before): 15i part 3 SESSION B BUILT AND DRIVEN LIVE (bc0b0ae + the two fixes after it,
     unpublished, verify 364 + 172): PHP debugging through PHP Debug v1.40.2 (owner's yes for the download), Xdebug
     file per run, Debugging in Settings > Languages. The (a)-(e) fixes were driven in the same test build: all work.
     See 15i "Built (part 3, session B)" and "Driven live (part 3, session B)". The install offer's doubled name is
@@ -1501,6 +1505,38 @@ runs on or off; with it off nothing is sent anywhere.
     PHP's warnings (3 of 5 keys; now all, 400 ms after the first); the sidebar kept "no Xdebug" after Settings fixed
     it (now cleared by the check). The install offer said the debugger's name twice; owner agreed to shorten it:
     now "<name> is needed. Downloads its latest release from GitHub (…)" (not driven live).
+  - Built (part 4, 2026-11-14): split editor and minimap.
+    Split: at most two editor groups, side by side or one above the other (button at the right of the work area's tab
+    row flips it; the split and its size are kept in localStorage qanuvi.editorSplit). Each group has its own tabs and
+    active file; a file can be open in both (src/lib/editor/groups.ts: the rules, with tests). Both views of one file
+    stay in step (src/lib/editor/shared.ts: a change typed in one is copied into the other, not added to its undo
+    history; a state handed between groups is reconfigured to the receiving editor, keeping text, selection, undo and
+    language). Ctrl+\ opens the file in the other group (splitting when there is one), Ctrl+1 / Ctrl+2 move the
+    keyboard, Ctrl+W closes the tab in the focused group. Tabs drag (pointer events, src/lib/stores/tabDrag.svelte.ts)
+    to another place, to the other group, or onto the right side of the editor to split it; the tab menu has Open to
+    the side / Open below / Open in the other group / Move to the other group; the × on a group's strip joins the
+    groups. Opening a file goes to the focused group (as VS Code). A reload (disk version) now raises tab.version so
+    every editor showing the file starts again. The language-server actions find the file's live view in either
+    group. Each project's workspace keeps which group shows which file (SavedTab.groups, active2, focused).
+    Minimap (Settings > Appearance, off by default): src/lib/editor/minimap.ts paints one canvas, 2 px per line, only
+    the lines that fit, in the syntax colours (theme.ts minimapHighlighter); selection, search hits while the search
+    panel is open, git changes on the left edge, the whole file's errors / warnings / search hits on the right edge;
+    click a line to centre it, drag the slider, wheel scrolls.
+  - Driven live (part 4, 2026-11-14, release test build, scratch git project with a 300-line long.js and notes.md):
+    WORKS. Ctrl+\ split long.js into two groups; typing in the right group showed at once in the left (same git mark
+    and unsaved dot in both); two Ctrl+Z in the right undid it in both and both went back to saved; the layout button
+    put the groups one above the other and back; notes.md opened in the focused group; dragging its tab into the other
+    group's strip moved it; the minimap switch showed the minimap in both groups with syntax colours, the slider and the
+    git mark; a click on the minimap centred the clicked line (221); dragging the slider scrolled; Ctrl+F "step4"
+    marked the hits on the right edge; after a restart both groups, their files and the minimap came back; the
+    group's × joined the groups; dragging a tab onto the right side of the editor split it again. The new logo shows in
+    the title bar; the built qanuvi.exe icon has the new colours (checked by pixel; the centre square is transparent
+    in the owner's file, so the taskbar shows through it). Not driven: Ctrl+1 / Ctrl+2, Open below from the menu,
+    errors on the minimap (no JS server installed in the test data), reorder within one strip.
+    Findings for the owner (not changed): (a) with one file in both groups, the language-server install offer shows
+    in both; proposed: show it in the focused group only. (b) a tab given back after a restart (or shown from a kept
+    state) has its cursor line in the status (Ln 83) but the view stays at the top (as before part 4); proposed: scroll
+    the cursor into view when a kept state is shown.
   - LATER (owner, 2026-11-14): Phpactor as a second PHP server to choose in Settings > Languages. It is free and
     open source and gives quick fixes and rename, which free Intelephense keeps for its paid licence (VS Code users
     on free Intelephense have the same gap). Phpactor needs PHP 8.1+ on the machine (it is a PHP program, not npm),

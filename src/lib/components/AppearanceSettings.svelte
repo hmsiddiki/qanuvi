@@ -1,5 +1,5 @@
 <script lang="ts">
-  /** Settings → Appearance (15h): the editor's font size and the size of the whole interface. */
+  /** Settings → Appearance (15h): the editor's font size, the size of the whole interface, the minimap (15i). */
   import { settings } from "$lib/stores/settings.svelte";
 
   let a = $derived(settings.value.appearance);
@@ -7,7 +7,7 @@
 </script>
 
 <h2>Appearance</h2>
-<p class="intro">How big things are. Changes show at once.</p>
+<p class="intro">How big things are and what the editor shows. Changes show at once.</p>
 
 <div class="rows">
   <label>
@@ -30,6 +30,16 @@
       value={a.uiScale}
       onchange={(e) => set({ uiScale: Number(e.currentTarget.value) })}
     />
+  </label>
+  <label class="check">
+    <input type="checkbox" checked={a.minimap} onchange={(e) => set({ minimap: e.currentTarget.checked })} />
+    <span
+      ><strong>Minimap</strong>
+      <span class="muted"
+        >A small picture of the file beside the editor, with errors, git changes and search hits. Click or drag it to
+        scroll.</span
+      ></span
+    >
   </label>
   <button type="button" class="link" onclick={() => set({ editorFontSize: 13, uiScale: 100 })}
     >Back to the usual sizes</button
@@ -59,6 +69,17 @@
   label {
     display: grid;
     gap: 6px;
+  }
+
+  label.check {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  label.check .muted {
+    display: block;
+    margin: 2px 0 0;
   }
 
   .muted {

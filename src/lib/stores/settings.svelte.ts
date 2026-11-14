@@ -53,8 +53,8 @@ export interface Settings {
   team: import("$lib/core/decider").TeamSettings;
   /** How long "Allow for N minutes" lasts on Qanuvi's own agent's approval cards (1–240). */
   approveMinutes: number;
-  /** How Qanuvi looks (15h): the editor's font size (px) and the size of the whole interface (%). */
-  appearance: { editorFontSize: number; uiScale: number };
+  /** How Qanuvi looks (15h): the editor's font size (px), the size of the whole interface (%), the minimap (15i). */
+  appearance: { editorFontSize: number; uiScale: number; minimap: boolean };
   /** Start with Qanuvi: commands started hidden when Qanuvi starts (a Headroom proxy, for example). */
   startup: StartupItem[];
   /** Updates (1b): off, a newer version waits for the user's click in the status bar before it downloads. */
@@ -196,7 +196,7 @@ const DEFAULTS: Settings = {
   remoteAccess: { enabled: false, relay: "", name: "" },
   brain: { providers: DEFAULT_MODEL_PROVIDERS, models: [], local: true, omniAssist: true },
   approveMinutes: 10,
-  appearance: { editorFontSize: 13, uiScale: 100 },
+  appearance: { editorFontSize: 13, uiScale: 100, minimap: false },
   updates: { autoDownload: false },
   languages: { off: [], never: [], idleMinutes: 10, formatOnSave: false, xdebugFile: "" },
   chatHandover: { when: "ask", limit: CHAT_HANDOVER_LIMIT },
@@ -256,7 +256,11 @@ export function parseSettings(json: string | null): Settings {
     const ap = raw.appearance && typeof raw.appearance === "object" ? (raw.appearance as Record<string, unknown>) : {};
     const n = (v: unknown, d: number, lo: number, hi: number) =>
       typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d;
-    s.appearance = { editorFontSize: n(ap.editorFontSize, 13, 10, 24), uiScale: n(ap.uiScale, 100, 80, 150) };
+    s.appearance = {
+      editorFontSize: n(ap.editorFontSize, 13, 10, 24),
+      uiScale: n(ap.uiScale, 100, 80, 150),
+      minimap: ap.minimap === true,
+    };
   }
   {
     const up = raw.updates && typeof raw.updates === "object" ? (raw.updates as Record<string, unknown>) : {};

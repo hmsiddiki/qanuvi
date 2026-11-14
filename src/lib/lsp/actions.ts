@@ -11,6 +11,7 @@ import { projects } from "$lib/stores/projects.svelte";
 import { agent } from "$lib/stores/agent.svelte";
 import { contextMenu } from "$lib/stores/contextMenu.svelte";
 import { definition, references, renameEdits } from "./codemirror";
+import { liveViews } from "$lib/editor/shared";
 import {
   applyEdits,
   editsByFile,
@@ -26,17 +27,14 @@ import { actionLabels, fixText, guessIndent, orderActions, touches, type CodeAct
 
 const rootOf = (projectId: string) => projects.list.find((p) => p.id === projectId)?.path ?? "";
 
-/** The editor view and the tab it shows (set by CodeEditor), so edits to that file go through the view. */
-let shownView: () => { view: EditorView; key: string } | null = () => null;
-export function setShownView(get: typeof shownView): void {
-  shownView = get;
-}
+/** An editor view showing this file now (either group), so edits to it go through the view. */
+const shownView = (key: string): EditorView | null => liveViews(key)[0] ?? null;
 
 /** A file's text: the open tab's editor text, its saved text, or the file read from disk; null if not text. */
 async function textOf(projectId: string, path: string): Promise<string | null> {
   const key = tabKey(projectId, path);
-  const shown = shownView();
-  if (shown?.key === key) return shown.view.state.doc.toString();
+  const shown = shownView(key);
+  if (shown) return shown.state.doc.toString();
   const state = editor.states.get(key);
   if (state) return state.doc.toString();
   const tab = editor.tabs.find((t) => t.key === key);
@@ -155,9 +153,9 @@ export async function applyWorkspaceEdit(
     if (!edits.length) continue;
     const key = tabKey(projectId, path);
     const tab = editor.tabs.find((t) => t.key === key);
-    const shown = shownView();
-    if (shown?.key === key) {
-      shown.view.dispatch({ changes: changesFor(shown.view.state.doc, edits) });
+    const shown = shownView(key);
+    if (shown) {
+      shown.dispatch({ changes: changesFor(shown.state.doc, edits) });
     } else if (tab) {
       const state = editor.states.get(key);
       if (state) {

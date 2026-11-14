@@ -3,7 +3,7 @@
  * changed lines and a red mark where lines were removed, compared with the staged version of the file. They are worked
  * out again shortly after typing stops, so typing stays cheap in big files.
  */
-import { RangeSet, RangeSetBuilder, StateEffect, StateField, type Text } from "@codemirror/state";
+import { RangeSet, RangeSetBuilder, StateEffect, StateField, type EditorState, type Text } from "@codemirror/state";
 import { EditorView, GutterMarker, ViewPlugin, gutter, type ViewUpdate } from "@codemirror/view";
 import { lineMarks, type Mark } from "./hunks";
 
@@ -96,6 +96,12 @@ const theme = EditorView.baseTheme({
     marginTop: "-4px",
   },
 });
+
+/** The changed lines between two positions, with their kind (for the minimap). */
+export function gitMarks(state: EditorState, from: number, to: number, f: (pos: number, kind: Mark) => void): void {
+  const marks = state.field(marksField, false);
+  marks?.between(from, to, (pos, _end, m) => f(pos, (m as ChangeMarker).kind));
+}
 
 export function gitGutter() {
   return [

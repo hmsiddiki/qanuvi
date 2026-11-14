@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { contextMenu } from "$lib/stores/contextMenu.svelte";
-  import * as files from "$lib/fileActions";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
@@ -11,10 +9,14 @@
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
   import X from "@lucide/svelte/icons/x";
+  import Columns2 from "@lucide/svelte/icons/columns-2";
+  import Rows2 from "@lucide/svelte/icons/rows-2";
   import Splitter from "./Splitter.svelte";
   import IconButton from "./IconButton.svelte";
   import { panel } from "$lib/stores/panel.svelte";
-  import CodeEditor from "./CodeEditor.svelte";
+  import EditorGroup from "./EditorGroup.svelte";
+  import FileTabs from "./FileTabs.svelte";
+  import { tabDrag } from "$lib/stores/tabDrag.svelte";
   import PreviewTab from "./PreviewTab.svelte";
   import PlanView from "./PlanView.svelte";
   import SourceControl from "./SourceControl.svelte";
@@ -35,18 +37,21 @@
   import { terminals } from "$lib/stores/terminals.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { ui, type WorkView } from "$lib/stores/ui.svelte";
-  import { LANGUAGE_LABELS } from "$lib/editor/languages";
 
   let project = $derived(projects.current);
-  let fileTabs = $derived(editor.visible(project?.id ?? null));
-  let active = $derived(editor.active);
+  /** The editor groups with tabs for this project (15i part 4): one, or two when the editor is split. */
+  let shown = $derived(editor.shownGroups(project?.id ?? null));
+  let split = $derived(shown.length > 1);
+  let down = $derived(editor.split.direction === "down");
+  let groupsWidth = $state(0);
+  let groupsHeight = $state(0);
+  /** Room for the two groups (the handle between them takes none). */
+  let room = $derived(Math.max(1, down ? groupsHeight : groupsWidth));
   let maximized = $derived(layout.state.terminalVisible && layout.state.terminalMaximized);
   let termTabs = $derived(terminals.forProject(project?.id ?? null));
   let activeTerm = $derived(terminals.active(project?.id ?? null));
   let problemCount = $derived(lsp.counts(project?.id ?? null));
   let bottom = $derived(lsp.bottom);
-  let cursor = $state({ line: 1, column: 1 });
-  let editorView: CodeEditor | undefined = $state();
 
   const fixed: { id: WorkView; label: string; icon: typeof Globe }[] = [
     { id: "preview", label: "Preview", icon: Globe },
@@ -71,55 +76,6 @@
   $effect(() => {
     if (editor.activeKey) ui.view = "editor";
   });
-
-  /** Right-click on a file tab. */
-  function tabMenu(e: MouseEvent, tab: (typeof fileTabs)[number]) {
-    const tabs = fileTabs;
-    const at = tabs.findIndex((t) => t.key === tab.key);
-    const closeAll = async (list: typeof tabs) => {
-      for (const t of list) await editor.close(t.key);
-    };
-    const own = project && !tab.global && tab.projectId === project.id ? project : null;
-    contextMenu.show(e, [
-      [
-        { label: "Close", hint: "Ctrl+W", action: () => editor.close(tab.key) },
-        {
-          label: "Close others",
-          disabled: tabs.length < 2,
-          action: () => closeAll(tabs.filter((t) => t.key !== tab.key)),
-        },
-        { label: "Close to the right", disabled: at === tabs.length - 1, action: () => closeAll(tabs.slice(at + 1)) },
-        { label: "Close saved", action: () => closeAll(tabs.filter((t) => !t.dirty)) },
-      ],
-      own && [
-        { label: "Copy path", action: () => files.copyPath(own, tab.path) },
-        { label: "Copy relative path", action: () => files.copyRelativePath(tab.path) },
-        { label: "Reveal in File Explorer", action: () => files.reveal(own, tab.path) },
-      ],
-      own && [{ label: "Add to the message", action: () => files.addToMessage(tab.path) }],
-    ]);
-  }
-
-  function fileName(path: string) {
-    return path.split("/").pop() ?? path;
-  }
-
-  async function overwrite() {
-    const text = editorView?.currentText();
-    if (active && text !== null && text !== undefined) await editor.save(active.key, text, true);
-  }
-
-  // The tab strip, and the open tab kept in view (a newly opened one may be past the edge).
-  let tabStrip = $state<HTMLDivElement | null>(null);
-  $effect(() => {
-    const key = editor.activeKey;
-    if (!tabStrip || !key) return;
-    queueMicrotask(() =>
-      tabStrip
-        ?.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)
-        ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
-    );
-  });
 </script>
 
 <section class="work-pane" aria-label="Work">
@@ -138,49 +94,23 @@
           >
             <FolderTree size={14} />
           </IconButton>
-          <div
-            class="file-tabs"
-            bind:this={tabStrip}
-            onwheel={(e) => {
-              if (!tabStrip || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-              tabStrip.scrollLeft += e.deltaY;
-            }}
-          >
-            {#each fileTabs as tab (tab.key)}
-              <div
-                class="tab file-tab"
-                class:active={ui.view === "editor" && editor.activeKey === tab.key}
-                data-key={tab.key}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={ui.view === "editor" && editor.activeKey === tab.key}
-                  title={tab.path}
-                  onclick={() => {
-                    editor.activate(tab.key);
-                    ui.view = "editor";
-                  }}
-                  onauxclick={(e) => e.button === 1 && editor.close(tab.key)}
-                  oncontextmenu={(e) => tabMenu(e, tab)}
-                >
-                  <FileCode size={13} />
-                  <span class="name">{tab.label ?? fileName(tab.path)}</span>
-                </button>
-                <button
-                  type="button"
-                  class="close"
-                  class:dirty={tab.dirty}
-                  aria-label="Close {fileName(tab.path)}"
-                  title={tab.dirty ? "Unsaved changes" : "Close"}
-                  onclick={() => editor.close(tab.key)}
-                >
-                  <span class="dot"></span>
-                  <X size={12} />
-                </button>
-              </div>
-            {/each}
-          </div>
+          {#if split}
+            <!-- Split: each group has its own tabs; this one brings the editor back from Preview or Plan. -->
+            <button
+              type="button"
+              role="tab"
+              class="tab fixed"
+              class:active={ui.view === "editor"}
+              aria-selected={ui.view === "editor"}
+              onclick={() => (ui.view = "editor")}
+            >
+              <FileCode size={13} />
+              <span>Editor</span>
+            </button>
+            <span class="grow"></span>
+          {:else}
+            <FileTabs group={shown[0]} tabs={editor.inGroup(project?.id ?? null, shown[0])} split={false} />
+          {/if}
           {#each fixed as f (f.id)}
             <button
               type="button"
@@ -212,6 +142,24 @@
               </button>
             </div>
           {/if}
+          {#if project && ui.view === "editor"}
+            {#if split}
+              <IconButton
+                label={down ? "Put the editor groups side by side" : "Put the editor groups one above the other"}
+                onclick={() => editor.setSplit({ direction: down ? "right" : "down" })}
+              >
+                {#if down}<Columns2 size={14} />{:else}<Rows2 size={14} />{/if}
+              </IconButton>
+            {:else}
+              <IconButton
+                label="Split the editor (Ctrl+\)"
+                disabled={!editor.activeIn(shown[0])}
+                onclick={() => editor.openToSide(editor.activeIn(shown[0])?.key ?? null)}
+              >
+                {#if down}<Rows2 size={14} />{:else}<Columns2 size={14} />{/if}
+              </IconButton>
+            {/if}
+          {/if}
         </div>
 
         <div class="content" role="tabpanel">
@@ -222,55 +170,21 @@
               <p>Add a project folder with the + next to Projects in the sidebar.</p>
             </div>
           {:else if ui.view === "editor"}
-            {#if active && (active.global || active.projectId === project.id || !settings.value.tabsFollowProject)}
-              <div class="editor-area">
-                {#if active.conflict}
-                  <div class="bar warn">
-                    This file was changed on disk after you opened it.
-                    <button type="button" onclick={overwrite}>Overwrite with mine</button>
-                    <button type="button" onclick={() => editor.reload(active!.key)}>Load the disk version</button>
-                  </div>
+            <div class="groups" class:down bind:clientWidth={groupsWidth} bind:clientHeight={groupsHeight}>
+              {#each shown as g, i (g)}
+                {#if i === 1}
+                  <Splitter
+                    axis={down ? "y" : "x"}
+                    size={editor.split.ratio * room}
+                    label="Resize the editor groups"
+                    onresize={(size) => editor.setSplit({ ratio: size / room })}
+                  />
                 {/if}
-                {#if active.saveError}
-                  <div class="bar warn">
-                    {active.saveError}
-                    <button type="button" onclick={() => (active!.saveError = "")}>Dismiss</button>
-                  </div>
-                {/if}
-                {#if active.error}
-                  <div class="placeholder"><p class="err">{active.error}</p></div>
-                {:else if active.binary || active.tooLarge}
-                  <div class="placeholder">
-                    <p>
-                      {active.binary
-                        ? "This is a binary file and is not shown in the editor."
-                        : "This file is larger than 10 MB and is not opened in the editor."}
-                    </p>
-                  </div>
-                {:else}
-                  <div class="editor-host">
-                    <CodeEditor
-                      bind:this={editorView}
-                      tab={active}
-                      oncursor={(line, column) => (cursor = { line, column })}
-                    />
-                  </div>
-                  <div class="status">
-                    <span class="path">{active.path}</span>
-                    {#if active.dirty}<span class="unsaved">Unsaved · Ctrl+S</span>{/if}
-                    <span class="spacer"></span>
-                    <span>Ln {cursor.line}, Col {cursor.column}</span>
-                    <span>{active.language ? LANGUAGE_LABELS[active.language] : "Plain text"}</span>
-                  </div>
-                {/if}
-              </div>
-            {:else}
-              <div class="placeholder">
-                <FileCode size={22} />
-                <h3>Editor</h3>
-                <p>Open a file from the tree, or press {platform.isMac ? "Cmd" : "Ctrl"}+P to go to a file.</p>
-              </div>
-            {/if}
+                <div class="slot" style:flex={split && i === 0 ? `0 0 ${editor.split.ratio * room}px` : "1 1 0"}>
+                  <EditorGroup group={g} {project} {split} />
+                </div>
+              {/each}
+            </div>
           {:else if ui.view === "preview"}
             <PreviewTab {project} />
           {:else if ui.view === "plan"}
@@ -402,6 +316,9 @@
       </div>
     </div>
   {/if}
+  {#if tabDrag.key}
+    <div class="drag-ghost" style:left="{tabDrag.x + 14}px" style:top="{tabDrag.y + 10}px">{tabDrag.label}</div>
+  {/if}
 </section>
 
 <style>
@@ -435,19 +352,6 @@
     gap: 2px;
     padding: 4px var(--qx-space-2) 0;
     border-bottom: 1px solid var(--qx-border);
-  }
-
-  .file-tabs {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    gap: 2px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .file-tabs:hover {
-    scrollbar-width: thin;
   }
 
   .file-tab {
@@ -522,10 +426,6 @@
     background: transparent;
   }
 
-  .file-tab .close.dirty .dot {
-    background: var(--qx-text-secondary);
-  }
-
   .file-tab:hover .close :global(svg),
   .file-tab.active .close:not(.dirty) :global(svg) {
     display: block;
@@ -540,70 +440,51 @@
     background: var(--qx-bg-raised);
   }
 
+  .grow {
+    flex: 1;
+  }
+
+  .groups {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+
+  .groups.down {
+    flex-direction: column;
+  }
+
+  .slot {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .groups:not(.down) .slot ~ .slot {
+    border-left: 1px solid var(--qx-border);
+  }
+
+  .groups.down .slot ~ .slot {
+    border-top: 1px solid var(--qx-border);
+  }
+
+  .drag-ghost {
+    position: fixed;
+    z-index: 100;
+    padding: 3px 10px;
+    border: 1px solid var(--qx-border);
+    border-radius: 6px;
+    background: var(--qx-bg-raised);
+    color: var(--qx-text);
+    font-size: var(--qx-text-small);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
   .content {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-
-  .editor-area {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .editor-host {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .status {
-    flex: none;
-    display: flex;
-    gap: var(--qx-space-4);
-    padding: 3px var(--qx-space-3);
-    border-top: 1px solid var(--qx-border);
-    color: var(--qx-text-muted);
-    font-size: 11px;
-  }
-
-  .status .path {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .status .spacer {
-    flex: 1;
-  }
-
-  .unsaved {
-    color: var(--qx-status-waiting);
-  }
-
-  .bar {
-    display: flex;
-    align-items: center;
-    gap: var(--qx-space-2);
-    padding: 6px var(--qx-space-3);
-    font-size: var(--qx-text-small);
-  }
-
-  .bar.warn {
-    background: color-mix(in srgb, var(--qx-status-waiting) 15%, transparent);
-    color: var(--qx-text);
-  }
-
-  .bar button {
-    padding: 2px 8px;
-    border: 1px solid var(--qx-border);
-    border-radius: 6px;
-    background: var(--qx-bg-raised);
-    color: var(--qx-text);
-    font: inherit;
-    cursor: pointer;
   }
 
   .placeholder {
@@ -623,10 +504,6 @@
   .placeholder p {
     margin: 0;
     color: var(--qx-text-secondary);
-  }
-
-  .placeholder .err {
-    color: var(--qx-status-failed);
   }
 
   .terminal {

@@ -37,7 +37,7 @@
   import { ui } from "$lib/stores/ui.svelte";
   import { untrack } from "svelte";
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
-  import { isProjectView, workspace } from "$lib/stores/workspace.svelte";
+  import { isProjectView, workspace, type SavedTab } from "$lib/stores/workspace.svelte";
   import { projectFromUrl, windows } from "$lib/stores/windows.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 
@@ -113,14 +113,23 @@
       for (const t of w.tabs) {
         if (projects.currentId !== id) return;
         if (editorStore.tabs.some((x) => x.key === tabKey(id, t.path))) continue;
-        await editorStore.open(id, t.path, t.line, t.column);
+        await editorStore.open(id, t.path, t.line, t.column, 0);
         // A file that is gone is not reopened.
         const tab = editorStore.tabs.find((x) => x.key === tabKey(id, t.path));
         if (tab?.error) await editorStore.close(tab.key);
       }
       if (projects.currentId !== id) return;
       if (w.active && editorStore.tabs.some((x) => x.key === tabKey(id, w.active!)))
-        editorStore.activate(tabKey(id, w.active));
+        editorStore.activate(tabKey(id, w.active), 0);
+      // The split editor as it was: which files the second group shows (15i part 4).
+      const second = w.tabs.filter((t) => t.groups?.includes(1));
+      if (second.length)
+        editorStore.restoreGroups(
+          second.map((t) => tabKey(id, t.path)),
+          second.filter((t) => !t.groups?.includes(0)).map((t) => tabKey(id, t.path)),
+          w.active2 ? tabKey(id, w.active2) : null,
+          w.focused,
+        );
       if (w.view) ui.show(w.view);
       if (terminals.forProject(id).length === 0) for (const shell of w.terminals) terminals.open(id, shell);
       workspace.restored.add(id);
@@ -146,10 +155,20 @@
   $effect(() => {
     const id = projects.currentId;
     if (!id || !workspace.restored.has(id)) return;
+    const groups = editorStore.groups;
     const tabs = editorStore.tabs
       .filter((t) => t.projectId === id && !t.config)
-      .map((t) => ({ path: t.path, line: t.cursor?.line ?? 1, column: t.cursor?.column ?? 1 }));
-    const active = editorStore.tabs.find((t) => t.key === editorStore.activeKey && t.projectId === id && !t.config);
+      .map((t) => {
+        const saved: SavedTab = { path: t.path, line: t.cursor?.line ?? 1, column: t.cursor?.column ?? 1 };
+        const g = [0, 1].filter((n) => groups[n]?.keys.includes(t.key));
+        if (g.includes(1)) saved.groups = g;
+        return saved;
+      });
+    const own = (key: string | null | undefined) =>
+      editorStore.tabs.find((t) => t.key === key && t.projectId === id && !t.config);
+    const active = own(groups[0]?.active);
+    const active2 = own(groups[1]?.active);
+    const focused = editorStore.focused;
     const view = ui.view;
     const shells = terminals
       .forProject(id)
@@ -160,6 +179,8 @@
       workspace.saveSoon(id, {
         tabs,
         active: active?.path ?? null,
+        active2: active2?.path ?? null,
+        focused,
         terminals: shells,
         ...(isProjectView(view) ? { view } : {}),
         // A blank new session is not worth remembering over the one the project was on.
@@ -199,7 +220,18 @@
       ui.show("search");
     } else if (k === "w" && !event.shiftKey && ui.view === "editor" && editor.activeKey) {
       event.preventDefault();
-      editor.close(editor.activeKey);
+      editor.close(editor.activeKey, editor.focused);
+    } else if (event.key === "\\" && !event.shiftKey && ui.view === "editor" && editor.activeKey) {
+      // Ctrl+\: the open file in the other editor group (splitting the editor when there is one group).
+      event.preventDefault();
+      editor.openToSide();
+    } else if ((k === "1" || k === "2") && !event.shiftKey && ui.view === "editor") {
+      // Ctrl+1 / Ctrl+2: the keyboard to the first or second editor group.
+      const g = Number(k) - 1;
+      if (editor.shownGroups(projects.currentId).includes(g)) {
+        event.preventDefault();
+        editor.focus(g, true);
+      }
     }
   }
 

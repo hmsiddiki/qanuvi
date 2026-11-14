@@ -10,11 +10,17 @@ export interface SavedTab {
   path: string;
   line: number;
   column: number;
+  /** The editor groups showing it (15i part 4), when not only the first: [1] or [0, 1]. */
+  groups?: number[];
 }
 
 export interface Workspace {
   tabs: SavedTab[];
   active: string | null;
+  /** The second editor group's active file, when the editor is split. */
+  active2: string | null;
+  /** The editor group worked in last (0 or 1). */
+  focused: number;
   view: WorkView | null;
   /** Shell ids of the open terminals, in order. */
   terminals: string[];
@@ -31,6 +37,8 @@ export const isProjectView = (v: WorkView) => VIEWS.includes(v);
 export const emptyWorkspace = (): Workspace => ({
   tabs: [],
   active: null,
+  active2: null,
+  focused: 0,
   view: null,
   terminals: [],
   session: null,
@@ -54,11 +62,20 @@ export function parseWorkspace(json: string | null): Workspace {
   if (Array.isArray(raw.tabs))
     for (const t of raw.tabs.slice(0, MAX_TABS)) {
       const path = str((t as SavedTab)?.path);
-      if (path && !path.includes("..") && !w.tabs.some((x) => x.path === path))
-        w.tabs.push({ path, line: pos((t as SavedTab).line), column: pos((t as SavedTab).column) });
+      if (!path || path.includes("..") || w.tabs.some((x) => x.path === path)) continue;
+      const saved: SavedTab = { path, line: pos((t as SavedTab).line), column: pos((t as SavedTab).column) };
+      const groups = (t as SavedTab).groups;
+      if (Array.isArray(groups)) {
+        const g = [0, 1].filter((n) => groups.includes(n));
+        if (g.includes(1)) saved.groups = g;
+      }
+      w.tabs.push(saved);
     }
   w.active = str(raw.active);
   if (w.active && !w.tabs.some((t) => t.path === w.active)) w.active = null;
+  w.active2 = str(raw.active2);
+  if (w.active2 && !w.tabs.some((t) => t.path === w.active2 && t.groups?.includes(1))) w.active2 = null;
+  w.focused = raw.focused === 1 && w.tabs.some((t) => t.groups?.includes(1)) ? 1 : 0;
   w.view = VIEWS.includes(raw.view as WorkView) ? (raw.view as WorkView) : null;
   if (Array.isArray(raw.terminals)) w.terminals = raw.terminals.filter((s) => str(s)).slice(0, 8) as string[];
   w.session = str(raw.session);

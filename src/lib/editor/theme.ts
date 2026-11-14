@@ -1,7 +1,7 @@
 /** Qanuvi's dark editor theme, built from the design tokens. */
 import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { tags as t } from "@lezer/highlight";
+import { tagHighlighter, tags as t } from "@lezer/highlight";
 
 const c = {
   bg: "#1c1c1f",
@@ -85,3 +85,21 @@ export const qanuviHighlight = syntaxHighlighting(
     { tag: t.invalid, color: c.invalid },
   ]),
 );
+
+/** The same colours for the minimap, which paints on a canvas: each "class" is the colour itself. */
+export const minimapHighlighter = tagHighlighter([
+  { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword], class: c.keyword },
+  { tag: [t.string, t.special(t.string), t.regexp], class: c.string },
+  { tag: [t.number, t.bool, t.null, t.atom], class: c.number },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], class: c.fn },
+  { tag: [t.typeName, t.className, t.namespace], class: c.type },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], class: c.comment },
+  { tag: [t.tagName], class: c.tag },
+  { tag: [t.attributeName, t.propertyName], class: c.attr },
+  { tag: [t.operator, t.punctuation, t.bracket, t.meta, t.processingInstruction], class: c.secondary },
+  { tag: [t.heading, t.link, t.url], class: c.fn },
+  { tag: t.invalid, class: c.invalid },
+]);
+
+/** Plain text in the minimap. */
+export const minimapText = c.text;

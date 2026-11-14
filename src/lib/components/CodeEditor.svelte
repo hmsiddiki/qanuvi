@@ -1,14 +1,15 @@
 <script lang="ts">
   /**
-   * One CodeMirror view for all tabs. Each tab keeps its own editor state (text, cursor, undo history); switching
-   * tabs swaps the state, which is cheaper than a view per tab.
+   * One CodeMirror view per editor group for all its tabs. Each tab keeps its own editor state (text, cursor, undo
+   * history); switching tabs swaps the state, which is cheaper than a view per tab. A file shown in both groups has
+   * a live view in each, kept in step by $lib/editor/shared.
    */
   import { clipboardText, contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import { addToMessage } from "$lib/fileActions";
   import { ui } from "$lib/stores/ui.svelte";
   import { onDestroy, onMount, untrack } from "svelte";
   import { basicSetup } from "codemirror";
-  import { EditorState, Compartment } from "@codemirror/state";
+  import { EditorState, type Extension } from "@codemirror/state";
   import { EditorView, keymap } from "@codemirror/view";
   import { indentWithTab } from "@codemirror/commands";
   import { editor, type EditorTab } from "$lib/stores/editor.svelte";
@@ -31,8 +32,18 @@
     quickFixMenu,
     renameBlocked,
     renameSymbol,
-    setShownView,
   } from "$lib/lsp/actions";
+  import {
+    adopt,
+    forward,
+    fromOtherView,
+    hiding,
+    languageSlot,
+    otherView,
+    ownerFacet,
+    showing,
+  } from "$lib/editor/shared";
+  import { Minimap } from "$lib/editor/minimap";
   import { serverFor } from "$lib/lsp/protocol";
   import { settings } from "$lib/stores/settings.svelte";
   import { dap } from "$lib/stores/dap.svelte";
@@ -40,15 +51,24 @@
 
   interface Props {
     tab: EditorTab;
+    /** The editor group this editor belongs to (0, or 1 when the editor is split). */
+    group?: number;
     oncursor?: (line: number, column: number) => void;
   }
 
-  let { tab, oncursor }: Props = $props();
+  let { tab, group = 0, oncursor }: Props = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | null = null;
+  let ready = $state(false);
   let shownKey: string | null = null;
-  const language = new Compartment();
+  /** The file's version (raised by a reload) this editor shows. */
+  let shownVersion = 0;
+  /** Marks the states this editor built: their extensions call back into this component. */
+  const owner = Symbol("editor");
+  let mapCanvas: HTMLCanvasElement | undefined = $state();
+  let minimap: Minimap | null = null;
+  let minimapOn = $derived(settings.value.appearance.minimap);
   /** Who last changed the cursor's line (Alt+B), shown for a few seconds. */
   let blameText = $state("");
   let blameTimer: ReturnType<typeof setTimeout> | undefined;
@@ -63,6 +83,7 @@
 
   /** Right-click in the editor. */
   function menu(e: MouseEvent) {
+    if (e.target === mapCanvas) return e.preventDefault();
     const v = view;
     const t = tab;
     if (!v || !t) return;
@@ -270,8 +291,9 @@
     });
   }
 
-  function extensions() {
+  function extensions(lang: Extension = []) {
     return [
+      ownerFacet.of(owner),
       // Before basicSetup, so the breakpoint gutter sits left of the line numbers.
       debugExtensions(
         (line) => toggleBreakpoint(line),
@@ -298,10 +320,18 @@
       lspExtensions(currentDoc),
       qanuviTheme,
       qanuviHighlight,
-      language.of([]),
+      languageSlot.of(lang),
       EditorState.tabSize.of(4),
       EditorView.updateListener.of((update) => {
+        minimap?.schedule();
         if (update.docChanged && shownKey) {
+          // Typed here: the other group's view of this file gets the same change.
+          let own = false;
+          for (const tr of update.transactions)
+            if (tr.docChanged && !tr.annotation(fromOtherView)) {
+              own = true;
+              forward(shownKey, owner, tr);
+            }
           const t = editor.tabs.find((x) => x.key === shownKey);
           if (t) {
             // Back to the saved text (for example after undo) is not a change. The full comparison only runs
@@ -312,7 +342,8 @@
             const d = currentDoc();
             const key = shownKey;
             const text = () => (shownKey === key && view ? view.state : editor.states.get(key))?.doc.toString() ?? "";
-            if (d) lsp.changed(d, text);
+            // The language server hears a change once, from the view it was typed in.
+            if (d && own) lsp.changed(d, text);
           }
         }
         if (update.selectionSet || update.docChanged) {
@@ -326,25 +357,41 @@
     ];
   }
 
-  function stateFor(t: EditorTab): EditorState {
-    return editor.states.get(t.key) ?? EditorState.create({ doc: t.savedText, extensions: extensions() });
+  /**
+   * The state to show a tab with: the other group's live one when it shows the file too (same text), else the one
+   * kept from last time, else a new one. `fresh` (after a reload) always starts from the saved text.
+   */
+  function stateFor(t: EditorTab, fresh: boolean): EditorState {
+    if (!fresh) {
+      const kept = otherView(t.key, owner)?.state ?? editor.states.get(t.key);
+      if (kept) return adopt(kept, owner, extensions);
+    }
+    return EditorState.create({ doc: t.savedText, extensions: extensions() });
   }
 
   async function show(t: EditorTab) {
     if (!view) return;
-    if (shownKey && shownKey !== t.key) editor.states.set(shownKey, view.state);
-    if (shownKey !== t.key || !editor.states.has(t.key)) {
+    const version = t.version ?? 0;
+    const reloaded = shownKey === t.key && shownVersion !== version;
+    if (shownKey !== t.key || reloaded) {
+      if (shownKey && shownKey !== t.key) {
+        editor.states.set(shownKey, view.state);
+        hiding(shownKey, owner);
+      }
       shownKey = t.key;
-      view.setState(stateFor(t));
+      shownVersion = version;
+      view.setState(stateFor(t, reloaded));
       // Mark the tab as having a live state, so later updates do not rebuild it from the saved text.
       editor.states.set(t.key, view.state);
+      showing(t.key, owner, view);
+      minimap?.schedule();
       // setState runs no update listener: give the status bar this tab's cursor, not the last tab's.
       const head = view.state.selection.main.head;
       const at = view.state.doc.lineAt(head);
       oncursor?.(at.number, head - at.from + 1);
       loadBase(t);
       const ext = await loadLanguage(t.language);
-      if (shownKey === t.key && view) view.dispatch({ effects: language.reconfigure(ext) });
+      if (shownKey === t.key && view) view.dispatch({ effects: languageSlot.reconfigure(ext) });
       reattach();
       showDebug();
     }
@@ -359,12 +406,13 @@
       t.revealLine = null;
       t.revealColumn = null;
     }
-    view.focus();
+    // Only the group worked in takes the keyboard (the other group's editor shows a tab without taking it).
+    if (editor.focused === group) view.focus();
   }
 
   onMount(() => {
     view = new EditorView({ parent: host });
-    setShownView(() => (view && shownKey ? { view, key: shownKey } : null));
+    ready = true;
     show(tab);
   });
 
@@ -372,9 +420,27 @@
     // Re-run when the tab, a reload, or a reveal request changes.
     void tab.key;
     void tab.savedText;
+    void tab.version;
     void tab.revealLine;
-    if (view && !editor.states.has(tab.key) && shownKey === tab.key) shownKey = null;
     show(tab);
+  });
+
+  // Ctrl+1 / Ctrl+2, a tab clicked in this group, Open to the side: this editor takes the keyboard.
+  $effect(() => {
+    void editor.focusTick;
+    if (editor.focused === group) untrack(() => view?.focus());
+  });
+
+  // The minimap, while it is switched on (Settings, Appearance).
+  $effect(() => {
+    const canvas = mapCanvas;
+    if (!ready || !canvas || !view) return;
+    const m = new Minimap(canvas, view);
+    minimap = m;
+    return () => {
+      m.destroy();
+      if (minimap === m) minimap = null;
+    };
   });
 
   // Compare again after a save, an agent turn or a git action (staging changes what the markers compare with).
@@ -443,14 +509,22 @@
   }
 
   onDestroy(() => {
-    setShownView(() => null);
+    if (shownKey) hiding(shownKey, owner);
     if (view && shownKey) editor.states.set(shownKey, view.state);
     view?.destroy();
     view = null;
   });
 </script>
 
-<div class="code-editor" bind:this={host} oncontextmenu={menu} role="presentation">
+<div
+  class="code-editor"
+  class:with-minimap={minimapOn}
+  bind:this={host}
+  oncontextmenu={menu}
+  onfocusin={() => editor.focus(group)}
+  role="presentation"
+>
+  {#if minimapOn}<canvas class="minimap" bind:this={mapCanvas} aria-hidden="true"></canvas>{/if}
   {#if blameText}<div class="blame" role="status">{blameText}</div>{/if}
   {#if offer}
     {@const o = offer}
@@ -482,6 +556,26 @@
     position: relative;
     height: 100%;
     overflow: hidden;
+  }
+
+  .minimap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    width: 90px;
+    height: 100%;
+    border-left: 1px solid #ffffff0d;
+    background: #1c1c1f;
+  }
+
+  .with-minimap :global(.cm-editor) {
+    margin-right: 90px;
+  }
+
+  .with-minimap .blame {
+    right: 102px;
   }
 
   .blame {

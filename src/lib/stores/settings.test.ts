@@ -54,11 +54,17 @@ describe("parseSettings", () => {
 
 describe("appearance (15h)", () => {
   it("keeps sizes within what stays readable", () => {
-    expect(parseSettings(null).appearance).toEqual({ editorFontSize: 13, uiScale: 100 });
+    expect(parseSettings(null).appearance).toEqual({ editorFontSize: 13, uiScale: 100, minimap: false });
     expect(parseSettings(JSON.stringify({ appearance: { editorFontSize: 99, uiScale: 10 } })).appearance).toEqual({
       editorFontSize: 24,
       uiScale: 80,
+      minimap: false,
     });
+  });
+
+  it("keeps the minimap off unless switched on (15i part 4)", () => {
+    expect(parseSettings(JSON.stringify({ appearance: { minimap: true } })).appearance.minimap).toBe(true);
+    expect(parseSettings(JSON.stringify({ appearance: { minimap: "yes" } })).appearance.minimap).toBe(false);
   });
 });
 
