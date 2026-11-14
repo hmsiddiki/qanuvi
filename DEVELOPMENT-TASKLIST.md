@@ -375,7 +375,9 @@ runs on or off; with it off nothing is sent anywhere.
     stopgap (a quiet agent is told to go on, no more "paused by the owner"), R2b's process-tree stop. PLAN-F was fixed
     by hand (97a-2, 97a-6, 97a-7 [x]); the owner updates to 0.1.22 and reruns it from 97a-3. Owner agreed the design
     for messages typed into a runner-opened step chat (24z "Owner messages in step chats"): build it into the Rust
-    runner. GitHub CI: Linux failed every build since 07d8e38 (#85-#104; Windows and macOS green): installed() in
+    runner. Also agreed: replaced steps get their own colour (24z "Replaced steps get their own colour"), and
+    Settings + Collapse sit on one line in the open sidebar (done, ffdc9a2, unpublished). PLAN-F runs on 0.1.22 from
+    97a-3 (5/13 done at the checkpoint); watch its first review on the fixed prompt. GitHub CI: Linux failed every build since 07d8e38 (#85-#104; Windows and macOS green): installed() in
     desktop_notify.rs was unused on Linux and clippy -D warnings stopped verify; fixed in 7ed071f, check the next Linux
     build (if still red, read the Linux job log for the next cause). NEXT: R2c (the run loop on RunEnv, owner messages included, un-ignore the 10 scenarios) in a fresh
     conversation; check free RAM before builds and run verify in parts (guard.ps1).
@@ -795,6 +797,11 @@ runs on or off; with it off nothing is sent anywhere.
         checks::kill_group (taskkill /T on Windows, the process group elsewhere) in stop, stop_project and stop_all,
         with a test that starts a process with a child and checks both are gone. Seen live: 21 old agent chats in
         the owner's VS Code held about 5.5 GB (each with 4 MCP node processes).
+      - [ ] Replaced steps get their own colour (owner agreed 2026-11-15): a step marked [!] only because the planner
+        rewrote it (its "Replaced by steps ..." note, planner.ts replaceStep) shows in the Plan view with its own
+        colour (not the red of a real block) and the label "replaced by 97a-1–97a-4"; it turns green when all its
+        replacement steps are done (closeReplaced already ticks it [x]). Seen live: PLAN-F 97a showed red while its
+        replacements ran fine. Small window change; next build.
       - [ ] Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
