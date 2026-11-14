@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14, later night): R2b DONE (see 24z "R2b DONE"): the agent turn and its fix
+    RESUME HERE (newest, 2026-11-15 checkpoint): 0.1.22 PUBLISHED (owner: "publish anyway", release rule skipped):
+    PLAN-F stuck-again fixes (reviews search the plan's folder and check an empty diff against the Done line; replans
+    rewrite Needs lines; Headroom "<<ccr:" placeholders give way to the agent's text), the "read my message now"
+    stopgap (a quiet agent is told to go on, no more "paused by the owner"), R2b's process-tree stop. PLAN-F was fixed
+    by hand (97a-2, 97a-6, 97a-7 [x]); the owner updates to 0.1.22 and reruns it from 97a-3. Owner agreed the design
+    for messages typed into a runner-opened step chat (24z "Owner messages in step chats"): build it into the Rust
+    runner. GitHub CI: Linux failed every build since 07d8e38 (#85-#104; Windows and macOS green): installed() in
+    desktop_notify.rs was unused on Linux and clippy -D warnings stopped verify; fixed in 7ed071f, check the next Linux
+    build (if still red, read the Linux job log for the next cause). NEXT: R2c (the run loop on RunEnv, owner messages included, un-ignore the 10 scenarios) in a fresh
+    conversation; check free RAM before builds and run verify in parts (guard.ps1).
+    RESUME HERE (before, 2026-11-14, later night): R2b DONE (see 24z "R2b DONE"): the agent turn and its fix
     rounds in Rust (plan/turn.rs) and the process-tree stop. NEXT: R2c (the run loop on RunEnv: step order, attempts
     through turn::attempt, reviews, replans, holds through the Inbox, closing steps, limit waits; un-ignore the 10
     scenarios) in a fresh conversation; check free RAM before builds and run verify in parts (guard.ps1).
@@ -785,6 +795,15 @@ runs on or off; with it off nothing is sent anywhere.
         checks::kill_group (taskkill /T on Windows, the process group elsewhere) in stop, stop_project and stop_all,
         with a test that starts a process with a child and checks both are gone. Seen live: 21 old agent chats in
         the owner's VS Code held about 5.5 GB (each with 4 MCP node processes).
+      - [ ] Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
+        owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
+        decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
+        goes on; (b) a question: the agent answers it briefly in the chat, then goes on; (c) a change of plan or scope:
+        the agent finishes the edit in hand, and the runner asks in words (chat + Inbox): now, after this step, or as a
+        new step; (d) stop or pause words: as the buttons. No answer within a set wait (setting, default 10 min): the
+        safe default (never destructive), e.g. finish the step and add the request as a new step, and it says what it
+        chose. The step's log keeps each message and how it was handled. No more pausing a step only because the agent
+        went quiet after the owner's message (stopgap in 0.1.22: it is told to go on). Scenario tests first.
       Owner findings to fix with R2 (2026-11-14, installed 0.1.21):
       - [ ] A held step's Inbox question says only "is blocked / it needs you" (PLAN-F 97a, held by the 0.1.20 run
         after two turned-down reviews). The question must say why it was held (who held it, the review's reason or
