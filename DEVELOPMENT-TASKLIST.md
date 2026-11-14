@@ -371,7 +371,8 @@ runs on or off; with it off nothing is sent anywhere.
     publish 0.1.20 yet.
     RESUME HERE (newest, 2026-11-14 night): R2a DONE (see 24z "R2a DONE"). PLAN-F reran on 0.1.21: 97a-1 done, the
     rest skipped by the Needs-label bug (R2 findings); the plan file was fixed by hand (Needs point at 97a-1...97a-4,
-    old skip lines removed) and the owner reruns it. NEXT: R2b (the agent turn and its fix rounds on RunEnv) in a
+    old skip lines removed) and the owner reruns it. NEXT: R2b (the agent turn and its fix rounds on RunEnv, plus
+    the process-tree stop agreed today) in a
     fresh conversation; check free RAM before builds and run verify in parts.
     RESUME HERE (before, 2026-11-14 late): R2 PRE-FIX DONE (see 24z "R2 PRE-FIX"): reviews from Qanuvi's own
     snapshots (git optional per project), empty-diff rule, free replan numbers, replaced steps never held, skip-twice
@@ -758,6 +759,12 @@ runs on or off; with it off nothing is sent anywhere.
         in memory). runner/scenarios.rs: the 10 scenarios ported, #[ignore] until R2c connects the `Run` hook.
         Verify: 400 TS + 312 Rust (11 ignored), clippy and svelte-check clean. Runs were done under a memory guard
         (scratchpad guard.ps1): the first full verify hit low virtual memory and blacked out the installed Qanuvi.
+      - [ ] R2b also (owner agreed 2026-11-14): stopping an agent session stops its whole process tree. Today
+        Agents::stop does child.kill(), which on Windows ends only the agent process; a non-lean session's MCP
+        servers (node: Playwright, web research) stay running after idle close (10 min), Stop and app exit. Use
+        checks::kill_group (taskkill /T on Windows, the process group elsewhere) in stop, stop_project and stop_all,
+        with a test that starts a process with a child and checks both are gone. Seen live: 21 old agent chats in
+        the owner's VS Code held about 5.5 GB (each with 4 MCP node processes).
       Owner findings to fix with R2 (2026-11-14, installed 0.1.21):
       - [ ] A held step's Inbox question says only "is blocked / it needs you" (PLAN-F 97a, held by the 0.1.20 run
         after two turned-down reviews). The question must say why it was held (who held it, the review's reason or
