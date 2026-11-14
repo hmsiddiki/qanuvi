@@ -24,6 +24,7 @@
   } from "$lib/plan/runner";
   import { freeWorks, type TeamMode } from "$lib/core/decider";
   import { loadPlanNotes, runSettingsKey, savePlanNotes } from "$lib/plan/guidance";
+  import { planData } from "$lib/plan/planData.svelte";
   import {
     changeDecided,
     holdWording,
@@ -155,7 +156,7 @@
   }
   function restore(): boolean {
     try {
-      const k = JSON.parse(localStorage.getItem(KEY()) ?? "null") as Partial<Kept> | null;
+      const k = JSON.parse(planData.getItem(KEY()) ?? "null") as Partial<Kept> | null;
       if (!k) return false;
       if (k.providerId && usable.some((p) => p.id === k.providerId)) providerId = k.providerId;
       const p = providerById(providerId || agent.runProviderId);
@@ -215,7 +216,7 @@
       stepMin,
       finishAuto,
     };
-    localStorage.setItem(KEY(), JSON.stringify(k));
+    planData.setItem(KEY(), JSON.stringify(k));
   }
 
   /** Another agent: its own models and modes. */

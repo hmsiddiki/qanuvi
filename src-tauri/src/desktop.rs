@@ -1841,6 +1841,47 @@ fn inbox_import(
     Ok(n)
 }
 
+// What a plan keeps between runs (24z R2a): every change is told to every window ("qanuvi-plan-data"), so each keeps
+// the same copy; the runner in the core writes the same rows.
+fn plan_data_changed(
+    app: &tauri::AppHandle,
+    project_id: &str,
+    file: &str,
+    kind: crate::plan_data::Kind,
+    value: &serde_json::Value,
+) {
+    let _ = tauri::Emitter::emit(
+        app,
+        "qanuvi-plan-data",
+        serde_json::json!({"project_id": project_id, "file": file, "kind": kind, "value": value}),
+    );
+}
+
+#[tauri::command]
+fn plan_data_list(state: State<AppState>) -> Res<Vec<crate::plan_data::Entry>> {
+    crate::plan_data::list(&state.db)
+}
+
+#[tauri::command]
+fn plan_data_set(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    project_id: String,
+    file: String,
+    kind: crate::plan_data::Kind,
+    value: serde_json::Value,
+) -> Res<()> {
+    let kept = crate::plan_data::set(&state.db, &project_id, &file, kind, &value)?;
+    let value = kept.map(|e| e.value).unwrap_or(serde_json::Value::Null);
+    plan_data_changed(&app, &project_id, &file, kind, &value);
+    Ok(())
+}
+
+#[tauri::command]
+fn plan_data_import(state: State<AppState>, entries: Vec<crate::plan_data::Entry>) -> Res<usize> {
+    crate::plan_data::import(&state.db, &entries)
+}
+
 #[tauri::command]
 fn runs_list_all(state: State<AppState>, limit: usize) -> Res<Vec<runs::RunRecord>> {
     runs::list_all(&state.db, limit)
@@ -2242,6 +2283,9 @@ pub fn run() {
             inbox_remove,
             inbox_clear,
             inbox_import,
+            plan_data_list,
+            plan_data_set,
+            plan_data_import,
             agent_usage_since,
             agent_config_list,
             agent_config_read,

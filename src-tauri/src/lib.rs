@@ -32,6 +32,7 @@ pub mod notify;
 pub mod omniroute;
 pub mod paths;
 pub mod plan;
+pub mod plan_data;
 pub mod preview;
 pub mod projects;
 pub mod relay;

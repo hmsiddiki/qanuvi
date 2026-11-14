@@ -242,7 +242,7 @@ pub fn remove(db: &Db, id: &str) -> Result<(), String> {
     db.conn()
         .execute("DELETE FROM projects WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;
-    Ok(())
+    crate::plan_data::forget_project(db, id)
 }
 
 pub fn update(

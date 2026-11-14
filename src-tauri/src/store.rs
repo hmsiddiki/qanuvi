@@ -198,6 +198,25 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 9 {
+        // What a plan keeps between runs (24z R2a), once in the window's localStorage: the decider's model picks, the
+        // plan state (holds, answers, closings, decisions, extra checks), the plan's notes and its run settings. In the
+        // core, so a run going on without the window reads and writes the same. No reference to projects: a master's
+        // projects are not in this computer's list, and their window copy is kept here as localStorage kept it.
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE plan_data (
+                 project_id TEXT NOT NULL,
+                 file TEXT NOT NULL,
+                 kind TEXT NOT NULL,
+                 value TEXT NOT NULL,
+                 updated_at INTEGER NOT NULL,
+                 PRIMARY KEY (project_id, file, kind)
+             );
+             PRAGMA user_version = 9;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -220,7 +239,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

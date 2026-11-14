@@ -49,6 +49,7 @@
   import { modelLabel, providerById } from "$lib/agents/providers";
   import { chooseModel, jobType, monthStart, type ModelStats } from "$lib/plan/routing";
   import { loadPicks, pickFor } from "$lib/plan/picks";
+  import { planData } from "$lib/plan/planData.svelte";
   import BrainCircuit from "@lucide/svelte/icons/brain-circuit";
   import { formatCost } from "$lib/agent/events";
 
@@ -138,7 +139,8 @@
   /** The decider's picks the owner asked for ("Pick models"), kept on this computer for this plan. */
   let picks = $derived.by(() => {
     void runner.picksSaved;
-    return file ? loadPicks(localStorage, project.id, file) : null;
+    void planData.changed;
+    return file ? loadPicks(planData, project.id, file) : null;
   });
   let pickNote = $state("");
   async function pickModels() {

@@ -5,6 +5,7 @@
 pub mod compare;
 pub mod costs;
 pub mod decider;
+pub mod env;
 pub mod finishing;
 pub mod guidance;
 pub mod holdask;

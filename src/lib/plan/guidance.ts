@@ -4,6 +4,8 @@
  * When nobody writes, the plan runs as it was set.
  */
 
+import { planData } from "./planData.svelte";
+
 /** Where the note starts in a sent message (the stored and shown message is the user's words only). */
 export const GUIDE_MARK = "\n\n(Qanuvi: the user wrote this while you work on step ";
 
@@ -92,8 +94,8 @@ export function runSettingsKey(projectId: string, file: string): string {
 export function keepRunSetting(projectId: string, file: string, patch: Record<string, unknown>): void {
   try {
     const key = runSettingsKey(projectId, file);
-    const now = JSON.parse(localStorage.getItem(key) ?? "{}");
-    localStorage.setItem(key, JSON.stringify({ ...now, ...patch }));
+    const now = JSON.parse(planData.getItem(key) ?? "{}");
+    planData.setItem(key, JSON.stringify({ ...now, ...patch }));
   } catch {
     // Kept settings are a help; the run goes on without them.
   }
@@ -292,7 +294,7 @@ function planNotesKey(projectId: string, file: string): string {
 
 export function loadPlanNotes(projectId: string, file: string): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(planNotesKey(projectId, file)) ?? "[]");
+    const v = JSON.parse(planData.getItem(planNotesKey(projectId, file)) ?? "[]");
     return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
   } catch {
     return [];
@@ -301,7 +303,7 @@ export function loadPlanNotes(projectId: string, file: string): string[] {
 
 export function savePlanNotes(projectId: string, file: string, notes: string[]): void {
   try {
-    localStorage.setItem(planNotesKey(projectId, file), JSON.stringify(notes.slice(-60)));
+    planData.setItem(planNotesKey(projectId, file), JSON.stringify(notes.slice(-60)));
   } catch {
     // Notes are a help; the run goes on without them.
   }

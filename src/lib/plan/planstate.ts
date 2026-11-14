@@ -1,3 +1,4 @@
+import { planData } from "./planData.svelte";
 import type { DecidedForYou } from "./preflight";
 
 /**
@@ -56,7 +57,7 @@ function planStateKey(projectId: string, file: string): string {
 
 export function loadPlanState(projectId: string, file: string): PlanState {
   try {
-    const v = JSON.parse(localStorage.getItem(planStateKey(projectId, file)) ?? "null") as Partial<PlanState> | null;
+    const v = JSON.parse(planData.getItem(planStateKey(projectId, file)) ?? "null") as Partial<PlanState> | null;
     return {
       holds: Array.isArray(v?.holds) ? v.holds.filter((h) => typeof h?.step === "string") : [],
       answers: Array.isArray(v?.answers) ? v.answers.filter((a) => typeof a?.step === "string") : [],
@@ -83,8 +84,8 @@ export function savePlanState(projectId: string, file: string, state: PlanState)
       !state.decided.length &&
       !state.checks.length
     )
-      localStorage.removeItem(key);
-    else localStorage.setItem(key, JSON.stringify(state));
+      planData.removeItem(key);
+    else planData.setItem(key, JSON.stringify(state));
   } catch {
     // A help only: without it a later run asks again.
   }

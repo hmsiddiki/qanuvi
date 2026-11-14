@@ -908,3 +908,9 @@ pub fn paid_per_step(stats: &super::routing::Stats) -> HashMap<String, f64> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) mod fake;
+
+#[cfg(test)]
+mod scenarios;

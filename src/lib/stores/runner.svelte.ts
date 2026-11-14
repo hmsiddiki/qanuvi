@@ -101,6 +101,7 @@ import {
   type ModelStats,
 } from "$lib/plan/routing";
 import { loadPicks, pickFor, savePicks, type SavedPicks } from "$lib/plan/picks";
+import { planData } from "$lib/plan/planData.svelte";
 import {
   assignPrompt,
   freeWorks,
@@ -940,7 +941,7 @@ class RunnerStore {
           this.#decide(run, { kind: "assign", by, subject: `Step ${a.number}`, decision: a.worker, why: a.why });
         }
       }
-      const saved = oneModel ? null : loadPicks(localStorage, project.id, file);
+      const saved = oneModel ? null : loadPicks(planData, project.id, file);
       for (const b of briefs) {
         const p = pickFor(saved, b, provider.id);
         if (!p?.model) continue;
@@ -2209,7 +2210,7 @@ class RunnerStore {
             ...(a.model ? { model: a.model } : {}),
           };
       }
-      savePicks(localStorage, project.id, file, saved);
+      savePicks(planData, project.id, file, saved);
       this.picksSaved++;
       return `Picked by ${by} for ${list.length} step${list.length === 1 ? "" : "s"}.`;
     } catch (e) {

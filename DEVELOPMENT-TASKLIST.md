@@ -369,7 +369,11 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-14 late): R2 PRE-FIX DONE (see 24z "R2 PRE-FIX"): reviews from Qanuvi's own
+    RESUME HERE (newest, 2026-11-14 night): R2a DONE (see 24z "R2a DONE"). PLAN-F reran on 0.1.21: 97a-1 done, the
+    rest skipped by the Needs-label bug (R2 findings); the plan file was fixed by hand (Needs point at 97a-1...97a-4,
+    old skip lines removed) and the owner reruns it. NEXT: R2b (the agent turn and its fix rounds on RunEnv) in a
+    fresh conversation; check free RAM before builds and run verify in parts.
+    RESUME HERE (before, 2026-11-14 late): R2 PRE-FIX DONE (see 24z "R2 PRE-FIX"): reviews from Qanuvi's own
     snapshots (git optional per project), empty-diff rule, free replan numbers, replaced steps never held, skip-twice
     fix, and the standing runner scenarios (10) + snapshot layout tests. Driven live in a test build, then PUBLISHED
     0.1.21 on the dev channel (owner: "test then publish anyway"; QANUVI_RELEASE_ANYWAY=1). PLAN-F cleaned (colliding
@@ -741,6 +745,30 @@ runs on or off; with it off nothing is sent anywhere.
       settings into Rust now); master runs without a credential store say so in the step and go on (a master store
       later); the TypeScript plan files and the comparison check stay until nothing imports them. Note: migration 8 is
       the Inbox, so the queue (R3) is migration 10.
+      - [x] R2a DONE 2026-11-14: migration 9 `plan_data` (project, file, kind = picks/state/notes/run, JSON value; no
+        reference to projects, so a master's projects keep their window copy; removed with its project); plan_data.rs
+        (typed load/save for the runner, notes kept to 60, run settings patch, one-time import where the database
+        wins); commands plan_data_list/set/import and the "qanuvi-plan-data" event. Window: plan/planData.svelte.ts,
+        a copy that reads at once and writes through (same keys as localStorage had, so planstate.ts, guidance.ts,
+        picks, RunPanel and PlanView only swapped localStorage for it; an older echo never undoes a newer write;
+        started first in +page). plan/env.rs: the RunEnv trait (files, snapshots, agent turn that waits for the turn's
+        end, checks, usage, run records, Inbox, plan data, memory slice, project settings), CoreEnv over the real
+        core, memory_context and ask_planner (read-only turn, memory slice, stopped after, errors as the window).
+        runner/fake.rs: the stand-ins (port of fakeCore.ts; Inbox and plan data are the real modules on a database
+        in memory). runner/scenarios.rs: the 10 scenarios ported, #[ignore] until R2c connects the `Run` hook.
+        Verify: 400 TS + 312 Rust (11 ignored), clippy and svelte-check clean. Runs were done under a memory guard
+        (scratchpad guard.ps1): the first full verify hit low virtual memory and blacked out the installed Qanuvi.
+      Owner findings to fix with R2 (2026-11-14, installed 0.1.21):
+      - [ ] A held step's Inbox question says only "is blocked / it needs you" (PLAN-F 97a, held by the 0.1.20 run
+        after two turned-down reviews). The question must say why it was held (who held it, the review's reason or
+        the last error, attempts and cost) and what each answer does, in plain words. Build it into the Rust holds.
+      - [ ] Right-click > Paste in the Inbox closes the Inbox: Sidebar.svelte closes the popover on any pointerdown
+        outside `.inbox-pop`, and the right-click menu (`.cmenu`) is drawn outside it. Treat `.cmenu` as inside,
+        and check that the pasted text lands in the answer box.
+      - [ ] PLAN-F rerun on 0.1.21 (22:01-22:17): the replan renamed the planner's 97a1-97a4 to 97a-1-97a-4 but
+        left their Needs lines as "Needs: 97a1" etc., so 97a-2-97a-4 were skipped as "needs step 97a1, which is not
+        done", and 97b-97z after them. The renumbering must rewrite Needs lines inside the replacement steps too
+        (and accept the planner's own label as the same step). Add a scenario first.
     - [ ] R3: the queue (DB table, migration 8): tasks and whole plans, one after another per project, side by side
       across projects, holds and answers per plan, a hook for the paid monitor (24e, built later).
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,

@@ -33,6 +33,7 @@
   import { terminals } from "$lib/stores/terminals.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
+  import { planData } from "$lib/plan/planData.svelte";
   import { startNotifications } from "$lib/stores/notify.svelte";
   import { ui } from "$lib/stores/ui.svelte";
   import { untrack } from "svelte";
@@ -46,6 +47,8 @@
   onMount(() => {
     layout.load();
     settings.load();
+    // First: what plans keep (picks, plan state, notes, run settings) reads at once from its copy.
+    planData.start().catch(() => {});
     ready = true;
     platform.load();
     // A project window opens with its own project and leaves the main window's choice alone.
