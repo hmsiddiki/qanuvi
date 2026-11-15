@@ -66,6 +66,8 @@
 
   const order = ["pc", "local", "openrouter", "omniroute", "done"] as const;
   function next() {
+    // An earlier step's install result stays only while its terminal is still shown.
+    if (!installing) outcome = "";
     const i = order.indexOf(step);
     for (const s of order.slice(i + 1)) {
       if (s === "done" || want[s as keyof typeof want]) {
@@ -126,8 +128,10 @@
       outcome += ` Qanuvi does not find it yet: restart Qanuvi on ${place} so it sees the new program.`;
   }
 
+  /** The terminal goes and what the install ended with goes with it. */
   function closeInstall() {
     installing = null;
+    outcome = "";
   }
 
   async function lookAgain() {

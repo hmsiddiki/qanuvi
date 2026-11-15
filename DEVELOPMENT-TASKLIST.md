@@ -386,8 +386,13 @@ runs on or off; with it off nothing is sent anywhere.
     install terminal, a Linux or Mac master. FOUND, small, waiting for the owner: (a) the status bar's month-cost
     tooltip still says "Agent cost this month (all sessions on this computer)" while a master is shown; (b) the
     wizard's outcome line ("Ollama was not installed (exit code 1) ...") stays after "Close the terminal" and on the
-    next steps (closeInstall clears installing only, not outcome). NEXT: the owner's answer on (a)/(b), then D3
-    (backups + data folder) in a fresh conversation.
+    next steps (closeInstall clears installing only, not outcome). UPDATE 20:10: owner said fix both and drive
+    them; FIXED and DRIVEN LIVE (release test build 19:56, same wrapper set-up, real master put back after, same
+    bytes). (a) StatusBar keeps the shown machine's name with each month-cost answer: "all sessions on this
+    computer" on This PC, the master's name with the master shown. (b) "Close the terminal" clears the outcome line;
+    moving to another step clears it only when no install terminal is shown (with the terminal still open the
+    result stays with it, checked on step 3). Green: prettier, svelte-check, 354 TS tests (Rust unchanged). NEXT:
+    D3 (backups + data folder) in a fresh conversation.
     RESUME HERE (before, 2026-11-15 19:30): 24z3 D2 BUILT (machine/setup + usage + notifications on the shown
     machine). Owner agreed: the status bar shows only the shown machine; every install runs the SAME way on every
     machine and system (This PC, desktop masters, servers): the wizard asks first with the exact command (and, when

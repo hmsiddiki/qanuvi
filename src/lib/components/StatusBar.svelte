@@ -31,11 +31,14 @@
   import { formatCost } from "$lib/agent/events";
   import { monthStart } from "$lib/plan/routing";
   import { remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import { shownPlace } from "$lib/remote";
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
 
   let menu = $state(false);
   let git = $state<GitStatus | null>(null);
   let monthCost = $state<number | null>(null);
+  /** Whose cost it is ("this computer" or the master's name), kept with the answer it came with. */
+  let costPlace = $state("this computer");
 
   function show(view: Place) {
     menu = false;
@@ -66,9 +69,13 @@
   $effect(() => {
     void agent.turnsEnded;
     if (!settings.value.ai) return;
+    const place = shownPlace();
     api.usage
       .since(monthStart())
-      .then((u) => (monthCost = u.cost_usd))
+      .then((u) => {
+        monthCost = u.cost_usd;
+        costPlace = place;
+      })
       .catch(() => (monthCost = null));
   });
 
@@ -272,7 +279,7 @@
       <button
         type="button"
         class="item"
-        title="Agent cost this month (all sessions on this computer)"
+        title="Agent cost this month (all sessions on {costPlace})"
         onclick={() => show("agents")}
       >
         <Bot size={12} />
