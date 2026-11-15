@@ -459,6 +459,84 @@ fn a_blocked_step_goes_to_the_inbox_the_run_waits_and_an_answer_lets_it_go_on() 
 }
 
 #[test]
+fn a_step_blocked_again_after_the_answer_asks_again_as_a_new_question() {
+    let env = world("# Plan\n\n- [ ] **1. Needs a login**\n");
+    let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let t = tries.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        // The first two tries block with the very same words; the third (after the second answer) is done.
+        if t.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 2 {
+            c.env.mark(FILE, "1", '!');
+            let text = c.env.text(FILE).replace(
+                "**1. Needs a login**",
+                "**1. Needs a login**\n  - Blocked: the admin login is missing",
+            );
+            c.env.put(FILE, &text);
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    let open_question = |env: &FakeEnv| {
+        env.inbox()
+            .into_iter()
+            .find(|i| i.kind_of == "answer" && i.status == "open")
+    };
+    let wait_for = |what: &str, f: &dyn Fn() -> bool| {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while !f() {
+            assert!(std::time::Instant::now() < until, "{what}");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    };
+    wait_for("the first question never came", &|| {
+        open_question(&env).is_some()
+    });
+    let first = open_question(&env).unwrap();
+    env.answer(
+        first.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "try again"}),
+    );
+    // Blocked again with the same words: a new, open question (so the owner is told again), never the answered one.
+    wait_for("the second question never came", &|| {
+        open_question(&env).is_some_and(|q| q.id != first.id)
+    });
+    let second = open_question(&env).unwrap();
+    assert_eq!(second.key, first.key);
+    assert!(second.answer.is_none());
+    assert_eq!(
+        env.inbox().iter().filter(|i| i.kind_of == "answer").count(),
+        1,
+        "the answered question went; only the new one is there"
+    );
+    env.answer(
+        second.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "the login is admin now"}),
+    );
+    let r = running.wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(
+        env.prompts()
+            .last()
+            .unwrap()
+            .1
+            .contains("the login is admin now")
+    );
+}
+
+#[test]
 fn failing_tests_go_back_to_the_same_session_with_only_the_failures_then_pass() {
     let env = world("# Plan\n\n- [ ] **5. Coupon rule**\n");
     let fixed = Arc::new(std::sync::atomic::AtomicBool::new(false));

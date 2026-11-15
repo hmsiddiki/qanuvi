@@ -2801,6 +2801,12 @@ impl<'a> Loop<'a> {
             .map(|n| format!("{n}. "))
             .unwrap_or_default();
         let pid = self.env.project_id().to_string();
+        // Blocked or not finished after a try is a new question, even in the same words: an earlier answered one goes
+        // first, so the Inbox never takes it for the old question asked again (no notification, old answer shown).
+        // A hold asked again at a run's start keeps the owner's first answer.
+        if kind != HeldKind::Hold {
+            let _ = self.env.inbox_resolve(&self.hold_key(&k));
+        }
         let _ = self.env.inbox_add(&NewItem {
             kind_of: "answer".into(),
             kind: "run".into(),

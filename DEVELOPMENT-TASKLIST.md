@@ -369,7 +369,23 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 02:55): the "Decided for you" fold DRIVEN LIVE, FAILS at a step change
+    RESUME HERE (newest, 2026-11-16 03:30): fold FIXED (owner: "yes fix it and continue") and DRIVEN LIVE, all
+    pass (release test build, scratch projl/PLAN-L.md, Haiku 5.5, about $0.05). The core's PlanState keeps
+    decidedFolded (serde "decidedFolded", from_json reads it, prune keeps it capped to the kept choices; new Rust
+    test). Live: 4 choices decided, folded in 1a, stayed folded through 1b, 1z, the run's end and a window restart; a
+    new step 1c with one new choice: "Decided for you (5)" opened by itself. Also (owner, screenshot): the agent chip
+    "· switching after the edit in hand" wrapped each part into a column in a narrow pane; now the chip is one line
+    (model text cut with "…", full text in its tooltip) and the note reads "· switching…" (the long words in its
+    tooltip); driven live in a narrow pane. Also (owner): a step that needed them a SECOND time sent no Windows or
+    Inbox notification. Read from the DB (qpfixbase TINYCODE step 8): blocked twice on Haiku, asked once 20:45Z,
+    answered in the Inbox 20:52Z ("Try again"), nothing ran until the run panel answer 20:58Z; the installed 0.1.22
+    (11-14) still runs the OLD window runner. Today's core runner wakes on an Inbox answer and removes the answered
+    question, so a second block is a new question with a notification (new scenario test proves it). Guard added: a
+    step blocked or not finished after a try clears any earlier question of the step before asking, so inbox add_new
+    can never take it for "the same question asked again" (it skips the notification and shows the old answer);
+    holds asked again at a run's start keep the owner's first answer. Green: 406 Rust, 377 TS, svelte-check 0/0.
+    NEXT: D4 leftovers (Claude Code version on the master's Agents page; VPS with the new server build), then D5.
+    RESUME HERE (before, 2026-11-16 02:55): the "Decided for you" fold DRIVEN LIVE, FAILS at a step change
     (release test build 02:45, scratch projk/PLAN-K.md, Haiku 5.5, $0.02, 3 of 3 done, 4/4 tests). The check
     decided 1a (date format) and 1b (slug rules); "Decided for you (2)" opened, folded during 1a, stayed folded
     when the plan reloaded (1/3); when the run moved to 1b it OPENED AGAIN with no new choice. Cause: the core's

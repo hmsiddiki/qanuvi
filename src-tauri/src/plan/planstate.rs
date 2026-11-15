@@ -70,6 +70,14 @@ pub struct PlanState {
     /// The models the owner chose for steps in Qanuvi (R2e i), kept here, not in the plan file.
     #[serde(default)]
     pub models: Vec<KeptModel>,
+    /// The owner folded "Decided for you" when it held this many choices; a choice added later opens it again.
+    /// Set by the window; the core keeps it as it is, so its writes never undo the fold.
+    #[serde(
+        rename = "decidedFolded",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub decided_folded: Option<u64>,
 }
 
 /// The model the owner chose for a step in Qanuvi (`KeptModel`).
@@ -150,6 +158,7 @@ impl PlanState {
                         .and_then(Value::as_str)
                         .is_some_and(|m| !m.is_empty())
             }),
+            decided_folded: v.get("decidedFolded").and_then(Value::as_u64),
         }
     }
 }
@@ -205,7 +214,7 @@ pub fn keep_answer(
 /// Drops what belongs to steps no longer open (done, or gone from the plan); a closing record stays while its
 /// closing step is in the plan and something is still waiting or done late. `all`: every step in the plan.
 pub fn prune_state(state: &PlanState, open: &HashSet<String>, all: &HashSet<String>) -> PlanState {
-    PlanState {
+    let mut out = PlanState {
         holds: state
             .holds
             .iter()
@@ -265,7 +274,13 @@ pub fn prune_state(state: &PlanState, open: &HashSet<String>, all: &HashSet<Stri
             })
             .filter(|c| !c.waiting.is_empty() || !c.late.is_empty())
             .collect(),
-    }
+        decided_folded: None,
+    };
+    // The fold stays; it never counts more choices than are kept, so a choice added later still opens it.
+    out.decided_folded = state
+        .decided_folded
+        .map(|n| n.min(out.decided.len() as u64));
+    out
 }
 
 /// A closing step finished: what of its section is still set aside is what it waits for now; late ones are seen.
@@ -559,5 +574,32 @@ mod tests {
         assert_eq!(s.decided.len(), 1);
         assert!(PlanState::from_json(&json!(null)).is_empty());
         assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn keeps_the_owners_fold_of_decided_for_you() {
+        let d = |step: &str| json!({ "step": step, "what": "w", "answer": "a", "because": "", "at": 1 });
+        let stored = json!({ "decided": [d("1a"), d("1b")], "decidedFolded": 2 });
+        let s = PlanState::from_json(&stored);
+        assert_eq!(s.decided_folded, Some(2));
+        // The core's write keeps it under the window's name; a step's work in between does not drop it.
+        let s = mark_late(&s, "1a");
+        let saved = serde_json::to_value(&s).unwrap();
+        assert_eq!(saved["decidedFolded"], 2);
+        assert_eq!(PlanState::from_json(&saved).decided_folded, Some(2));
+        // Pruning keeps it, never above the choices still kept (so a new choice still opens the list).
+        let p = prune_state(&s, &set(&["1b"]), &set(&["1a", "1b"]));
+        assert_eq!(p.decided_folded, Some(2));
+        let p = prune_state(&s, &set(&[]), &set(&["1b"]));
+        assert_eq!((p.decided.len(), p.decided_folded), (1, Some(1)));
+        // Never folded: nothing is written for it.
+        let open = PlanState::from_json(&json!({ "decided": [d("1a")] }));
+        assert_eq!(open.decided_folded, None);
+        assert!(
+            serde_json::to_value(&open)
+                .unwrap()
+                .get("decidedFolded")
+                .is_none()
+        );
     }
 }

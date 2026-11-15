@@ -1145,20 +1145,23 @@ With the agent now: a message it has cannot be taken back.`}
     <button
       type="button"
       class="agent-chip"
-      title="Choose the model ({agent.provider.name})"
+      title="Choose the model ({agent.provider.name} · {modelLabel(agent.provider, agent.model)}{agent.provider.efforts
+        .length
+        ? ` · ${agent.effort}`
+        : ''})"
       onpointerdown={(e) => e.stopPropagation()}
       onclick={() => (commandsOpen = !commandsOpen)}
     >
       <span class="badge" style:background={agent.provider.color}>{agent.provider.badge}</span>
       <span>{agent.provider.name}</span>
-      <span class="dim"
+      <span class="dim model"
         >· {modelLabel(agent.provider, agent.model)}{agent.provider.efforts.length ? ` · ${agent.effort}` : ""}</span
       >
       {#if runner.switchingTo && agent.onPlanStep}
         <span
-          class="dim"
-          title="The agent at work finishes the edit in hand and writes a progress note; the picked model goes on from it"
-          >· switching after the edit in hand</span
+          class="dim switching"
+          title="Switching after the edit in hand: the agent at work finishes it and writes a progress note; the picked model goes on from it"
+          >· switching…</span
         >
       {/if}
     </button>
@@ -2203,6 +2206,26 @@ With the agent now: a message it has cannot be taken back.`}
     font: inherit;
     font-size: var(--qx-text-small);
     cursor: pointer;
+    /* One line always: a narrow pane cuts the model text with "…" instead of wrapping each part into a column. */
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .agent-chip > span {
+    flex-shrink: 0;
+  }
+
+  .agent-chip > .model {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agent-chip > .switching {
+    color: var(--qx-accent);
   }
 
   .agent-chip:hover {
