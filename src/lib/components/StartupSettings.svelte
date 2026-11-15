@@ -133,7 +133,7 @@
         ><input
           type="checkbox"
           checked={it.enabled}
-          onchange={(e) => update(it.id, { enabled: e.currentTarget.checked })}
+          onchange={(e) => void startup.setEnabled(it.id, e.currentTarget.checked)}
         /> On</label
       >
       <button type="button" class="btn" disabled={!it.enabled} onclick={() => startup.restart(it)}>Restart</button>

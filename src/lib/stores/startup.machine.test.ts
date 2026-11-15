@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 // 24z3 D4: Start-up and Claude Code's version follow the shown machine; an answer from the one before is dropped.
 vi.mock("@tauri-apps/api/core", () => ({ Channel: class {}, invoke: vi.fn() }));
+const kept = new Map<string, string>();
+vi.stubGlobal("localStorage", {
+  getItem: (k: string) => kept.get(k) ?? null,
+  setItem: (k: string, v: string) => void kept.set(k, v),
+  removeItem: (k: string) => void kept.delete(k),
+  clear: () => kept.clear(),
+});
 
 const { invoke: rawInvoke } = await import("@tauri-apps/api/core");
 const invoke = vi.mocked(rawInvoke);
@@ -66,5 +73,33 @@ describe("Claude Code's version on the shown machine", () => {
     await running;
     expect(claudeUpdate.note).toBe("");
     expect(claudeUpdate.busy).toBe(false);
+  });
+});
+
+describe("the On box", () => {
+  it("off stops it now and keeps it off; on starts it now", async () => {
+    const { settings } = await import("./settings.svelte");
+    const calls: string[] = [];
+    invoke.mockImplementation((cmd, args) => {
+      calls.push(cmd === "remote_call" ? (args as { cmd: string }).cmd : cmd);
+      return Promise.resolve([]);
+    });
+    showMachine(null);
+    settings.set("startup", [{ id: "hr", name: "Headroom", command: "headroom proxy", waitFor: "", enabled: true }]);
+    calls.length = 0;
+    await startup.setEnabled("hr", false);
+    expect(calls[0]).toBe("startup_stop");
+    expect(invoke).toHaveBeenCalledWith("startup_stop", { id: "hr" });
+    expect(settings.value.startup).toEqual([expect.objectContaining({ id: "hr", enabled: false })]);
+    // Nothing turned on is started by the off box.
+    expect(invoke).toHaveBeenLastCalledWith("startup_start", { items: [] });
+
+    calls.length = 0;
+    await startup.setEnabled("hr", true);
+    expect(calls).not.toContain("startup_stop");
+    expect(invoke).toHaveBeenLastCalledWith("startup_start", {
+      items: [expect.objectContaining({ id: "hr", enabled: true })],
+    });
+    expect(settings.value.startup).toHaveLength(1);
   });
 });

@@ -46,6 +46,17 @@ class StartupStore {
     return this.#ask("startup_stop", { id });
   }
 
+  /**
+   * The On box on the page. Off stops it now when Qanuvi started it (one started by hand is left alone), so the
+   * page never says "off" while it still runs; on starts it now.
+   */
+  async setEnabled(id: string, on: boolean): Promise<void> {
+    const next = settings.value.startup.map((i) => (i.id === id ? { ...i, enabled: on } : i));
+    if (!on) await this.stop(id);
+    settings.set("startup", next);
+    await this.apply();
+  }
+
   status(id: string): StartupStatus | undefined {
     return this.statuses.find((s) => s.id === id);
   }

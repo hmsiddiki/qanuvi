@@ -369,7 +369,15 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 02:10): the start-up list bug FIXED (owner: "proposed fix is fine") and
+    RESUME HERE (newest, 2026-11-16 02:30): the On box (owner: "your proposal is just fine do it") BUILT AND
+    DRIVEN LIVE. Unticking On stops the command now when Qanuvi (or the master) started it; one started by hand is
+    left alone (Rust stop only ends a child it owns); ticking On starts it now (startup.setEnabled; new test in
+    startup.machine.test.ts). Live with the master shown: off -> the process under the master ended, grey dot, "off",
+    no "Answering", gone from the status bar; on -> a new process under the master, "running", back in the status
+    bar. Green: 375 TS tests, svelte-check 0/0, prettier; no Rust change. Test lists emptied after. R7 (plan notes
+    box) added as a task. Owner asked (not to change yet): why "Decided for you" opens again on each step change.
+    Still OPEN for D4: Claude Code version on the master's Agents page, the VPS; then D5.
+    RESUME HERE (before, 2026-11-16 02:10): the start-up list bug FIXED (owner: "proposed fix is fine") and
     driven live. parseSettings gives `startup` its own array (as agents/rules/masters); two new tests in
     settings.test.ts (each parse its own list, never growing or shared; turning one off keeps one entry), both
     fail without the fix. Green: 374 TS tests, svelte-check 0/0, prettier; no Rust change. Live (release test build
@@ -1522,6 +1530,19 @@ runs on or off; with it off nothing is sent anywhere.
       start-up check for leftovers of an earlier run. OWNER RULE: the tray service (R4) keeps runs, the queue and other
       background work going with the window closed; cleanup must NEVER end what the tray service is still handling
       (its runs, agents, terminals, servers, its own core) — only processes no living part of Qanuvi owns.
+    - [ ] R7 (owner asked 2026-11-16, not built; order to agree): "Notes for this plan" on the Run the plan screen. A
+      plain text box (several lines) where the owner writes anything every step should know, in their own words: a
+      MySQL user and password for the test database, a URL, "never touch the live site", and so on. Plain text is fine:
+      it is the easy way when the owner does not want to set env variables in the project's properties.
+      Proposed shape: it builds on the plan's existing PRIVATE DETAILS (logins kept in Windows' credential store, given
+      to every step as is, never sorted by a model, "Forget", forgotten when the plan is finished if ticked): the box
+      is one more private detail, so a password in it is kept the same safe way, NEVER in the plan file, FACTS.md,
+      the plan's memory, the database or git. On a master it is kept on that machine (24z3). Every step's prompt gets
+      it as one block ("Notes from the owner for this plan: ..."), on every agent and model, the decider too; a change
+      during a run applies from the next step. A short line under the box: "Kept with this plan in <machine>'s
+      credential store, not in the plan file or git; every step gets it." Left out of logs and Inbox texts. To check
+      when building: where a Linux/macOS master keeps private details. Scenario: a note with a test DB login is set,
+      step 2 on another model connects with it; the plan file and git show no trace of it.
 - [ ] **24z3. Machines: the window shows one machine at a time (owner, 2026-11-15; DESIGN MILESTONE, before R3;
   parts written out for the owner's review, nothing built yet)**: every Qanuvi is a machine ("This PC" too: the desktop
   runs the same core as a master). The work lives on a machine; the window owns no work, it shows one machine and
