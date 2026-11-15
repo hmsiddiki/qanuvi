@@ -369,7 +369,25 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 01:40): 24z3 D4 BUILT (start-up/Headroom + Claude Code updates on the shown
+    RESUME HERE (newest, 2026-11-16 01:50): 24z3 D4 DRIVEN LIVE on the local test master, PASS with one bug
+    found (release test build 01:41, scratch pc-proj/master-proj). Passed: with the master shown, Start-up names
+    "the Qanuvi master on DESKTOP-R8G3PAK (test)", "Start it with the Qanuvi master", that machine's Claude Code
+    proxy line; This PC's page keeps its own wording and its own (empty) list. A command added there (a node
+    listener waiting on 127.0.0.1:18911) runs as a child of the master's serve, "running" / "Answering at" read from
+    the master. Window closed: master and command keep running. Master ended (tree) and serve started by hand with no
+    window: the command started again by itself. Restart on the item: a new process under the master. Killing the
+    master drops the window back to This PC with "The connection ended ... connect again" (expected). NOT driven
+    yet: Claude Code version on the master's Agents page, the daily auto-update, the VPS (it still runs the
+    pre-D4 build: expect "cannot be done on basevm378 yet"). BUG (old, from 35b1d0d4 Start-up, shown by D4):
+    parseSettings copies DEFAULTS shallowly, so `s.startup.push` (settings.svelte.ts ~338) fills the SHARED
+    DEFAULTS.startup array; every parse adds the items again. Live: turning "On" off saved TWO entries with the same
+    id (one on, one off) to the master's DB, so the master started the command again on its next start; after that
+    the Start-up page would not render (keyed each with a duplicate id), and the list can leak from one machine to
+    another. Proposed fix (owner to agree): `startup: []` in the object made at line 275 (as agents/rules/masters),
+    a test that two parses never share or grow the list, then drive D4 again. Also seen (not D4, owner to decide):
+    turning a command Off only stops it starting next time; the running one keeps going and still shows green /
+    "Answering" / in the status bar, while the label says "off". Test master's start-up list emptied after.
+    RESUME HERE (before, 2026-11-16 01:40): 24z3 D4 BUILT (start-up/Headroom + Claude Code updates on the shown
     machine), NOT driven live. A master answers startup_start/status/restart/stop, startup_headroom,
     claude_settings_base_url, claude_versions, claude_update (master.rs; its own Startup). Each core starts its OWN
     start-up list from its own settings DB with no window needed: a master in serve (Master::start_own), This PC's app
