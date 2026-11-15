@@ -80,3 +80,25 @@ describe("notification settings (24u part 4, session B)", () => {
     expect(n).toEqual({ ...DEFAULT_NOTIFICATIONS, quietFrom: 1439, quietTo: 0 });
   });
 });
+
+describe("parseSettings: start-up list", () => {
+  const item = (id: string, enabled: boolean) => ({ id, name: id, command: "node x.js", waitFor: "", enabled });
+
+  it("gives every parse its own list, never growing or shared", () => {
+    const json = JSON.stringify({ startup: [item("a", true)] });
+    const first = parseSettings(json);
+    const second = parseSettings(json);
+    expect(first.startup).toHaveLength(1);
+    expect(second.startup).toHaveLength(1);
+    expect(second.startup).not.toBe(first.startup);
+    // Another machine's settings with no list never show the one parsed before.
+    expect(parseSettings(JSON.stringify({})).startup).toEqual([]);
+    expect(parseSettings(null).startup).toEqual([]);
+  });
+
+  it("keeps one entry per item when it is turned off", () => {
+    const on = parseSettings(JSON.stringify({ startup: [item("a", true)] }));
+    const off = parseSettings(JSON.stringify({ ...on, startup: on.startup.map((i) => ({ ...i, enabled: false })) }));
+    expect(off.startup).toEqual([{ ...item("a", false) }]);
+  });
+});

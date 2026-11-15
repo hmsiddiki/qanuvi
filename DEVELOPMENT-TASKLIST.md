@@ -369,7 +369,19 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 01:50): 24z3 D4 DRIVEN LIVE on the local test master, PASS with one bug
+    RESUME HERE (newest, 2026-11-16 02:10): the start-up list bug FIXED (owner: "proposed fix is fine") and
+    driven live. parseSettings gives `startup` its own array (as agents/rules/masters); two new tests in
+    settings.test.ts (each parse its own list, never growing or shared; turning one off keeps one entry), both
+    fail without the fix. Green: 374 TS tests, svelte-check 0/0, prettier; no Rust change. Live (release test build
+    02:03): command added on the master, Off saved ONE entry (enabled false) to the master's DB; master ended and
+    serve started by hand: the command did NOT start; the window reopened: the Start-up page renders the one card,
+    grey, "off"; Remove emptied the master's list; This PC's list stayed []. Seen once, left over from the buggy
+    build: at the first launch after the fix the window started the old leaked command from its cached copy of This
+    PC's settings (localStorage, applied before the machine's own settings are read); it rewrote the cache from the
+    DB and the next launch started nothing. Still OPEN for D4: Claude Code version on the master's Agents page, the
+    daily auto-update, the VPS (pre-D4 build there). Off-behaviour question asked to the owner (Off only stops the
+    next start; the running one keeps going).
+    RESUME HERE (before, 2026-11-16 01:50): 24z3 D4 DRIVEN LIVE on the local test master, PASS with one bug
     found (release test build 01:41, scratch pc-proj/master-proj). Passed: with the master shown, Start-up names
     "the Qanuvi master on DESKTOP-R8G3PAK (test)", "Start it with the Qanuvi master", that machine's Claude Code
     proxy line; This PC's page keeps its own wording and its own (empty) list. A command added there (a node

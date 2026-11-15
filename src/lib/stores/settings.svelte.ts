@@ -272,7 +272,8 @@ export function parseSettings(json: string | null): Settings {
   } catch {
     raw = {};
   }
-  const s: Settings = { ...DEFAULTS, agents: {}, rules: {}, masters: [] };
+  // Lists filled below get their own arrays: pushing into DEFAULTS' would share them between every parse.
+  const s: Settings = { ...DEFAULTS, agents: {}, rules: {}, masters: [], startup: [] };
   const disk = raw.memoryDisk && typeof raw.memoryDisk === "object" ? (raw.memoryDisk as Record<string, unknown>) : {};
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   s.memoryDisk = {
