@@ -101,7 +101,8 @@ impl Master {
         paths::set_data_dir(dir.to_path_buf());
         crate::model_keys::use_master_names();
         // A restore booked in Settings, Backups (24z3 D3): applied now, before the database opens.
-        if let Some(note) = crate::backups::apply_pending(dir, dir, None, None) {
+        if let Some(note) = crate::backups::apply_pending(dir, dir, None, Some(&backups_default()))
+        {
             eprintln!("{note}");
         }
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
@@ -436,32 +437,36 @@ impl Master {
                 self.terminals.kill(&s(args, "id"));
                 Ok(Value::Null)
             }
-            // Backups and the data folder (24z3 D3): the master's own. It has no default backups folder, so they are
-            // off until one is chosen on it; its pointer file is in its own data folder; the folder itself is set
-            // where it starts (--data or QANUVI_MASTER_DATA), so Settings only shows it.
+            // Backups and the data folder (24z3 D3): the master's own, on by default like the desktop app's (in
+            // Documents/Qanuvi master backups); its pointer file is in its own data folder; the data folder itself is
+            // set where it starts (--data or QANUVI_MASTER_DATA), so Settings only shows it.
             "backups_info" => {
                 let d = &self.dir;
-                to(Ok(crate::backups::info(d, d, None)))
+                to(Ok(crate::backups::info(d, d, Some(&backups_default()))))
             }
             "backups_set" => to(crate::backups::set(
                 &self.dir,
                 &s(args, "folder"),
                 args["off"].as_bool().unwrap_or(false),
             )),
-            "backups_now" => to(crate::backups::now_backup(&self.dir, None, None)),
+            "backups_now" => to(crate::backups::now_backup(
+                &self.dir,
+                None,
+                Some(&backups_default()),
+            )),
             "backups_restore" => {
                 let d = &self.dir;
                 to(crate::backups::book_restore(
                     d,
                     d,
-                    None,
+                    Some(&backups_default()),
                     Path::new(&s(args, "path")),
                 ))
             }
             "backups_cancel_restore" => to(crate::backups::cancel_restore(&self.dir)),
             "backups_remove" => to(crate::backups::remove_one(
                 &self.dir,
-                None,
+                Some(&backups_default()),
                 Path::new(&s(args, "path")),
             )),
             "data_location_info" => {
@@ -711,6 +716,11 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
     }
 }
 
+/// A master's default backups folder (a test build's has its own name, as in the desktop app).
+fn backups_default() -> PathBuf {
+    crate::backups::master_default_dir(crate::data_location::from_source())
+}
+
 /// Where the background service notes its address and token (readable by its user only).
 fn service_file(dir: &Path) -> PathBuf {
     dir.join("master.json")
@@ -769,13 +779,14 @@ impl Master {
 /// Runs the background service until it is stopped.
 pub fn serve(dir: &Path) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
-    // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour; nothing
-    // happens until a backups folder is chosen on this machine.
+    // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour.
     let backup_dir = dir.to_path_buf();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(120));
         loop {
-            if let Err(e) = crate::backups::run_due(&backup_dir, None, None, false) {
+            if let Err(e) =
+                crate::backups::run_due(&backup_dir, None, Some(&backups_default()), false)
+            {
                 eprintln!("Backup failed: {e}");
             }
             std::thread::sleep(Duration::from_secs(3600));
@@ -1125,13 +1136,20 @@ mod tests {
         assert_eq!(loc["fixed"], true);
         assert_eq!(loc["current"], d.to_string_lossy().as_ref());
 
-        // No backups folder by default: off, "Back up now" says why.
+        // On by default, in its own default folder (never the desktop app's); nothing is written there here.
         let i = call(&m, "backups_info", json!({})).unwrap();
+        let def = backups_default().to_string_lossy().into_owned();
         assert_eq!(
             (i["dir"].as_str(), i["defaultDir"].as_str()),
-            (Some(""), Some(""))
+            (Some(def.as_str()), Some(def.as_str()))
         );
-        assert!(call(&m, "backups_now", json!({})).is_err());
+        assert_eq!(
+            (i["off"].as_bool(), i["custom"].as_bool()),
+            (Some(false), Some(false))
+        );
+        assert!(def.contains("Qanuvi master backups"), "{def}");
+        assert_ne!(backups_default(), crate::backups::default_dir(false));
+        assert_ne!(backups_default(), crate::backups::default_dir(true));
 
         let dest = tempfile::tempdir().unwrap();
         let folder = dest.path().join("b").to_string_lossy().into_owned();

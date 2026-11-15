@@ -4,8 +4,9 @@
    * folder the user chooses, the last 7 kept. A restore is applied when Qanuvi starts again; the data in use is kept
    * beside it as a "before restore" backup.
    *
-   * 24z3 D3: the page is the shown machine's. A master has no default folder (its backups are off until a folder is
-   * typed, a full path on that machine), keeps no window settings, and its restore is applied when it restarts.
+   * 24z3 D3: the page is the shown machine's, the same rules on every machine (on by default, a default folder in
+   * its Documents). On a master the folder is typed (a full path there; the picker only sees This PC), its backups
+   * hold no window settings, and its restore is applied when it restarts.
    */
   import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
   import { ask, open } from "@tauri-apps/plugin-dialog";
@@ -73,11 +74,12 @@
   const when = (secs: number) => new Date(secs * 1000).toLocaleString();
   const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(0.1, b / 1e6).toFixed(1)} MB`);
   const KIND = { daily: "Daily", manual: "Made by you", beforeRestore: "Before restore" } as const;
+  // The same drive letter, or (Linux, Mac) both under / where one disk is the usual case: the hint is shown.
   const sameDrive = $derived(
-    !!info && /^[a-z]:/i.test(info.dir) && info.dir.slice(0, 2).toLowerCase() === info.data.slice(0, 2).toLowerCase(),
+    !!info &&
+      ((/^[a-z]:/i.test(info.dir) && info.dir.slice(0, 2).toLowerCase() === info.data.slice(0, 2).toLowerCase()) ||
+        (info.dir.startsWith("/") && info.data.startsWith("/"))),
   );
-  /** A master with no folder chosen: its backups are off until one is. */
-  const noFolder = $derived(!!info && !info.dir);
   const restartWord = $derived(machine ? place : "Qanuvi");
 
   async function save(dir: string, off: boolean) {
@@ -195,39 +197,25 @@
   <div class="card">
     <div class="row">
       <label class="check">
-        <input
-          type="checkbox"
-          checked={!info.off && !noFolder}
-          disabled={noFolder}
-          onchange={(e) => save(folder, !e.currentTarget.checked)}
-        />
+        <input type="checkbox" checked={!info.off} onchange={(e) => save(folder, !e.currentTarget.checked)} />
         Back up every day
       </label>
       <span class="spacer"></span>
-      <button type="button" class="btn primary" disabled={busy || noFolder} onclick={now}>
+      <button type="button" class="btn primary" disabled={busy} onclick={now}>
         {busy ? "Backing up…" : "Back up now"}
       </button>
     </div>
-    {#if noFolder}
-      <p class="warn small">
-        Backups are off on {place} until you choose a folder there. A folder on another disk than {place}'s data is
-        best: a backup on the same disk is lost with it.
-      </p>
-    {:else}
-      <p class="small">
-        {#if info.lastAt}Last backup: {when(info.lastAt)}{:else}No backup yet{/if}
-        {#if info.off}<span class="warn">· daily backups are off</span>{/if}
-      </p>
-    {/if}
+    <p class="small">
+      {#if info.lastAt}Last backup: {when(info.lastAt)}{:else}No backup yet{/if}
+      {#if info.off}<span class="warn">· daily backups are off</span>{/if}
+    </p>
     {#if info.lastError}<p class="error small">The last backup failed: {info.lastError}</p>{/if}
     {#if note}<p class="ok small">{note}</p>{/if}
 
-    {#if !noFolder}
-      <p class="small">
-        Folder: <code>{info.dir}</code>
-        {#if !info.custom}<span class="muted">(the default)</span>{/if}
-      </p>
-    {/if}
+    <p class="small">
+      Folder: <code>{info.dir}</code>
+      {#if !info.custom}<span class="muted">(the default)</span>{/if}
+    </p>
     <div class="row">
       <input
         bind:value={folder}
@@ -245,14 +233,13 @@
         onclick={() => save(folder, info!.off)}>Use this folder</button
       >
       {#if info.custom}
-        <button type="button" class="link" onclick={() => save("", info!.off)}
-          >{machine ? "Stop backing up" : "Back to the default"}</button
-        >
+        <button type="button" class="link" onclick={() => save("", info!.off)}>Back to the default</button>
       {/if}
     </div>
     {#if machine}
       <p class="muted small">{shownPlaceTitle()} makes the folder when it is not there yet.</p>
-    {:else if sameDrive}
+    {/if}
+    {#if sameDrive}
       <p class="muted small">Another drive is safer: a backup on the same drive is lost with it.</p>
     {/if}
   </div>
@@ -272,25 +259,23 @@
     </div>
   {/if}
 
-  {#if !noFolder}
-    <h3>Backups in the folder</h3>
-    {#each info.backups as b (b.path)}
-      <div class="item">
-        <div class="what">
-          <strong>{when(b.created)}</strong>
-          <span class="muted small">
-            {KIND[b.kind]} · {size(b.bytes)} · {b.files} files · Qanuvi {b.version}{b.window || machine
-              ? ""
-              : " · no window settings"}
-          </span>
-        </div>
-        <button type="button" class="btn" disabled={!!info.restore} onclick={() => restore(b)}>Restore…</button>
-        <button type="button" class="link" onclick={() => remove(b)}>Remove…</button>
+  <h3>Backups in the folder</h3>
+  {#each info.backups as b (b.path)}
+    <div class="item">
+      <div class="what">
+        <strong>{when(b.created)}</strong>
+        <span class="muted small">
+          {KIND[b.kind]} · {size(b.bytes)} · {b.files} files · Qanuvi {b.version}{b.window || machine
+            ? ""
+            : " · no window settings"}
+        </span>
       </div>
-    {:else}
-      <p class="muted small">None yet.</p>
-    {/each}
-  {/if}
+      <button type="button" class="btn" disabled={!!info.restore} onclick={() => restore(b)}>Restore…</button>
+      <button type="button" class="link" onclick={() => remove(b)}>Remove…</button>
+    </div>
+  {:else}
+    <p class="muted small">None yet.</p>
+  {/each}
 {/if}
 
 {#if error}<p class="error small">{error}</p>{/if}

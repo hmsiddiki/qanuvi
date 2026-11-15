@@ -369,7 +369,19 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 21:10): 24z3 D3 BUILT (backups + data folder on the shown machine). Owner
+    RESUME HERE (newest, 2026-11-15 21:40): 24z3 D3 CHANGED (owner: "no different, if on or off same for master or
+    pc"; then yes to "on everywhere"): backups are ON by default on every machine, the same rules everywhere. A
+    master's default folder is Documents/"Qanuvi master backups" (test build: "... (test build)"), its own name so a
+    master on the same computer as a desktop app never lists or prunes the desktop's backups (two masters with
+    different --data on one computer would still share it: not a case now). backups::master_default_dir; master.rs
+    passes it everywhere (start-up restore, daily check, its commands). Page: the "off until you choose a folder"
+    text is gone, "Back to the default" on every machine, the same-drive hint also when both paths are under / (Linux,
+    Mac). The parts below that say "off by default" / "Stop backing up" are replaced by this. Green: prettier,
+    svelte-check, 354 TS tests, rustfmt, clippy desktop + server, 398 desktop / 385 server Rust tests (one run had a
+    timing failure in plan::live a_run_goes_on_its_own_thread..., untouched code; passed alone and twice in full
+    after). NOT driven live. NEXT: drive D3 live (default folder and on for the test master, Back up now, book a
+    restore, Restart the master, the note; This PC unchanged; data folder panel read-only), then D4.
+    BEFORE (2026-11-15 21:10): 24z3 D3 BUILT (backups + data folder on the shown machine). Owner
     agreed the proposal; on question (a) a master's backups are OFF by default until a folder is chosen on it (the
     owner's sentence ended at "it should ..."; read as "it should ask for a folder", the page says so; confirm);
     (b) a master's data folder is only shown, moving it comes later. backups.rs: the default folder is now a

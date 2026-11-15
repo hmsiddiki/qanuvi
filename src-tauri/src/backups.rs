@@ -115,15 +115,29 @@ pub fn stamp(secs: u64) -> String {
 /// The default backups folder: "Qanuvi backups" in the user's Documents (a test build: "Qanuvi backups (test build)"),
 /// outside the data folder, so removing the app's data never takes the backups with it.
 pub fn default_dir(test_build: bool) -> PathBuf {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    let name = if test_build {
+    documents(if test_build {
         "Qanuvi backups (test build)"
     } else {
         "Qanuvi backups"
-    };
-    home.join("Documents").join(name)
+    })
+}
+
+/// A master's default backups folder (24z3 D3): on like the desktop app's, in the same Documents folder, under its
+/// own name, so a master on the same computer as a desktop app never lists or prunes the desktop's backups.
+pub fn master_default_dir(test_build: bool) -> PathBuf {
+    documents(if test_build {
+        "Qanuvi master backups (test build)"
+    } else {
+        "Qanuvi master backups"
+    })
+}
+
+fn documents(name: &str) -> PathBuf {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("Documents")
+        .join(name)
 }
 
 pub fn read_config(data: &Path) -> Config {
@@ -139,14 +153,15 @@ pub fn write_config(data: &Path, c: &Config) -> Result<(), String> {
 }
 
 /// The folder backups go to for this data folder: the chosen one, else `default` (the desktop app's
-/// `default_dir`). A master has no default (24z3 D3): its backups are off until a folder is chosen on it.
+/// `default_dir`). A master's is `master_default_dir`
+/// (24z3 D3); None (tests only) means no backups until a folder is chosen.
 pub fn folder(data: &Path, default: Option<&Path>) -> Option<PathBuf> {
     read_config(data)
         .dir
         .or_else(|| default.map(Path::to_path_buf))
 }
 
-/// Sets the backups folder (empty: none chosen, so the default one, or none on a master) and whether daily backups
+/// Sets the backups folder (empty: the default one) and whether daily backups
 /// run. A chosen folder must be a full path outside the data folder; it is made when missing.
 pub fn set(data: &Path, folder: &str, off: bool) -> Result<(), String> {
     let mut c = read_config(data);
@@ -202,9 +217,9 @@ pub fn remove_one(data: &Path, default: Option<&Path>, backup: &Path) -> Result<
 #[serde(rename_all = "camelCase")]
 pub struct Info {
     pub data: String,
-    /// Where backups go; empty when none is chosen on a master.
+    /// Where backups go (empty only without a default, in tests).
     pub dir: String,
-    /// The desktop app's default folder; empty on a master (it has none).
+    /// This machine's default folder.
     pub default_dir: String,
     pub custom: bool,
     pub off: bool,
