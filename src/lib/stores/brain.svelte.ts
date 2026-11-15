@@ -186,7 +186,7 @@ class BrainStore {
     }
   }
 
-  /** OmniRoute on this computer: it makes a key named Qanuvi, kept in the credential store; then its models are found. */
+  /** OmniRoute on the shown machine: it makes a key named Qanuvi, kept in that machine's credential store; then its models are found. */
   async connect(p: ModelProvider): Promise<void> {
     this.searching = { ...this.searching, [p.id]: true };
     this.errors = { ...this.errors, [p.id]: "" };
@@ -196,7 +196,7 @@ class BrainStore {
       this.keys = { ...this.keys, [p.id]: true };
       this.notes = {
         ...this.notes,
-        [p.id]: "Connected: OmniRoute made a key named Qanuvi, kept in your system's credential store.",
+        [p.id]: `Connected: OmniRoute made a key named Qanuvi, kept in ${shownPlace() === "this computer" ? "your system" : shownPlace()}'s credential store.`,
       };
       this.missing = { ...this.missing, [p.id]: false };
     } catch (e) {

@@ -548,6 +548,41 @@ impl Master {
             "claude_settings_base_url" => to(Ok(crate::claude_update::settings_base_url())),
             "claude_versions" => to(crate::claude_update::versions()),
             "claude_update" => to(crate::claude_update::update()),
+            // OmniRoute (24z3 D5): the one on this master's machine, with this master's keys.
+            "omniroute_connect" => {
+                crate::omniroute::connect(&endpoint_arg(args)?)?;
+                Ok(Value::Null)
+            }
+            "omniroute_connections" => to(crate::omniroute::connections(&endpoint_arg(args)?)),
+            "omniroute_catalog" => to(crate::omniroute::catalog(&endpoint_arg(args)?)),
+            "omniroute_add_key" => {
+                crate::omniroute::add_key_with(
+                    &endpoint_arg(args)?,
+                    &s(args, "provider"),
+                    opt(args, "key"),
+                    opt(args, "saved"),
+                )?;
+                Ok(Value::Null)
+            }
+            "omniroute_test" => {
+                crate::omniroute::test(&endpoint_arg(args)?, &s(args, "id"))?;
+                Ok(Value::Null)
+            }
+            "omniroute_remove" => {
+                crate::omniroute::remove(&endpoint_arg(args)?, &s(args, "id"))?;
+                Ok(Value::Null)
+            }
+            "omniroute_sign_in" => {
+                crate::omniroute::sign_in(&endpoint_arg(args)?, &s(args, "provider"))?;
+                Ok(Value::Null)
+            }
+            "omniroute_make_combo" => {
+                let models: Vec<String> =
+                    serde_json::from_value(args["models"].clone()).map_err(|e| e.to_string())?;
+                crate::omniroute::make_combo(&endpoint_arg(args)?, &s(args, "name"), &models)?;
+                Ok(Value::Null)
+            }
+            "omniroute_look" => to(Ok(self.omniroute_look())),
             // Git.
             "git_status" => to(git::status(&self.root(args)?)),
             "git_diff" => to(git::diff(&self.root(args)?, &s(args, "path"))),
@@ -799,6 +834,27 @@ impl Master {
                 std::thread::sleep(Duration::from_secs(24 * 3600));
             }
         });
+        // The OmniRoute watch (24z3 D5): a minute after start, then every 30 minutes, with no window needed.
+        let me = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(60));
+            loop {
+                let Some(m) = me.upgrade() else { return };
+                m.omniroute_look();
+                drop(m);
+                std::thread::sleep(crate::omniroute::WATCH_EVERY);
+            }
+        });
+    }
+
+    /// Looks at this master's OmniRoute once; its Inbox changes go to the connections that follow the Inbox.
+    fn omniroute_look(&self) -> Option<Vec<crate::omniroute::Connection>> {
+        let watchers = self.inbox_watchers.clone();
+        crate::omniroute::look(&self.db, &move |event: &str, value: Value| {
+            if event == "qanuvi-inbox" {
+                watchers.send(&value);
+            }
+        })
     }
 
     /// Starts a new service that waits for this one to end, then ends this one: its agent sessions and terminals
@@ -1277,6 +1333,45 @@ mod tests {
             )
             .unwrap_err();
             assert!(e.contains("QANUVI_KEY_OPENROUTER"), "{e}");
+        }
+    }
+
+    #[test]
+    fn answers_omniroute_on_its_own_machine() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        // Known commands: a bad endpoint gets the endpoint's error, never "does not know the command".
+        for cmd in [
+            "omniroute_connect",
+            "omniroute_connections",
+            "omniroute_catalog",
+            "omniroute_add_key",
+            "omniroute_test",
+            "omniroute_remove",
+            "omniroute_sign_in",
+            "omniroute_make_combo",
+        ] {
+            let e = call(&m, cmd, json!({"endpoint": {"id": "x"}})).unwrap_err();
+            assert!(!e.contains("does not know"), "{cmd}: {e}");
+        }
+        // Its own settings say Qanuvi does not run OmniRoute there: nothing to watch.
+        let mut off = serde_json::Map::new();
+        off.insert("brain".into(), json!({"omniAssist": false}));
+        crate::settings::set_many(&m.db, &off).unwrap();
+        assert_eq!(call(&m, "omniroute_look", json!({})).unwrap(), Value::Null);
+        #[cfg(not(feature = "desktop"))]
+        {
+            let ep =
+                json!({"id": "omniroute", "kind": "openai", "url": "http://localhost:20128/v1"});
+            let e = call(&m, "omniroute_connect", json!({"endpoint": ep})).unwrap_err();
+            assert!(e.contains("QANUVI_KEY_OMNIROUTE"), "{e}");
+            let e = call(
+                &m,
+                "omniroute_sign_in",
+                json!({"endpoint": ep, "provider": "antigravity"}),
+            )
+            .unwrap_err();
+            assert_eq!(e, "panel");
         }
     }
 

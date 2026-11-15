@@ -286,6 +286,10 @@ pub fn remove(ep: &Endpoint, id: &str) -> Result<(), String> {
 /// signs in. Other sign-ins go through OmniRoute's own page (the caller opens it).
 pub fn sign_in(ep: &Endpoint, provider: &str) -> Result<(), String> {
     valid_id(provider)?;
+    // A server has no screen for a browser: its sign-ins go through OmniRoute's own page too.
+    if crate::secrets::kind() == "environment" {
+        return Err("panel".into());
+    }
     match provider {
         "antigravity" => run(
             ep,
@@ -331,10 +335,217 @@ pub fn make_combo(ep: &Endpoint, name: &str, models: &[String]) -> Result<(), St
     .map(|_| ())
 }
 
+/// Connects Qanuvi to the OmniRoute on this machine: OmniRoute makes an API key named Qanuvi, kept where this machine
+/// keeps model keys (24z3 D5: a master keeps its own). A server keeps model keys in its environment, so it says so
+/// before OmniRoute makes a key nobody could keep.
+pub fn connect(ep: &Endpoint) -> Result<(), String> {
+    if crate::model_keys::kind() == "environment" {
+        return Err(format!(
+            "{} Make the key on OmniRoute's own page on this server (API keys).",
+            crate::model_keys::env_only(&ep.id)
+        ));
+    }
+    let key = crate::local_servers::omniroute_new_key(ep)?;
+    crate::model_keys::set(&ep.id, &key)
+}
+
+/// Connects a provider in OmniRoute with a key: one the user pasted, or (`saved`) the key this machine keeps for one
+/// of Qanuvi's own providers, which goes to OmniRoute without passing through the window.
+pub fn add_key_with(
+    ep: &Endpoint,
+    provider: &str,
+    key: Option<String>,
+    saved: Option<String>,
+) -> Result<(), String> {
+    let key = match (key.filter(|k| !k.trim().is_empty()), saved) {
+        (Some(k), _) => k,
+        (None, Some(from)) => {
+            crate::model_keys::get(&from).ok_or("Qanuvi keeps no key for that provider.")?
+        }
+        (None, None) => return Err("No key.".into()),
+    };
+    add_key(ep, provider, &key)
+}
+
+/// How often each core looks at its OmniRoute (15f; in the core since 24z3 D5).
+pub const WATCH_EVERY: Duration = Duration::from_secs(30 * 60);
+
+/// The OmniRoute this machine's settings say Qanuvi runs for the user: none when omniAssist is off.
+pub fn watched(settings: &serde_json::Map<String, Value>) -> Option<Endpoint> {
+    let brain = settings.get("brain");
+    if brain.is_some_and(|b| b["omniAssist"] == false) {
+        return None;
+    }
+    let mine = brain
+        .and_then(|b| b["providers"].as_array())
+        .and_then(|list| list.iter().find(|p| p["id"] == "omniroute"));
+    let p = match mine {
+        Some(p) => serde_json::json!({"id": "omniroute", "kind": p["kind"], "url": p["url"]}),
+        // Never saved: the window's default provider.
+        None if brain.is_none_or(|b| b["providers"].is_null()) => {
+            serde_json::json!({"id": "omniroute", "kind": "openai", "url": "http://localhost:20128/v1"})
+        }
+        None => return None,
+    };
+    serde_json::from_value(p).ok()
+}
+
+/// The Inbox items the watch keeps for these connections: an item per sign-in to renew or key that stopped working
+/// (not the muted ones), and the keys of the solved ones (None) to resolve.
+pub fn watch_items(
+    conns: &[Connection],
+    muted: &[String],
+) -> Vec<(String, Option<crate::inbox::NewItem>)> {
+    conns
+        .iter()
+        .map(|c| {
+            let key = format!("sign-in:{}", c.id);
+            let problem =
+                (c.state == "needs sign-in" || c.state == "error") && !muted.contains(&c.id);
+            if !problem {
+                return (key, None);
+            }
+            let name = if c.name.trim().is_empty() {
+                if c.provider.is_empty() {
+                    &c.id
+                } else {
+                    &c.provider
+                }
+            } else {
+                c.name.trim()
+            };
+            let signin = c.state == "needs sign-in";
+            let item = crate::inbox::NewItem {
+                kind_of: "info".into(),
+                kind: "sign-in".into(),
+                title: if signin {
+                    format!("{name}: sign in again")
+                } else {
+                    format!("{name}: not working")
+                },
+                text: format!(
+                    "{}{}",
+                    if c.problem.is_empty() {
+                        String::new()
+                    } else {
+                        format!("{} ", c.problem)
+                    },
+                    if signin {
+                        "Its free models stop until the sign-in is renewed."
+                    } else {
+                        "Its models are skipped until it works again."
+                    }
+                ),
+                key: Some(key.clone()),
+                open: Some(serde_json::json!({"label": "Open OmniRoute", "view": "agents"})),
+                form: None,
+                source: None,
+            };
+            (key, Some(item))
+        })
+        .collect()
+}
+
+/// Looks once at this machine's OmniRoute (when Qanuvi runs it and has its key) and keeps its Inbox items: sign-ins
+/// to renew and keys that stopped working. Each core does it by itself, so a machine not shown is watched too.
+/// Answers the connections (None: nothing to watch, or OmniRoute could not be asked).
+pub fn look(db: &crate::store::Db, notify: &dyn Fn(&str, Value)) -> Option<Vec<Connection>> {
+    let settings = crate::settings::get_all(db).ok()?;
+    let ep = watched(&settings)?;
+    if !crate::model_keys::has(&ep.id) {
+        return None;
+    }
+    let conns = connections(&ep).ok()?;
+    let muted: Vec<String> = settings
+        .get("omniMuted")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    for (key, item) in watch_items(&conns, &muted) {
+        match item {
+            Some(item) => {
+                if let Ok((added, new)) = crate::inbox::add_new(db, &item) {
+                    notify(
+                        "qanuvi-inbox",
+                        serde_json::json!({"change": "add", "item": added, "new": new}),
+                    );
+                }
+            }
+            None => {
+                if crate::inbox::resolve(db, &key).unwrap_or(false) {
+                    notify(
+                        "qanuvi-inbox",
+                        serde_json::json!({"change": "resolve", "item": null}),
+                    );
+                }
+            }
+        }
+    }
+    Some(conns)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn conn(id: &str, name: &str, state: &str, problem: &str) -> Connection {
+        Connection {
+            id: id.into(),
+            provider: "kiro".into(),
+            name: name.into(),
+            auth: "oauth".into(),
+            state: state.into(),
+            problem: problem.into(),
+        }
+    }
+
+    #[test]
+    fn the_watch_files_problems_and_resolves_the_rest() {
+        let list = [
+            conn("a", "", "needs sign-in", "Token expired."),
+            conn("b", "Work", "error", ""),
+            conn("c", "", "working", ""),
+            conn("d", "", "error", ""),
+        ];
+        let got = watch_items(&list, &["d".to_string()]);
+        let keys: Vec<_> = got.iter().map(|(k, i)| (k.as_str(), i.is_some())).collect();
+        assert_eq!(
+            keys,
+            [
+                ("sign-in:a", true),
+                ("sign-in:b", true),
+                ("sign-in:c", false),
+                ("sign-in:d", false)
+            ]
+        );
+        let a = got[0].1.as_ref().unwrap();
+        assert_eq!(a.title, "kiro: sign in again");
+        assert_eq!(
+            a.text,
+            "Token expired. Its free models stop until the sign-in is renewed."
+        );
+        assert_eq!(a.kind, "sign-in");
+        assert_eq!(got[1].1.as_ref().unwrap().title, "Work: not working");
+    }
+
+    #[test]
+    fn the_watch_follows_the_machines_own_settings() {
+        let m = |v: Value| v.as_object().unwrap().clone();
+        // Never saved: the default OmniRoute.
+        assert_eq!(
+            watched(&m(json!({}))).unwrap().url,
+            "http://localhost:20128/v1"
+        );
+        let own = json!({"brain": {"omniAssist": true, "providers": [{"id": "omniroute", "kind": "openai", "url": "http://localhost:3000/v1", "name": "x"}]}});
+        assert_eq!(watched(&m(own)).unwrap().url, "http://localhost:3000/v1");
+        assert!(watched(&m(json!({"brain": {"omniAssist": false}}))).is_none());
+        assert!(watched(&m(json!({"brain": {"providers": [{"id": "openrouter", "kind": "openrouter", "url": "u"}]}}))).is_none());
+    }
 
     #[test]
     fn reads_connection_health() {

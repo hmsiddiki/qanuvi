@@ -103,3 +103,41 @@ describe("the On box", () => {
     expect(settings.value.startup).toHaveLength(1);
   });
 });
+
+describe("the Claude Code card on the shown machine", () => {
+  const pc = { available: true, path: "C:\claude.exe", version: "2.1.318" };
+  const none = { available: false, path: "", version: "" };
+
+  it("a switch asks the new machine and drops the machine before's path", async () => {
+    const { agent } = await import("./agent.svelte");
+    const { show } = await import("./machines");
+    invoke.mockImplementation((cmd, args) => {
+      const c = cmd === "remote_call" ? (args as { cmd: string }).cmd : cmd;
+      if (c === "agent_info") return Promise.resolve(cmd === "remote_call" ? none : pc);
+      return Promise.resolve(c === "settings_get" ? null : []);
+    });
+    showMachine(null);
+    await agent.loadInfo();
+    expect(agent.info?.path).toBe(pc.path);
+    const shown = show("vps");
+    expect(agent.info).toBeNull();
+    await shown;
+    expect(agent.info).toEqual(none);
+    expect(invoke).toHaveBeenCalledWith("remote_call", expect.objectContaining({ master: "vps", cmd: "agent_info" }));
+  });
+
+  it("drops an answer that comes after a switch", async () => {
+    const { agent } = await import("./agent.svelte");
+    let answer: (v: unknown) => void = () => {};
+    invoke.mockImplementation((cmd) =>
+      cmd === "remote_call" ? new Promise((r) => (answer = r)) : Promise.resolve(pc),
+    );
+    showMachine("vps");
+    const late = agent.loadInfo();
+    showMachine(null);
+    await agent.loadInfo();
+    answer(none);
+    await late;
+    expect(agent.info).toEqual(pc);
+  });
+});

@@ -1,5 +1,6 @@
 import { api, errorText, type AgentEvent, type AgentInfo, type Attachment, type Grant, type Session } from "$lib/api";
 import { untrack } from "svelte";
+import { shownMachine } from "$lib/remote";
 import { reduce, reduceAll, type Item } from "$lib/agent/events";
 import { HOLD_MS, withdrawnNote } from "$lib/agent/waiting";
 
@@ -325,12 +326,19 @@ ${text}`
     return this.info?.available && paid ? paid.id : settings.value.agent;
   }
 
+  /** The shown machine's paid agent (24z3: a master's own Claude Code, or "Not found" there). */
   async loadInfo(): Promise<void> {
+    const machine = shownMachine();
+    const missing: AgentInfo = { available: false, path: "", version: "" };
+    let info: AgentInfo;
     try {
-      this.info = await api.agent.info();
+      info = (await api.agent.info()) ?? missing;
     } catch {
-      this.info = { available: false, path: "", version: "" };
+      info = missing;
     }
+    // Another machine shown meanwhile: this answer is not its own.
+    if (machine !== shownMachine()) return;
+    this.info = info;
     // No paid agent here but free models are set up: new sessions use Qanuvi's own agent.
     if (!this.info.available && settings.value.agent === "claude-code" && settings.value.brain.models.length) {
       settings.set("agent", "qanuvi");

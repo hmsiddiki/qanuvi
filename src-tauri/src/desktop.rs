@@ -1172,11 +1172,7 @@ fn local_server_status(
 /// credential store. The key never reaches the window.
 #[tauri::command]
 async fn omniroute_connect(endpoint: crate::llm::Endpoint) -> Res<()> {
-    blocking(move || {
-        let key = crate::local_servers::omniroute_new_key(&endpoint)?;
-        model_key_set(endpoint.id.clone(), key)
-    })
-    .await
+    blocking(move || crate::omniroute::connect(&endpoint)).await
 }
 
 /// The tools the setup wizard looks for (Ollama, Node.js, npm, OmniRoute, winget).
@@ -1448,15 +1444,16 @@ async fn omniroute_add_key(
     key: Option<String>,
     saved: Option<String>,
 ) -> Res<()> {
+    blocking(move || crate::omniroute::add_key_with(&endpoint, &provider, key, saved)).await
+}
+
+/// Looks at this computer's OmniRoute now (the watch, 24z3 D5): its Inbox items kept, its connections answered.
+#[tauri::command]
+async fn omniroute_look(app: tauri::AppHandle) -> Res<Option<Vec<crate::omniroute::Connection>>> {
     blocking(move || {
-        let key = match (key.filter(|k| !k.trim().is_empty()), saved) {
-            (Some(k), _) => k,
-            (None, Some(from)) => {
-                model_key(&from).ok_or("Qanuvi keeps no key for that provider.")?
-            }
-            (None, None) => return Err("No key.".into()),
-        };
-        crate::omniroute::add_key(&endpoint, &provider, &key)
+        let notify = plan_runs::notify(&app);
+        let state = app.state::<AppState>();
+        Ok(crate::omniroute::look(&state.db, &*notify))
     })
     .await
 }
@@ -2056,6 +2053,19 @@ pub fn run() {
                     std::thread::sleep(std::time::Duration::from_secs(24 * 3600));
                 }
             });
+            // The OmniRoute watch (15f; in the core since 24z3 D5): a minute after start, then every 30 minutes, sign-ins
+            // to renew and keys that stopped working go to the Inbox, shown or not.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                let notify = plan_runs::notify(&handle);
+                loop {
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        crate::omniroute::look(&state.db, &*notify);
+                    }
+                    std::thread::sleep(crate::omniroute::WATCH_EVERY);
+                }
+            });
             // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
             // when the last good one is a day old.
             let backup_dir = dir.clone();
@@ -2148,6 +2158,7 @@ pub fn run() {
             local_server_status,
             local_server_start,
             omniroute_connect,
+            omniroute_look,
             omniroute_connections,
             omniroute_remove,
             core_decide,

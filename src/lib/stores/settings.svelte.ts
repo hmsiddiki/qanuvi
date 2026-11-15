@@ -112,6 +112,11 @@ export interface Settings {
    * one, and quiet hours (minutes after midnight, local time). The Inbox keeps every item whatever is shown.
    */
   notifications: NotifySettings;
+  /**
+   * OmniRoute connections the owner wants no warnings about (15f), on this machine (24z3 D5: its core's watch reads
+   * them; they stay in OmniRoute either way).
+   */
+  omniMuted: string[];
 }
 
 export interface NotifySettings {
@@ -244,6 +249,7 @@ const DEFAULTS: Settings = {
   chatCleanupDays: 60,
   notifications: DEFAULT_NOTIFICATIONS,
   startup: [],
+  omniMuted: [],
   team: DEFAULT_TEAM,
 };
 
@@ -273,7 +279,7 @@ export function parseSettings(json: string | null): Settings {
     raw = {};
   }
   // Lists filled below get their own arrays: pushing into DEFAULTS' would share them between every parse.
-  const s: Settings = { ...DEFAULTS, agents: {}, rules: {}, masters: [], startup: [] };
+  const s: Settings = { ...DEFAULTS, agents: {}, rules: {}, masters: [], startup: [], omniMuted: [] };
   const disk = raw.memoryDisk && typeof raw.memoryDisk === "object" ? (raw.memoryDisk as Record<string, unknown>) : {};
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   s.memoryDisk = {
@@ -332,6 +338,8 @@ export function parseSettings(json: string | null): Settings {
   }
   s.chatCleanupDays = ([0, 30, 60, 90] as const).find((d) => d === raw.chatCleanupDays) ?? 60;
   s.notifications = parseNotifications(raw.notifications);
+  if (Array.isArray(raw.omniMuted))
+    s.omniMuted = [...new Set((raw.omniMuted as unknown[]).filter((x): x is string => typeof x === "string" && !!x))];
   if (Array.isArray(raw.startup))
     for (const it of raw.startup as Record<string, unknown>[]) {
       const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");

@@ -1,10 +1,11 @@
 /**
- * Running the OmniRoute on this computer for the user (24c): its connections and their health, adding free providers,
- * renewing sign-ins and Qanuvi's fallback combo. Keys never come back to the window.
+ * Running the OmniRoute on the shown machine for the user (24c; per machine since 24z3 D5): its connections and their
+ * health, adding free providers, renewing sign-ins and Qanuvi's fallback combo. Keys never come back to the window.
+ * Each machine's core watches its own OmniRoute for the Inbox; the window only shows the shown machine's.
  */
-import { routed as invoke } from "$lib/remote";
+import { routed as invoke, shownMachine } from "$lib/remote";
 import { errorText } from "$lib/api";
-import type { ModelProvider } from "./settings.svelte";
+import { settings, type ModelProvider } from "./settings.svelte";
 
 export interface OmniConnection {
   id: string;
@@ -30,15 +31,20 @@ export function connectionName(c: OmniConnection): string {
 
 const endpoint = (p: ModelProvider) => ({ id: p.id, kind: p.kind, url: p.url });
 
-/** Connections the user does not want warnings about (kept in OmniRoute, only quiet in Qanuvi). */
-const MUTED_KEY = "qanuvi.omni.muted";
-function loadMuted(): string[] {
+/** Before 24z3 D5 the muted connections were the window's; now they are This PC's setting (moved once). */
+const OLD_MUTED_KEY = "qanuvi.omni.muted";
+export function moveOldMuted(): void {
+  if (typeof localStorage === "undefined" || shownMachine() !== null) return;
+  const raw = localStorage.getItem(OLD_MUTED_KEY);
+  if (raw === null) return;
   try {
-    const v = JSON.parse(localStorage.getItem(MUTED_KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+    const v = JSON.parse(raw);
+    const old = Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    if (old.length) settings.set("omniMuted", [...new Set([...settings.value.omniMuted, ...old])]);
   } catch {
-    return [];
+    // Unreadable: nothing to keep.
   }
+  localStorage.removeItem(OLD_MUTED_KEY);
 }
 
 class OmniStore {
@@ -47,7 +53,11 @@ class OmniStore {
   busy = $state<Record<string, string>>({});
   error = $state("");
   note = $state("");
-  muted = $state<string[]>(typeof localStorage === "undefined" ? [] : loadMuted());
+
+  /** Connections the user does not want warnings about, on the shown machine (kept in OmniRoute, only quiet here). */
+  get muted(): string[] {
+    return settings.value.omniMuted;
+  }
 
   /** Connections that need the user: a sign-in to renew, or a key that stopped working (not the muted ones). */
   get problems(): OmniConnection[] {
@@ -58,8 +68,28 @@ class OmniStore {
 
   /** No more warnings about this connection (or warnings again); it stays in OmniRoute either way. */
   setMuted(c: OmniConnection, on: boolean): void {
-    this.muted = on ? [...new Set([...this.muted, c.id])] : this.muted.filter((id) => id !== c.id);
-    localStorage.setItem(MUTED_KEY, JSON.stringify(this.muted));
+    settings.set("omniMuted", on ? [...new Set([...this.muted, c.id])] : this.muted.filter((id) => id !== c.id));
+    // The machine's watch files or resolves its Inbox item now, not in half an hour.
+    void this.look();
+  }
+
+  /**
+   * The shown machine's core looks at its OmniRoute now (it keeps the Inbox items itself) and answers the connections
+   * for the status bar. Nothing to watch there (or an older master): nothing shown.
+   */
+  async look(): Promise<void> {
+    const machine = shownMachine();
+    const list = await invoke<OmniConnection[] | null>("omniroute_look").catch(() => null);
+    if (machine === shownMachine() && list) this.connections = list;
+  }
+
+  /** Another machine is shown (machines.ts): nothing of the machine before stays on screen. */
+  switched(): void {
+    this.connections = null;
+    this.catalog = [];
+    this.busy = {};
+    this.error = "";
+    this.note = "";
   }
 
   /** Removes the connection from OmniRoute itself. */
@@ -69,7 +99,11 @@ class OmniStore {
     );
     if (ok) {
       this.note = `${connectionName(c)} is removed from OmniRoute.`;
-      if (this.muted.includes(c.id)) this.setMuted(c, false);
+      if (this.muted.includes(c.id))
+        settings.set(
+          "omniMuted",
+          this.muted.filter((id) => id !== c.id),
+        );
       await this.load(p);
     }
     return !!ok;
@@ -91,18 +125,21 @@ class OmniStore {
   }
 
   async load(p: ModelProvider): Promise<void> {
+    const machine = shownMachine();
     const list = await this.#do("load", "Reading OmniRoute…", () =>
       invoke<OmniConnection[]>("omniroute_connections", { endpoint: endpoint(p) }),
     );
-    if (list) this.connections = list;
+    if (list && machine === shownMachine()) this.connections = list;
   }
 
   async loadCatalog(p: ModelProvider): Promise<void> {
     if (this.catalog.length) return;
+    const machine = shownMachine();
     const list = await this.#do("catalog", "Reading the catalog…", () =>
       invoke<OmniCatalogEntry[]>("omniroute_catalog", { endpoint: endpoint(p) }),
     );
-    if (list) this.catalog = list.sort((a, b) => Number(b.hasFree) - Number(a.hasFree) || a.name.localeCompare(b.name));
+    if (list && machine === shownMachine())
+      this.catalog = list.sort((a, b) => Number(b.hasFree) - Number(a.hasFree) || a.name.localeCompare(b.name));
   }
 
   /** Connects a provider with a pasted key, or with the key Qanuvi keeps for `saved`. */

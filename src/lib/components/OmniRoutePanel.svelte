@@ -11,7 +11,8 @@
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import { omni } from "$lib/stores/omniroute.svelte";
   import { brain } from "$lib/stores/brain.svelte";
-  import type { ModelProvider } from "$lib/stores/settings.svelte";
+  import { settings, type ModelProvider } from "$lib/stores/settings.svelte";
+  import { shownMachine, shownPlace } from "$lib/remote";
 
   let { provider }: { provider: ModelProvider } = $props();
 
@@ -21,6 +22,24 @@
   let custom = $state({ id: "", key: "" });
 
   onMount(() => omni.load(provider));
+
+  // Another machine shown (24z3 D5): its own OmniRoute.
+  let seen = brain.shownCount;
+  $effect(() => {
+    if (brain.shownCount === seen) return;
+    seen = brain.shownCount;
+    expert = false;
+    keys = {};
+    void omni.load(provider);
+  });
+
+  /** OmniRoute's own page opens in this PC's browser only when the shown machine is this computer. */
+  function openPage(url: string) {
+    const id = shownMachine();
+    if (id === null || settings.value.masters.find((m) => m.id === id)?.target === "local") void openUrl(url);
+    else
+      omni.note = `OmniRoute's own page is on ${shownPlace()}: ${url} there. Open it in a browser on that machine, or through an SSH tunnel to its port.`;
+  }
 
   let connected = $derived(new Set((omni.connections ?? []).map((c) => c.provider)));
   let shown = $derived(
@@ -94,7 +113,7 @@
   }
 
   async function signIn(id: string) {
-    if ((await omni.signIn(provider, id)) === "panel") openUrl(`${base()}/dashboard/providers`);
+    if ((await omni.signIn(provider, id)) === "panel") openPage(`${base()}/dashboard/providers`);
   }
 
   function base() {
@@ -114,7 +133,7 @@
   <div class="head">
     <strong>OmniRoute, run by Qanuvi</strong>
     <button type="button" class="link" onclick={() => omni.load(provider)}>Refresh</button>
-    <button type="button" class="link" onclick={() => openUrl(base())}>Open OmniRoute's panel</button>
+    <button type="button" class="link" onclick={() => openPage(base())}>Open OmniRoute's panel</button>
   </div>
 
   {#if omni.connections}

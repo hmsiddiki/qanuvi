@@ -369,7 +369,30 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 03:45): D4 leftovers DRIVEN LIVE (release test build 03:09, Haiku not used).
+    RESUME HERE (newest, 2026-11-16 04:20): owner: "fix a and continue to d5, keep them in d6".
+    (a) FIXED: machines.ts show() empties agent.info and asks the shown machine again (after its settings and Models,
+    so a machine with free models and no Claude Code gets Qanuvi's own agent as ITS default); loadInfo drops an answer
+    that comes after a switch and takes a missing answer as "not found" (2 new tests in startup.machine.test.ts; the
+    first fails without the fix). D6 NOW ALSO HOLDS (owner): the Agent setup group on a master (agent_config_list /
+    read / write, agent_configure, agent_clean_up: Part A map group 1), so the master's Agents page loses its
+    "cannot be done on <machine> yet (agent_config_list)" line; D6 = memory disk + remote access + agent setup.
+    D5 OMNIROUTE BUILT (not driven live yet): a master answers omniroute_connect / connections / catalog / add_key /
+    test / remove / sign_in / make_combo for the OmniRoute on ITS machine, with ITS keys (omniroute.rs connect and
+    add_key_with shared by both cores; a server refuses connect BEFORE OmniRoute makes a key nobody could keep, naming
+    QANUVI_KEY_OMNIROUTE; a server's sign-ins go through OmniRoute's own page, "panel"). The 15f watch moved out of
+    the window into each core (omniroute::look; a minute after start, then every 30 minutes, desktop setup and
+    Master::start_own), so a machine not shown is watched too; its Inbox items "sign-in:<id>" (same keys and words as
+    before) go to that machine's Inbox with the usual notification. New omniroute_look (both cores): looks now, answers
+    the connections for the status bar. Muted connections moved from the window's localStorage (qanuvi.omni.muted) to
+    the machine's settings (omniMuted; This PC's old list moved once); muting looks again at once. Window: the
+    OmniRoute store follows the shown machine (switched(); late answers dropped; status bar warnings are the shown
+    machine's: before, This PC's "kiro: sign in again" showed on basevm378), the panel reloads on a switch, "Open
+    OmniRoute's panel" / a sign-in's page open in this PC's browser only for This PC or a master on this computer
+    (target local), else a note with the address there; key texts name the machine's credential store. Green: 384 TS
+    (5 new omniroute.machine.test.ts), svelte-check 0/0, prettier, rustfmt, clippy desktop + server, 409 Rust (3 new),
+    server-build master tests 15. NEXT: drive (a) + D5 live (release test build; local test master: Models page,
+    OmniRoute panel, watch; VPS with the new server build: no This PC warnings, Connect Qanuvi hidden), then D6.
+    RESUME HERE (before, 2026-11-16 03:45): D4 leftovers DRIVEN LIVE (release test build 03:09, Haiku not used).
     PASS: local test master shown -> Settings, Agents shows that machine's own Claude Code versions ("2.1.325 is out
     (this one is 2.1.318)"; Update not pressed: the local master shares This PC's real Claude Code). VPS: server
     build re-cross-built (zigbuild -j 4, 9.1 MB, 2m 49s) and swapped into ~/.local/bin (old serve and --stdio ended

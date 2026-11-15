@@ -283,7 +283,7 @@
               type="button"
               class="btn primary"
               disabled={brain.searching[p.id]}
-              title="OmniRoute makes a key named Qanuvi; Qanuvi keeps it in your system's credential store"
+              title={`OmniRoute makes a key named Qanuvi; Qanuvi keeps it in ${here === "this computer" ? "your system" : here}'s credential store`}
               onclick={() => brain.connect(p)}>Connect Qanuvi</button
             >
           {/if}
