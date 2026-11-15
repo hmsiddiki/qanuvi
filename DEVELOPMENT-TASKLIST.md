@@ -369,7 +369,20 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 night): 24z3 A3 SECOND PART BUILT (project secrets on a master). Owner chose
+    RESUME HERE (newest, 2026-11-15 14:30): 24z3 A2 + A3 DRIVEN LIVE, all pass (release test build 14:06, scratch
+    projects pc-proj and master-proj, "This PC" test master, $0). A2: with the master connected, This PC's sidebar
+    stays This PC's only; Show lists only the master's two projects, title and month cost follow it. A3 part 1:
+    Minimap differs per machine; turned on for the master and off for This PC, each kept its own; the master's value
+    survived a restart (its DB). A3 part 2, desktop master: store text, a DEMO_TOKEN test secret added, listed, removed
+    (gone from the credential store). Server master (--no-default-features build swapped in next to the test app for
+    the check, desktop master put back after): environment text with QANUVI_SECRET_DB_PASSWORD, DEMO listed from
+    QANUVI_SECRET_DEMO, no Add or Remove. FOUND for Part B: the old test master is NAMED "This PC", so the Servers
+    page says "The sidebar shows This PC" and the tooltip "On This PC: ..." while the master is shown; Part B should
+    refuse "This PC" as a server's name (and rename an existing one). Owner agreed 2026-11-15 the batch order for the
+    Settings groups (map group 2), one per conversation: D1 Models + keys, D2 machine/setup + usage + notifications,
+    D3 backups + data folder, D4 start-up/Headroom + Claude Code updates, D5 OmniRoute, D6 memory disk + remote
+    access (fixes the KNOWN note below). NEXT: D1.
+    RESUME HERE (before, 2026-11-15 night): 24z3 A3 SECOND PART BUILT (project secrets on a master). Owner chose
     2026-11-15: a server keeps secrets in its ENVIRONMENT for now (no key file). secrets.rs: kind() is "store"
     (desktop, credential store) or "environment" (server build); a server reads QANUVI_SECRET_<NAME> and gives
     <NAME> to every project's agents and test command; adding/removing there answers how to set it (systemd unit,
