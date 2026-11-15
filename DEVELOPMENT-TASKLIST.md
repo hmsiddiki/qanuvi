@@ -369,7 +369,14 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15): NEW DESIGN MILESTONE 24z3 (machines, one at a time through a switcher) comes
+    RESUME HERE (newest, 2026-11-15 afternoon): 24z3 owner read-through done, one change: Part C2 (one Inbox
+    screen for all machines, stored per machine, badges, answer without switching). PART A STEP 1 MAP DONE (read
+    only): docs/design/24z3-part-a-map.md. Routing today follows ids, so id-less calls (projects_list, projects_add,
+    term_shells, plan_run_active) always hit This PC; masters.svelte.ts mixes master projects into the sidebar; ~90
+    window commands have no master answer (lsp, dap, memory, settings, keys, models...); Settings live in window
+    localStorage. NEXT: owner answers the map's two questions (account + memory disk, lsp/dap on a master) and agrees
+    the order A1-A4; then A1 (the shown machine in remote.ts) in a fresh conversation. Nothing built.
+    RESUME HERE (before, 2026-11-15): NEW DESIGN MILESTONE 24z3 (machines, one at a time through a switcher) comes
     BEFORE R3 (owner agreed). DESIGN COMPLETE: parts A-F plus the owner's decisions (whole screen and Settings are
     the shown machine's, This PC never hidden, hidden machines wiped and rebuilt, drafts, connection overlay, two
     screens, a window per machine, working icon) are all in item 24z3. NEXT (fresh conversation): owner's final
