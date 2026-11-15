@@ -369,7 +369,16 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after the R2e fixes): the owner's decisions on R2e (a)-(i) are BUILT with tests
+    RESUME HERE (newest, 2026-11-15 09:10, checkpoint): planner Model lines committed (a1ca399; 406 TS + 188 Rust
+    plan tests, clippy clean). Owner's new logo v13 (apex corner mark) everywhere (20c416b: app icon, generated
+    icons, title-bar logo, favicon; v12 kept in docs/design; exe icon checked by pixels). Test build rebuilt in full
+    (target/release, --no-bundle, test data folder dev.qanuvi.desktop.source); the old "This PC" test master was
+    stopped with the owner's yes, so start it again from the Servers page when driving master paths. Nothing
+    pushed or published. NEXT (fresh conversation): drive R2e fixes (a)-(i) and the planner Model lines live in
+    this test build on a scratch project, then delete what is left of the TypeScript runner, then write out the
+    master accounts milestone in parts for the owner's review. Helper scripts (room.ps1, rone/rall/rplan/clip.sh,
+    ui.ps1, loadmon.ps1, logo.ps1, exeicon.ps1) are in the scratchpad of session fc920636.
+    RESUME HERE (before, 2026-11-15, after the R2e fixes): the owner's decisions on R2e (a)-(i) are BUILT with tests
     (see 24z "R2e FIXES DONE"); not driven live, nothing published. Owner (2026-11-15): the planner's "- Model:"
     lines move to plan data too: done (new plans and replanned steps keep the planner's model per step in the plan
     state, the file gets the steps without them). NEXT: drive the fixes live in a test build on a
