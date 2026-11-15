@@ -1392,6 +1392,13 @@ runs on or off; with it off nothing is sent anywhere.
     Claude Code's raw "The user doesn't want to proceed…" text and the turn said "Finished": now the step has a stop
     icon and "Stopped by you" (either order of its result and Qanuvi's notice), the turn reads "Stopped by you · 26 s"
     in a neutral colour (events.ts state "stopped", result.stopped; rewind and session tools skip stopped edits).
+  - [ ] 24r2 LATER (owner agreed 2026-11-15): say why waiting messages wait. Seen live 2026-11-15: the agent wrote a
+    366-line file in one answer (about 5 minutes); the Waiting box showed both messages with "Working…" and nothing
+    else, so it looked stuck, though it was not (Claude Code reads queued messages only after the tool result; they
+    went in at the end of the write). While an answer streams one long tool call, the Waiting box says what it is and
+    for how long, for example "the agent is writing a long file (2 min); it reads your messages when that is done",
+    and points at "Stop this command, read my message now" for the urgent case. Uses the streamed tool input already
+    shown in the step card (no extra reads); only after about 30 s, so short steps stay quiet.
 - [ ] **24q. No token bursts: smaller steps and pacing (owner, 2026-11-13)**: measured on PLAN-D (3 days, about 45
   steps, $218 at API prices): the cost is cache reads, not new input. Each tool call re-reads the whole context, so
   a step of about 180 turns at 100-150k context reads about 20M tokens (88b 20.7M / $8.53, 87c 19.0M, 93z 21.8M,
