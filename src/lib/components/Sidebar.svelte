@@ -521,14 +521,18 @@
     min-height: 0;
   }
 
-  .sessions {
-    flex: 1;
-    overflow: auto;
+  /* Projects and sessions share the height left under the menu: two thirds to projects and one third to sessions
+     when both are long, and a short list gives what it does not need to the other. Each scrolls inside its own part;
+     Settings stays at the bottom. */
+  .sessions,
+  .projects-group {
+    flex: 1 1 0;
+    max-height: max-content;
+    overflow-y: auto;
   }
 
-  /* Many projects scroll inside their group instead of running under Settings at the bottom. */
   .projects-group {
-    overflow-y: auto;
+    flex-grow: 2;
   }
 
   .group header {

@@ -895,6 +895,7 @@ impl<'a> Loop<'a> {
             let what = match status {
                 RunStatus::Done => "finished",
                 RunStatus::NeedsYou => "needs you",
+                RunStatus::Paused => "paused",
                 _ => "stopped",
             };
             let project = if self.s.project_name.is_empty() {
@@ -1409,6 +1410,19 @@ impl<'a> Loop<'a> {
             });
             self.save();
             return false;
+        }
+        // What it needs comes later in this run and has not had its turn yet: it waits (still open) and the pass goes
+        // on; the run comes back to it after them. Only later steps count, so steps that need each other end skipped.
+        if unmet.is_some() {
+            let mut soon = self.done_numbers.clone();
+            soon.extend(self.run.steps[i + 1..].iter().filter_map(|x| {
+                (x.status == RunStepStatus::Waiting)
+                    .then(|| x.number.clone())
+                    .flatten()
+            }));
+            if unmet_need(&needs, &soon, &self.other_plans(&needs)).is_none() {
+                return false;
+            }
         }
         if let Some(why) = unmet {
             let st = &mut self.run.steps[i];

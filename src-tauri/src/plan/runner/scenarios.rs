@@ -594,6 +594,50 @@ fn a_step_whose_needs_line_names_an_unfinished_step_in_another_plan_is_skipped_w
     assert_eq!(step(&r, "2").status, RunStepStatus::Done);
 }
 
+#[test]
+fn a_step_that_needs_a_later_step_of_the_run_waits_for_it_and_runs_after_it() {
+    // R2e live drive 2026-11-15: 6b needed 6c (the pre-run check wrote the line), 6c came later in the file and was
+    // done in the same run, yet 6b was skipped as "needs step 6c, which is not done".
+    let env = world(
+        "# Plan\n\n- [ ] **6b. Sorted unique**\n  - Needs: 6c\n- [ ] **6c. Unique**\n- [ ] **6d. Last**\n",
+    );
+    let order = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let seen = order.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["6b", "6c", "6d"]);
+        seen.lock().unwrap().push(n.to_string());
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(step(&r, "6b").status, RunStepStatus::Done);
+    assert_eq!(step(&r, "6b").reason, None);
+    assert_eq!(*order.lock().unwrap(), vec!["6c", "6d", "6b"]);
+    assert!(env.text(FILE).contains("- [x] **6b. Sorted unique**"));
+}
+
+#[test]
+fn two_steps_that_need_each_other_are_skipped_and_the_run_ends() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. One**\n  - Needs: 2\n- [ ] **2. Two**\n  - Needs: 1\n- [ ] **3. Three**\n",
+    );
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        c.env.mark(FILE, step_of(c.prompt, &["1", "2", "3"]), 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(step(&r, "1").status, RunStepStatus::Skipped);
+    assert_eq!(step(&r, "2").status, RunStepStatus::Skipped);
+    assert_eq!(step(&r, "3").status, RunStepStatus::Done);
+}
+
 // ---------- Added with the run loop in the core (R2c) ----------
 
 #[test]
@@ -624,6 +668,17 @@ fn pausing_in_the_middle_of_a_step_keeps_its_session_for_resume() {
     assert!(!env.stopped().contains(&paused.session_id));
     assert_eq!(step(&r, "1").attempts[0].note, "paused by the owner");
     assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
+    // The Inbox says paused, not stopped (R2e live drive 2026-11-15).
+    let note = env
+        .inbox()
+        .into_iter()
+        .find(|i| i.kind == "run")
+        .expect("a run note in the Inbox");
+    assert!(
+        note.title.contains(" paused · 0/2 steps done"),
+        "{}",
+        note.title
+    );
 }
 
 #[test]

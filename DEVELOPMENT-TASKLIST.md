@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 09:10, checkpoint): planner Model lines committed (a1ca399; 406 TS + 188 Rust
+    RESUME HERE (newest, 2026-11-15 10:15): R2e fixes DRIVEN LIVE (see 24z "R2e fixes driven live"): (a), (c), (d),
+    (g), (h), (i) and the planner Model lines work in the test build; (b) and (e) not reached (no long reason, no try
+    2). Found and fixed (owner's yes): a step whose Needs name a later step of the same run was skipped instead of
+    waiting for it (scenario first, driven live); the Inbox called a paused run "stopped"; the sidebar's Sessions list
+    had been squeezed to nothing by the scrolling project list (8ddd58f); now projects take two thirds and sessions
+    one third of the free height (owner's choice). Left as is: pausing right after a step's edits shows "0 of N done"
+    until Resume (cosmetic). The test build started its "This PC" test master again (qanuvi-master.exe from
+    target/release, still running; builds use --bin qanuvi until it is stopped from the Servers page). Nothing
+    published. NEXT: delete what is left of the TypeScript runner, then write out the master accounts milestone in
+    parts for the owner's review. Scripts + scratch project (proj, PLAN-R2F.md) in the scratchpad of session 98d99277.
+    RESUME HERE (before, 2026-11-15 09:10, checkpoint): planner Model lines committed (a1ca399; 406 TS + 188 Rust
     plan tests, clippy clean). Owner's new logo v13 (apex corner mark) everywhere (20c416b: app icon, generated
     icons, title-bar logo, favicon; v12 kept in docs/design; exe icon checked by pixels). Test build rebuilt in full
     (target/release, --no-bundle, test data folder dev.qanuvi.desktop.source); the old "This PC" test master was
@@ -1076,6 +1086,18 @@ runs on or off; with it off nothing is sent anywhere.
         written before keep their lines (hand-written and planner lines cannot be told apart; picking a model in the
         Plan view moves one). Commits 6fa3523, fd705f6 and the planner commit after them. NEXT: drive (a)-(i) live in a test build on a scratch project, then delete what is left of
         the TypeScript runner; then the master accounts milestone written out in parts for the owner's review.
+      - [x] R2e fixes driven live 2026-11-15 (test build, scratch PLAN-R2F, about $0.25): (i) a Plan view pick goes
+        to plan state and takes the step's Model line out of the file; a hand-written line wins over a kept pick.
+        (g) the check's Order list ("6b after 6c") became one "- Needs: 6c" line, not doubled by a second check.
+        (c) "Pausing…" at full width. (d) "Change: … as a new step" typed during 6c, answered "As a new step" in the
+        Inbox: step 6c-1 titled without the label, the closing words or the ellipsis. (h) sessions carry the step
+        they went on into. (a) finishing pass offered at $0.17 / $0.65 for a $0.11 run. Fixed on the way (scenarios
+        first): a step needing a LATER step of the run now waits (stays open) and runs after it; only later steps
+        count, so two steps needing each other end skipped (run.rs ready; scenarios
+        a_step_that_needs_a_later_step_of_the_run_waits_for_it_and_runs_after_it,
+        two_steps_that_need_each_other_are_skipped_and_the_run_ends); driven live: 6b, 7b, 7a, 3 of 3 done. The
+        Inbox note of a paused run says "paused". Sidebar: projects and sessions share the free height 2:1, each
+        capped at its own content and scrolling inside. Not reached: (b), (e).
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work
