@@ -1203,6 +1203,22 @@ runs on or off; with it off nothing is sent anywhere.
   - Part E, a machine not reachable: the switcher shows it offline; picking it shows "VPS not connected" and
     Reconnect, never a stale copy taken for live. Its work goes on there.
   - Part F, drive live: This PC and the "This PC" test master side by side on scratch projects only; then the VPS.
+  - Agreed with the owner 2026-11-15:
+    - Unsaved edits on switching away: kept as drafts on the machine they belong to, back on return; no question asked.
+    - A master on an older Qanuvi version: not a subject now (not released, one user); no version gate.
+    - Two screens on one machine (two devices, or two windows): both see the same live state, an answer from either
+      counts, one question is never asked twice. LATER, to explain to the owner then: a master setting "one screen at
+      a time" or "many screens".
+    - Connection lost while a machine is shown: an overlay "VPS connection lost, reconnecting..." over a read-only
+      screen, gone by itself when it is back; the work goes on on the machine.
+    - Several machines at once: "Open in a new window" on each machine in the switcher's right-click menu (builds on
+      15c, windows.svelte.ts). Each window has its own switcher and shows one machine; the app keeps one connection
+      per machine for all its windows; a machine's streams go only to the window(s) showing it. A badge or
+      notification brings forward the window already showing that machine, else switches the current one. On reopen
+      each window comes back on its machine. Each extra window is its own web engine (estimate 100-200 MB; Part F
+      measures it).
+    - Working icon in the switcher: an icon per machine that shows its agents are working (with the count on hover);
+      one number per machine, never its chats.
   - Later, not in this milestone: moving work between machines ("send this queued plan to the VPS") as an explicit
     copy, never a sync.
   - This PC always stays in the switcher, never hidden (owner, 2026-11-15): every PC has its own workspace, used or not.
