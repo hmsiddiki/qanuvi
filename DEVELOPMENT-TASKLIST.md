@@ -1430,6 +1430,14 @@ runs on or off; with it off nothing is sent anywhere.
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
       the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
     - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
+    - [ ] R6 (LATER, owner 2026-11-16, after R4): leftover processes. Seen 2026-11-16: old agent sessions, their MCP
+      servers (npx/node) and old monitor scripts stayed running and held memory. Today a normal stop or close cleans
+      up (agent stop ends its tree, a window takes its terminals/LSP/DAP, the last window ends everything, Headroom and
+      OmniRoute stop with their workers), but after a crash or a forced kill only the browser goes (kill-on-close
+      job). Proposed: every child Qanuvi starts in a kill-on-close job (Windows) / process group (Linux, macOS), and a
+      start-up check for leftovers of an earlier run. OWNER RULE: the tray service (R4) keeps runs, the queue and other
+      background work going with the window closed; cleanup must NEVER end what the tray service is still handling
+      (its runs, agents, terminals, servers, its own core) — only processes no living part of Qanuvi owns.
 - [ ] **24z3. Machines: the window shows one machine at a time (owner, 2026-11-15; DESIGN MILESTONE, before R3;
   parts written out for the owner's review, nothing built yet)**: every Qanuvi is a machine ("This PC" too: the desktop
   runs the same core as a master). The work lives on a machine; the window owns no work, it shows one machine and
