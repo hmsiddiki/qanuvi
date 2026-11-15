@@ -382,7 +382,14 @@ runs on or off; with it off nothing is sent anywhere.
     master accounts milestone comes after that: qanuvi.com has no sign-in yet (domain only), so it is written out in
     parts and its Qanuvi side built against a local stand-in sign-in server; the live check waits for the site.
     The 0.1.22 release (2b4dd63) is the last TypeScript-runner version. The test master was stopped with the owner's
-    yes (10:25), so full builds run again. Scripts + scratch project (proj, PLAN-R2F.md) in the scratchpad of session
+    yes (10:25); full test build rebuilt 10:32 (all four binaries, nothing started). Account site (owner, 10:40):
+    while R3-R4 are built, the owner puts up a plain Qlopy site, either a local copy (must be http://localhost or
+    http://127.0.0.1, subfolder fine) or live at https://qlopy.top (owner decides which). Test builds point at it
+    with QANUVI_ACCOUNT_SITE (and QANUVI_ACCOUNT_CLIENT); the site registers app qanuvi-desktop, redirect
+    http://127.0.0.1:47213/callback, scope users:read; endpoints oauth/authorize, v1/oauth/token, v1/oauth/revoke,
+    v1/users/me under /api/qlopy. Local: the whole sign-in is checked here with a test account kept in the site's
+    seed or example config. qlopy.top: public live site, so the owner signs in in the browser and Qanuvi's side is
+    checked after; throwaway test account only. Then the accounts milestone is built against it. Scripts + scratch project (proj, PLAN-R2F.md) in the scratchpad of session
     98d99277.
     RESUME HERE (before, 2026-11-15 09:10, checkpoint): planner Model lines committed (a1ca399; 406 TS + 188 Rust
     plan tests, clippy clean). Owner's new logo v13 (apex corner mark) everywhere (20c416b: app icon, generated
