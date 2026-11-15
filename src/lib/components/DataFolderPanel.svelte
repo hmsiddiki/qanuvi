@@ -2,9 +2,12 @@
   /**
    * Where Qanuvi keeps its data (15e): any folder on any drive. The move happens when Qanuvi starts again (nothing is
    * in use then): everything is copied, checked and switched; the old copy is kept until the user removes it.
+   *
+   * 24z3 D3: the shown machine's. A master's folder is set where it starts (--data or QANUVI_MASTER_DATA), so it
+   * is only shown (fixed); moving it from here comes later.
    */
-  import { onMount } from "svelte";
-  import { routed as invoke } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
+  import { settings } from "$lib/stores/settings.svelte";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
 
@@ -14,6 +17,8 @@
     pending: string | null;
     old: string | null;
     note: string | null;
+    /** Set where the machine starts; not moved from here. */
+    fixed?: boolean;
   }
 
   let info = $state<Info | null>(null);
@@ -21,10 +26,21 @@
   let error = $state("");
   let busy = $state(false);
 
+  let place = $state("this computer");
+
   async function load() {
-    info = await invoke<Info>("data_location_info").catch(() => null);
+    const m = shownMachine();
+    const got = await invoke<Info>("data_location_info").catch(() => null);
+    if (m === shownMachine()) info = got;
   }
-  onMount(load);
+  // Read again when another machine is shown.
+  $effect(() => {
+    void settings.machine;
+    place = shownPlace();
+    info = null;
+    error = "";
+    void load();
+  });
 
   async function choose() {
     const picked = await open({ directory: true, title: "Where should Qanuvi keep its data?" }).catch(() => null);
@@ -67,10 +83,14 @@
 
 {#if info}
   <section class="data">
-    <h3>Where Qanuvi keeps its data</h3>
+    <h3>Where {info.fixed ? place : "Qanuvi"} keeps its data</h3>
     <p class="muted">
-      Projects, sessions, memory, Qanuvi core's records, agent histories and the window's settings, all in one folder.
-      Put it on any drive.
+      {#if info.fixed}
+        Projects, sessions, memory, Qanuvi core's records and agent histories, all in one folder on {place}.
+      {:else}
+        Projects, sessions, memory, Qanuvi core's records, agent histories and the window's settings, all in one folder.
+        Put it on any drive.
+      {/if}
     </p>
     <p>
       Now: <code>{info.current}</code>
@@ -84,7 +104,12 @@
         {info.note}
       </p>{/if}
 
-    {#if info.pending}
+    {#if info.fixed}
+      <p class="muted small">
+        {shownPlaceTitle()} is told where when it starts: <code>qanuvi-master serve --data &lt;folder&gt;</code>, or the
+        <code>QANUVI_MASTER_DATA</code> setting. Moving it from here comes later.
+      </p>
+    {:else if info.pending}
       <p class="warn">
         Moves to <code>{info.pending}</code> when Qanuvi starts again: copied, checked, then switched.
       </p>

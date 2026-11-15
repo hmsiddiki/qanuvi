@@ -3,11 +3,15 @@
    * Backups (1d): a daily copy of Qanuvi's data (database, core records, agent histories, the window's settings) in a
    * folder the user chooses, the last 7 kept. A restore is applied when Qanuvi starts again; the data in use is kept
    * beside it as a "before restore" backup.
+   *
+   * 24z3 D3: the page is the shown machine's. A master has no default folder (its backups are off until a folder is
+   * typed, a full path on that machine), keeps no window settings, and its restore is applied when it restarts.
    */
-  import { onMount } from "svelte";
-  import { routed as invoke } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
+  import { masters } from "$lib/stores/masters.svelte";
+  import { settings } from "$lib/stores/settings.svelte";
 
   interface Backup {
     path: string;
@@ -20,7 +24,6 @@
     bytes: number;
     window: boolean;
   }
-
   interface Info {
     data: string;
     dir: string;
@@ -31,6 +34,7 @@
     lastError: string | null;
     keep: number;
     restore: string | null;
+    note: string | null;
     backups: Backup[];
   }
 
@@ -39,22 +43,42 @@
   let error = $state("");
   let note = $state("");
   let busy = $state(false);
+  /** The machine this page shows (null: This PC), and its name for sentences. */
+  let machine = $state<string | null>(null);
+  let place = $state("this computer");
 
   async function load() {
-    info = await invoke<Info>("backups_info").catch((e) => {
+    const m = shownMachine();
+    const got = await invoke<Info>("backups_info").catch((e) => {
       error = errorText(e);
       return null;
     });
+    // Switched again while this was asked: the newer answer wins.
+    if (m !== shownMachine()) return;
+    info = got;
     if (info) folder = info.custom ? info.dir : "";
   }
-  onMount(load);
+
+  // Read again when another machine is shown (Settings follow the shown machine).
+  $effect(() => {
+    void settings.machine;
+    machine = shownMachine();
+    place = shownPlace();
+    info = null;
+    error = "";
+    note = "";
+    void load();
+  });
 
   const when = (secs: number) => new Date(secs * 1000).toLocaleString();
   const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(0.1, b / 1e6).toFixed(1)} MB`);
-  const KIND = { daily: "Daily", manual: "Made by you", beforeRestore: "Before a restore" } as const;
+  const KIND = { daily: "Daily", manual: "Made by you", beforeRestore: "Before restore" } as const;
   const sameDrive = $derived(
     !!info && /^[a-z]:/i.test(info.dir) && info.dir.slice(0, 2).toLowerCase() === info.data.slice(0, 2).toLowerCase(),
   );
+  /** A master with no folder chosen: its backups are off until one is. */
+  const noFolder = $derived(!!info && !info.dir);
+  const restartWord = $derived(machine ? place : "Qanuvi");
 
   async function save(dir: string, off: boolean) {
     error = "";
@@ -67,7 +91,7 @@
   }
 
   async function choose() {
-    const picked = await open({ directory: true, title: "Where should Qanuvi keep its backups?" }).catch(() => null);
+    const picked = await open({ directory: true, title: "Where should Qanuvi keep backups?" }).catch(() => null);
     if (typeof picked === "string") await save(picked, info?.off ?? false);
   }
 
@@ -88,7 +112,7 @@
 
   async function restore(b: Backup) {
     const yes = await ask(
-      `Restore the backup from ${when(b.created)}? It is applied when Qanuvi starts again. Your data as it is then is backed up first and kept beside the others, so you can go back to it.`,
+      `Restore the backup from ${when(b.created)}? It is applied when ${restartWord} starts again. The data it has then is backed up first and kept beside the others, so you can go back to it.`,
       { title: "Restore a backup", kind: "warning", okLabel: "Restore at the next start", cancelLabel: "Cancel" },
     );
     if (!yes) return;
@@ -104,6 +128,34 @@
   async function cancelRestore() {
     await invoke("backups_cancel_restore").catch((e) => (error = errorText(e)));
     await load();
+  }
+
+  /** This PC starts Qanuvi again; a master restarts its service and the window connects to it again. */
+  async function restartNow() {
+    if (!machine) {
+      await invoke("app_restart").catch((e) => (error = errorText(e)));
+      return;
+    }
+    const id = machine;
+    const going = await invoke<{ agents: number; runs: number }>("master_busy").catch(() => null);
+    const parts: string[] = [];
+    if (going?.agents) parts.push(`${going.agents} agent session${going.agents === 1 ? "" : "s"} open`);
+    if (going?.runs) parts.push(`${going.runs} plan run${going.runs === 1 ? "" : "s"} going on`);
+    const stops = parts.length
+      ? ` It has ${parts.join(" and ")}: they stop with the restart.`
+      : " Nothing is running there now.";
+    const yes = await ask(`Restart ${place}?${stops} This window connects to it again when it is back.`, {
+      title: `Restart ${place}`,
+      kind: "warning",
+      okLabel: "Restart",
+      cancelLabel: "Cancel",
+    });
+    if (!yes) return;
+    error = "";
+    busy = true;
+    const failed = await masters.restart(id);
+    busy = false;
+    if (failed) error = failed;
   }
 
   async function remove(b: Backup) {
@@ -123,43 +175,69 @@
   }
 </script>
 
-<h2>Backups</h2>
+<h2>Backups{machine ? `: ${place}` : ""}</h2>
 <p class="intro">
-  Once a day Qanuvi copies its data: projects, sessions, memory, Qanuvi core's records, agent histories and the window's
-  settings. The database is copied whole while Qanuvi runs. The last {info?.keep ?? 7} backups are kept.
+  {#if machine}
+    Once a day {place} copies its data: projects, sessions, memory, Qanuvi core's records and agent histories. The database
+    is copied whole while it runs. The last {info?.keep ?? 7} backups are kept, in a folder on {place}.
+  {:else}
+    Once a day Qanuvi copies its data: projects, sessions, memory, Qanuvi core's records, agent histories and the
+    window's settings. The database is copied whole while Qanuvi runs. The last {info?.keep ?? 7} backups are kept.
+  {/if}
 </p>
 
 {#if info}
+  {#if info.note}
+    <p class="small" class:ok={info.note.startsWith("Restored")} class:error={!info.note.startsWith("Restored")}>
+      {info.note}
+    </p>
+  {/if}
   <div class="card">
     <div class="row">
       <label class="check">
-        <input type="checkbox" checked={!info.off} onchange={(e) => save(folder, !e.currentTarget.checked)} />
+        <input
+          type="checkbox"
+          checked={!info.off && !noFolder}
+          disabled={noFolder}
+          onchange={(e) => save(folder, !e.currentTarget.checked)}
+        />
         Back up every day
       </label>
       <span class="spacer"></span>
-      <button type="button" class="btn primary" disabled={busy} onclick={now}>
+      <button type="button" class="btn primary" disabled={busy || noFolder} onclick={now}>
         {busy ? "Backing up…" : "Back up now"}
       </button>
     </div>
-    <p class="small">
-      {#if info.lastAt}Last backup: {when(info.lastAt)}{:else}No backup yet{/if}
-      {#if info.off}<span class="warn">· daily backups are off</span>{/if}
-    </p>
+    {#if noFolder}
+      <p class="warn small">
+        Backups are off on {place} until you choose a folder there. A folder on another disk than {place}'s data is
+        best: a backup on the same disk is lost with it.
+      </p>
+    {:else}
+      <p class="small">
+        {#if info.lastAt}Last backup: {when(info.lastAt)}{:else}No backup yet{/if}
+        {#if info.off}<span class="warn">· daily backups are off</span>{/if}
+      </p>
+    {/if}
     {#if info.lastError}<p class="error small">The last backup failed: {info.lastError}</p>{/if}
     {#if note}<p class="ok small">{note}</p>{/if}
 
-    <p class="small">
-      Folder: <code>{info.dir}</code>
-      {#if !info.custom}<span class="muted">(the default)</span>{/if}
-    </p>
+    {#if !noFolder}
+      <p class="small">
+        Folder: <code>{info.dir}</code>
+        {#if !info.custom}<span class="muted">(the default)</span>{/if}
+      </p>
+    {/if}
     <div class="row">
       <input
         bind:value={folder}
-        placeholder="A folder, for example D:\Qanuvi backups"
+        placeholder={machine
+          ? `A full path on ${place}, for example /home/you/qanuvi-backups`
+          : "A folder, for example D:\\Qanuvi backups"}
         spellcheck="false"
         aria-label="Backups folder"
       />
-      <button type="button" class="btn" onclick={choose}>Choose…</button>
+      {#if !machine}<button type="button" class="btn" onclick={choose}>Choose…</button>{/if}
       <button
         type="button"
         class="btn"
@@ -167,10 +245,14 @@
         onclick={() => save(folder, info!.off)}>Use this folder</button
       >
       {#if info.custom}
-        <button type="button" class="link" onclick={() => save("", info!.off)}>Back to the default</button>
+        <button type="button" class="link" onclick={() => save("", info!.off)}
+          >{machine ? "Stop backing up" : "Back to the default"}</button
+        >
       {/if}
     </div>
-    {#if sameDrive}
+    {#if machine}
+      <p class="muted small">{shownPlaceTitle()} makes the folder when it is not there yet.</p>
+    {:else if sameDrive}
       <p class="muted small">Another drive is safer: a backup on the same drive is lost with it.</p>
     {/if}
   </div>
@@ -178,34 +260,39 @@
   {#if info.restore}
     <div class="card">
       <p class="warn">
-        <code>{info.restore.split(/[\\/]/).pop()}</code> is restored when Qanuvi starts again. Your data as it is then is
-        backed up first.
+        <code>{info.restore.split(/[\\/]/).pop()}</code> is restored when {restartWord} starts again. The data as it is then
+        is backed up first.
       </p>
       <div class="row">
-        <button type="button" class="btn primary" onclick={() => invoke("app_restart")}>Restart Qanuvi now</button>
+        <button type="button" class="btn primary" disabled={busy} onclick={restartNow}
+          >{machine ? `Restart ${place} now` : "Restart Qanuvi now"}</button
+        >
         <button type="button" class="link" onclick={cancelRestore}>Cancel the restore</button>
       </div>
     </div>
   {/if}
 
-  <h3>Backups in the folder</h3>
-  {#each info.backups as b (b.path)}
-    <div class="item">
-      <div class="what">
-        <strong>{when(b.created)}</strong>
-        <span class="muted small">
-          {KIND[b.kind]} · {size(b.bytes)} · {b.files} files · Qanuvi {b.version}{b.window
-            ? ""
-            : " · no window settings"}
-        </span>
+  {#if !noFolder}
+    <h3>Backups in the folder</h3>
+    {#each info.backups as b (b.path)}
+      <div class="item">
+        <div class="what">
+          <strong>{when(b.created)}</strong>
+          <span class="muted small">
+            {KIND[b.kind]} · {size(b.bytes)} · {b.files} files · Qanuvi {b.version}{b.window || machine
+              ? ""
+              : " · no window settings"}
+          </span>
+        </div>
+        <button type="button" class="btn" disabled={!!info.restore} onclick={() => restore(b)}>Restore…</button>
+        <button type="button" class="link" onclick={() => remove(b)}>Remove…</button>
       </div>
-      <button type="button" class="btn" disabled={!!info.restore} onclick={() => restore(b)}>Restore…</button>
-      <button type="button" class="link" onclick={() => remove(b)}>Remove…</button>
-    </div>
-  {:else}
-    <p class="muted small">None yet.</p>
-  {/each}
+    {:else}
+      <p class="muted small">None yet.</p>
+    {/each}
+  {/if}
 {/if}
+
 {#if error}<p class="error small">{error}</p>{/if}
 
 <style>

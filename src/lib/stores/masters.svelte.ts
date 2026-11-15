@@ -6,7 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
-import { callMaster, disown, forgetMaster, nameMachines, own } from "$lib/remote";
+import { callMaster, disown, forgetMaster, nameMachines, own, shownMachine } from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
 import { show } from "./machines";
@@ -105,6 +105,35 @@ class MastersStore {
       invoke("remote_disconnect", { id: m.id }).catch(() => {});
       this.#dropped(m.id, errorText(e));
     }
+  }
+
+  /**
+   * Restarts a master's service (24z3 D3, a restore booked in its Backups): it answers, starts a new service that
+   * waits for it to end, and ends. The window lets the old connection go, connects again and shows the machine again
+   * when it was shown. Answers an error text, empty when it is back.
+   */
+  async restart(id: string): Promise<string> {
+    const m = this.list.find((x) => x.id === id);
+    if (!m) return "That machine is not in the list.";
+    const wasShown = shownMachine() === id;
+    try {
+      await callMaster(id, "master_restart", {});
+    } catch (e) {
+      return errorText(e);
+    }
+    await invoke("remote_disconnect", { id }).catch(() => {});
+    this.#dropped(id);
+    this.#set(id, { state: "connecting" });
+    // The new service waits for the old one to end, then applies the restore before it answers.
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, i === 0 ? 1500 : 3000));
+      await this.connect(m);
+      if (this.statusOf(id).state === "on") {
+        if (wasShown) await show(id);
+        return "";
+      }
+    }
+    return this.statusOf(id).error ?? `${m.name} did not come back.`;
   }
 
   async disconnect(id: string): Promise<void> {

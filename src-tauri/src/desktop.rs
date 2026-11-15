@@ -1230,6 +1230,8 @@ struct DataLocationInfo {
     pending: Option<String>,
     old: Option<String>,
     note: Option<String>,
+    /// Set where it starts (a master's --data); false here, a move is booked from the window.
+    fixed: bool,
 }
 
 /// Whether this is a test build from the source tree (it keeps its own data; the title bar says so).
@@ -1249,6 +1251,7 @@ fn data_location_info() -> DataLocationInfo {
         pending: loc.pending.as_deref().map(s),
         old: loc.old.as_deref().map(s),
         note: loc.note,
+        fixed: false,
     }
 }
 
@@ -1284,47 +1287,24 @@ async fn data_location_remove_old() -> Res<()> {
     .await
 }
 
-/// Backups (1d): where they go, whether daily backups are on, the last one, the list, and a restore booked.
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BackupsInfo {
-    data: String,
-    dir: String,
-    default_dir: String,
-    custom: bool,
-    off: bool,
-    last_at: u64,
-    last_error: Option<String>,
-    keep: usize,
-    restore: Option<String>,
-    backups: Vec<crate::backups::Entry>,
+/// The desktop app's default backups folder (a master has none).
+fn backups_default() -> std::path::PathBuf {
+    crate::backups::default_dir(crate::data_location::from_source())
 }
 
 fn backups_webview() -> Option<std::path::PathBuf> {
     crate::data_location::Defaults::real().webview_for(&crate::paths::data_dir())
 }
 
+/// Backups (1d): where they go, whether daily backups are on, the last one, the list, and a restore booked.
 #[tauri::command]
-async fn backups_info() -> Res<BackupsInfo> {
+async fn backups_info() -> Res<crate::backups::Info> {
     blocking(|| {
-        let data = crate::paths::data_dir();
-        let test = crate::data_location::from_source();
-        let c = crate::backups::read_config(&data);
-        let dir = crate::backups::folder(&data, test);
-        let loc = crate::data_location::read(&crate::data_location::Defaults::real().base);
-        let s = |p: &std::path::Path| p.to_string_lossy().into_owned();
-        Ok(BackupsInfo {
-            data: s(&data),
-            dir: s(&dir),
-            default_dir: s(&crate::backups::default_dir(test)),
-            custom: c.dir.is_some(),
-            off: c.off,
-            last_at: c.last_at,
-            last_error: c.last_error,
-            keep: crate::backups::KEEP,
-            restore: loc.restore.as_deref().map(s),
-            backups: crate::backups::list(&dir),
-        })
+        Ok(crate::backups::info(
+            &crate::paths::data_dir(),
+            &crate::data_location::Defaults::real().base,
+            Some(&backups_default()),
+        ))
     })
     .await
 }
@@ -1332,28 +1312,7 @@ async fn backups_info() -> Res<BackupsInfo> {
 /// Sets the backups folder (empty: the default one) and whether daily backups run.
 #[tauri::command]
 async fn backups_set(folder: String, off: bool) -> Res<()> {
-    blocking(move || {
-        let data = crate::paths::data_dir();
-        let mut c = crate::backups::read_config(&data);
-        let folder = folder.trim();
-        c.dir = if folder.is_empty() {
-            None
-        } else {
-            let p = std::path::PathBuf::from(folder);
-            if !p.is_absolute() {
-                return Err("Choose a full folder path.".into());
-            }
-            if p.starts_with(&data) {
-                return Err("The backups folder cannot be inside Qanuvi's data folder.".into());
-            }
-            std::fs::create_dir_all(&p)
-                .map_err(|e| format!("{} cannot be created: {e}", p.display()))?;
-            Some(p)
-        };
-        c.off = off;
-        crate::backups::write_config(&data, &c)
-    })
-    .await
+    blocking(move || crate::backups::set(&crate::paths::data_dir(), &folder, off)).await
 }
 
 /// Backs up now. Answers the new backup's folder.
@@ -1361,14 +1320,11 @@ async fn backups_set(folder: String, off: bool) -> Res<()> {
 async fn backups_now() -> Res<String> {
     blocking(|| {
         let web = backups_webview();
-        crate::backups::run_due(
+        crate::backups::now_backup(
             &crate::paths::data_dir(),
             web.as_deref(),
-            crate::data_location::from_source(),
-            true,
-        )?
-        .map(|p| p.to_string_lossy().into_owned())
-        .ok_or_else(|| "No backup was made.".to_string())
+            Some(&backups_default()),
+        )
     })
     .await
 }
@@ -1377,10 +1333,10 @@ async fn backups_now() -> Res<String> {
 #[tauri::command]
 async fn backups_restore(path: String) -> Res<()> {
     blocking(move || {
-        let data = crate::paths::data_dir();
-        crate::backups::plan_restore(
+        crate::backups::book_restore(
+            &crate::paths::data_dir(),
             &crate::data_location::Defaults::real().base,
-            &crate::backups::folder(&data, crate::data_location::from_source()),
+            Some(&backups_default()),
             std::path::Path::new(&path),
         )
     })
@@ -1396,9 +1352,9 @@ fn backups_cancel_restore() -> Res<()> {
 #[tauri::command]
 async fn backups_remove(path: String) -> Res<()> {
     blocking(move || {
-        let data = crate::paths::data_dir();
-        crate::backups::remove(
-            &crate::backups::folder(&data, crate::data_location::from_source()),
+        crate::backups::remove_one(
+            &crate::paths::data_dir(),
+            Some(&backups_default()),
             std::path::Path::new(&path),
         )
     })
@@ -2015,7 +1971,7 @@ pub fn run() {
         &defaults.base,
         &data,
         defaults.webview_for(&data).as_deref(),
-        crate::data_location::from_source(),
+        Some(&backups_default()),
     ) {
         eprintln!("{note}");
     }
@@ -2086,13 +2042,14 @@ pub fn run() {
             // when the last good one is a day old.
             let backup_dir = dir.clone();
             let backup_web = crate::data_location::Defaults::real().webview_for(&dir);
+            let backup_default = backups_default();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(120));
                 loop {
                     if let Err(e) = crate::backups::run_due(
                         &backup_dir,
                         backup_web.as_deref(),
-                        crate::data_location::from_source(),
+                        Some(&backup_default),
                         false,
                     ) {
                         eprintln!("Backup failed: {e}");

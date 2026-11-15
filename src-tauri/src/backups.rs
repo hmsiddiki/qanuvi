@@ -17,8 +17,9 @@ pub const KEEP: usize = 7;
 const DAY: u64 = 24 * 60 * 60;
 
 /// Files of the data folder that are never copied: the database (copied its own way) and its side files, the pointer,
-/// locks, the window's storage (copied apart), and folders that are rebuilt or only temporary.
-const SKIP: [&str; 9] = [
+/// locks, the window's storage (copied apart), folders that are rebuilt or only temporary, and a master's service
+/// file and restart mark (its port and token are made new at each start).
+const SKIP: [&str; 11] = [
     "qanuvi.db",
     "qanuvi.db-wal",
     "qanuvi.db-shm",
@@ -28,6 +29,8 @@ const SKIP: [&str; 9] = [
     "webview",
     "tmp",
     "browser-profiles",
+    "master.json",
+    "master-restarting",
 ];
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -135,11 +138,107 @@ pub fn write_config(data: &Path, c: &Config) -> Result<(), String> {
     std::fs::write(data.join(CONFIG), text).map_err(|e| format!("backups.json: {e}"))
 }
 
-/// The folder backups go to for this data folder.
-pub fn folder(data: &Path, test_build: bool) -> PathBuf {
+/// The folder backups go to for this data folder: the chosen one, else `default` (the desktop app's
+/// `default_dir`). A master has no default (24z3 D3): its backups are off until a folder is chosen on it.
+pub fn folder(data: &Path, default: Option<&Path>) -> Option<PathBuf> {
     read_config(data)
         .dir
-        .unwrap_or_else(|| default_dir(test_build))
+        .or_else(|| default.map(Path::to_path_buf))
+}
+
+/// Sets the backups folder (empty: none chosen, so the default one, or none on a master) and whether daily backups
+/// run. A chosen folder must be a full path outside the data folder; it is made when missing.
+pub fn set(data: &Path, folder: &str, off: bool) -> Result<(), String> {
+    let mut c = read_config(data);
+    let folder = folder.trim();
+    c.dir = if folder.is_empty() {
+        None
+    } else {
+        let p = PathBuf::from(folder);
+        if !p.is_absolute() {
+            return Err("Choose a full folder path.".into());
+        }
+        if p.starts_with(data) {
+            return Err("The backups folder cannot be inside Qanuvi's data folder.".into());
+        }
+        std::fs::create_dir_all(&p)
+            .map_err(|e| format!("{} cannot be created: {e}", p.display()))?;
+        Some(p)
+    };
+    c.off = off;
+    write_config(data, &c)
+}
+
+/// "Back up now". Answers the new backup's folder.
+pub fn now_backup(
+    data: &Path,
+    webview: Option<&Path>,
+    default: Option<&Path>,
+) -> Result<String, String> {
+    run_due(data, webview, default, true)?
+        .map(|p| p.to_string_lossy().into_owned())
+        .ok_or_else(|| "No backup was made.".to_string())
+}
+
+/// Books `backup` (one in this machine's backups folder) to be restored at the next start.
+pub fn book_restore(
+    data: &Path,
+    base: &Path,
+    default: Option<&Path>,
+    backup: &Path,
+) -> Result<(), String> {
+    let dest = folder(data, default).ok_or("No backups folder is chosen.")?;
+    plan_restore(base, &dest, backup)
+}
+
+/// Removes one backup from this machine's backups folder.
+pub fn remove_one(data: &Path, default: Option<&Path>, backup: &Path) -> Result<(), String> {
+    let dest = folder(data, default).ok_or("No backups folder is chosen.")?;
+    remove(&dest, backup)
+}
+
+/// What Settings → Backups shows for one machine.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Info {
+    pub data: String,
+    /// Where backups go; empty when none is chosen on a master.
+    pub dir: String,
+    /// The desktop app's default folder; empty on a master (it has none).
+    pub default_dir: String,
+    pub custom: bool,
+    pub off: bool,
+    pub last_at: u64,
+    pub last_error: Option<String>,
+    pub keep: usize,
+    pub restore: Option<String>,
+    /// What the last restore did (kept in the pointer file until the next one).
+    pub note: Option<String>,
+    pub backups: Vec<Entry>,
+}
+
+/// Backups facts for the data folder `data` whose pointer file is in `base`.
+pub fn info(data: &Path, base: &Path, default: Option<&Path>) -> Info {
+    let c = read_config(data);
+    let dir = folder(data, default);
+    let loc = crate::data_location::read(base);
+    let s = |p: &Path| p.to_string_lossy().into_owned();
+    let note = loc
+        .note
+        .filter(|n| n.starts_with("Restored") || n.starts_with("The backup was not restored"));
+    Info {
+        data: s(data),
+        dir: dir.as_deref().map(s).unwrap_or_default(),
+        default_dir: default.map(s).unwrap_or_default(),
+        custom: c.dir.is_some(),
+        off: c.off,
+        last_at: c.last_at,
+        last_error: c.last_error,
+        keep: KEEP,
+        restore: loc.restore.as_deref().map(s),
+        note,
+        backups: dir.as_deref().map(list).unwrap_or_default(),
+    }
 }
 
 /// Where the window keeps its settings inside its storage folder (WebView2).
@@ -325,14 +424,21 @@ pub fn remove(dest: &Path, path: &Path) -> Result<(), String> {
 pub fn run_due(
     data: &Path,
     webview: Option<&Path>,
-    test_build: bool,
+    default: Option<&Path>,
     force: bool,
 ) -> Result<Option<PathBuf>, String> {
     let mut c = read_config(data);
     if !force && (c.off || now().saturating_sub(c.last_at) < DAY) {
         return Ok(None);
     }
-    let dest = c.dir.clone().unwrap_or_else(|| default_dir(test_build));
+    let Some(dest) = folder(data, default) else {
+        // A master with no folder chosen: nothing to do, and "Back up now" says why.
+        return if force {
+            Err("Choose a backups folder on this machine first.".into())
+        } else {
+            Ok(None)
+        };
+    };
     let kind = if force { Kind::Manual } else { Kind::Daily };
     let result = make(data, webview, &dest, kind);
     // Read again: the window may have changed the settings while the copy ran.
@@ -395,12 +501,15 @@ pub fn apply_pending(
     base: &Path,
     data: &Path,
     webview: Option<&Path>,
-    test_build: bool,
+    default: Option<&Path>,
 ) -> Option<String> {
     let mut loc = crate::data_location::read(base);
     let backup = loc.restore.take()?;
-    let dest = folder(data, test_build);
     let note = (|| {
+        let dest = folder(data, default).ok_or_else(|| {
+            "no backups folder is chosen, so the data in use could not be backed up first"
+                .to_string()
+        })?;
         let src = backup.join("data");
         if !src.is_dir() {
             return Err(format!("{} is not there any more", backup.display()));
@@ -519,9 +628,9 @@ mod tests {
         )
         .unwrap();
 
-        assert!(run_due(&data, None, false, false).unwrap().is_some());
+        assert!(run_due(&data, None, None, false).unwrap().is_some());
         assert!(
-            run_due(&data, None, false, false).unwrap().is_none(),
+            run_due(&data, None, None, false).unwrap().is_none(),
             "not again the same day"
         );
         // Ten more (as if on ten days): only the newest seven stay, a before-restore copy stays too.
@@ -530,7 +639,7 @@ mod tests {
             let mut c = read_config(&data);
             c.last_at = 0;
             write_config(&data, &c).unwrap();
-            run_due(&data, None, false, false).unwrap().unwrap();
+            run_due(&data, None, None, false).unwrap().unwrap();
         }
         let l = list(&dest);
         assert_eq!(
@@ -549,8 +658,8 @@ mod tests {
         c.off = true;
         c.last_at = 0;
         write_config(&data, &c).unwrap();
-        assert!(run_due(&data, None, false, false).unwrap().is_none());
-        assert!(run_due(&data, None, false, true).unwrap().is_some());
+        assert!(run_due(&data, None, None, false).unwrap().is_none());
+        assert!(run_due(&data, None, None, true).unwrap().is_some());
 
         // A folder that cannot be made: the error is recorded for the window.
         let file = root.path().join("a-file");
@@ -563,7 +672,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(run_due(&data, None, false, false).is_err());
+        assert!(run_due(&data, None, None, false).is_err());
         assert!(read_config(&data).last_error.is_some());
     }
 
@@ -598,7 +707,7 @@ mod tests {
         // Only a listed backup can be booked.
         assert!(plan_restore(&base, &dest, &root.path().join("nope")).is_err());
         plan_restore(&base, &dest, &backup).unwrap();
-        let note = apply_pending(&base, &data, Some(&web), false).unwrap();
+        let note = apply_pending(&base, &data, Some(&web), None).unwrap();
         assert!(note.starts_with("Restored"), "{note}");
         assert_eq!(rows(&data.join("qanuvi.db")), ["old"]);
         assert!(!data.join("later.json").exists());
@@ -613,7 +722,7 @@ mod tests {
         );
         assert!(crate::data_location::read(&base).restore.is_none());
         assert!(
-            apply_pending(&base, &data, Some(&web), false).is_none(),
+            apply_pending(&base, &data, Some(&web), None).is_none(),
             "once"
         );
 
@@ -624,12 +733,55 @@ mod tests {
             .unwrap();
         assert_eq!(rows(&before.path.join("data/qanuvi.db")), ["old", "new"]);
         plan_restore(&base, &dest, &before.path).unwrap();
-        apply_pending(&base, &data, Some(&web), false).unwrap();
+        apply_pending(&base, &data, Some(&web), None).unwrap();
         assert_eq!(rows(&data.join("qanuvi.db")), ["old", "new"]);
         assert!(data.join("later.json").exists());
         assert_eq!(
             std::fs::read(local_storage(&web).join("s")).unwrap(),
             b"new settings"
         );
+    }
+
+    #[test]
+    fn a_machine_without_a_default_backs_up_only_once_a_folder_is_chosen() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("master");
+        drop(data_with_db(&data, &["a"]));
+        std::fs::write(data.join("master.json"), b"{\"token\":\"t\"}").unwrap();
+
+        // No folder chosen: the daily check does nothing, "Back up now" says why, the page shows no folder.
+        assert!(run_due(&data, None, None, false).unwrap().is_none());
+        assert!(run_due(&data, None, None, true).is_err());
+        let i = info(&data, &data, None);
+        assert_eq!((i.dir.as_str(), i.default_dir.as_str()), ("", ""));
+        assert!(i.backups.is_empty());
+
+        // A folder that is not a full path, or inside the data, is refused.
+        assert!(set(&data, "backups", false).is_err());
+        assert!(set(&data, &data.join("b").to_string_lossy(), false).is_err());
+        let dest = root.path().join("backups");
+        set(&data, &dest.to_string_lossy(), false).unwrap();
+        let made = run_due(&data, None, None, false).unwrap().unwrap();
+        assert!(made.join("data/qanuvi.db").exists());
+        assert!(
+            !made.join("data/master.json").exists(),
+            "the service file stays out"
+        );
+        let i = info(&data, &data, None);
+        assert_eq!(i.backups.len(), 1);
+        assert!(i.custom);
+
+        // A restore on the machine itself (pointer file in its own data folder).
+        plan_restore(&data, &dest, &made).unwrap();
+        let note = apply_pending(&data, &data, None, None).unwrap();
+        assert!(note.starts_with("Restored"), "{note}");
+        assert!(info(&data, &data, None).note.is_some());
+
+        // Back to no folder: off again; a booked restore cannot keep the data first, so nothing changes.
+        plan_restore(&data, &dest, &made).unwrap();
+        set(&data, "", false).unwrap();
+        let note = apply_pending(&data, &data, None, None).unwrap();
+        assert!(note.starts_with("The backup was not restored"), "{note}");
+        assert_eq!(rows(&data.join("qanuvi.db")), ["a"]);
     }
 }

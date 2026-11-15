@@ -369,7 +369,30 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 20:00): 24z3 D2 DRIVEN LIVE, all pass (release test build 19:35, scratch
+    RESUME HERE (newest, 2026-11-15 21:10): 24z3 D3 BUILT (backups + data folder on the shown machine). Owner
+    agreed the proposal; on question (a) a master's backups are OFF by default until a folder is chosen on it (the
+    owner's sentence ended at "it should ..."; read as "it should ask for a folder", the page says so; confirm);
+    (b) a master's data folder is only shown, moving it comes later. backups.rs: the default folder is now a
+    parameter (desktop: default_dir, a master: none); shared set/info/now_backup/book_restore/remove_one used by both
+    desktop.rs and master.rs; "Back up now" with no folder says "Choose a backups folder on this machine first."; a
+    booked restore with no folder is refused at start ("not restored", nothing changed); master.json and the restart
+    mark are never copied into a backup. master.rs answers backups_info/_set/_now/_restore/_cancel_restore/_remove,
+    data_location_info (fixed: true, its --data / QANUVI_MASTER_DATA text), master_busy (open agent sessions, plan
+    runs) and master_restart; Master keeps its own data folder (paths keeps only the first a process sets, which
+    made a test flaky). A master applies a booked restore in Master::open before its database opens, and runs the
+    daily check (2 min after start, then hourly) in serve(). Restart: writes a "master-restarting" mark, starts a new
+    `serve --after-pid=<pid>` (it waits for the old one to end), answers, then ends (agents, terminals stopped,
+    service file removed); ensure_service waits for the coming service while the mark is under 30 s old instead of
+    starting a second; the new service removes the mark. Window: Backups page and the data folder panel reload on a
+    machine switch (late answers dropped); on a master the header says "Backups: <name>", no Choose… picker (a full
+    path typed on that machine), "Stop backing up" instead of "Back to the default", no "window settings" texts,
+    "Restart <name> now" asks with what stops there, then masters.restart() lets the connection go, connects again
+    (4 tries) and shows the machine again; the restore note shows on the Backups page. Green: prettier,
+    svelte-check, 354 TS tests, rustfmt, clippy desktop + server, 398 desktop / 385 server Rust tests (new: a
+    machine without a default folder, a master's backup commands). NOT driven live. NEXT: drive D3 live (test build,
+    the "This PC" test master: no folder text, choose a scratch folder, Back up now, book a restore, Restart the
+    master, the note and the data from before; This PC's page unchanged; data folder panel read-only), then D4.
+    RESUME HERE (before, 2026-11-15 20:00): 24z3 D2 DRIVEN LIVE, all pass (release test build 19:35, scratch
     projects pc-proj and master-proj, the "This PC" test master, $0, nothing installed). For the master only, a test
     wrapper took the place of qanuvi-master.exe and started the real one with PATH, LOCALAPPDATA, APPDATA,
     ProgramFiles and ProgramW6432 pointing at empty folders and a stand-in winget.exe that installs nothing and ends

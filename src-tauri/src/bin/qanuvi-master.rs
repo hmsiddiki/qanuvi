@@ -46,7 +46,16 @@ fn main() {
         qanuvi_lib::master::stdio_bridge(&data)
     } else {
         match command {
-            Some("serve") => qanuvi_lib::master::serve(&data),
+            Some("serve") => {
+                // A restart (Settings, Backups): the service before must end first (it has the data open).
+                if let Some(pid) = qanuvi_lib::data_location::after_pid(args.iter().cloned()) {
+                    qanuvi_lib::data_location::wait_for_exit(
+                        pid,
+                        std::time::Duration::from_secs(30),
+                    );
+                }
+                qanuvi_lib::master::serve(&data)
+            }
             Some("stop") => {
                 let stopped = qanuvi_lib::master::stop_service(&data);
                 println!("{}", if stopped { "Stopped." } else { "Not running." });

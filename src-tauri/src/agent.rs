@@ -1531,6 +1531,11 @@ impl Agents {
         }
     }
 
+    /// How many agent sessions have a process open (a master's restart says so first).
+    pub fn open_count(&self) -> usize {
+        self.map.lock().unwrap_or_else(|e| e.into_inner()).len()
+    }
+
     pub fn stop_all(&self) {
         let ids: Vec<String> = self
             .map

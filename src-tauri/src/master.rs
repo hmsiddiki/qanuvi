@@ -29,6 +29,8 @@ mod plan_runs;
 
 /// What a running master shares with its connections.
 pub struct Master {
+    /// Its data folder (the one it was opened on; paths keeps the first one a process sets).
+    dir: PathBuf,
     db: Db,
     terminals: Terminals,
     agents: Agents,
@@ -98,10 +100,15 @@ impl Master {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         paths::set_data_dir(dir.to_path_buf());
         crate::model_keys::use_master_names();
+        // A restore booked in Settings, Backups (24z3 D3): applied now, before the database opens.
+        if let Some(note) = crate::backups::apply_pending(dir, dir, None, None) {
+            eprintln!("{note}");
+        }
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
         agent::mark_interrupted(&db);
         runs::mark_interrupted(&db);
         Ok(Self {
+            dir: dir.to_path_buf(),
             db,
             terminals: Terminals::default(),
             agents: Agents::default(),
@@ -429,6 +436,55 @@ impl Master {
                 self.terminals.kill(&s(args, "id"));
                 Ok(Value::Null)
             }
+            // Backups and the data folder (24z3 D3): the master's own. It has no default backups folder, so they are
+            // off until one is chosen on it; its pointer file is in its own data folder; the folder itself is set
+            // where it starts (--data or QANUVI_MASTER_DATA), so Settings only shows it.
+            "backups_info" => {
+                let d = &self.dir;
+                to(Ok(crate::backups::info(d, d, None)))
+            }
+            "backups_set" => to(crate::backups::set(
+                &self.dir,
+                &s(args, "folder"),
+                args["off"].as_bool().unwrap_or(false),
+            )),
+            "backups_now" => to(crate::backups::now_backup(&self.dir, None, None)),
+            "backups_restore" => {
+                let d = &self.dir;
+                to(crate::backups::book_restore(
+                    d,
+                    d,
+                    None,
+                    Path::new(&s(args, "path")),
+                ))
+            }
+            "backups_cancel_restore" => to(crate::backups::cancel_restore(&self.dir)),
+            "backups_remove" => to(crate::backups::remove_one(
+                &self.dir,
+                None,
+                Path::new(&s(args, "path")),
+            )),
+            "data_location_info" => {
+                let d = &self.dir;
+                let loc = crate::data_location::read(d);
+                Ok(json!({
+                    "current": d.to_string_lossy(),
+                    "defaultDir": paths::default_master_dir().to_string_lossy(),
+                    "pending": null,
+                    "old": null,
+                    "note": loc.note,
+                    "fixed": true,
+                }))
+            }
+            // What a restart stops (the window says so before asking), and the restart itself.
+            "master_busy" => Ok(json!({
+                "agents": self.agents.open_count(),
+                "runs": self.runs.active().len(),
+            })),
+            "master_restart" => {
+                self.restart(&self.dir)?;
+                Ok(Value::Null)
+            }
             // This machine and its setup (24z3 D2): the guide, the setup wizard and the status bar while it is shown.
             "machine_info" => to(Ok(crate::machine::detect())),
             "machine_room" => to(Ok(
@@ -669,9 +725,62 @@ fn private(file: &Path) {
 #[cfg(not(unix))]
 fn private(_file: &Path) {}
 
+/// Marks a restart under way (24z3 D3): a connection that finds no service then waits for the new one instead of
+/// starting a second.
+fn restart_mark(dir: &Path) -> PathBuf {
+    dir.join("master-restarting")
+}
+
+/// A restart mark younger than half a minute.
+fn restarting(dir: &Path) -> bool {
+    std::fs::metadata(restart_mark(dir))
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < Duration::from_secs(30))
+}
+
+impl Master {
+    /// Starts a new service that waits for this one to end, then ends this one: its agent sessions and terminals
+    /// stop, a booked restore is applied by the new one before its database opens. The answer goes out first.
+    fn restart(&self, dir: &Path) -> Result<(), String> {
+        let me = self
+            .me
+            .get()
+            .and_then(|w| w.upgrade())
+            .ok_or("The master is not ready.")?;
+        std::fs::write(restart_mark(dir), b"").map_err(|e| e.to_string())?;
+        if let Err(e) = start_service(dir, Some(std::process::id())) {
+            let _ = std::fs::remove_file(restart_mark(dir));
+            return Err(e);
+        }
+        let dir = dir.to_path_buf();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(400));
+            me.agents.stop_all();
+            me.terminals.kill_all();
+            let _ = std::fs::remove_file(service_file(&dir));
+            std::process::exit(0);
+        });
+        Ok(())
+    }
+}
+
 /// Runs the background service until it is stopped.
 pub fn serve(dir: &Path) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
+    // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour; nothing
+    // happens until a backups folder is chosen on this machine.
+    let backup_dir = dir.to_path_buf();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(120));
+        loop {
+            if let Err(e) = crate::backups::run_due(&backup_dir, None, None, false) {
+                eprintln!("Backup failed: {e}");
+            }
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    });
     let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let token = uuid::Uuid::new_v4().simple().to_string();
@@ -686,6 +795,7 @@ pub fn serve(dir: &Path) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &file).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(restart_mark(dir));
     for stream in listener.incoming().flatten() {
         let (master, token) = (master.clone(), token.clone());
         std::thread::spawn(move || {
@@ -731,13 +841,15 @@ pub fn is_running(dir: &Path) -> bool {
 }
 
 /// Starts the background service, detached from this process and its terminal.
-fn start_service(dir: &Path) -> Result<(), String> {
+/// `after`: a service that is ending (a restart); the new one waits for it before it opens the data.
+fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut cmd = std::process::Command::new(exe);
-    cmd.arg("serve")
-        .arg("--data")
-        .arg(dir)
-        .stdin(std::process::Stdio::null())
+    cmd.arg("serve").arg("--data").arg(dir);
+    if let Some(pid) = after {
+        cmd.arg(format!("--after-pid={pid}"));
+    }
+    cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     #[cfg(unix)]
@@ -762,8 +874,21 @@ pub fn ensure_service(dir: &Path) -> Result<(TcpStream, String), String> {
         return Ok(c);
     }
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    // A restart under way: its new service is coming (it waits for the old one to end first).
+    if restarting(dir) {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while Instant::now() < deadline && restarting(dir) {
+            if let Some(c) = connect(dir) {
+                return Ok(c);
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        if let Some(c) = connect(dir) {
+            return Ok(c);
+        }
+    }
     let _ = std::fs::remove_file(service_file(dir));
-    start_service(dir)?;
+    start_service(dir, None)?;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         if let Some(c) = connect(dir) {
@@ -989,6 +1114,44 @@ mod tests {
         )
         .unwrap_err();
         assert!(!e.contains("does not know"), "{e}");
+    }
+
+    #[test]
+    fn answers_its_own_backups_and_shows_its_data_folder() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let d = data.path();
+        let loc = call(&m, "data_location_info", json!({})).unwrap();
+        assert_eq!(loc["fixed"], true);
+        assert_eq!(loc["current"], d.to_string_lossy().as_ref());
+
+        // No backups folder by default: off, "Back up now" says why.
+        let i = call(&m, "backups_info", json!({})).unwrap();
+        assert_eq!(
+            (i["dir"].as_str(), i["defaultDir"].as_str()),
+            (Some(""), Some(""))
+        );
+        assert!(call(&m, "backups_now", json!({})).is_err());
+
+        let dest = tempfile::tempdir().unwrap();
+        let folder = dest.path().join("b").to_string_lossy().into_owned();
+        call(&m, "backups_set", json!({"folder": folder, "off": false})).unwrap();
+        let made = call(&m, "backups_now", json!({})).unwrap();
+        let i = call(&m, "backups_info", json!({})).unwrap();
+        assert_eq!(i["backups"].as_array().unwrap().len(), 1, "{i}");
+        call(&m, "backups_restore", json!({"path": made})).unwrap();
+        assert_eq!(
+            call(&m, "backups_info", json!({})).unwrap()["restore"],
+            made
+        );
+        call(&m, "backups_cancel_restore", json!({})).unwrap();
+        call(&m, "backups_remove", json!({"path": made})).unwrap();
+        let busy = call(&m, "master_busy", json!({})).unwrap();
+        assert_eq!(
+            (busy["agents"].as_u64(), busy["runs"].as_u64()),
+            (Some(0), Some(0))
+        );
+        call(&m, "backups_set", json!({"folder": "", "off": false})).unwrap();
     }
 
     #[test]
