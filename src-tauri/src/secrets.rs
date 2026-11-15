@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 /// The credential store under the three calls this file needs. The desktop build uses the system's store (keyring);
 /// a server build without the desktop feature has none: nothing is read, saving says so, deleting is a no-op.
 #[cfg(feature = "desktop")]
-mod store {
+pub(crate) mod store {
     fn entry(key: &str) -> Result<keyring::Entry, String> {
         keyring::Entry::new("Qanuvi", key).map_err(|e| e.to_string())
     }
@@ -32,7 +32,7 @@ mod store {
 }
 
 #[cfg(not(feature = "desktop"))]
-mod store {
+pub(crate) mod store {
     pub fn read(_key: &str) -> Option<String> {
         None
     }

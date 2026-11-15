@@ -28,6 +28,7 @@ pub mod master;
 pub mod mcp;
 pub mod memory;
 pub mod memory_disk;
+pub mod model_keys;
 pub mod notify;
 pub mod omniroute;
 pub mod paths;

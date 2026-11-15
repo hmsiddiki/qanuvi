@@ -5,7 +5,8 @@
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import X from "@lucide/svelte/icons/x";
   import { onMount } from "svelte";
-  import { brain } from "$lib/stores/brain.svelte";
+  import { brain, keyEnvName } from "$lib/stores/brain.svelte";
+  import { shownPlace } from "$lib/remote";
   import { settings, type ModelProvider } from "$lib/stores/settings.svelte";
   import { ask } from "$lib/stores/confirm.svelte";
   import { agent } from "$lib/stores/agent.svelte";
@@ -47,6 +48,15 @@
   let addError = $state("");
 
   let b = $derived(settings.value.brain);
+  /** "this computer", or the shown master's name. */
+  let here = $derived((void brain.shownCount, shownPlace()));
+
+  // Another machine on screen: what was typed or said about the one before goes.
+  $effect(() => {
+    void brain.shownCount;
+    keyDraft = {};
+    keyNote = {};
+  });
 
   onMount(() => {
     brain.loadKeys();
@@ -71,9 +81,14 @@
     const err = await brain.setKey(p.id, keyDraft[p.id] ?? "");
     keyNote = {
       ...keyNote,
-      [p.id]: err || (keyDraft[p.id]?.trim() ? "Key kept in the credential store." : "Key forgotten."),
+      [p.id]: err || (keyDraft[p.id]?.trim() ? keptText() : "Key forgotten."),
     };
     keyDraft = { ...keyDraft, [p.id]: "" };
+  }
+
+  function keptText(): string {
+    const where = shownPlace();
+    return where === "this computer" ? "Key kept in the credential store." : `Key kept in ${where}'s credential store.`;
   }
 
   function setUrl(p: ModelProvider, url: string) {
@@ -134,13 +149,13 @@
       >{/if}
   </h3>
   <p class="note">
-    Best first. With "Auto", questions go to a model on this computer first, changes to the first model in this list; a
-    model that is rate limited, down or keeps getting tool calls wrong hands the turn to the next one.
+    Best first. With "Auto", questions go to a model on {here} first, changes to the first model in this list; a model that
+    is rate limited, down or keeps getting tool calls wrong hands the turn to the next one.
   </p>
   {#each b.models as m, i (m.id)}
     <div class="model">
       <span class="name">{m.label}</span>
-      {#if m.local}<span class="tag local">this computer</span>{:else if m.free}<span class="tag free">free</span>{/if}
+      {#if m.local}<span class="tag local">{here}</span>{:else if m.free}<span class="tag free">free</span>{/if}
       <span class="muted small">{m.id.split("/")[0]} · {record(m.id)}</span>
       <span class="spacer"></span>
       <button type="button" class="icon" title="Move up" disabled={i === 0} onclick={() => brain.move(m.id, -1)}
@@ -161,8 +176,8 @@
 
   <h3>Where models come from</h3>
   <p class="note">
-    No paid plan needed: a model on this computer through Ollama, free models through OpenRouter, or OmniRoute's free
-    providers. Each has a step-by-step guide. Guides checked on {guides.all.map((g) => g.checkedOn).sort()[0]}.
+    No paid plan needed: a model on {here} through Ollama, free models through OpenRouter, or OmniRoute's free providers.
+    Each has a step-by-step guide. Guides checked on {guides.all.map((g) => g.checkedOn).sort()[0]}.
     {#if paidAgent}
       <button type="button" class="link" disabled={guides.updating} onclick={updateGuides}
         >{guides.updating ? "Updating…" : "Update them with Claude Code"}</button
@@ -216,13 +231,14 @@
       onchange={(e) => settings.set("brain", { ...b, local: e.currentTarget.checked })}
     />
     <span>
-      <strong>Use models on this computer (Ollama)</strong>
+      <strong>Use models on {here} (Ollama)</strong>
       <span class="muted small"
         >Off: only free models online (OpenRouter, OmniRoute). Nothing is installed, downloaded or started on this
         computer, and models already in the list from it are skipped.</span
       >
     </span>
   </label>
+  {#if brain.keyError}<p class="error">Keys: {brain.keyError}</p>{/if}
   {#each b.providers.filter((p) => b.local || p.kind !== "ollama") as p (p.id)}
     <div class="provider">
       <div class="row">
@@ -244,17 +260,25 @@
       </div>
       {#if p.kind !== "ollama"}
         <div class="row">
-          <input
-            type="password"
-            class="key"
-            placeholder={brain.keys[p.id] ? "Key kept (type a new one to replace it)" : "API key (if it needs one)"}
-            bind:value={keyDraft[p.id]}
-            aria-label="{p.name} key"
-          />
-          <button type="button" class="btn" onclick={() => saveKey(p)}>
-            {keyDraft[p.id]?.trim() ? "Save key" : brain.keys[p.id] ? "Forget key" : "Save key"}
-          </button>
-          {#if p.id === "omniroute" && !brain.keys[p.id]}
+          {#if brain.keyStore === "environment"}
+            <span class="muted small env-key">
+              {#if brain.keys[p.id]}Key set in {shownPlace()}'s environment ({keyEnvName(p.id)}).{:else}No key. This
+                server reads it from its environment: set {keyEnvName(p.id)} where qanuvi-master starts (for example in its
+                systemd unit), then restart it.{/if}
+            </span>
+          {:else}
+            <input
+              type="password"
+              class="key"
+              placeholder={brain.keys[p.id] ? "Key kept (type a new one to replace it)" : "API key (if it needs one)"}
+              bind:value={keyDraft[p.id]}
+              aria-label="{p.name} key"
+            />
+            <button type="button" class="btn" onclick={() => saveKey(p)}>
+              {keyDraft[p.id]?.trim() ? "Save key" : brain.keys[p.id] ? "Forget key" : "Save key"}
+            </button>
+          {/if}
+          {#if p.id === "omniroute" && !brain.keys[p.id] && brain.keyStore === "store"}
             <button
               type="button"
               class="btn primary"
@@ -303,7 +327,7 @@
               <span class="name">{f.name}</span>
               <span class="muted small">
                 {[
-                  f.local ? "this computer" : f.free ? "free" : "paid",
+                  f.local ? here : f.free ? "free" : "paid",
                   f.context ? `${Math.round(f.context / 1024)}k context` : "",
                   size(f.size),
                 ]
@@ -390,6 +414,9 @@
     font-size: 11px;
   }
 
+  .env-key {
+    flex: 1;
+  }
   .error {
     margin: 4px 0;
     color: var(--qx-status-failed);

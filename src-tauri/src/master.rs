@@ -78,6 +78,14 @@ fn n(args: &Value, k: &str) -> u64 {
     args[k].as_u64().unwrap_or(0)
 }
 
+/// A model provider from the window's `endpoint` argument (its key is added here, never sent).
+fn endpoint_arg(args: &Value) -> Result<crate::llm::Endpoint, String> {
+    let mut ep: crate::llm::Endpoint =
+        serde_json::from_value(args["endpoint"].clone()).map_err(|e| e.to_string())?;
+    ep.key = None;
+    Ok(ep)
+}
+
 fn to<T: serde::Serialize>(r: Result<T, String>) -> Result<Value, String> {
     r.and_then(|v| serde_json::to_value(v).map_err(|e| e.to_string()))
 }
@@ -89,6 +97,7 @@ impl Master {
     pub fn open(dir: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         paths::set_data_dir(dir.to_path_buf());
+        crate::model_keys::use_master_names();
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
         agent::mark_interrupted(&db);
         runs::mark_interrupted(&db);
@@ -283,6 +292,53 @@ impl Master {
                 crate::secrets::remove(&id, &s(args, "name"))?;
                 Ok(Value::Null)
             }
+            // Models (24z3 D1): this master's own providers, keys and local servers; a key never goes to the window.
+            "model_key_store" => Ok(json!(crate::model_keys::kind())),
+            "model_key_has" => Ok(json!(crate::model_keys::has(&s(args, "endpoint")))),
+            "model_key_set" => {
+                crate::model_keys::set(&s(args, "endpoint"), &s(args, "key"))?;
+                Ok(Value::Null)
+            }
+            "models_list" => to(crate::llm::list_models(
+                &crate::model_keys::with_key(endpoint_arg(args)?),
+                b(args, "all"),
+            )),
+            "model_probe" => to(crate::llm::probe(
+                crate::model_keys::with_key(endpoint_arg(args)?),
+                s(args, "model"),
+            )),
+            "model_key_check" => to(crate::llm::check_key(&crate::model_keys::with_key(
+                endpoint_arg(args)?,
+            ))),
+            "local_server_status" => to(Ok(crate::local_servers::status(
+                &endpoint_arg(args)?,
+                opt(args, "start").as_deref(),
+            ))),
+            "local_server_start" => {
+                crate::local_servers::start(
+                    &crate::model_keys::with_key(endpoint_arg(args)?),
+                    opt(args, "start").as_deref(),
+                )?;
+                Ok(Value::Null)
+            }
+            "ollama_pull" => {
+                let sink = stream(&s(args, "onEvent"));
+                let mut last = Instant::now() - Duration::from_secs(1);
+                crate::llm::ollama_pull(
+                    &endpoint_arg(args)?,
+                    &s(args, "model"),
+                    |status, done, total| {
+                        // A few updates a second are enough.
+                        if last.elapsed().as_millis() >= 250 || status == "success" {
+                            last = Instant::now();
+                            let _ =
+                                sink.send(json!({"status": status, "done": done, "total": total}));
+                        }
+                    },
+                )?;
+                Ok(Value::Null)
+            }
+            "brain_records" => to(Ok(crate::brain::Records::load(&paths::data_dir()))),
             // This machine's settings (24z3 A3): the window's Settings page while this master is shown.
             "settings_get" => to(crate::settings::get_all(db)),
             "settings_set" => {
@@ -461,7 +517,7 @@ impl Master {
                     opt(args, "agent").as_deref().unwrap_or("claude-code"),
                     args.get("setup")
                         .filter(|v| !v.is_null())
-                        .map(|v| crate::brain::with_keys(&v.to_string(), crate::brain::env_key))
+                        .map(|v| crate::brain::with_keys(&v.to_string(), crate::model_keys::get))
                         .transpose()?
                         .as_deref(),
                     events,
@@ -885,6 +941,55 @@ mod tests {
         for cmd in ["secrets_names", "secrets_set", "secrets_remove"] {
             let args = json!({"projectId": "not-a-project", "name": "DB_PASSWORD", "value": "x"});
             assert!(call(&m, cmd, args).is_err(), "{cmd}");
+        }
+    }
+
+    #[test]
+    fn answers_the_models_page_with_its_own_keys() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        assert_eq!(
+            call(&m, "model_key_store", json!({})).unwrap(),
+            json!(crate::model_keys::kind())
+        );
+        // A key in the master's environment counts (a name no other test uses).
+        let name = crate::model_keys::env_name("d1master-env");
+        // SAFETY: no other test reads or writes this variable.
+        unsafe { std::env::set_var(&name, "k2") };
+        assert_eq!(
+            call(&m, "model_key_has", json!({"endpoint": "d1master-env"})).unwrap(),
+            json!(true)
+        );
+        unsafe { std::env::remove_var(&name) };
+        assert_eq!(
+            call(&m, "model_key_has", json!({"endpoint": "d1master-env"})).unwrap(),
+            json!(false)
+        );
+        assert_eq!(
+            call(&m, "brain_records", json!({})).unwrap()["models"],
+            json!({})
+        );
+        // Known commands: a bad endpoint is the endpoint's error, never "does not know the command".
+        for cmd in [
+            "models_list",
+            "model_probe",
+            "model_key_check",
+            "local_server_status",
+            "local_server_start",
+            "ollama_pull",
+        ] {
+            let e = call(&m, cmd, json!({"endpoint": {"id": "x"}})).unwrap_err();
+            assert!(!e.contains("does not know"), "{cmd}: {e}");
+        }
+        #[cfg(not(feature = "desktop"))]
+        {
+            let e = call(
+                &m,
+                "model_key_set",
+                json!({"endpoint": "openrouter", "key": "k"}),
+            )
+            .unwrap_err();
+            assert!(e.contains("QANUVI_KEY_OPENROUTER"), "{e}");
         }
     }
 

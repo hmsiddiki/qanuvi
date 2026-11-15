@@ -369,7 +369,22 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 14:30): 24z3 A2 + A3 DRIVEN LIVE, all pass (release test build 14:06, scratch
+    RESUME HERE (newest, 2026-11-15 15:40): 24z3 D1 BUILT (Models + keys on the shown machine; owner agreed the
+    proposal and both questions: a desktop master keeps its own key names, brain records per machine). New
+    model_keys.rs (one place for both builds): credential store first, then QANUVI_KEY_<PROVIDER>; a server build
+    cannot save or forget a key and says where to set it; a master's store entries are master-models:<id>, so a
+    master on the same computer never shares This PC's models:<id>. Agents and plan runs on a master now read keys
+    the same way (before: environment only, so a key saved on a desktop master did nothing). llm::probe shared.
+    master.rs answers model_key_store (new, also on the desktop), model_key_has/_set, models_list, model_probe,
+    model_key_check, local_server_status/_start, ollama_pull (streamed), brain_records (the master's data folder).
+    Window: machines.show() calls brain.switched() (drops found/probes/notes, reads the machine's keys and records;
+    late answers from the machine before are ignored); an older master says "VPS cannot do this yet" instead of
+    "no key"; a server shows "Key set in VPS's environment" or the QANUVI_KEY_ text, no key field and no Connect
+    Qanuvi; texts say the machine's name instead of "this computer" (remote.ts shownPlace). Green: 351 TS tests (6
+    new, brain.machine.test.ts), svelte-check, prettier, rustfmt, clippy (desktop and server), 393 Rust tests, new
+    tests on the server build too. NOT driven live. NEXT: drive D1 live (test build, scratch master: Find models and
+    a key on a desktop master; server build swapped in for the environment text), then D2.
+    RESUME HERE (before, 2026-11-15 14:30): 24z3 A2 + A3 DRIVEN LIVE, all pass (release test build 14:06, scratch
     projects pc-proj and master-proj, "This PC" test master, $0). A2: with the master connected, This PC's sidebar
     stays This PC's only; Show lists only the master's two projects, title and month cost follow it. A3 part 1:
     Minimap differs per machine; turned on for the master and off for This PC, each kept its own; the master's value

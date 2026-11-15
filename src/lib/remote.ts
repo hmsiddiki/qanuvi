@@ -43,6 +43,11 @@ export function shownMachine(): string | null {
   return shown;
 }
 
+/** Where the shown machine's things are, for sentences: "this computer", or the master's name ("VPS"). */
+export function shownPlace(): string {
+  return shown ? nameOf(shown) : "this computer";
+}
+
 export function nameMachines(names: (master: string) => string): void {
   nameOf = names;
 }

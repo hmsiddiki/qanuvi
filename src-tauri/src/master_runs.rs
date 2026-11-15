@@ -1,7 +1,7 @@
 // Plan runs on the master (24z R2d): the same run loop as the desktop, on the master's own projects. A run goes on
 // when the desktop disconnects; a connection that wants its news calls `plan_run_watch` (or passes `onEvent` to
 // `plan_run_start`) and gets `{"kind": "view", "view": …}` and `{"kind": "agent", "sessionId": …, "event": …}` on
-// that stream until it goes away. API keys are the master's own (QANUVI_KEY_… in its environment), as for agent_start.
+// that stream until it goes away. API keys are the master's own (model_keys.rs), as for agent_start.
 
 use super::{Master, Streams, opt, s, to};
 use crate::agent::AgentEvent;
@@ -54,9 +54,9 @@ impl Tell for Watchers {
 fn start_of(args: &Value) -> Result<RunStart, String> {
     let mut start: RunStart = serde_json::from_value(args["start"].clone())
         .map_err(|e| format!("The run's start is not valid: {e}"))?;
-    // The master's own keys: the desktop's are never sent to it.
+    // The master's own keys (its credential store or QANUVI_KEY_…): the desktop's are never sent to it.
     for setup in start.turns.setups.values_mut() {
-        *setup = crate::brain::with_keys(setup, crate::brain::env_key)?;
+        *setup = crate::brain::with_keys(setup, crate::model_keys::get)?;
     }
     Ok(start)
 }

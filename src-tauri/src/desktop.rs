@@ -1114,38 +1114,27 @@ struct RelayTarget {
     pairing: String,
 }
 
-/// Where a model provider's key is kept (Milestone 24).
-fn model_key_entry(endpoint: &str) -> Res<keyring::Entry> {
-    keyring::Entry::new("Qanuvi", &format!("models:{endpoint}")).map_err(|e| e.to_string())
+/// A provider's key on this computer (model_keys.rs: the credential store, or QANUVI_KEY_<PROVIDER>).
+fn model_key(endpoint: &str) -> Option<String> {
+    crate::model_keys::get(endpoint)
 }
 
-/// A provider's key: the credential store, or an environment variable (QANUVI_KEY_<PROVIDER>).
-fn model_key(endpoint: &str) -> Option<String> {
-    model_key_entry(endpoint)
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .or_else(|| crate::brain::env_key(endpoint))
+/// Where this computer keeps model keys: "store" (the credential store) or "environment".
+#[tauri::command]
+fn model_key_store() -> &'static str {
+    crate::model_keys::kind()
 }
 
 /// Keeps a provider's key in the credential store (an empty key forgets it).
 #[tauri::command]
 fn model_key_set(endpoint: String, key: String) -> Res<()> {
-    let entry = model_key_entry(&endpoint)?;
-    if key.trim().is_empty() {
-        return match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(e.to_string()),
-        };
-    }
-    entry
-        .set_password(key.trim())
-        .map_err(|e| format!("The key could not be kept: {e}"))
+    crate::model_keys::set(&endpoint, &key)
 }
 
 /// Whether a provider has a key (the key itself never goes to the window).
 #[tauri::command]
 fn model_key_has(endpoint: String) -> bool {
-    model_key(&endpoint).is_some()
+    crate::model_keys::has(&endpoint)
 }
 
 /// The models a provider offers (OpenRouter: free ones that can use tools, unless `all`).
@@ -1155,54 +1144,21 @@ async fn models_list(
     all: Option<bool>,
 ) -> Res<Vec<crate::llm::ModelInfo>> {
     blocking(move || {
-        let mut ep = endpoint;
-        ep.key = model_key(&ep.id);
-        crate::llm::list_models(&ep, all.unwrap_or(false))
+        crate::llm::list_models(&crate::model_keys::with_key(endpoint), all.unwrap_or(false))
     })
     .await
 }
 
-/// Tries a model with one tiny message (and one tool, as the agent needs tools): Ok with the seconds it took, or why
-/// it did not answer. Routers list models whose providers are not connected; this finds out.
+/// Tries a model with one tiny message (llm::probe).
 #[tauri::command]
 async fn model_probe(endpoint: crate::llm::Endpoint, model: String) -> Res<f64> {
-    blocking(move || {
-        let mut ep = endpoint;
-        ep.key = model_key(&ep.id);
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let start = std::time::Instant::now();
-            let tools = serde_json::json!([{"type": "function", "function": {
-                "name": "Read", "description": "Read a file.",
-                "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}}, "required": ["file_path"]}
-            }}]);
-            let messages = [serde_json::json!({"role": "user", "content": "Reply with the single word OK."})];
-            let r = crate::llm::chat(&ep, &model, &messages, &tools, &["Read"], &mut |_| {})
-                .map_err(|f| f.reason)
-                .and_then(|r| {
-                    if r.text.trim().is_empty() && r.calls.is_empty() {
-                        Err("an empty answer".to_string())
-                    } else {
-                        Ok(start.elapsed().as_secs_f64())
-                    }
-                });
-            let _ = tx.send(r);
-        });
-        rx.recv_timeout(std::time::Duration::from_secs(45))
-            .unwrap_or_else(|_| Err("no answer within 45 seconds".into()))
-    })
-    .await
+    blocking(move || crate::llm::probe(crate::model_keys::with_key(endpoint), model)).await
 }
 
 /// Checks a provider's key (OpenRouter: also the free requests left today).
 #[tauri::command]
 async fn model_key_check(endpoint: crate::llm::Endpoint) -> Res<String> {
-    blocking(move || {
-        let mut ep = endpoint;
-        ep.key = model_key(&ep.id);
-        crate::llm::check_key(&ep)
-    })
-    .await
+    blocking(move || crate::llm::check_key(&crate::model_keys::with_key(endpoint))).await
 }
 
 /// This computer's memory and graphics card, for suggesting local models that fit.
@@ -2190,6 +2146,7 @@ pub fn run() {
             remote_pair,
             model_key_set,
             model_key_has,
+            model_key_store,
             models_list,
             brain_records,
             model_key_check,

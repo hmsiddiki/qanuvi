@@ -753,6 +753,32 @@ pub fn chat_model(m: &Value) -> bool {
     }
 }
 
+/// Tries a model with one tiny message (and one tool, as the agent needs tools): Ok with the seconds it took, or why
+/// it did not answer. Routers list models whose providers are not connected; this finds out.
+pub fn probe(ep: Endpoint, model: String) -> Result<f64, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let start = std::time::Instant::now();
+        let tools = json!([{"type": "function", "function": {
+            "name": "Read", "description": "Read a file.",
+            "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}}, "required": ["file_path"]}
+        }}]);
+        let messages = [json!({"role": "user", "content": "Reply with the single word OK."})];
+        let r = chat(&ep, &model, &messages, &tools, &["Read"], &mut |_| {})
+            .map_err(|f| f.reason)
+            .and_then(|r| {
+                if r.text.trim().is_empty() && r.calls.is_empty() {
+                    Err("an empty answer".to_string())
+                } else {
+                    Ok(start.elapsed().as_secs_f64())
+                }
+            });
+        let _ = tx.send(r);
+    });
+    rx.recv_timeout(Duration::from_secs(45))
+        .unwrap_or_else(|_| Err("no answer within 45 seconds".into()))
+}
+
 /// Checks a provider's key and says so in a sentence. OpenRouter also tells how many free requests are left today.
 pub fn check_key(ep: &Endpoint) -> Result<String, String> {
     ep.check()?;

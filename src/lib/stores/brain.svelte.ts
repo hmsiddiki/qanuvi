@@ -3,7 +3,7 @@
  * store, through the app), choosing which models the brain may use, and what it has learned about them.
  */
 import { deciderSeat } from "$lib/core/decider";
-import { routed as invoke } from "$lib/remote";
+import { routed as invoke, shownPlace } from "$lib/remote";
 import { api, errorText } from "$lib/api";
 import { settings, type ModelProvider, type OwnModel } from "./settings.svelte";
 
@@ -18,7 +18,15 @@ export interface ModelInfo {
   size: number;
 }
 
-/** A local provider's program on this computer (from local_server_status). */
+/** Where a machine keeps model keys: its credential store, or (a server build) its environment. */
+export type KeyStore = "store" | "environment";
+
+/** The variable a server reads a provider's key from (model_keys.rs env_name): QANUVI_KEY_OPENROUTER. */
+export function keyEnvName(providerId: string): string {
+  return `QANUVI_KEY_${providerId.toUpperCase().replace(/-/g, "_")}`;
+}
+
+/** A local provider's program on the shown machine (from local_server_status). */
 export interface LocalServer {
   program: string;
   installed: boolean;
@@ -82,18 +90,29 @@ class BrainStore {
   missing = $state<Record<string, boolean>>({});
   /** Models tried with one tiny message (by model id): whether they answered. Kept while Qanuvi runs. */
   probes = $state<Record<string, { state: "testing" | "ok" | "failed"; text: string }>>({});
+  /** Where the shown machine keeps model keys. */
+  keyStore = $state<KeyStore>("store");
+  /** Why the shown machine could not say which keys it has (an older master), or "". */
+  keyError = $state("");
+  /** Counts machine switches, so a late answer from the machine before is dropped. */
+  #gen = 0;
+  /** Goes up each time another machine is shown (the Models page drops what was typed for the one before). */
+  shownCount = $state(0);
 
   /** Tries a model with one tiny message: routers list models whose providers are not connected. */
   async probe(p: ModelProvider, m: ModelInfo): Promise<boolean> {
     this.probes = { ...this.probes, [m.id]: { state: "testing", text: "testing…" } };
+    const gen = this.#gen;
     try {
       const secs = await invoke<number>("model_probe", {
         endpoint: { id: p.id, kind: p.kind, url: p.url },
         model: m.name,
       });
+      if (gen !== this.#gen) return false;
       this.probes = { ...this.probes, [m.id]: { state: "ok", text: `answered in ${secs.toFixed(1)} s` } };
       return true;
     } catch (e) {
+      if (gen !== this.#gen) return false;
       this.probes = {
         ...this.probes,
         [m.id]: { state: "failed", text: `did not answer: ${errorText(e).slice(0, 140)}` },
@@ -105,6 +124,8 @@ class BrainStore {
   async find(p: ModelProvider, all = false): Promise<void> {
     const endpoint = { id: p.id, kind: p.kind, url: p.url };
     const list = () => invoke<ModelInfo[]>("models_list", { endpoint, all });
+    const gen = this.#gen;
+    const here = shownPlace();
     this.searching = { ...this.searching, [p.id]: true };
     this.errors = { ...this.errors, [p.id]: "" };
     this.notes = { ...this.notes, [p.id]: "" };
@@ -114,18 +135,18 @@ class BrainStore {
       try {
         models = await list();
       } catch (e) {
-        // Nothing answers at a local address: look for the program on this computer, start it if it is installed,
+        // Nothing answers at a local address: look for the program on the shown machine, start it if it is installed,
         // otherwise show how to install it.
         const server = /could not be reached/.test(errorText(e))
           ? await invoke<LocalServer | null>("local_server_status", { endpoint, start: p.start ?? null }).catch(
               () => null,
             )
           : null;
-        if (!server) throw e;
+        if (!server || gen !== this.#gen) throw e;
         const name = server.program === "ollama" ? "Ollama" : server.program === "omniroute" ? "OmniRoute" : p.name;
         if (!server.installed) {
           this.missing = { ...this.missing, [p.id]: true };
-          throw new Error(`${name} is not installed on this computer. The steps below install it.`);
+          throw new Error(`${name} is not installed on ${here}. The steps below install it.`);
         }
         this.notes = {
           ...this.notes,
@@ -135,6 +156,7 @@ class BrainStore {
         this.notes = { ...this.notes, [p.id]: `Started ${name}.` };
         models = await list();
       }
+      if (gen !== this.#gen) return;
       this.found = { ...this.found, [p.id]: models };
       if (!models.length)
         this.errors = {
@@ -147,6 +169,7 @@ class BrainStore {
                 : "No models found.",
         };
     } catch (e) {
+      if (gen !== this.#gen) return;
       let text = errorText(e);
       // Running, but it wants a key: say so and show the steps (they say where the key is).
       if (/\b401\b|authentication required|invalid_api_key|unauthori[sz]ed/i.test(text)) {
@@ -159,7 +182,7 @@ class BrainStore {
       }
       this.errors = { ...this.errors, [p.id]: text };
     } finally {
-      this.searching = { ...this.searching, [p.id]: false };
+      if (gen === this.#gen) this.searching = { ...this.searching, [p.id]: false };
     }
   }
 
@@ -188,11 +211,24 @@ class BrainStore {
     if (!this.errors[p.id]) this.notes = { ...this.notes, [p.id]: note };
   }
 
+  /** Which keys the shown machine has; an older master that cannot say leaves none and sets keyError. */
   async loadKeys(): Promise<void> {
-    for (const p of settings.value.brain.providers) {
-      if (p.kind === "ollama") continue;
-      const has = await invoke<boolean>("model_key_has", { endpoint: p.id }).catch(() => false);
-      this.keys = { ...this.keys, [p.id]: has };
+    const gen = this.#gen;
+    try {
+      const store = await invoke<KeyStore>("model_key_store");
+      const keys: Record<string, boolean> = {};
+      for (const p of settings.value.brain.providers) {
+        if (p.kind === "ollama") continue;
+        keys[p.id] = await invoke<boolean>("model_key_has", { endpoint: p.id });
+      }
+      if (gen !== this.#gen) return;
+      this.keyStore = store;
+      this.keys = keys;
+      this.keyError = "";
+    } catch (e) {
+      if (gen !== this.#gen) return;
+      this.keys = {};
+      this.keyError = errorText(e);
     }
   }
 
@@ -207,8 +243,31 @@ class BrainStore {
   }
 
   async loadRecords(): Promise<void> {
-    const r = await invoke<{ models: Record<string, ModelRecord> }>("brain_records").catch(() => ({ models: {} }));
-    this.records = r.models;
+    const gen = this.#gen;
+    const r = await invoke<{ models: Record<string, ModelRecord> } | null>("brain_records").catch(() => ({
+      models: {},
+    }));
+    if (gen === this.#gen) this.records = r?.models ?? {};
+  }
+
+  /**
+   * Another machine is on screen (24z3 D1): what was found, tried and kept belongs to the one before, so it is
+   * dropped and the new machine's keys and records are read. Answers still coming from the one before are ignored.
+   */
+  async switched(): Promise<void> {
+    this.#gen++;
+    this.shownCount++;
+    this.found = {};
+    this.errors = {};
+    this.searching = {};
+    this.notes = {};
+    this.missing = {};
+    this.probes = {};
+    this.keys = {};
+    this.records = {};
+    this.keyStore = "store";
+    this.keyError = "";
+    await Promise.all([this.loadKeys(), this.loadRecords()]);
   }
 
   uses(id: string): boolean {

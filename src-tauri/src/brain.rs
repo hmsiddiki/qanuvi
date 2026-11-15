@@ -81,11 +81,7 @@ pub fn with_keys(setup: &str, key_of: impl Fn(&str) -> Option<String>) -> Result
 
 /// A key for a provider from the environment: `QANUVI_KEY_OPENROUTER` for the provider `openrouter`.
 pub fn env_key(endpoint: &str) -> Option<String> {
-    std::env::var(format!(
-        "QANUVI_KEY_{}",
-        endpoint.to_uppercase().replace('-', "_")
-    ))
-    .ok()
+    std::env::var(crate::model_keys::env_name(endpoint)).ok()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
