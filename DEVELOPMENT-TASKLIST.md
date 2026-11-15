@@ -382,8 +382,20 @@ runs on or off; with it off nothing is sent anywhere.
     "Back to the default" brought the default back. Servers page with the master shown: "Where This PC keeps its
     data" is read-only (its --data path, the restore note, "Moving it from here comes later"). Back on This PC: page
     and its "Several at once as one" unchanged. Seen, not new: the box says "Restart This PC?" because the old test
-    master is named "This PC" (Part B refuses that name). NOT driven: a master on Linux/Mac, the daily check (2 min
-    after start). NEXT: D4 (start-up/Headroom + Claude Code updates) in a fresh conversation.
+    master is named "This PC" (Part B refuses that name). LINUX (23:20, owner's VPS, Debian 12): the server build
+    cross-built with zigbuild (9.0 MB) in ~/.local/bin, server "vps test" with the key file, connected (basevm378 ·
+    linux/x86_64 · master 0.1.22). Backups: vps test: on, /root/Documents/Qanuvi master backups (the default, no
+    "(test build)" on a server build); Back up now (master.json not copied); the same restore test passed (setting
+    off, Restore…, "Restart vps test now", a new `serve --after-pid=<old>` took over, the note, a "Before restore"
+    backup, the setting back on); data folder panel read-only (/root/.local/share/qanuvi). The service was stopped
+    after; ~/qanuvi-test (12 KB), ~/.local/share/qanuvi (144 KB), ~/Documents (232 KB) and ~/.local/bin/qanuvi-master
+    are left on the VPS; the test build's "vps test" server has "Connect when Qanuvi starts" on. FOUND, small, for
+    the owner: (a) "Vps test makes the folder..." (shownPlaceTitle capitalises the server's own name); (b) the
+    default makes a Documents folder in a headless server's home (fine on a desktop master; a server might rather use
+    ~/qanuvi-backups or beside its data). Seen, known: no memory figure in the status bar for a Linux master
+    (usage.rs is Windows only so far). NOT driven: a Mac master (owner gets one soon), the daily check (2 min after
+    start). NEXT: owner's answer on (a)/(b), then D4 (start-up/Headroom + Claude Code updates) in a fresh
+    conversation.
     RESUME HERE (before, 2026-11-15 21:40): 24z3 D3 CHANGED (owner: "no different, if on or off same for master or
     pc"; then yes to "on everywhere"): backups are ON by default on every machine, the same rules everywhere. A
     master's default folder is Documents/"Qanuvi master backups" (test build: "... (test build)"), its own name so a
