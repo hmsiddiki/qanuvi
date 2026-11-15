@@ -377,7 +377,8 @@ runs on or off; with it off nothing is sent anywhere.
     desktop + server, backups + master backup tests on both builds. Driven live on the VPS: "/root/qanuvi-backups
     (the default)"; the two test backups were moved there from /root/Documents (removed) and listed. Seen: the green
     "Restored the backup ..." note still shows after a later plain restart of the master (stays until the next
-    restore?): check what the desktop does and decide. Finding (a) is a PROPOSAL waiting for the owner (owner: not
+    restore): by design and the same on the desktop (shared code: booking a restore clears it); proposed to the owner
+    as a small "Dismiss" on the note. Finding (a) is a PROPOSAL waiting for the owner (owner: not
     "as typed" blindly, make it professional): see the reply of 2026-11-16; not built. Then D4.
     RESUME HERE (before, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
     projects pc-proj and master-proj, the "This PC" test master). This PC's Backups page unchanged (its test-build
