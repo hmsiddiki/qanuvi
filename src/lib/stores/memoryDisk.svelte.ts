@@ -2,7 +2,7 @@
  * The memory disk (Milestone 18): where the encrypted copy of the memory is kept, and syncing it. Each machine writes
  * its own file there; syncing takes in what other machines changed (newest wins, deletions included).
  */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { errorText } from "$lib/api";
 import { settings, type MemoryDiskSettings } from "./settings.svelte";
 import { memory } from "./memory.svelte";

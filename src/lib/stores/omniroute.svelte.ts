@@ -2,7 +2,7 @@
  * Running the OmniRoute on this computer for the user (24c): its connections and their health, adding free providers,
  * renewing sign-ins and Qanuvi's fallback combo. Keys never come back to the window.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { errorText } from "$lib/api";
 import type { ModelProvider } from "./settings.svelte";
 

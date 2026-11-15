@@ -2,7 +2,7 @@
  * Start with Qanuvi: the commands in Settings, Start-up run while Qanuvi is open (a Headroom proxy, for example).
  * Rust starts them hidden and keeps their state and output; this store starts them once and follows their state.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { settings, type StartupItem } from "./settings.svelte";
 
 export interface StartupStatus {

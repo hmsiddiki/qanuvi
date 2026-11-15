@@ -5,7 +5,7 @@
    * beside it as a "before restore" backup.
    */
   import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { routed as invoke } from "$lib/remote";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
 

@@ -3,7 +3,7 @@
  * store, through the app), choosing which models the brain may use, and what it has learned about them.
  */
 import { deciderSeat } from "$lib/core/decider";
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { api, errorText } from "$lib/api";
 import { settings, type ModelProvider, type OwnModel } from "./settings.svelte";
 

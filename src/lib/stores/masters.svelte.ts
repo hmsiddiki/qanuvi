@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
-import { callMaster, disown, forgetMaster, own } from "$lib/remote";
+import { callMaster, disown, forgetMaster, nameMachines, own } from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
 import { projects } from "./projects.svelte";
@@ -26,6 +26,9 @@ export interface MasterStatus {
   info?: MasterInfo;
   error?: string;
 }
+
+// Messages from the router name the machine as the owner named it ("VPS cannot do this yet").
+nameMachines((id) => settings.value.masters.find((m) => m.id === id)?.name || id);
 
 class MastersStore {
   status = $state<Record<string, MasterStatus>>({});

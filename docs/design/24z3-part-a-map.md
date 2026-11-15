@@ -39,11 +39,11 @@ uses This PC instead.
 
 | Group | Commands | Used by |
 | --- | --- | --- |
-| Language servers | lsp_start, lsp_send, lsp_stop, lsp_stop_window, lsp_statuses, lsp_install | editor completion, hover, formatting |
-| Debugging | dap_start, dap_connect, dap_send, dap_stop, dap_stop_window, dap_statuses, dap_install, dap_php | Run and debug |
+| Language servers | lsp_start, lsp_send, lsp_stop, lsp_statuses, lsp_install | editor completion, hover, formatting |
+| Debugging | dap_start, dap_connect, dap_send, dap_stop, dap_statuses, dap_install, dap_php | Run and debug |
 | Project memory | memory_list, memory_save, memory_search, memory_slice, memory_delete | agent memory, notes |
 | Agent setup | agent_config_list, agent_config_read, agent_config_write, agent_configure, agent_clean_up | agent pane, model picker |
-| Other | core_decide, attachment_page, browser_agent_shot, startup_path, term_kill_window | agent pane, terminals |
+| Other | core_decide, attachment_page, attachment_image, browser_agent_shot, startup_path | agent pane, chat images |
 
 ### 2. Settings (Part D: the whole Settings page is the shown machine's)
 
@@ -65,9 +65,10 @@ uses This PC instead.
 ### 3. Stay with the window (never routed to a machine)
 
 app_info, app_restart, data_test_build, remote_* (the switcher's list of masters), notify_item / notify_take_start /
-notify_test (the desktop banner shows on this screen), attachment_file / attachment_image (a file picked on this
+notify_test (the desktop banner shows on this screen), attachment_file (a file picked on this
 screen for a message), inspector_* (the preview pane in this window), knowledge_fetch (Qanuvi's signed knowledge
-file), inbox_import / plan_data_import (one-time moves from old localStorage).
+file), inbox_import / plan_data_import (one-time moves from old localStorage), term_kill_window / lsp_stop_window /
+dap_stop_window (this window's own terminals and servers before it reloads).
 
 ## Window state kept in localStorage (Part B/D: becomes the shown machine's)
 

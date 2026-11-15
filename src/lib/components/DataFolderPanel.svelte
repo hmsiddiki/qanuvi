@@ -4,7 +4,7 @@
    * in use then): everything is copied, checked and switched; the old copy is kept until the user removes it.
    */
   import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { routed as invoke } from "$lib/remote";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
 

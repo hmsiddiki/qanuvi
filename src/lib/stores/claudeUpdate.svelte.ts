@@ -1,5 +1,5 @@
 /** Claude Code's version against the newest one, and its own update (Settings, Agents; or by itself when chosen). */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { errorText } from "$lib/api";
 import { settings } from "./settings.svelte";
 import { agent } from "./agent.svelte";

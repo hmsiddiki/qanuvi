@@ -1,6 +1,6 @@
 <script lang="ts">
   /** Settings, Start-up: commands Qanuvi starts with itself (Headroom, for example), their state and output. */
-  import { invoke } from "@tauri-apps/api/core";
+  import { routed as invoke } from "$lib/remote";
   import { settings, type StartupItem } from "$lib/stores/settings.svelte";
   import { startup } from "$lib/stores/startup.svelte";
 

@@ -3,7 +3,7 @@
  * desktop part decides and shows), and a clicked notification opens the Inbox at its item: in the window it was sent
  * to, or (when the click started Qanuvi) once this window is ready.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { settings } from "./settings.svelte";
 import { ui } from "./ui.svelte";

@@ -6,7 +6,7 @@
    * started and connected; sign-ins open in the browser). Every install, page and sign-in waits for a click.
    */
   import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { routed as invoke } from "$lib/remote";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { errorText } from "$lib/api";
   import { localVerdict, recommend } from "$lib/agents/guides";

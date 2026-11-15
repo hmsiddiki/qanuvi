@@ -8,7 +8,7 @@
    * An image in the conversation or in the message box: a thumbnail; a click shows it whole over the window (Esc or a
    * click closes it). A stored image (sent earlier) is read from the data folder.
    */
-  import { invoke } from "@tauri-apps/api/core";
+  import { routed as invoke } from "$lib/remote";
   import type { ShownImage } from "$lib/agent/events";
 
   let { image, size = 160 }: { image: ShownImage; size?: number } = $props();

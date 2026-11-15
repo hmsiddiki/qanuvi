@@ -2,7 +2,8 @@
  * The setup guides for free and local models (Milestone 24): the ones shipped with Qanuvi, or a newer version a paid
  * agent brought up to date with the user's permission (kept here after the user accepts it).
  */
-import { invoke, Channel } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 import { errorText } from "$lib/api";
 import {
   BUILT_IN_GUIDES,

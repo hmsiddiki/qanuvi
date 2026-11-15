@@ -1,5 +1,5 @@
 /** Qanuvi's total memory and processor use (itself and every process it started), for the status bar (1f). */
-import { invoke } from "@tauri-apps/api/core";
+import { routed as invoke } from "$lib/remote";
 
 export interface UsagePart {
   name: string;

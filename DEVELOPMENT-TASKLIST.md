@@ -369,7 +369,19 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 afternoon): 24z3 owner read-through done, one change: Part C2 (one Inbox
+    RESUME HERE (newest, 2026-11-15 13:00): 24z3 A1 BUILT (the shown machine). Owner agreed both map questions
+    (Qlopy sign-in stays with the window: it will decide which machines a device such as a phone connects to, a topic
+    for another day; each machine keeps its own memory disk sync; lsp/dap on a master later, said on screen until
+    then) and the order A1-A4. Owner restated: a complete separate screen per machine, only the Inbox shared.
+    A1: remote.ts has showMachine/shownMachine; a call with no id goes to the shown machine (This PC by default), an
+    id still goes to the machine that made it; WINDOW_ONLY lists the window/install commands that never leave This
+    PC; a master's "does not know the command" reply becomes NotOnMachine ("VPS cannot do this yet (cmd).", name
+    from masters.svelte.ts), never retried on This PC; 13 Settings/setup files moved from invoke to the router. No
+    behaviour change yet: nothing calls showMachine until Part B's switcher. 330 TS tests (11 routing), svelte-check
+    and prettier clean; not driven live (nothing to see until B). Refusing an id of another machine waits for A2
+    (today's mixed sidebar still opens master projects). NEXT: A2 (sidebar lists only the shown machine's projects;
+    projects.addRemote goes) in a fresh conversation.
+    RESUME HERE (before, 2026-11-15 afternoon): 24z3 owner read-through done, one change: Part C2 (one Inbox
     screen for all machines, stored per machine, badges, answer without switching). PART A STEP 1 MAP DONE (read
     only): docs/design/24z3-part-a-map.md. Routing today follows ids, so id-less calls (projects_list, projects_add,
     term_shells, plan_run_active) always hit This PC; masters.svelte.ts mixes master projects into the sidebar; ~90
