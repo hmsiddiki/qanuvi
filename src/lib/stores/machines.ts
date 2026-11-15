@@ -14,6 +14,7 @@ import { agent } from "./agent.svelte";
 import { omni } from "./omniroute.svelte";
 import { memoryDisk } from "./memoryDisk.svelte";
 import { remoteAccess } from "./remoteAccess.svelte";
+import { memory } from "./memory.svelte";
 
 /** Shows a machine: null is This PC. */
 export async function show(machine: string | null): Promise<void> {
@@ -36,4 +37,6 @@ export async function show(machine: string | null): Promise<void> {
   // The memory disk and remote access (24z3 D6): the new machine's own, read once its settings are in.
   void memoryDisk.switched();
   void remoteAccess.switched();
+  // Memory entries (24z3 D7): the Memory page and the waiting suggestions are the new machine's.
+  memory.touch();
 }

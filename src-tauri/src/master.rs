@@ -569,6 +569,34 @@ impl Master {
             "claude_settings_base_url" => to(Ok(crate::claude_update::settings_base_url())),
             "claude_versions" => to(crate::claude_update::versions()),
             "claude_update" => to(crate::claude_update::update()),
+            // Memory entries (24z3 D7): this master's own memory, as the desktop answers them for This PC.
+            "memory_list" => to(crate::memory::list(
+                db,
+                opt(args, "project").as_deref(),
+                b(args, "suggested"),
+            )),
+            "memory_save" => {
+                let entry: crate::memory::Entry =
+                    serde_json::from_value(args["entry"].clone()).map_err(|e| e.to_string())?;
+                to(crate::memory::save(db, &entry))
+            }
+            "memory_delete" => {
+                crate::memory::delete(db, &s(args, "id"))?;
+                Ok(Value::Null)
+            }
+            "memory_slice" => to(crate::memory::slice(
+                db,
+                opt(args, "project").as_deref(),
+                &s(args, "query"),
+                (n(args, "budget") as usize).clamp(200, 20000),
+                b(args, "count"),
+            )),
+            "memory_search" => to(crate::memory::search(
+                db,
+                opt(args, "project").as_deref(),
+                &s(args, "query"),
+                50,
+            )),
             // The memory disk (24z3 D6): this master's own disk (from its settings), passphrase and sync.
             "memory_disk_device" => to(Ok(crate::memory_disk::device(&self.dir))),
             "memory_disk_status" => to(Ok(crate::memory_disk::status(db))),
@@ -1494,6 +1522,64 @@ mod tests {
         assert_eq!(
             call(&m, "agent_clean_up", json!({"days": 0, "keep": []})).unwrap(),
             json!(0)
+        );
+    }
+
+    #[test]
+    fn answers_memory_entries_from_its_own_memory() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        // 24z3 D7: list, save, search, slice and delete work on this master's own memory.
+        assert_eq!(
+            call(
+                &m,
+                "memory_list",
+                json!({"project": null, "suggested": true})
+            )
+            .unwrap(),
+            json!([])
+        );
+        let saved = call(
+            &m,
+            "memory_save",
+            json!({"entry": {"kind": "fact", "title": "Master memory test fact", "body": "kept on the master"}}),
+        )
+        .unwrap();
+        let id = saved["id"].as_str().unwrap().to_string();
+        assert!(!id.is_empty());
+        let listed = call(
+            &m,
+            "memory_list",
+            json!({"project": null, "suggested": false}),
+        )
+        .unwrap();
+        assert_eq!(listed.as_array().unwrap().len(), 1);
+        let found = call(
+            &m,
+            "memory_search",
+            json!({"project": null, "query": "master memory"}),
+        )
+        .unwrap();
+        assert_eq!(found[0]["id"], json!(id));
+        let slice = call(
+            &m,
+            "memory_slice",
+            json!({"project": null, "query": "master memory", "budget": 4000, "count": false}),
+        )
+        .unwrap();
+        assert!(
+            slice.to_string().contains("Master memory test fact"),
+            "{slice}"
+        );
+        call(&m, "memory_delete", json!({"id": id})).unwrap();
+        assert_eq!(
+            call(
+                &m,
+                "memory_list",
+                json!({"project": null, "suggested": true})
+            )
+            .unwrap(),
+            json!([])
         );
     }
 

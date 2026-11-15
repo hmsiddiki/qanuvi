@@ -1,5 +1,6 @@
 /** The user's memory in the window (Milestone 17): the slice agents get, and the entries for the Memory view. */
 import { api } from "$lib/api";
+import { shownMachine } from "$lib/remote";
 import { settings } from "./settings.svelte";
 
 /** The memory to send with a request, or null (memory off, nothing applies, or it could not be read). */
@@ -20,12 +21,16 @@ class MemoryStore {
   waiting = $state(0);
 
   async refreshWaiting(): Promise<void> {
+    const asked = shownMachine();
+    let n = 0;
     try {
       const all = await api.memory.list(null, true);
-      this.waiting = all.filter((e) => e.status === "suggested").length;
+      n = all.filter((e) => e.status === "suggested").length;
     } catch {
-      this.waiting = 0;
+      n = 0;
     }
+    // An answer from the machine shown before a switch is dropped.
+    if (shownMachine() === asked) this.waiting = n;
   }
 
   touch(): void {

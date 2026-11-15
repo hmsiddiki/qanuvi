@@ -199,7 +199,7 @@
     {#if memoryDisk.last}
       {@const l = memoryDisk.last}
       <p class="muted">
-        Last synced {ago(l.at)}: {l.written} entries on the disk from {onMaster ? place : "this computer"}{l.devices
+        Last synced {ago(l.at)}: {l.written} {l.written === 1 ? "entry" : "entries"} on the disk from {onMaster ? place : "this computer"}{l.devices
           .length
           ? `; read ${l.devices.join(", ")}`
           : "; no other computer yet"}{l.merged.added || l.merged.changed || l.merged.deleted

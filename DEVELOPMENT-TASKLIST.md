@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 05:20): 24z3 D6 DRIVEN LIVE on the local test master, all pass (release test
+    RESUME HERE (newest, 2026-11-16 05:40): 24z3 D7 BUILT (not driven live yet). A master answers memory_list,
+    memory_save, memory_delete, memory_slice, memory_search from its own memory (master.rs, same arguments as the
+    desktop; test answers_memory_entries_from_its_own_memory). (b) This PC's disk file is named "This PC"
+    (memory_disk.rs writer/named_for; a master keeps its own name; the file still goes by the lasting id). (c) "1
+    entry" singular in the memory disk panel. Also: a switch reloads the Memory page and the waiting suggestions
+    (machines.ts memory.touch()), and an answer from the machine shown before a switch is dropped (MemoryView load,
+    memory.refreshWaiting; test memory.machine.test.ts). Checks: 391 TS tests, master + memory_disk Rust tests,
+    clippy clean, server build checks. NEXT: drive live on the local test master (Memory page lists/adds/edits/
+    deletes the master's entries, the "D6 disk test fact" it merged shows; This PC's file reads "This PC" on the
+    master after a This PC sync; "1 entry"), then the VPS (owner yes for the swap), then Part B with (d).
+    RESUME HERE (before, 2026-11-16 05:20): 24z3 D6 DRIVEN LIVE on the local test master, all pass (release test
     build 04:55). Master shown -> Memory: "Only on this machine / A folder", typed path (no Browse), text names
     DESKTOP-R8G3PAK (test); folder + passphrase saved -> "Passphrase kept on DESKTOP-R8G3PAK (test)", its own file
     <lasting id>.qxm in the folder, credential master-memory-disk (This PC's stays memory-disk). Window CLOSED, master

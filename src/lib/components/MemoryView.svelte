@@ -14,6 +14,7 @@
   import { memory } from "$lib/stores/memory.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings } from "$lib/stores/settings.svelte";
+  import { shownMachine } from "$lib/remote";
   import IconButton from "./IconButton.svelte";
   import MemoryDiskPanel from "./MemoryDiskPanel.svelte";
 
@@ -47,10 +48,16 @@
   );
 
   async function load() {
+    const asked = shownMachine();
     try {
-      entries = await api.memory.list(project?.id ?? null, true);
+      const got = await api.memory.list(project?.id ?? null, true);
+      // Entries from the machine shown before a switch are dropped (24z3 D7).
+      if (shownMachine() !== asked) return;
+      entries = got;
       error = "";
     } catch (e) {
+      if (shownMachine() !== asked) return;
+      entries = [];
       error = errorText(e);
     }
   }

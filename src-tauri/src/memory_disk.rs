@@ -756,13 +756,31 @@ fn keep_last(db: &Db, report: Option<&Report>, error: &str) {
     let _ = crate::settings::set_many(db, &v);
 }
 
+/// This machine as its disk file names it (24z3 D7): This PC is "This PC" (the hostname looked like a master on the
+/// same computer); a master keeps its own name. The file itself goes by the lasting id, so the name may change.
+fn writer(data_dir: &Path) -> Device {
+    let me = device(data_dir);
+    named_for(me, crate::model_keys::is_master())
+}
+
+fn named_for(me: Device, master: bool) -> Device {
+    if master {
+        me
+    } else {
+        Device {
+            name: "This PC".into(),
+            ..me
+        }
+    }
+}
+
 /// Syncs this machine's memory with the disk its settings name. The result (or the problem) is kept for the window.
 pub fn sync_here(db: &Db, data_dir: &Path) -> Result<Report, String> {
     let _one = BUSY.lock().unwrap_or_else(|e| e.into_inner());
     let settings = crate::settings::get_all(db)?;
     let result = disk_from_settings(&settings)
         .ok_or_else(|| "Choose where the memory disk is first.".to_string())
-        .and_then(|disk| sync(db, &disk, &passphrase()?, &device(data_dir)));
+        .and_then(|disk| sync(db, &disk, &passphrase()?, &writer(data_dir)));
     match &result {
         Ok(r) => keep_last(db, Some(r), ""),
         Err(e) => keep_last(db, None, e),
@@ -823,6 +841,17 @@ mod tests {
             updated_at: 0,
             uses: 0,
         }
+    }
+
+    #[test]
+    fn this_pc_names_its_file_this_pc_and_a_master_keeps_its_name() {
+        let me = Device {
+            id: "abc".into(),
+            name: "DESKTOP-1".into(),
+        };
+        let pc = named_for(me.clone(), false);
+        assert_eq!((pc.id.as_str(), pc.name.as_str()), ("abc", "This PC"));
+        assert_eq!(named_for(me.clone(), true), me);
     }
 
     fn titles(db: &Db) -> Vec<String> {
