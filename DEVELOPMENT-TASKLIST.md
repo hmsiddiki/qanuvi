@@ -369,7 +369,26 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 19:30): 24z3 D2 BUILT (machine/setup + usage + notifications on the shown
+    RESUME HERE (newest, 2026-11-15 20:00): 24z3 D2 DRIVEN LIVE, all pass (release test build 19:35, scratch
+    projects pc-proj and master-proj, the "This PC" test master, $0, nothing installed). For the master only, a test
+    wrapper took the place of qanuvi-master.exe and started the real one with PATH, LOCALAPPDATA, APPDATA,
+    ProgramFiles and ProgramW6432 pointing at empty folders and a stand-in winget.exe that installs nothing and ends
+    with exit code 1 (Windows rebuilds ProgramFiles from ProgramW6432 for a 64-bit child, so both are needed). The
+    real master was put back after (same bytes). Status bar: $4.19 on This PC, $0.28 and the master's memory (11 MB)
+    with the master shown, This PC's again after switching back. Wizard on the master: step 1 shows the master's
+    machine line; step 2 "Ollama ... is not installed yet" (This PC has it, so the master answered); Install asks with
+    the exact winget line (--scope user, no permission line); Install runs the stand-in in a terminal inside the
+    wizard, "[The install has ended.]", "Ollama was not installed (exit code 1)". Step 4 "OmniRoute needs Node.js";
+    Install Node.js asks with the winget line and "Windows asks for permission on This PC's own screen: someone there
+    has to click Yes"; Cancel starts nothing. Notifications: "Several at once as one" turned off on the master stayed
+    on for This PC and stayed off on the master after switching back and forth (put back on after). NOT driven: a
+    real notify_item using the master's settings (needs an Inbox item on the master), a password typed into the
+    install terminal, a Linux or Mac master. FOUND, small, waiting for the owner: (a) the status bar's month-cost
+    tooltip still says "Agent cost this month (all sessions on this computer)" while a master is shown; (b) the
+    wizard's outcome line ("Ollama was not installed (exit code 1) ...") stays after "Close the terminal" and on the
+    next steps (closeInstall clears installing only, not outcome). NEXT: the owner's answer on (a)/(b), then D3
+    (backups + data folder) in a fresh conversation.
+    RESUME HERE (before, 2026-11-15 19:30): 24z3 D2 BUILT (machine/setup + usage + notifications on the shown
     machine). Owner agreed: the status bar shows only the shown machine; every install runs the SAME way on every
     machine and system (This PC, desktop masters, servers): the wizard asks first with the exact command (and, when
     Windows will show its permission box on that machine's own screen, says someone there clicks Yes; never a UAC
