@@ -1348,6 +1348,12 @@ fn backups_cancel_restore() -> Res<()> {
     crate::backups::cancel_restore(&crate::data_location::Defaults::real().base)
 }
 
+/// Takes away the note about the last restore.
+#[tauri::command]
+fn backups_dismiss_note() -> Res<()> {
+    crate::backups::dismiss_note(&crate::data_location::Defaults::real().base)
+}
+
 /// Removes one backup (the window asked the user first).
 #[tauri::command]
 async fn backups_remove(path: String) -> Res<()> {
@@ -2147,6 +2153,7 @@ pub fn run() {
             backups_now,
             backups_restore,
             backups_cancel_restore,
+            backups_dismiss_note,
             backups_remove,
             app_restart,
             setup_tools,

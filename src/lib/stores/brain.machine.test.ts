@@ -70,7 +70,7 @@ describe("the Models page follows the shown machine (24z3 D1)", () => {
     showMachine("vps");
     await brain.switched();
     expect(brain.keys).toEqual({});
-    expect(brain.keyError).toBe("VPS cannot do this yet (model_key_store).");
+    expect(brain.keyError).toBe("This cannot be done on VPS yet (model_key_store).");
     expect(brain.records).toEqual({});
   });
 

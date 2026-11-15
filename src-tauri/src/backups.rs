@@ -18,8 +18,9 @@ const DAY: u64 = 24 * 60 * 60;
 
 /// Files of the data folder that are never copied: the database (copied its own way) and its side files, the pointer,
 /// locks, the window's storage (copied apart), folders that are rebuilt or only temporary, and a master's service
-/// file and restart mark (its port and token are made new at each start).
-const SKIP: [&str; 11] = [
+/// file and restart mark (its port and token are made new at each start), and the machine's lasting id (a backup
+/// restored on another computer must not make it the same machine).
+const SKIP: [&str; 12] = [
     "qanuvi.db",
     "qanuvi.db-wal",
     "qanuvi.db-shm",
@@ -31,6 +32,7 @@ const SKIP: [&str; 11] = [
     "browser-profiles",
     "master.json",
     "master-restarting",
+    crate::machine::ID_FILE,
 ];
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -498,17 +500,32 @@ pub fn plan_restore(base: &Path, dest: &Path, backup: &Path) -> Result<(), Strin
     crate::data_location::write(base, &loc)
 }
 
+/// Takes away the note about the last restore (a note about a moved data folder stays: it is shown elsewhere).
+pub fn dismiss_note(base: &Path) -> Result<(), String> {
+    let mut loc = crate::data_location::read(base);
+    if !loc
+        .note
+        .as_deref()
+        .is_some_and(|n| n.starts_with("Restored") || n.starts_with("The backup was not restored"))
+    {
+        return Ok(());
+    }
+    loc.note = None;
+    crate::data_location::write(base, &loc)
+}
+
 pub fn cancel_restore(base: &Path) -> Result<(), String> {
     let mut loc = crate::data_location::read(base);
     loc.restore = None;
     crate::data_location::write(base, &loc)
 }
 
-/// Removes everything in the data folder but the pointer, the backups settings and a backups folder inside it.
+/// Removes everything in the data folder but the pointer, the backups settings, the machine's id and a backups folder
+/// inside it.
 fn clear_data(data: &Path) {
     for e in std::fs::read_dir(data).into_iter().flatten().flatten() {
         let name = e.file_name();
-        if name == "data-location.json" || name == CONFIG {
+        if name == "data-location.json" || name == CONFIG || name == crate::machine::ID_FILE {
             continue;
         }
         let p = e.path();
@@ -798,6 +815,7 @@ mod tests {
         let data = root.path().join("master");
         drop(data_with_db(&data, &["a"]));
         std::fs::write(data.join("master.json"), b"{\"token\":\"t\"}").unwrap();
+        let id = crate::machine::lasting_id(&data);
 
         // No folder chosen: the daily check does nothing, "Back up now" says why, the page shows no folder.
         assert!(run_due(&data, None, None, false).unwrap().is_none());
@@ -817,6 +835,10 @@ mod tests {
             !made.join("data/master.json").exists(),
             "the service file stays out"
         );
+        assert!(
+            !made.join("data").join(crate::machine::ID_FILE).exists(),
+            "the machine's id stays out"
+        );
         let i = info(&data, &data, None);
         assert_eq!(i.backups.len(), 1);
         assert!(i.custom);
@@ -826,6 +848,16 @@ mod tests {
         let note = apply_pending(&data, &data, None, None).unwrap();
         assert!(note.starts_with("Restored"), "{note}");
         assert!(info(&data, &data, None).note.is_some());
+        // The restore keeps the machine's id; Dismiss takes the note away.
+        assert_eq!(crate::machine::lasting_id(&data), id);
+        dismiss_note(&data).unwrap();
+        assert!(info(&data, &data, None).note.is_none());
+        // A note about a moved data folder is not this page's to dismiss.
+        let mut loc = crate::data_location::read(&data);
+        loc.note = Some("Qanuvi's data moved to x.".into());
+        crate::data_location::write(&data, &loc).unwrap();
+        dismiss_note(&data).unwrap();
+        assert!(crate::data_location::read(&data).note.is_some());
 
         // Back to no folder: off again; a booked restore cannot keep the data first, so nothing changes.
         plan_restore(&data, &dest, &made).unwrap();

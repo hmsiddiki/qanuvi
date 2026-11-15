@@ -121,7 +121,7 @@ describe("settings belong to the shown machine (24z3 A3)", () => {
     old.add("vps");
     await show("vps");
     expect(settings.machine).toBe("vps");
-    expect(settings.error).toContain("cannot do this yet");
+    expect(settings.error).toContain("cannot be done on");
     expect(settings.value.approveMinutes).not.toBe(25);
     await show(null);
     expect(settings.error).toBe("");

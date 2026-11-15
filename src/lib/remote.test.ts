@@ -106,7 +106,7 @@ describe("the machine on screen (24z3 A1)", () => {
     showMachine("vps");
     const e: unknown = await routed("backups_info").catch((x: unknown) => x);
     expect(e).toBeInstanceOf(NotOnMachine);
-    expect((e as Error).message).toBe("VPS cannot do this yet (backups_info).");
+    expect((e as Error).message).toBe("This cannot be done on VPS yet (backups_info).");
     expect(invoke).toHaveBeenCalledTimes(1);
     invoke.mockReset().mockRejectedValue("The master did not answer in 30 seconds.");
     expect(await routed("projects_list").catch((x) => x)).toBe("The master did not answer in 30 seconds.");

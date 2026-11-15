@@ -369,7 +369,36 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 00:00): finding (b) DONE (owner: "do what suits better"). A master's default
+    RESUME HERE (newest, 2026-11-16 00:30): 24z3 MACHINE NAMES BATCH (1)-(9) BUILT (not driven live). New
+    src/lib/machineNames.ts: nameProblem (trimmed; at most 40 characters; invisible characters refused: control,
+    zero-width, direction marks, private/unassigned; taken names refused case-insensitively after NFKC; "This PC"
+    and "This computer" refused, the second added because sentences say "this computer"), uniqueName (names
+    from a machine itself: cleaned, cut, numbered "basevm378 (2)"), COLORS + pickColor. (1) names exactly as
+    typed: placeTitle capitalises only "this computer"; sentences reworded so a name never starts one (backups
+    folder line, data folder line, setup guide memory line, router message "This cannot be done on VPS yet",
+    restart "No answer from X after the restart"); usage.place/guides.place now the sentence form. (2) an empty
+    Name stays empty in settings (the loader no longer fills it with the address); displayName() shows the
+    address until the first hello, then the host name is filled in (made unique). (3) Rename on the server card
+    (same rules; a card keeps its place in the list: save() replaces in place). A name kept from before the rules
+    (the old test master "This PC") shows a red line asking to rename it. (4) refused on add and rename. (5) a
+    colour per machine: picked on the first connect (first unused), eight swatches on the card, a coloured chip
+    with the name in the status bar while a master is shown (This PC plain); the switcher's part waits for Part
+    B. (6) lasting id: machine::lasting_id keeps a uuid in <data>/machine-id (made once; never copied into a
+    backup and kept through a restore: SKIP + clear_data), hello answers machineId, the window stores it per
+    server; masters.add/pair connect as fresh: the same id as a machine in the list -> "This is the same computer
+    as X. It was not added again." and the new entry (and its relay pairing on this device) is taken out; an
+    older entry that turns out to be a twin shows "... Remove one of the two." (7) relay pairings: the computer's
+    own name made unique, empty -> host name from hello (no "A computer" stored); this device's name checked
+    (length, invisible). Rust relay_client::clean_name (40 characters, invisible dropped) for the name sent when
+    pairing, the remote access name and a device's name. (8) see nameProblem. (9) "Dismiss" on the restore note:
+    backups::dismiss_note (only a restore note; a moved-data note stays), backups_dismiss_note on the desktop and
+    the master. (10) the SSH address on hover is the switcher's: waits for Part B (nothing built). Green: 365
+    TS tests (new machineNames.test.ts, masters.names.test.ts), svelte-check 0/0, prettier, rustfmt, clippy
+    desktop + server, 22 Rust tests on both builds (new: lasting id, clean names; backups test checks the id file
+    stays out of a backup, survives a restore, and Dismiss). NEXT: drive it live (release test build, a local
+    master and the VPS: add with an empty name, add the same computer twice, rename to a taken name / This PC,
+    colours on the card and status bar, Dismiss), then D4.
+    RESUME HERE (before, 2026-11-16 00:00): finding (b) DONE (owner: "do what suits better"). A master's default
     backups folder now follows the system: Windows and macOS keep Documents/"Qanuvi master backups" ("(test build)"
     for a test build); Linux and other systems (usually a server without a desktop) use ~/qanuvi-backups
     (~/qanuvi-backups-test-build): in sight, easy to copy off with rsync/scp, no Documents folder made on a server;

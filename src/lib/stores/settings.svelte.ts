@@ -201,7 +201,12 @@ export interface MemoryDiskSettings {
 
 export interface MasterSettings {
   id: string;
+  /** Shown exactly as typed; empty until the machine says its own computer name (filled in on connect). */
   name: string;
+  /** Its colour in the switcher and the status bar (machineNames.ts); picked on the first connect. */
+  color?: string;
+  /** The machine's lasting id, from its hello: adding the same computer twice is refused. */
+  machineId?: string;
   /** SSH address: user@host, a host name or an alias from the SSH config; "local" for the master on this PC. */
   target: string;
   /** The master program on the server. */
@@ -344,7 +349,10 @@ export function parseSettings(json: string | null): Settings {
       if (!m || typeof m !== "object" || !str(m.id) || !str(m.target)) continue;
       s.masters.push({
         id: str(m.id).slice(0, 60),
-        name: str(m.name).slice(0, 60) || str(m.target),
+        // Empty until the machine says its computer name (masters.svelte.ts fills it in on connect).
+        name: str(m.name).slice(0, 60),
+        ...(/^#[0-9a-f]{6}$/i.test(str(m.color)) ? { color: str(m.color) } : {}),
+        ...(str(m.machineId) ? { machineId: str(m.machineId).slice(0, 64) } : {}),
         target: str(m.target).slice(0, 200),
         program: str(m.program).slice(0, 300) || "qanuvi-master",
         identity: str(m.identity).slice(0, 400),

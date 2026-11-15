@@ -10,8 +10,10 @@
   import Unplug from "@lucide/svelte/icons/unplug";
   import Trash2 from "@lucide/svelte/icons/trash";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import { ask } from "$lib/stores/confirm.svelte";
-  import { masters } from "$lib/stores/masters.svelte";
+  import { displayName, masters } from "$lib/stores/masters.svelte";
+  import { COLORS, NAME_MAX, nameProblem, uniqueName } from "$lib/machineNames";
   import { show } from "$lib/stores/machines";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
@@ -41,7 +43,9 @@
   let folder = $state<Record<string, string>>({});
   let folderError = $state<Record<string, string>>({});
 
-  function add(e: SubmitEvent) {
+  let adding = $state(false);
+
+  async function add(e: SubmitEvent) {
     e.preventDefault();
     const t = target.trim();
     if (!t) {
@@ -50,22 +54,45 @@
     }
     const m: MasterSettings = {
       id: crypto.randomUUID(),
-      name: name.trim() || (t === "local" ? "This PC (test)" : t),
+      // Empty: the machine's own computer name, from its first answer (the test master on this PC has its own).
+      name: name.trim() || (t === "local" ? uniqueName("This PC (test)", masters.list.map(displayName)) : ""),
       target: t,
       program: program.trim() || "qanuvi-master",
       identity: identity.trim(),
       autoConnect: auto,
     };
-    masters.save(m);
-    name = "";
-    target = "";
-    formError = "";
-    masters.connect(m);
+    adding = true;
+    formError = await masters.add(m);
+    adding = false;
+    if (!formError) {
+      name = "";
+      target = "";
+    }
   }
+
+  /** The card being renamed, and what is typed there. */
+  let renaming = $state<string | null>(null);
+  let newName = $state("");
+  let renameError = $state("");
+
+  function startRename(m: MasterSettings) {
+    renaming = m.id;
+    newName = displayName(m);
+    renameError = "";
+  }
+
+  function rename(e: SubmitEvent, id: string) {
+    e.preventDefault();
+    renameError = masters.rename(id, newName);
+    if (!renameError) renaming = null;
+  }
+
+  /** A name kept from before the name rules (the same as another machine's, or "This PC"). */
+  const nameIssue = (m: MasterSettings) => (m.name ? nameProblem(m.name, masters.namesBesides(m.id)) : "");
 
   async function remove(m: MasterSettings) {
     const ok = await ask(
-      `Remove ${m.name} from Qanuvi? Nothing on the server is changed; it just leaves this window.`,
+      `Remove ${displayName(m)} from Qanuvi? Nothing on the server is changed; it just leaves this window.`,
       { title: "Remove server", okLabel: "Remove", cancelLabel: "Keep" },
     );
     if (ok) await masters.remove(m.id);
@@ -92,7 +119,10 @@
   {#if projects.machine}
     <p class="row">
       <span class="muted"
-        >The sidebar shows {masters.list.find((m) => m.id === projects.machine)?.name ?? "a server"}.</span
+        >The sidebar shows {(() => {
+          const m = masters.list.find((x) => x.id === projects.machine);
+          return m ? displayName(m) : "a server";
+        })()}.</span
       >
       <button type="button" class="btn" onclick={() => show(null)}><Eye size={14} /> Show This PC</button>
     </p>
@@ -106,7 +136,8 @@
     <section class="card">
       <header>
         <span class="dot {st.state}"></span>
-        <strong>{m.name}</strong>
+        {#if m.color}<span class="swatch" style:background={m.color} title="Its colour"></span>{/if}
+        <strong>{displayName(m)}</strong>
         <span class="muted">{m.relay ? "through the relay" : m.target === "local" ? "this PC" : m.target}</span>
         <span class="spacer"></span>
         {#if st.state === "on" && projects.machine !== m.id}
@@ -119,8 +150,19 @@
             <Plug size={14} />
           </IconButton>
         {/if}
+        <IconButton label="Rename" onclick={() => startRename(m)}><Pencil size={14} /></IconButton>
         <IconButton label="Remove" onclick={() => remove(m)}><Trash2 size={14} /></IconButton>
       </header>
+      {#if renaming === m.id}
+        <form class="row" onsubmit={(e) => rename(e, m.id)}>
+          <input bind:value={newName} maxlength={NAME_MAX + 10} aria-label="New name" />
+          <button type="submit" class="btn">Save</button>
+          <button type="button" class="btn" onclick={() => (renaming = null)}>Cancel</button>
+        </form>
+        {#if renameError}<p class="error">{renameError}</p>{/if}
+      {:else if nameIssue(m)}
+        <p class="error">{nameIssue(m)} Rename it so the two are never mixed up.</p>
+      {/if}
       {#if st.state === "connecting"}<p class="muted">Connecting…</p>{/if}
       {#if st.state === "error"}<p class="error">{st.error}</p>{/if}
       {#if st.state === "on" && st.info}
@@ -156,6 +198,20 @@
         />
         Connect when Qanuvi starts
       </label>
+      <div class="colors" role="group" aria-label="Its colour">
+        <span class="muted">Colour</span>
+        {#each COLORS as c (c)}
+          <button
+            type="button"
+            class="color"
+            class:picked={m.color === c}
+            style:background={c}
+            aria-label="Colour {c}"
+            aria-pressed={m.color === c}
+            onclick={() => masters.setColor(m.id, c)}
+          ></button>
+        {/each}
+      </div>
     </section>
   {:else}
     <p class="muted">No servers yet.</p>
@@ -176,7 +232,7 @@
     </label>
     <label>
       This device's name (shown on the other computer)
-      <input bind:value={pairName} placeholder="My laptop" />
+      <input bind:value={pairName} placeholder="My laptop" maxlength={NAME_MAX + 10} />
     </label>
     {#if pairError}<p class="error">{pairError}</p>{/if}
     <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
@@ -187,8 +243,8 @@
   <h3>Add a server</h3>
   <form class="add" onsubmit={add}>
     <label>
-      Name
-      <input bind:value={name} placeholder="My VPS" />
+      Name (empty: the server's own computer name)
+      <input bind:value={name} placeholder="My VPS" maxlength={NAME_MAX + 10} />
     </label>
     <label>
       SSH address
@@ -204,7 +260,7 @@
     </label>
     <label class="check"><input type="checkbox" bind:checked={auto} /> Connect when Qanuvi starts</label>
     {#if formError}<p class="error">{formError}</p>{/if}
-    <button type="submit" class="btn primary">Add and connect</button>
+    <button type="submit" class="btn primary" disabled={adding}>{adding ? "Connecting…" : "Add and connect"}</button>
   </form>
 
   <h3>Setting up a server</h3>
@@ -288,6 +344,32 @@
     height: 8px;
     border-radius: 50%;
     background: var(--qx-text-muted);
+  }
+
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  .colors {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .color {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .color.picked {
+    border-color: var(--qx-text);
   }
 
   .dot.on {

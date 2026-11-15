@@ -48,10 +48,16 @@ export function shownPlace(): string {
   return shown ? nameOf(shown) : "this computer";
 }
 
-/** The same at the start of a sentence: "This computer", or "VPS". */
+/**
+ * A place as a label or heading: "This computer", or the master's name exactly as typed (never capitalised).
+ * Sentences are worded so a machine's name never starts one.
+ */
+export function placeTitle(place: string): string {
+  return place === "this computer" ? "This computer" : place;
+}
+
 export function shownPlaceTitle(): string {
-  const p = shownPlace();
-  return p.charAt(0).toUpperCase() + p.slice(1);
+  return placeTitle(shownPlace());
 }
 
 export function nameMachines(names: (master: string) => string): void {
@@ -125,7 +131,7 @@ export class NotOnMachine extends Error {
     readonly master: string,
     readonly cmd: string,
   ) {
-    super(`${nameOf(master)} cannot do this yet (${cmd}).`);
+    super(`This cannot be done on ${nameOf(master)} yet (${cmd}).`);
     this.name = "NotOnMachine";
   }
 }

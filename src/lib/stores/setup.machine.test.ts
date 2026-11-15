@@ -76,7 +76,7 @@ describe("the status bar's usage (24z3 D2)", () => {
     answers.vps = (cmd) => (cmd === "qanuvi_usage" ? used(900) : null);
     await usage.look();
     expect(usage.now?.memory).toBe(100);
-    expect(usage.place).toBe("This computer");
+    expect(usage.place).toBe("this computer");
 
     // This PC's answer arrives late, after the master is shown: dropped.
     let late: (u: unknown) => void = () => {};

@@ -267,9 +267,38 @@ pub fn detect() -> Machine {
     }
 }
 
+/// The file in a machine's data folder that keeps its lasting id (24z3 machine names): made once, never in a backup
+/// (backups.rs), so a window can tell when two addresses reach the same machine.
+pub const ID_FILE: &str = "machine-id";
+
+/// This machine's lasting id, made the first time and kept in `ID_FILE` in its data folder `dir`.
+pub fn lasting_id(dir: &std::path::Path) -> String {
+    let file = dir.join(ID_FILE);
+    let kept = std::fs::read_to_string(&file).unwrap_or_default();
+    let kept = kept.trim();
+    if uuid::Uuid::parse_str(kept).is_ok() {
+        return kept.to_string();
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    // Not kept (a read-only folder): the id lasts while the master runs, and a window sees a new one next time.
+    let _ = std::fs::write(&file, &id);
+    id
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_lasting_id_is_made_once_and_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = lasting_id(dir.path());
+        assert!(uuid::Uuid::parse_str(&a).is_ok());
+        assert_eq!(lasting_id(dir.path()), a);
+        // A spoiled file gets a new id.
+        std::fs::write(dir.path().join(ID_FILE), "not an id").unwrap();
+        assert_ne!(lasting_id(dir.path()), a);
+    }
 
     #[test]
     fn checks_room_before_starting_something() {

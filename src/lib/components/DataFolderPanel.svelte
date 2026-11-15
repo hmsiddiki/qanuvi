@@ -6,7 +6,7 @@
    * 24z3 D3: the shown machine's. A master's folder is set where it starts (--data or QANUVI_MASTER_DATA), so it
    * is only shown (fixed); moving it from here comes later.
    */
-  import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace } from "$lib/remote";
   import { settings } from "$lib/stores/settings.svelte";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
@@ -106,7 +106,7 @@
 
     {#if info.fixed}
       <p class="muted small">
-        {shownPlaceTitle()} is told where when it starts: <code>qanuvi-master serve --data &lt;folder&gt;</code>, or the
+        When it starts, {shownPlace()} is told where: <code>qanuvi-master serve --data &lt;folder&gt;</code>, or the
         <code>QANUVI_MASTER_DATA</code> setting. Moving it from here comes later.
       </p>
     {:else if info.pending}

@@ -31,6 +31,8 @@ mod plan_runs;
 pub struct Master {
     /// Its data folder (the one it was opened on; paths keeps the first one a process sets).
     dir: PathBuf,
+    /// Its lasting id (kept in its data folder), answered in hello so a window knows the same machine again.
+    machine_id: String,
     db: Db,
     terminals: Terminals,
     agents: Agents,
@@ -106,10 +108,12 @@ impl Master {
             eprintln!("{note}");
         }
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
+        let machine_id = crate::machine::lasting_id(dir);
         agent::mark_interrupted(&db);
         runs::mark_interrupted(&db);
         Ok(Self {
             dir: dir.to_path_buf(),
+            machine_id,
             db,
             terminals: Terminals::default(),
             agents: Agents::default(),
@@ -154,6 +158,7 @@ impl Master {
                 "arch": std::env::consts::ARCH,
                 "host": hostname(),
                 "dataDir": paths::data_dir().to_string_lossy(),
+                "machineId": self.machine_id,
             })),
             // Remote access through a relay (Milestone 20), managed from this computer's own window.
             "relay_status" => to(Ok(self.relay.status())),
@@ -464,6 +469,7 @@ impl Master {
                 ))
             }
             "backups_cancel_restore" => to(crate::backups::cancel_restore(&self.dir)),
+            "backups_dismiss_note" => to(crate::backups::dismiss_note(&self.dir)),
             "backups_remove" => to(crate::backups::remove_one(
                 &self.dir,
                 Some(&backups_default()),
@@ -958,10 +964,11 @@ mod tests {
         )
         .unwrap();
         let m = Master::open(data.path()).unwrap();
-        assert_eq!(
-            call(&m, "hello", json!({})).unwrap()["name"],
-            "Qanuvi master"
-        );
+        let hello = call(&m, "hello", json!({})).unwrap();
+        assert_eq!(hello["name"], "Qanuvi master");
+        // Its lasting id: the same after it opens again on the same data folder.
+        let id = hello["machineId"].as_str().unwrap().to_string();
+        assert_eq!(id, crate::machine::lasting_id(data.path()));
         let p = call(
             &m,
             "projects_add",

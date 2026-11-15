@@ -101,6 +101,26 @@ pub struct Paired {
     pub key: String,
 }
 
+/// The longest name a computer or device gives itself, in characters (the window's rule too, machineNames.ts).
+pub const NAME_MAX: usize = 40;
+
+/// A name as it is kept and sent: characters that cannot be seen dropped (control, zero-width, direction marks),
+/// trimmed, at most `NAME_MAX` characters. The window refuses such names; this keeps any other way in clean.
+pub fn clean_name(name: &str) -> String {
+    let invisible = |c: char| {
+        c.is_control()
+            || matches!(c, '\u{00AD}' | '\u{061C}' | '\u{180E}' | '\u{200B}'..='\u{200F}'
+                | '\u{2028}'..='\u{202E}' | '\u{2060}'..='\u{206F}' | '\u{FEFF}' | '\u{FFF9}'..='\u{FFFB}')
+    };
+    let kept: String = name.chars().filter(|c| !invisible(*c)).collect();
+    kept.trim()
+        .chars()
+        .take(NAME_MAX)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
 /// Pairs with the computer showing `code`.
 pub fn pair(relay: &str, code: &str, my_name: &str) -> Result<Paired, String> {
     let code = Code::parse(code)?;
@@ -122,7 +142,7 @@ pub fn pair(relay: &str, code: &str, my_name: &str) -> Result<Paired, String> {
         .and_then(|b| serde_json::from_slice(&b).ok())
         .ok_or("The code was not right (or not this computer's).")?;
     let mine = HandlerCard {
-        name: my_name.chars().take(60).collect(),
+        name: clean_name(my_name),
         pairing: card.pairing.clone(),
     };
     link.send(&Msg::PairConfirm {
@@ -467,7 +487,7 @@ impl RelayMaster {
                 i.config.secret.clear();
             }
             i.config.relay = relay;
-            i.config.name = name.chars().take(60).collect();
+            i.config.name = clean_name(name);
             i.config.enabled = enabled;
             i.generation += 1;
             let c = i.config.clone();
@@ -624,10 +644,9 @@ impl RelayMaster {
                 if let Some(c) = card {
                     i.config.devices.push(Device {
                         pairing,
-                        name: if c.name.trim().is_empty() {
-                            "A device".into()
-                        } else {
-                            c.name
+                        name: match clean_name(&c.name) {
+                            n if n.is_empty() => "A device".into(),
+                            n => n,
                         },
                         added: now_secs(),
                         key: b64(&key),
@@ -822,6 +841,15 @@ const QUIET: [&str; 6] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_are_kept_clean_and_short() {
+        assert_eq!(clean_name("  Home PC  "), "Home PC");
+        assert_eq!(clean_name("Ho\u{200B}me\u{0007} PC"), "Home PC");
+        assert_eq!(clean_name("\u{202E}"), "");
+        assert_eq!(clean_name(&"x".repeat(60)).chars().count(), NAME_MAX);
+        assert_eq!(clean_name("Büro-Rechner"), "Büro-Rechner");
+    }
 
     #[test]
     fn relay_addresses_must_be_wss_or_this_computer() {

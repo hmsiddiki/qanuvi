@@ -22,7 +22,7 @@
   import { account } from "$lib/stores/account.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { gitState, ago } from "$lib/stores/git.svelte";
-  import { masters } from "$lib/stores/masters.svelte";
+  import { displayName, masters } from "$lib/stores/masters.svelte";
   import { memoryDisk } from "$lib/stores/memoryDisk.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings } from "$lib/stores/settings.svelte";
@@ -81,6 +81,8 @@
 
   let running = $derived(agent.sessions.filter((s) => s.status === "running").length);
   let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting").length);
+  /** The paired machine on screen, shown in its colour so it is never mistaken for This PC (which stays plain). */
+  let shownMaster = $derived(masters.list.find((m) => m.id === projects.machine));
   let connected = $derived(masters.list.filter((m) => masters.statusOf(m.id).state === "on").length);
   let serverProblem = $derived(masters.list.some((m) => masters.statusOf(m.id).state === "error"));
   let diskOn = $derived(settings.value.memoryDisk.mode !== "off");
@@ -148,6 +150,18 @@
         >
       {/if}
       {#if git.changes.length}<span class="dim">· {git.changes.length}</span>{/if}
+    </button>
+  {/if}
+
+  {#if shownMaster}
+    <button
+      type="button"
+      class="item machine"
+      title="On screen: {displayName(shownMaster)}"
+      onclick={() => show("servers")}
+    >
+      <span class="swatch" style:background={shownMaster.color ?? "var(--qx-text-muted)"}></span>
+      <span class="machine-name">{displayName(shownMaster)}</span>
     </button>
   {/if}
 
@@ -320,6 +334,19 @@
   .item:hover:not(.static) {
     background: var(--qx-bg-hover, rgba(127, 127, 127, 0.15));
     color: var(--qx-text);
+  }
+
+  .swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  .machine-name {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .item.static {

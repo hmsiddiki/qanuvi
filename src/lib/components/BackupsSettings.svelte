@@ -8,7 +8,7 @@
    * its Documents). On a master the folder is typed (a full path there; the picker only sees This PC), its backups
    * hold no window settings, and its restore is applied when it restarts.
    */
-  import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace } from "$lib/remote";
   import { ask, open } from "@tauri-apps/plugin-dialog";
   import { errorText } from "$lib/api";
   import { masters } from "$lib/stores/masters.svelte";
@@ -127,6 +127,12 @@
     await load();
   }
 
+  /** The note about the last restore goes until the next one (24z3 machine names batch, item 9). */
+  async function dismissNote() {
+    await invoke("backups_dismiss_note").catch((e) => (error = errorText(e)));
+    await load();
+  }
+
   async function cancelRestore() {
     await invoke("backups_cancel_restore").catch((e) => (error = errorText(e)));
     await load();
@@ -192,6 +198,7 @@
   {#if info.note}
     <p class="small" class:ok={info.note.startsWith("Restored")} class:error={!info.note.startsWith("Restored")}>
       {info.note}
+      <button type="button" class="link" onclick={dismissNote}>Dismiss</button>
     </p>
   {/if}
   <div class="card">
@@ -237,7 +244,7 @@
       {/if}
     </div>
     {#if machine}
-      <p class="muted small">{shownPlaceTitle()} makes the folder when it is not there yet.</p>
+      <p class="muted small">The folder is made on {shownPlace()} when it is not there yet.</p>
     {/if}
     {#if sameDrive}
       <p class="muted small">Another drive is safer: a backup on the same drive is lost with it.</p>

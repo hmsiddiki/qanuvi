@@ -3,7 +3,7 @@
  * agent brought up to date with the user's permission (kept here after the user accepts it).
  */
 import { Channel } from "@tauri-apps/api/core";
-import { routed as invoke, shownPlaceTitle } from "$lib/remote";
+import { routed as invoke, shownPlace } from "$lib/remote";
 import { errorText } from "$lib/api";
 import {
   BUILT_IN_GUIDES,
@@ -32,7 +32,7 @@ class GuidesStore {
   kept = $state<Guide[] | null>(null);
   machine = $state<MachineInfo | null>(null);
   /** Whose `machine` is, at the start of a sentence: "This computer" or the master's name. */
-  place = $state("This computer");
+  place = $state("this computer");
   checking = $state<Record<string, string>>({});
   pulling = $state<Record<string, { status: string; done: number; total: number } | null>>({});
   pullError = $state<Record<string, string>>({});
@@ -65,7 +65,7 @@ class GuidesStore {
     const ask = ++this.#asks;
     const info = await invoke<MachineInfo>("machine_info").catch(() => null);
     if (ask === this.#asks) {
-      this.place = shownPlaceTitle();
+      this.place = shownPlace();
       this.machine = info;
     }
   }
