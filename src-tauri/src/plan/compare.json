@@ -4711,6 +4711,37 @@
   "out": "- [ ] **1. Spaced**tail\n- [ ] ********"
  },
  {
+  "fn": "takeModels",
+  "args": [
+   "- [ ] **12. Add VAT**\r\n  - Model: claude-sonnet-5-5\r\n  - Validate: ok\n- [ ] Plain step\n  - MODEL: x\n- [ ] **13. None**\n"
+  ],
+  "out": {
+   "block": "- [ ] **12. Add VAT**\n  - Validate: ok\n- [ ] Plain step\n- [ ] **13. None**\n",
+   "models": [
+    {
+     "number": "12",
+     "title": "Add VAT",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "number": null,
+     "title": "Plain step",
+     "model": "x"
+    }
+   ]
+  }
+ },
+ {
+  "fn": "takeModels",
+  "args": [
+   ""
+  ],
+  "out": {
+   "block": "",
+   "models": []
+  }
+ },
+ {
   "fn": "renumberWith",
   "args": [
    "- [ ] **97a-2a. Code**\n  - Needs: 97a-1\n- [ ] **97a-2b. 97a2b. Tests**\n  - Needs:  97a-2a ,97a2b\n- [ ] Docs\n   - Needs: 97a-2b, x",

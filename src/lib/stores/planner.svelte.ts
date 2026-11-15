@@ -15,7 +15,9 @@ import {
   plannerPrompt,
   renumber,
   sectionTitleFrom,
+  takeModels,
 } from "$lib/plan/planner";
+import { loadPlanState, savePlanState, setKeptModel } from "$lib/plan/planstate";
 import type { Step } from "$lib/plan/tasklist";
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
@@ -167,8 +169,15 @@ class PlannerStore {
     // Numbers that are only in the plan's archive (24j) are taken too: a new step never repeats one.
     const archived = (await api.files.read(project.id, archivePath(file)).catch(() => null))?.text ?? "";
     const numbered = renumber(p.block, Math.max(lastNumber(text), lastNumber(archived)) + 1);
-    const next = appendSection(text, sectionTitle || p.title, numbered);
+    // The planner's model per step goes into the plan's own data, not the file (R2e i).
+    const taken = takeModels(numbered);
+    const next = appendSection(text, sectionTitle || p.title, taken.block);
     await api.files.write(project.id, file, next, current?.hash ?? null);
+    if (taken.models.length) {
+      let state = loadPlanState(project.id, file);
+      for (const m of taken.models) state = setKeptModel(state, m, m.model);
+      savePlanState(project.id, file, state);
+    }
     this.preview = null;
     const added = (await import("$lib/plan/tasklist")).parsePlan(next).steps;
     return added[added.length - p.steps.length]?.line ?? 0;

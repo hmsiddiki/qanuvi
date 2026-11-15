@@ -3178,6 +3178,9 @@ impl<'a> Loop<'a> {
                 &planner::free_labels(&current.text, &archive, step.number.as_deref(), count),
             );
             let labels = planner::label_range(&numbered);
+            // The planner's model per step goes into the plan's own data, not the file (R2e i).
+            let taken = planner::take_models(&numbered);
+            let numbered = taken.block;
             let next = planner::replace_step(
                 &current.text,
                 step.number.as_deref(),
@@ -3189,6 +3192,13 @@ impl<'a> Loop<'a> {
             self.env
                 .write(&self.s.file, &next, Some(&current.hash))
                 .ok()?;
+            if !taken.models.is_empty() {
+                let mut state = self.load_state();
+                for m in &taken.models {
+                    state.set_kept_model(m.number.as_deref(), &m.title, Some(&m.model));
+                }
+                self.save_state(&state);
+            }
             let new_numbers: Vec<Option<String>> = parse_plan(&numbered)
                 .steps
                 .into_iter()

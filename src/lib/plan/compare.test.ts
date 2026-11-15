@@ -297,6 +297,7 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   labelRange: planner.labelRange,
   freeLabels: planner.freeLabels,
   renumberWith: planner.renumberWith,
+  takeModels: planner.takeModels,
   sectionTitleFrom: planner.sectionTitleFrom,
   guidanceNote: guidance.guidanceNote,
   withoutGuidance: guidance.withoutGuidance,
@@ -736,6 +737,13 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["renumberWith", ["- [ ] **  12b.   Spaced  **tail\n- [ ] ****", ["1"]]],
+  [
+    "takeModels",
+    [
+      "- [ ] **12. Add VAT**\r\n  - Model: claude-sonnet-5-5\r\n  - Validate: ok\n- [ ] Plain step\n  - MODEL: x\n- [ ] **13. None**\n",
+    ],
+  ],
+  ["takeModels", [""]],
   [
     "renumberWith",
     [

@@ -11,6 +11,7 @@ import {
   replaceStep,
   replanPrompt,
   sectionTitleFrom,
+  takeModels,
 } from "./planner";
 
 const ANSWER = [
@@ -191,5 +192,27 @@ describe("finalText (PLAN-F 97a-2: a review reason that was only a proxy placeho
     expect(finalText('{"ok":true}', "other")).toBe('{"ok":true}');
     expect(finalText("<<ccr:a,string,1B>>", "")).toBe("<<ccr:a,string,1B>>");
     expect(assistantText({ type: "user", message: { content: [{ type: "text", text: "x" }] } })).toBe("");
+  });
+});
+
+describe("takeModels (R2e i)", () => {
+  it("takes the planner's Model lines out of the block and keeps them per step", () => {
+    const block = [
+      "- [ ] **12. Add VAT**",
+      "  - Validate: tests pass.",
+      "  - Model: claude-sonnet-5-5",
+      "- [ ] **13. Docs**",
+      "  - model: claude-haiku-5-5",
+      "- [ ] **14. No model**",
+      "  - Do it.",
+    ].join("\n");
+    const r = takeModels(block);
+    expect(r.block).not.toMatch(/model:/i);
+    expect(r.block).toContain("  - Validate: tests pass.\n- [ ] **13. Docs**\n- [ ] **14. No model**\n  - Do it.");
+    expect(r.models).toEqual([
+      { number: "12", title: "Add VAT", model: "claude-sonnet-5-5" },
+      { number: "13", title: "Docs", model: "claude-haiku-5-5" },
+    ]);
+    expect(takeModels("- [ ] **1. A**\n  - x").models).toEqual([]);
   });
 });

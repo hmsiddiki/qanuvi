@@ -513,6 +513,7 @@ fn run_2b(name: &str, a: &[Value]) -> Value {
             a[3].as_u64().unwrap_or(0) as usize
         )),
         "renumberWith" => json!(planner::renumber_with(&s(0), &de::<Vec<String>>(&a[1]))),
+        "takeModels" => to(planner::take_models(&s(0))),
         "sectionTitleFrom" => json!(planner::section_title_from(&s(0))),
         "guidanceNote" => json!(guidance::guidance_note(&s(0), &s(1))),
         "withoutGuidance" => json!(guidance::without_guidance(&s(0))),

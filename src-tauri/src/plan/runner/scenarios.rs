@@ -300,7 +300,7 @@ fn plan_f_97a_replanned_steps_get_free_numbers_the_replaced_step_is_not_held_and
     env.set_agent(|c| {
         if planner(c) {
             if c.title.is_some_and(|t| t.starts_with("Planner: rewrite")) {
-                let steps = "```tasklist\n- [ ] **97a1. Make it visible**\n  - first\n- [ ] **97a2. Schema 26**\n  - second\n```";
+                let steps = "```tasklist\n- [ ] **97a1. Make it visible**\n  - first\n  - Model: claude-sonnet-5-5\n- [ ] **97a2. Schema 26**\n  - second\n```";
                 return AgentReply { result: Some(steps.into()), ..Default::default() };
             }
             return ok_review(c);
@@ -327,6 +327,18 @@ fn plan_f_97a_replanned_steps_get_free_numbers_the_replaced_step_is_not_held_and
         );
     }
     assert!(!plan.contains("**97b. 97a"));
+    // The planner's model for a new step is kept in the plan's own data, not written into the file (R2e i).
+    assert!(!plan.contains("Model:"), "{plan}");
+    let state = crate::plan::planstate::PlanState::from_json(
+        &env.plan_data_get(FILE, crate::plan_data::Kind::State)
+            .unwrap(),
+    );
+    assert_eq!(
+        state
+            .kept_model(Some("97a-1"), "Make it visible")
+            .as_deref(),
+        Some("claude-sonnet-5-5")
+    );
     assert_eq!(r.status, RunStatus::Done);
     assert!(
         step(&r, "97a")

@@ -370,8 +370,9 @@ runs on or off; with it off nothing is sent anywhere.
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
     RESUME HERE (newest, 2026-11-15, after the R2e fixes): the owner's decisions on R2e (a)-(i) are BUILT with tests
-    (see 24z "R2e FIXES DONE"); not driven live, nothing published. Open for the owner: the planner still writes
-    "- Model:" lines into new plans; move those to plan data too? NEXT: drive the fixes live in a test build on a
+    (see 24z "R2e FIXES DONE"); not driven live, nothing published. Owner (2026-11-15): the planner's "- Model:"
+    lines move to plan data too: done (new plans and replanned steps keep the planner's model per step in the plan
+    state, the file gets the steps without them). NEXT: drive the fixes live in a test build on a
     scratch project (check free RAM first; Rust parts one job at a time), then delete what is left of the
     TypeScript runner, then write out the master accounts milestone in parts for the owner's review.
     RESUME HERE (before, 2026-11-15, after R2e part 2): R2e PART 2 DONE (see 24z "R2e part 2 DONE"): the master
@@ -1060,9 +1061,11 @@ runs on or off; with it off nothing is sent anywhere.
         fix rounds keep the title. (i) the model chosen for a step in the Plan view, by a switch during a run, or by
         "Keep it for every open step" in the Run panel goes into the plan state ("models": step, title, model), not
         the file; a "- Model:" line the step had is taken out then; a hand-written "- Model:" line still wins over a
-        kept choice; kept models stay while the step is in the plan. Not changed: the planner still writes "- Model:"
-        lines into new plans (owner to choose whether those move to plan data too). Commits 6fa3523 and the (i)
-        commit after it. NEXT: drive (a)-(i) live in a test build on a scratch project, then delete what is left of
+        kept choice; kept models stay while the step is in the plan. The planner too (owner's yes, 2026-11-15): a
+        new plan (planner.svelte.ts accept) and a replanned step (run.rs) go through takeModels / take_models after
+        numbering: "- Model:" lines leave the block and each goes into the plan state under its final number; plans
+        written before keep their lines (hand-written and planner lines cannot be told apart; picking a model in the
+        Plan view moves one). Commits 6fa3523, fd705f6 and the planner commit after them. NEXT: drive (a)-(i) live in a test build on a scratch project, then delete what is left of
         the TypeScript runner; then the master accounts milestone written out in parts for the owner's review.
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The

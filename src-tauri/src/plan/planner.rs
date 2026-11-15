@@ -293,6 +293,62 @@ pub fn renumber_with(block: &str, labels: &[String]) -> String {
         .join("\n")
 }
 
+/// A planner's model suggestion for a step, taken out of its block (`takeModels`).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TakenModel {
+    pub number: Option<String>,
+    pub title: String,
+    pub model: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Taken {
+    pub block: String,
+    pub models: Vec<TakenModel>,
+}
+
+/// Takes the planner's "- Model:" lines out of a numbered block (R2e i): the plan file gets the steps without them,
+/// and each suggestion is kept in the plan's own data instead (an agent reading the file took them for model
+/// attribution).
+pub fn take_models(block: &str) -> Taken {
+    let lines: Vec<&str> = block
+        .split('\n')
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect();
+    let is_model = |l: &str| {
+        let rest =
+            l.trim_start_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}');
+        rest.len() < l.len() && rest.to_lowercase().starts_with("- model:")
+    };
+    let mut models = Vec::new();
+    let mut drop = std::collections::HashSet::new();
+    for s in parse_plan(block).steps {
+        let Some(model) = s.model.clone() else {
+            continue;
+        };
+        models.push(TakenModel {
+            number: s.number.clone(),
+            title: s.title.clone(),
+            model,
+        });
+        for (i, l) in lines.iter().enumerate().take(s.end).skip(s.line + 1) {
+            if is_model(l) {
+                drop.insert(i);
+            }
+        }
+    }
+    Taken {
+        block: lines
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !drop.contains(i))
+            .map(|(_, l)| *l)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        models,
+    }
+}
+
 /// Adds a block of steps as a new section at the end of a task list, keeping its line endings.
 pub fn append_section(text: &str, title: &str, block: &str) -> String {
     static SPACES: LazyLock<Regex> = LazyLock::new(|| re(&format!("{}+", js::S)));
@@ -537,5 +593,28 @@ mod tests {
             "Add optional VAT to the cart total using addVat from…"
         );
         assert_eq!(section_title_from("  "), "Planned work");
+    }
+}
+
+#[cfg(test)]
+mod take_models_tests {
+    use super::*;
+
+    #[test]
+    fn takes_the_planners_model_lines_out_and_keeps_them_per_step() {
+        let block = "- [ ] **12. Add VAT**\n  - Validate: ok\n  - Model: claude-sonnet-5-5\n- [ ] **13. Docs**\n";
+        let t = take_models(block);
+        assert_eq!(
+            t.block,
+            "- [ ] **12. Add VAT**\n  - Validate: ok\n- [ ] **13. Docs**\n"
+        );
+        assert_eq!(
+            t.models,
+            vec![TakenModel {
+                number: Some("12".into()),
+                title: "Add VAT".into(),
+                model: "claude-sonnet-5-5".into()
+            }]
+        );
     }
 }

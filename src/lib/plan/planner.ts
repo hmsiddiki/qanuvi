@@ -161,6 +161,25 @@ export function renumberWith(block: string, labels: string[]): string {
     .join("\n");
 }
 
+/**
+ * Takes the planner's "- Model:" lines out of a numbered block (R2e i): the plan file gets the steps without them, and
+ * each suggestion is kept in the plan's own data instead (an agent reading the file took them for model attribution).
+ */
+export function takeModels(block: string): {
+  block: string;
+  models: { number: string | null; title: string; model: string }[];
+} {
+  const lines = block.split(/\r?\n/);
+  const models: { number: string | null; title: string; model: string }[] = [];
+  const drop = new Set<number>();
+  for (const s of parsePlan(block).steps) {
+    if (!s.model) continue;
+    models.push({ number: s.number, title: s.title, model: s.model });
+    for (let i = s.line + 1; i < s.end && i < lines.length; i++) if (/^\s+- Model:/i.test(lines[i])) drop.add(i);
+  }
+  return { block: lines.filter((_, i) => !drop.has(i)).join("\n"), models };
+}
+
 /** Adds a block of steps as a new section at the end of a task list, keeping its line endings. */
 export function appendSection(text: string, title: string, block: string): string {
   const { eol } = splitLines(text);
