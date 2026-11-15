@@ -90,26 +90,6 @@ const LEAN: Record<Priority, string> = {
     "Solving the problem comes first: give the paid model every step that is not routine; free models only for plain, low-risk steps.",
 };
 
-/** The decider's question for a whole plan, one call: which steps free models can do and which need the paid model. */
-export function assignPrompt(steps: StepBrief[], priority: Priority): string {
-  const list = steps
-    .map(
-      (s) =>
-        `${s.number}. ${s.title} [${s.type}]${s.details.length ? `\n   ${s.details.slice(0, 4).join("\n   ")}` : ""}`,
-    )
-    .join("\n");
-  return [
-    "You are the decider in a coding team. Free models (capable but weaker, may break tool calls) and one paid model (strong) can do each step of this plan.",
-    LEAN[priority],
-    "Money, payments, security and authentication work always goes to the paid model.",
-    "Look at the steps, then answer with JSON only, in this shape:",
-    '{"steps":[{"number":"1","worker":"free","why":"a short reason"}]}',
-    "",
-    "Steps:",
-    list,
-  ].join("\n");
-}
-
 /**
  * Reads the decider's answer. Steps it left out, or answered in a way that cannot be used, get the safe default:
  * security work → paid; otherwise free when saving, paid when solving, by kind when balanced.
@@ -304,35 +284,6 @@ export interface DecisionRecord {
   subject: string;
   decision: string;
   why: string;
-}
-
-/**
- * What one step changed in a file: the lines removed (-) and added (+) between two versions, with no context lines.
- * The review sees only this step's work, not earlier steps' changes that are not committed yet. Very long files
- * return null (the caller uses the file's whole diff instead).
- */
-export function stepDiff(path: string, before: string, after: string): string | null {
-  const a = before.split("\n");
-  const b = after.split("\n");
-  if (a.length * b.length > 4_000_000) return null;
-  // Longest common subsequence, then walk it.
-  const n = a.length;
-  const m = b.length;
-  const lcs: Uint32Array[] = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
-  for (let i = n - 1; i >= 0; i--)
-    for (let j = m - 1; j >= 0; j--)
-      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
-  const out: string[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < n || j < m) {
-    if (i < n && j < m && a[i] === b[j]) {
-      i++;
-      j++;
-    } else if (j < m && (i >= n || lcs[i][j + 1] >= lcs[i + 1][j])) out.push(`+${b[j++]}`);
-    else out.push(`-${a[i++]}`);
-  }
-  return out.length ? `--- ${path} (before this step)\n+++ ${path} (after)\n${out.join("\n")}` : "";
 }
 
 /** The word the paid agent answers with when the free pick is too weak for the message (24e). */

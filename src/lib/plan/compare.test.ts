@@ -3,12 +3,16 @@
  * This test keeps src-tauri/src/plan/compare.json (inputs and TypeScript outputs) up to date with the TypeScript; the
  * Rust test plan::compare runs the same inputs and must give the same outputs. After changing a case or the
  * TypeScript, write the file again with: npx vitest run -u src/lib/plan/compare.test.ts
+ *
+ * The run logic itself now lives only in Rust: its TypeScript functions were deleted after R2e. Their recorded cases
+ * stay in compare.json as they were (any entry whose function is not in `fns` below is kept untouched), so the Rust
+ * port is still held to the outputs the TypeScript gave.
  */
+import recordedText from "../../../src-tauri/src/plan/compare.json?raw";
 import { describe, expect, it } from "vitest";
 import * as decider from "$lib/core/decider";
 import * as limits from "./limits";
 import * as holdask from "./holdask";
-import * as setaside from "./setaside";
 import * as costs from "./costs";
 import * as picks from "./picks";
 import { taskListPrompt } from "./prompts";
@@ -17,7 +21,6 @@ import * as routing from "./routing";
 import * as runner from "./runner";
 import * as finishing from "./finishing";
 import * as preflight from "./preflight";
-import * as packet from "./packet";
 import * as planstate from "./planstate";
 import * as housekeeping from "./housekeeping";
 import * as planner from "./planner";
@@ -125,15 +128,6 @@ const RUNS = [
   },
   { steps: [sr("4", "done", [att("qanuvi:auto", "done", 0)], { title: "Add a page" })] },
 ];
-const FREE_PLAN = [
-  "- [!] **97a. Storage design**",
-  "- [ ] **97b. Phone mode**",
-  "- [ ] **97c. Texts**",
-  "- [ ] **97d. Custom field**",
-  "- [ ] **97z. Docs**",
-  "- [ ] **98. Next**",
-  "- [ ] **98a. Next part**",
-].join("\n");
 
 const RUN_STEPS = [
   sr("1", "done", [att(H5, "done", 0.25, 30), att(S5, "done", 0.5, 90)], { jobType: "docs" }),
@@ -159,12 +153,6 @@ const FINISH = {
   stillOpen: ["set the SMTP login"],
   note: "ran twice",
 };
-const BRIEFS = [
-  { number: "3", title: "Add the cart", done: ["- Done: " + "é".repeat(450), "two", "three", "four", "five"] },
-  { number: null, title: "No number", done: [] },
-];
-const useLine = (name: string, input: Record<string, unknown> = {}) =>
-  JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "x", name, input }] } });
 
 /** Function name → what it runs; the Rust side has the same names in plan/compare.rs. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,7 +160,6 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   parseTeam: decider.parseTeam,
   deciderSeat: decider.deciderSeat,
   freeWorks: (team, f, p) => decider.freeWorks(decider.parseTeam(team), f, p),
-  assignPrompt: decider.assignPrompt,
   parseAssignment: decider.parseAssignment,
   pickPrompt: decider.pickPrompt,
   parsePicks: decider.parsePicks,
@@ -180,39 +167,22 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   parseReview: decider.parseReview,
   chatModelPrompt: decider.chatModelPrompt,
   parseChatModel: decider.parseChatModel,
-  stepDiff: decider.stepDiff,
   overruleNote: decider.overruleNote,
   withoutOverruleNote: decider.withoutOverruleNote,
   overruleIn: decider.overruleIn,
   strongerModel: decider.strongerModel,
   isLimit: limits.isLimit,
-  limitResetAt: (text: string, now: number) => limits.limitResetAt(text, new Date(now))?.getTime() ?? null,
-  holdKey: holdask.holdKey,
-  asksSecret: holdask.asksSecret,
-  holdForm: holdask.holdForm,
   holdReply: holdask.holdReply,
-  isClosingStep: setaside.isClosingStep,
-  mentionedFiles: setaside.mentionedFiles,
-  planDependence: setaside.planDependence,
-  dependencePrompt: setaside.dependencePrompt,
-  parseDependence: (t, o, h) => [...setaside.parseDependence(t, o, h)],
-  waitingLine: setaside.waitingLine,
-  closingRerunNote: setaside.closingRerunNote,
-  setAsideBlock: setaside.setAsideBlock,
-  toolKinds: costs.toolKinds,
   finishedCost: costs.finishedCost,
   planHistory: costs.planHistory,
-  overLimit: costs.overLimit,
   pickFor: picks.pickFor,
   taskListPrompt: (file: string) => taskListPrompt(file),
   parsePlan: tasklist.parsePlan,
   setStepStatus: (t, l, st, e) => tried(() => tasklist.setStepStatus(t, l, st, e ?? undefined)),
   setStepTitle: (t, l, ti, e) => tried(() => tasklist.setStepTitle(t, l, ti, e ?? undefined)),
   setStepModel: (t, l, m, e) => tried(() => tasklist.setStepModel(t, l, m, e ?? undefined)),
-  setStepSkipped: (t, l, r, e) => tried(() => tasklist.setStepSkipped(t, l, r, e ?? undefined)),
   nextStatus: tasklist.nextStatus,
   findTaskLists: tasklist.findTaskLists,
-  clearStaleSkips: tasklist.clearStaleSkips,
   jobType: routing.jobType,
   learn: (runs) => Object.fromEntries(routing.learn(runs, routing.jobType)),
   reliability: routing.reliability,
@@ -220,83 +190,37 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   modelProfiles: (stats, type, models) => routing.modelProfiles(statsOf(stats), type, models),
   budgetState: routing.budgetState,
   chooseModel: (o) => routing.chooseModel({ ...o, stats: statsOf(o.stats) }),
-  freeFirstFor: runner.freeFirstFor,
-  freeWantedButMissing: runner.freeWantedButMissing,
   costRatio: runner.costRatio,
-  stepsToRun: (text, from, only, ranges) =>
-    runner.stepsToRun(tasklist.parsePlan(text).steps, from, only, runner.parseRanges(ranges).ranges).map((s) => s.line),
   parseRanges: runner.parseRanges,
   inRanges: (n, text) => runner.inRanges(n, runner.parseRanges(text).ranges),
-  unmetNeed: (needs, done, others) =>
-    runner.unmetNeed(
-      needs,
-      new Set(done),
-      new Map(Object.entries(others as Record<string, string[]>).map(([k, v]) => [k, new Set(v)])),
-    ),
-  endStatus: (steps) => runner.endStatus({ steps }),
-  runSummary: (steps) => runner.runSummary({ steps }),
-  reviewWithoutDiff: runner.reviewWithoutDiff,
-  replacementsDone: (steps, key) => runner.replacementsDone({ steps }, key),
-  startModel: (model, d) => runner.startModel({ model }, d),
-  nextModel: runner.nextModel,
-  stepOutcome: runner.stepOutcome,
-  stepPrompt: (file, text, i, done) => runner.stepPrompt(file, tasklist.parsePlan(text).steps[i], done),
   runTotals: (steps, deciderCalls, finish) => {
     const t = runner.runTotals({ steps, deciderCalls, finish: finish ?? undefined });
     return { ...t, byModel: Object.fromEntries(t.byModel) };
   },
-  nextModelFreeFirst: runner.nextModelFreeFirst,
   freeSavings: (steps, per) => runner.freeSavings({ steps }, per),
   paidPerStep: (stats) => runner.paidPerStep(statsOf(stats)),
   finishEstimate: (steps, level, prices) => finishing.finishEstimate({ steps }, level, prices ?? undefined),
   offersFinish: (status, steps, finish) => finishing.offersFinish({ status, steps, finish: finish ?? undefined }),
-  finishReviewPrompt: finishing.finishReviewPrompt,
-  parseFinishReview: finishing.parseFinishReview,
-  finishFullPrompt: finishing.finishFullPrompt,
-  stillOpenIn: finishing.stillOpenIn,
-  doneNotes: finishing.doneNotes,
-  isPlanFile: finishing.isPlanFile,
-  finishEntry: finishing.finishEntry,
   preflightPrompt: preflight.preflightPrompt,
   parsePreflight: preflight.parsePreflight,
   recommendedRisk: preflight.recommendedRisk,
   decidedNote: preflight.decidedNote,
   settleCheck: (answer, a, at, r, rt) => preflight.settleCheck(preflight.parsePreflight(answer), a, at, r, rt),
-  waitsBefore: preflight.waitsBefore,
-  mentions: packet.mentions,
-  excerptAround: packet.excerptAround,
-  packetContextBlock: packet.contextBlock,
-  failureSummary: packet.failureSummary,
-  packetPrompt: packet.packetPrompt,
-  fixPrompt: packet.fixPrompt,
-  locationBlock: packet.locationBlock,
   holdWording: planstate.holdWording,
   keepHolds: planstate.keepHolds,
   keepAnswer: planstate.keepAnswer,
-  pruneState: (s, open, all) => planstate.pruneState(s, new Set(open), all ? new Set(all) : undefined),
-  closingRan: planstate.closingRan,
-  markLate: planstate.markLate,
-  closingsDue: (s, pending, ending) => planstate.closingsDue(s, (x) => pending.includes(x), ending),
   keepDecided: planstate.keepDecided,
   changeDecided: planstate.changeDecided,
   archivePath: housekeeping.archivePath,
-  isArchive: housekeeping.isArchive,
-  doneNumbers: (...texts) => [...housekeeping.doneNumbers(...texts)],
   finishedSections: (t) => housekeeping.finishedSections(t).map((s) => [s.title, s.line, s.steps.length]),
   archiveFinished: housekeeping.archiveFinished,
   mergePlans: housekeeping.mergePlans,
   stepNumbers: housekeeping.stepNumbers,
   plannerPrompt: planner.plannerPrompt,
-  replanPrompt: (file, text, i, failure, models) =>
-    planner.replanPrompt(file, tasklist.parsePlan(text).steps[i], failure, models),
   extractSteps: planner.extractSteps,
   lastNumber: planner.lastNumber,
   renumber: planner.renumber,
   appendSection: planner.appendSection,
-  replaceStep: (t, step, block, labels) => tried(() => planner.replaceStep(t, step, block, labels)),
-  labelRange: planner.labelRange,
-  freeLabels: planner.freeLabels,
-  renumberWith: planner.renumberWith,
   takeModels: planner.takeModels,
   sectionTitleFrom: planner.sectionTitleFrom,
   guidanceNote: guidance.guidanceNote,
@@ -306,35 +230,13 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   isYes: guidance.isYes,
   askedToResume: guidance.askedToResume,
   isStopOrder: guidance.isStopOrder,
-  addedSteps: (text, known) => guidance.addedSteps(tasklist.parsePlan(text).steps, new Set(known)).map((s) => s.line),
-  reopenedSteps: (run, text, reopened) =>
-    guidance.reopenedSteps(run, tasklist.parsePlan(text).steps, new Set(reopened)).map((s) => s.line),
   stepKey: guidance.stepKey,
-  notesBlock: guidance.notesBlock,
-  notesIn: guidance.notesIn,
   looksSecret: guidance.looksSecret,
   contextSize: guidance.contextSize,
-  handoverDue: guidance.handoverDue,
-  handoverRequest: guidance.handoverRequest,
-  modelSwitchRequest: guidance.modelSwitchRequest,
-  canCarry: guidance.canCarry,
-  needingCount: (blocked, steps, waiting) => guidance.needingCount(blocked, steps, new Set(waiting)),
   privateBlock: guidance.privateBlock,
   logDir: guidance.logDir,
-  logPath: guidance.logPath,
-  attemptEntry: (a) => guidance.attemptEntry({ ...a, when: new Date(a.when) }),
-  resultEntry: (status, reason) => guidance.resultEntry(status, reason ?? undefined),
-  logsBlock: guidance.logsBlock,
   mapPath: guidance.mapPath,
   factsPath: guidance.factsPath,
-  apiPath: guidance.apiPath,
-  guidanceContextBlock: guidance.contextBlock,
-  knowledgeBlock: guidance.knowledgeBlock,
-  isCode: guidance.isCode,
-  apiSection: guidance.apiSection,
-  mergeApi: (existing, updates) => guidance.mergeApi(existing, new Map(updates)),
-  referencedPlans: guidance.referencedPlans,
-  referencedBlock: guidance.referencedBlock,
 };
 
 const models = [
@@ -346,7 +248,6 @@ const assignAnswer =
   'Sure:\n```json\n{"steps":[{"number":1,"worker":"free","why":"plain docs"},{"number":"2","worker":"free"},{"number":"4","worker":"paid","why":"' +
   "y".repeat(250) +
   '"}]}\n```';
-const held = { number: "95b", title: "Refunds", details: ["edit includes/refund.php"] };
 const saved = {
   at: 1,
   providerId: "claude-code",
@@ -489,20 +390,6 @@ const LOGS = [
   JSON.stringify({ type: "assistant", message: { usage: null }, usage: 1 }),
   JSON.stringify({ type: "result", usage: { input_tokens: 99 } }),
 ];
-const RECENT = [
-  { number: "1", files: ["a.ts"] },
-  { number: null, files: Array.from({ length: 27 }, (_, i) => `f${i}.ts`) },
-  { number: "3", files: [] },
-  { number: "4", files: ["b.rs", "c.rs"] },
-  { number: "5", files: ["d.svelte"] },
-];
-const RUN_REOPEN = [
-  { line: 0, number: "1", title: "Project setup", status: "blocked" },
-  { line: 1, number: "2", title: "Layout", status: "failed" },
-  { line: 2, number: "1b", title: "Updates", status: "skipped" },
-  { line: 3, number: null, title: "Plain step without bold", status: "skipped" },
-  { line: 4, number: "1b", title: "Updates", status: "waiting" },
-];
 
 const cases: [string, unknown[]][] = [
   ["preflightPrompt", ["PLAN-D.md", PF_STEPS, KNOWN]],
@@ -535,97 +422,6 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["settleCheck", [PF_ANSWER, {}, {}, {}, {}]],
-  [
-    "waitsBefore",
-    [
-      "84a",
-      [
-        { step: "84a", why: "refunds" },
-        { step: "84a", why: "second" },
-      ],
-    ],
-  ],
-  ["waitsBefore", ["84b", [{ step: "84a", why: "refunds" }]]],
-  ["waitsBefore", ["", [{ step: "", why: "empty" }]]],
-  ["waitsBefore", ["84a", null]],
-  [
-    "mentions",
-    [
-      "**3. Add a discount** to `src/price.js`: make `applyDiscount(price, percent)` use roundMoney and keep MAX_PERCENT. Validate: tests in test/price.test.js pass.",
-    ],
-  ],
-  [
-    "mentions",
-    [
-      './src/a.ts, lib/b.rs; c.json5 d.yml `obj.method()` `$var` `@Annotation` `ns::Fn()` `a` snake_case_name HTMLParser camelCaseX JSON Ünïcode_näme café.php `src/a.ts` (e.php) \'f.md\' "g.sql"\nfoo.ts.bak w.json. x.ts:12 `Model` `__init__()` `${"x".repeat(90)}`',
-    ],
-  ],
-  ["mentions", ["a.js b.ts c.vue d.go"]],
-  ["excerptAround", [Array.from({ length: 50 }, (_, i) => `line ${i + 1}`).join("\r\n"), 3, 5, 2]],
-  ["excerptAround", ["a\nb\nc", 60, 2, 3]],
-  ["excerptAround", ["a\nb\nc", 0, 0, 0]],
-  ["excerptAround", ["a\nb\nc", 2, 0, 0]],
-  [
-    "packetContextBlock",
-    [
-      [
-        { path: "src/é.js", start: 998, text: "x\ny\nz", reason: "definition of ü" },
-        { path: "src/b.js", start: 1, text: "z".repeat(50), reason: "mentioned" },
-        { path: "src/c.js", start: 1, text: "c", reason: "late" },
-      ],
-      90,
-    ],
-  ],
-  ["packetContextBlock", [[{ path: "big.js", start: 1, text: "é".repeat(200), reason: "big" }], 50]],
-  ["packetContextBlock", [[], 6000]],
-  [
-    "failureSummary",
-    [
-      [
-        "\x1b[32m✔ adds\x1b[0m",
-        ...Array.from({ length: 20 }, (_, i) => `ok ${i}`),
-        "✖ applies a discount",
-        "  AssertionError: expected 90 to equal 81",
-        "    at test/price.test.js:12:5",
-        "    at Object.<anonymous> (node_modules/vitest/x.js:1:1)",
-        "",
-        "Errors: 1",
-        "ERRORS found",
-        "PASS src/ok.test.ts",
-        "Passed fine",
-        ...Array.from({ length: 20 }, (_, i) => `ok more ${i}`),
-        "ℹ todo 0",
-        "ℹ todo0",
-        "# fail 1",
-      ].join("\r\n"),
-      3000,
-    ],
-  ],
-  ["failureSummary", ["é".repeat(50) + "\nFAIL x\n" + "ü".repeat(30), 10]],
-  ["failureSummary", ["", 3000]],
-  ["failureSummary", ["traceback here\nTRACEBACK\nnot ok 3\nerrorless\nassertEquals failed\n× bad", 3000]],
-  ["packetPrompt", ["Do it.", "", ""]],
-  ["packetPrompt", ["Do it.", "src/a.js (x):\n   1  y", "npm test"]],
-  ["packetPrompt", ["Do it.", "", "cargo test"]],
-  ["fixPrompt", ["npm test", "boom", 1, 2]],
-  [
-    "locationBlock",
-    [
-      [
-        { name: "applyDiscount", kind: "function", path: "src/price.js", line: 6, container: null },
-        { name: "add", kind: "method", path: "src/cart.ts", line: 12, container: "Cart" },
-        { name: "x", kind: "const", path: "a.ts", line: 1, container: "" },
-      ],
-      [
-        { path: "src/price.js", items: [{ name: "MAX_PERCENT", kind: "constant", line: 3, container: null }] },
-        { path: "empty.js", items: [] },
-      ],
-      ["src/cart.js", "é.js"],
-      2500,
-    ],
-  ],
-  ["locationBlock", [[], [], ["a.js", "b.js"], 30]],
-  ["locationBlock", [[], [], ["é".repeat(10)], 10]],
   ["holdWording", [{ why: "pushes", by: "you" }]],
   ["holdWording", [{ why: "a question", by: "default" }]],
   [
@@ -642,16 +438,6 @@ const cases: [string, unknown[]][] = [
   ],
   ["keepAnswer", [PS, "1a", "skip", "", 6]],
   ["keepAnswer", [PS, "3a", "go", "again", 6]],
-  ["pruneState", [PS, ["1a", "1b", "2a"], ["1a", "1b", "1c", "1z", "2a", "3a", "5z"]]],
-  ["pruneState", [PS, ["1a"], null]],
-  ["pruneState", [PS, [], []]],
-  ["closingRan", [PS, "1z", []]],
-  ["closingRan", [PS, "7z", ["7a", "7b"]]],
-  ["markLate", [PS, "1b"]],
-  ["markLate", [PS, "nope"]],
-  ["closingsDue", [PS, ["1a"], false]],
-  ["closingsDue", [PS, [], false]],
-  ["closingsDue", [PS, ["1a", "1b"], true]],
   [
     "keepDecided",
     [
@@ -674,10 +460,6 @@ const cases: [string, unknown[]][] = [
   ["archivePath", ["docs/PLAN.MD"]],
   ["archivePath", ["PLAN"]],
   ["archivePath", ["a.md.txt"]],
-  ["isArchive", ["X.ARCHIVE.MD"]],
-  ["isArchive", ["X.archive.md.bak"]],
-  ["doneNumbers", [HK_PLAN, null, "- [x] **7. A**\n- [x] **1. Again**", ""]],
-  ["doneNumbers", [PLAN]],
   ["finishedSections", [HK_PLAN]],
   ["finishedSections", [PLAN]],
   ["archiveFinished", [HK_PLAN, null, "docs/PLAN.md"]],
@@ -695,8 +477,6 @@ const cases: [string, unknown[]][] = [
   ["stepNumbers", [HK_PLAN]],
   ["stepNumbers", [null]],
   ["plannerPrompt", ["  Add VAT to the cart \n", "TASKLIST.md", models]],
-  ["replanPrompt", ["T.md", PLAN, 1, "  ", models]],
-  ["replanPrompt", ["T.md", PLAN, 4, " Tests kept failing: x !== y \n", models]],
   ["extractSteps", [PL_ANSWER]],
   ["extractSteps", ["- [ ] **1. No fence**\n  - d\nText\n- [x] **2. Done one**"]],
   ["extractSteps", ["I could not plan this."]],
@@ -713,30 +493,6 @@ const cases: [string, unknown[]][] = [
   ],
   ["appendSection", ["", "", "- [ ] **1. X**"]],
   ["appendSection", ["# P", "VAT", ""]],
-  ["replaceStep", [PLAN, { number: "2", title: "Layout" }, "\n- [ ] **2a. A**\n- [ ] **2b. B**\n", "2a–2b"]],
-  ["replaceStep", [PLAN, { number: null, title: "Plain step without bold" }, "- [ ] **x. y**", "x"]],
-  ["replaceStep", [PLAN, { number: "99", title: "Gone" }, "", ""]],
-  ["labelRange", ["- [ ] **12a. A**\n- [ ] **12b. B**\n- [ ] **12c. C**"]],
-  ["labelRange", ["- [ ] **5. A**"]],
-  ["labelRange", ["- [ ] Plain"]],
-  ["freeLabels", [FREE_PLAN, "", "97a", 4]],
-  ["freeLabels", [`${FREE_PLAN}\n- [ ] **97a-2. Old**`, "- [x] **97a-1. A**", "97a", 2]],
-  ["freeLabels", [FREE_PLAN, "", "97a-2", 2]],
-  ["freeLabels", [FREE_PLAN, "", "98", 3]],
-  [
-    "freeLabels",
-    [Array.from({ length: 26 }, (_, i) => `- [ ] **5${String.fromCharCode(97 + i)}. S**`).join("\n"), "", "5", 2],
-  ],
-  ["freeLabels", [FREE_PLAN, "- [x] **120. Old**", null, 2]],
-  ["freeLabels", ["", "", "", 1]],
-  [
-    "renumberWith",
-    [
-      "- [ ] **97a1. Make it visible**\n  - d\n- [ ] **97b. 97a2. Schema**\n- [ ] Plain 3. x\n- [ ] 12. Plain numbered\nnot a step",
-      ["97a-1", "97a-2", "97a-3"],
-    ],
-  ],
-  ["renumberWith", ["- [ ] **  12b.   Spaced  **tail\n- [ ] ****", ["1"]]],
   [
     "takeModels",
     [
@@ -744,13 +500,6 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["takeModels", [""]],
-  [
-    "renumberWith",
-    [
-      "- [ ] **97a-2a. Code**\n  - Needs: 97a-1\n- [ ] **97a-2b. 97a2b. Tests**\n  - Needs:  97a-2a ,97a2b\n- [ ] Docs\n   - Needs: 97a-2b, x",
-      ["97a-5", "97a-6"],
-    ],
-  ],
   ["sectionTitleFrom", ["Add coupons. Then test them."]],
   ["sectionTitleFrom", ["Add optional VAT to the cart total using addVat from src/tax.js, with tests."]],
   ["sectionTitleFrom", ["  "]],
@@ -789,33 +538,8 @@ const cases: [string, unknown[]][] = [
     "stop using floats",
     "do not stop",
   ].map((t): [string, unknown[]] => ["isStopOrder", [t]]),
-  ["addedSteps", [PLAN, ["1|Project setup", "|Plain step without bold"]]],
-  ["addedSteps", [PLAN, []]],
-  ["reopenedSteps", [RUN_REOPEN, PLAN, []]],
-  ["reopenedSteps", [RUN_REOPEN, PLAN, ["2|Layout"]]],
-  [
-    "reopenedSteps",
-    [
-      [
-        { line: 0, number: "7", title: "Skip me", attempts: [], status: "skipped" },
-        { line: 2, number: "8", title: "Back", attempts: [], status: "skipped" },
-        { line: 3, number: "9", title: "Blocked", attempts: [], status: "blocked" },
-      ],
-      "- [ ] **7. Skip me**\n  - Skipped: needs x\n- [ ] **8. Back**\n- [ ] **9. Blocked**\n  -skipped: not for a blocked one",
-      [],
-    ],
-  ],
   ["stepKey", [{ number: null, title: "T" }]],
   ["stepKey", [{ number: "4", title: "T|x" }]],
-  ["notesBlock", [["use the shop currency", "run php 8.2"]]],
-  ["notesBlock", [[]]],
-  [
-    "notesIn",
-    [
-      "Done.\n**Note for the next steps:** tests need php 8.2\nNote for the next steps:   \nx Note for the next steps: the db password is abc12345\n- Note for the next steps: " +
-        "é".repeat(450),
-    ],
-  ],
   ...[
     "root qz7test9 if you need db user pass",
     "the db password is abc12345",
@@ -833,144 +557,12 @@ const cases: [string, unknown[]][] = [
   ["contextSize", [LOGS]],
   ["contextSize", [[]]],
   ["contextSize", [[LOGS[1]]]],
-  ["handoverDue", [150_000, 200_000, 0]],
-  ["handoverDue", [200_000, 200_000, 3]],
-  ["handoverDue", [900_000, 0, 0]],
-  ["handoverDue", [300_000, 200_000, 4]],
-  ["handoverRequest", ["PLAN-D/logs/83b.md", 212_500]],
-  ["handoverRequest", ["L.md", 499]],
-  ["modelSwitchRequest", [".qanuvi/plan-logs/p/93a.md", "Opus 5.5"]],
-  ["canCarry", [{ model: "opus", section: "S82", tokens: 40000, steps: 5 }, "opus", "S82", 80000]],
-  ["canCarry", [{ model: "opus", section: "S82", tokens: 80000, steps: 1 }, "opus", "S82", 80000]],
-  ["canCarry", [{ model: "opus", section: "S82", tokens: 1, steps: 6 }, "opus", "S82", 80000]],
-  ["canCarry", [null, "opus", "S82", 80000]],
-  [
-    "needingCount",
-    [
-      "82b",
-      [
-        { number: "82c", needs: ["82a"] },
-        { number: "82d", needs: [" 82b "] },
-        { number: null, needs: ["82b"] },
-        { number: "82e", needs: ["82d"] },
-        { number: "82f" },
-        { number: "83a", needs: ["82e", "x"] },
-      ],
-      ["82c", "82d", "83a"],
-    ],
-  ],
   ["privateBlock", [["db user: test\r\n  password: x1", "plain"]]],
   ["privateBlock", [[]]],
   ["logDir", ["content\\plugins\\qcommerce\\PLAN-D.MD"]],
   ["logDir", ["docs/plän (2).md.txt"]],
-  ["logPath", ["PLAN.md", { number: "82b", title: "x" }]],
-  ["logPath", ["PLAN.md", { number: null, title: "Add greet test with a very long title that goes on and on" }]],
-  ["logPath", ["PLAN.md", { number: "", title: "Empty number" }]],
-  [
-    "attemptEntry",
-    [
-      {
-        when: Date.UTC(2026, 10, 12, 10, 0, 59, 999),
-        model: O5,
-        outcome: "open",
-        costUsd: 2.19,
-        seconds: 349.5,
-        testsPassed: false,
-        failure: "Expected 1200, got 1250",
-        answer: "  The cart cache was not cleared.  ",
-      },
-    ],
-  ],
-  [
-    "attemptEntry",
-    [
-      {
-        when: Date.UTC(2026, 0, 2, 3, 4),
-        model: H5,
-        outcome: "done",
-        costUsd: 0.125,
-        seconds: 2.4,
-        testsPassed: true,
-        note: "kept going",
-        failure: "é".repeat(1600),
-        answer: "",
-      },
-    ],
-  ],
-  ["attemptEntry", [{ when: 0, model: "m", outcome: "error", costUsd: 0, seconds: 0, testsPassed: null }]],
-  ["resultEntry", ["blocked", "no database login"]],
-  ["resultEntry", ["done", null]],
-  ["logsBlock", ["PLAN.md", ".qanuvi/plan-logs/PLAN/2.md", true]],
-  ["logsBlock", ["PLAN.md", "x", false]],
   ["mapPath", ["docs/PLAN.md"]],
   ["factsPath", ["docs/PLAN.md"]],
-  ["apiPath", ["docs/PLAN.md"]],
-  ["guidanceContextBlock", ["PLAN-D.md", "  src/a.php — a\n", RECENT, true]],
-  ["guidanceContextBlock", ["P.md", "é".repeat(8001), [], false]],
-  ["guidanceContextBlock", ["P.md", "   ", [], false]],
-  [
-    "knowledgeBlock",
-    [
-      "PLAN-D.md",
-      Array.from({ length: 90 }, (_, i) => `f${i}.php — x`).join("\n"),
-      Array.from({ length: 61 }, (_, i) => `fact ${i}`).join("\n\n"),
-      RECENT,
-      true,
-    ],
-  ],
-  ["knowledgeBlock", ["P.md", " map ", "", [], false]],
-  ["knowledgeBlock", ["P.md", "m".repeat(8005), "  ", [], false]],
-  ...[
-    "src/Cart/CartLine.php",
-    "README.md",
-    "vendor/x/y.php",
-    "a/build/b.ts",
-    "rebuild/c.TS",
-    "x.Svelte",
-    "x.hpp.bak",
-    "dist.ts",
-  ].map((t): [string, unknown[]] => ["isCode", [t]]),
-  [
-    "apiSection",
-    [
-      "src/A.php",
-      [
-        { name: "resetCache", kind: "method", line: 88, container: "CartStorage" },
-        { name: "f", kind: "function", line: 1, container: null },
-        ...Array.from({ length: 40 }, (_, i) => ({ name: `n${i}`, kind: "const", line: i, container: "" })),
-      ],
-    ],
-  ],
-  ["apiSection", ["src/A.php", []]],
-  [
-    "mergeApi",
-    [
-      "# What this plan added\n\n### src/B.php\n- class B :3\n\n###  src/Z.php \n- z\n### src/É.php\n- e\n##### not\nloose text\n### \n",
-      [
-        ["src/A.php", "### src/A.php\n- a :1"],
-        ["src/B.php", ""],
-        ["src/a.php", "### src/a.php\n- lower :2"],
-        ["src/Z.php", "### src/Z.php\n- z2"],
-      ],
-    ],
-  ],
-  ["mergeApi", ["", []]],
-  [
-    "referencedPlans",
-    [
-      [
-        "Builds on content/plugins/qcommerce/PLAN-C.md and the DEVELOPMENT-TASKLIST.md.",
-        "- [ ] **90. Hand over**",
-        "  - Needs: 89z, docs/OTHER-PLAN.md#4, docs\\OTHER-PLAN.md#5, ./lib/Road#1#2",
-        "  - NEEDS: #7, .qanuvi/x/plan.md#1",
-        "See PLAN-D.md for this plan, also sub/plan-d.md and my_todo_list.md, TODO.MD, roadmap-2026.md.",
-      ].join("\n"),
-      "PLAN-D.md",
-    ],
-  ],
-  ["referencedPlans", ["Needs: docs/PLAN.md#1 and docs/PLAN.md", "docs\\plan.md"]],
-  ["referencedBlock", [["docs/OTHER-PLAN.md", ...Array.from({ length: 9 }, (_, i) => `p${i}.md`)]]],
-  ["referencedBlock", [[]]],
   ["parseTeam", [{ mode: "direct", priority: "solve" }]],
   ["parseTeam", [{ mode: "nonsense", priority: 3 }]],
   ["parseTeam", [null]],
@@ -990,8 +582,6 @@ const cases: [string, unknown[]][] = [
   ["freeWorks", [{ mode: "free-decides" }, true, true]],
   ["freeWorks", [{ mode: "direct" }, true, false]],
   ["freeWorks", [{}, false, false]],
-  ["assignPrompt", [steps, "save"]],
-  ["assignPrompt", [steps, "solve"]],
   ["parseAssignment", [assignAnswer, steps, "balanced"]],
   ["parseAssignment", ["no idea", steps, "save"]],
   ["parseAssignment", ["{broken json}", steps, "solve"]],
@@ -1049,16 +639,6 @@ const cases: [string, unknown[]][] = [
   ["chatModelPrompt", ["rename a variable", models]],
   ["parseChatModel", ['{"model":" claude-haiku-5-5 ","why":"small"}', models]],
   ["parseChatModel", ['{"model":"gpt-9"}', models]],
-  [
-    "stepDiff",
-    [
-      "notes.txt",
-      "Shopping list\n- milk\n- apples\n- bread\n- butter\n",
-      "Shopping list\n- apples\n- bread\n- butter\n- milk\n",
-    ],
-  ],
-  ["stepDiff", ["a", "x\ny", "x\ny"]],
-  ["stepDiff", ["a", "", "new\nfile"]],
   ["overruleNote", ["Haiku 5.5", "a short question"]],
   ["overruleNote", ["Haiku 5.5", ""]],
   ["withoutOverruleNote", ["Is it sorted?" + decider.overruleNote("Haiku 5.5", "short")]],
@@ -1071,90 +651,9 @@ const cases: [string, unknown[]][] = [
   ["isLimit", ["You've hit your session limit · resets 5:20am (Asia/Dhaka)"]],
   ["isLimit", ["Rate limit was reached"]],
   ["isLimit", ["Tests failed."]],
-  ["limitResetAt", ["You've hit your session limit · resets 5:20am (Asia/Dhaka)", Date.UTC(2026, 10, 11, 21)]],
-  ["limitResetAt", ["hit your weekly limit · resets 11pm (UTC)", Date.UTC(2026, 10, 12, 22, 30)]],
-  ["limitResetAt", ["hit your limit · resets at 12am (America/New_York)", Date.UTC(2026, 10, 12, 4, 59)]],
-  ["limitResetAt", ["You've hit your usage limit", Date.UTC(2026, 10, 11, 21)]],
-  ["limitResetAt", ["no limit here", Date.UTC(2026, 10, 11, 21)]],
-  ["holdKey", ["p1", "docs/PLAN.md", "1c"]],
-  ["asksSecret", ["needs an API key for the mail service"]],
-  ["asksSecret", ["it changes the date format"]],
-  ["holdForm", ["hold", "it pushes to the live server"]],
-  ["holdForm", ["failed", "the tests kept failing"]],
-  ["holdForm", ["hold", "it needs the database login"]],
   ["holdReply", [{ choice: "go", text: " yes " }]],
   ["holdReply", [{ choice: "skip" }]],
   ["holdReply", [{ choice: "decide", text: "keep it small" }]],
-  ["isClosingStep", ["95Z"]],
-  ["isClosingStep", ["95b"]],
-  ["isClosingStep", [null]],
-  ["mentionedFiles", ["Change includes\\Checkout.php and src/a.ts, src/a.ts; see MAP.md and app.tsx, x.yml"]],
-  ["planDependence", [held, { number: "72a", title: "x", needs: [" 95b "] }]],
-  ["planDependence", [held, { number: "95c", title: "x" }]],
-  ["planDependence", [held, { number: "72a", title: "Log refund.php errors" }]],
-  ["planDependence", [held, { number: "72a", title: "Change lib/includes/refund.php" }]],
-  [
-    "planDependence",
-    [
-      { ...held, details: [], changed: ["src\\X.ts"] },
-      { number: "1", title: "fix x.ts" },
-    ],
-  ],
-  [
-    "planDependence",
-    [
-      { number: "95a", title: "a" },
-      { number: "96a", title: "b" },
-    ],
-  ],
-  [
-    "dependencePrompt",
-    [
-      [{ number: "95b", title: "Refunds", why: "a question" }],
-      [
-        { number: "72a", title: "Mail", details: ["one", "two", "three", "four"] },
-        { number: null, title: "No number" },
-      ],
-    ],
-  ],
-  [
-    "parseDependence",
-    [
-      'ok {"needs":[{"step":"72a","on":"95b","why":"mails the refund"},{"step":"99","on":"95b"},{"step":"72a","on":"1"}]}',
-      ["72a"],
-      ["95b"],
-    ],
-  ],
-  ["parseDependence", ["no", ["72a"], ["95b"]]],
-  ["waitingLine", [1]],
-  ["waitingLine", [3]],
-  ["closingRerunNote", [["1a"]]],
-  ["closingRerunNote", [["1a", "1b"]]],
-  ["setAsideBlock", [[]]],
-  [
-    "setAsideBlock",
-    [
-      [
-        { label: "95b", why: "waits for you" },
-        { label: "96", why: "failed" },
-      ],
-    ],
-  ],
-  [
-    "toolKinds",
-    [
-      [
-        useLine("Read"),
-        useLine("mcp__qanuvi__find_symbol"),
-        useLine("Bash", { description: "Read CheckoutPage first half" }),
-        useLine("Bash", { command: "cd src && grep -n x a.ts" }),
-        useLine("PowerShell", { description: null, command: "npm test" }),
-        useLine("Edit"),
-        useLine("TodoWrite"),
-        "not json",
-      ],
-    ],
-  ],
   [
     "finishedCost",
     [{ steps: [{ status: "done", attempts: [{ costUsd: 2 }, { costUsd: 1.25 }] }, { status: "blocked" }] }],
@@ -1172,9 +671,6 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["planHistory", [[], "P.md", "now"]],
-  ["overLimit", [3.125, 10, { usd: 3 }]],
-  ["overLimit", [1, 45.5, { usd: 3, minutes: 30 }]],
-  ["overLimit", [1, 10, { usd: 0, minutes: 30 }]],
   ["pickFor", [saved, { number: "95a", title: "Erasure" }, "claude-code"]],
   ["pickFor", [saved, { number: "95a", title: "Erasure" }, "codex"]],
   ["pickFor", [saved, { number: "9", title: "Write docs" }, "claude-code"]],
@@ -1198,10 +694,6 @@ const cases: [string, unknown[]][] = [
   ["setStepModel", [PLAN, 8, null, null]],
   ["setStepModel", [PLAN, 14, "", null]],
   ["setStepModel", [PLAN, 14, "two words", null]],
-  ["setStepSkipped", [PLAN, 8, "  waits\nfor   you ", "Layout"]],
-  ["setStepSkipped", [PLAN, 8, null, "Layout"]],
-  ["setStepSkipped", [PLAN, 14, "blocked", null]],
-  ["setStepSkipped", [PLAN, 3, " ", null]],
   ["nextStatus", ["!"]],
   ["nextStatus", ["-"]],
   [
@@ -1226,25 +718,6 @@ const cases: [string, unknown[]][] = [
         "x/.history/plan.md",
         "Backup/plan.md",
       ],
-    ],
-  ],
-  [
-    "clearStaleSkips",
-    [
-      [
-        "- [x] **1. One**",
-        "- [ ] **2. Two**",
-        "  - Needs: 1",
-        "  - Skipped: needs step 1",
-        "- [ ] **3. Three**",
-        "  - Needs: 2, 9",
-        "  - Skipped: needs step 2",
-        "- [ ] **4. Four**",
-        "  - Needs: 1, P.md#2",
-        "  - Skipped: other plan",
-        "",
-      ].join("\n"),
-      ["9"],
     ],
   ],
   ["jobType", ["Fix the refund docs and add tests"]],
@@ -1341,80 +814,16 @@ const cases: [string, unknown[]][] = [
       },
     ],
   ],
-  ["freeFirstFor", [undefined, true, true]],
-  ["freeFirstFor", ["free-only", false, true]],
-  ["freeWantedButMissing", [undefined, "priority", false, false]],
-  ["freeWantedButMissing", ["free-only", "direct", false, false]],
   ["costRatio", [priced, [O5, H5], S5]],
   ["costRatio", [priced, [H5], "unknown"]],
   ["costRatio", [[{ id: "a", label: "A", price: [0, 0] }], ["a"], "a"]],
-  ["stepsToRun", [PLAN, 0, false, ""]],
-  ["stepsToRun", [PLAN, 9, false, ""]],
-  ["stepsToRun", [PLAN, 14, true, ""]],
-  ["stepsToRun", [PLAN, 0, false, "1-2; 12"]],
-  ["stepsToRun", [PLAN, 14, true, "1-2"]],
   ["parseRanges", [" 2 - 6 ,, 10 to 15; 20, 9–7, x, 3-, 007"]],
   ["parseRanges", [undefined]],
   ["inRanges", ["12b", "10-12"]],
   ["inRanges", [null, "1-99"]],
   ["inRanges", ["b2", "1-99"]],
-  ["unmetNeed", [["1", "docs/B.md#4"], ["1"], { "docs/B.md": ["3"] }]],
-  ["unmetNeed", [["#5", "2"], ["#5"], {}]],
-  ["unmetNeed", [["a#b#7"], [], { "a#b": ["7"] }]],
-  ["endStatus", [RUN_STEPS]],
-  ["endStatus", [RUN_STEPS.slice(0, 4)]],
-  ["runSummary", [RUN_STEPS]],
-  ["runSummary", [[]]],
-  ["reviewWithoutDiff", [{ parts: ["--- a\n+x"] }, ["a"], true]],
-  ["reviewWithoutDiff", [{ parts: [] }, [], null]],
-  ["reviewWithoutDiff", [{ parts: [] }, ["src/A.php", "src/B.php", "src/C.php", "src/D.php"], true]],
-  ["reviewWithoutDiff", [{ parts: [] }, ["x"], false]],
-  ["reviewWithoutDiff", [{ parts: [] }, ["x"], null]],
-  ["reviewWithoutDiff", [{ parts: [], error: "The snapshot is gone" }, [], null]],
-  [
-    "replacementsDone",
-    [
-      [
-        { line: 0, number: "97a", title: "t", attempts: [], status: "blocked", replacedBy: "97a-1–97a-2" },
-        { line: 1, number: "97a-1", title: "a", attempts: [], status: "done", replaces: "97a" },
-        { line: 2, number: "97a-2", title: "b", attempts: [], status: "done", replaces: "97a" },
-      ],
-      "97a",
-    ],
-  ],
-  [
-    "replacementsDone",
-    [
-      [
-        { line: 1, number: "97a-1", title: "a", attempts: [], status: "done", replaces: "97a" },
-        { line: 2, number: "97a-2", title: "b", attempts: [], status: "held", replaces: "97a" },
-      ],
-      "97a",
-    ],
-  ],
-  ["replacementsDone", [RUN_STEPS, "97a"]],
-  ["startModel", [" m ", "d"]],
-  ["startModel", [null, "d"]],
-  ["nextModel", [priced, [att(H5, "open", 0), att(H5, "done", 0), att(H5, "error", 0)], H5, 2]],
-  ["nextModel", [priced, [att(H5, "blocked", 0)], S5, 0]],
-  ["nextModel", [priced, [att(O5, "open", 0)], H5, 0]],
-  ["stepOutcome", [PLAN, { number: "2", title: "Layout" }]],
-  ["stepOutcome", [PLAN, { number: null, title: "Plain step without bold" }]],
-  ["stepOutcome", [PLAN, { number: "1", title: "Project setup" }]],
-  ["stepOutcome", [PLAN, { number: "9", title: "Nope" }]],
-  [
-    "stepPrompt",
-    ["PLAN.md", PLAN, 1, Array.from({ length: 12 }, (_, i) => ({ number: i % 3 ? String(i) : null, title: `T${i}` }))],
-  ],
-  ["stepPrompt", ["PLAN.md", PLAN, 2, []]],
   ["runTotals", [RUN_STEPS, [{ model: S5, costUsd: 0.125 }], FINISH]],
   ["runTotals", [[], undefined, null]],
-  [
-    "nextModelFreeFirst",
-    [priced, [att("qanuvi:auto", "open", 0), att("qanuvi:auto", "error", 0)], "qanuvi:auto", S5, 2],
-  ],
-  ["nextModelFreeFirst", [priced, [att("qanuvi:auto", "done", 0)], "qanuvi:auto", S5, 1]],
-  ["nextModelFreeFirst", [priced, [att("qanuvi:auto", "open", 0), att(F5, "open", 0)], "qanuvi:auto", S5, 1]],
   ["freeSavings", [RUN_STEPS, { docs: 0.5 }]],
   ["freeSavings", [RUN_STEPS.slice(1, 3), {}]],
   ["freeSavings", [[], {}]],
@@ -1427,44 +836,26 @@ const cases: [string, unknown[]][] = [
   ["offersFinish", ["done", RUN_STEPS, null]],
   ["offersFinish", ["done", RUN_STEPS, FINISH]],
   ["offersFinish", ["needs-you", RUN_STEPS, null]],
-  ["finishReviewPrompt", ["P.md", BRIEFS, "d".repeat(40_001), FINISH.checks]],
-  ["finishReviewPrompt", ["P.md", [], "", null]],
-  ["finishReviewPrompt", ["P.md", BRIEFS, "diff", { command: "npm test", ok: true, summary: "" }]],
-  ["parseFinishReview", ['{"ok": true, "findings": [" a ", "", null, 3, {"x": 1}], "stillOpen": "no"}']],
-  ["parseFinishReview", ['{"ok": "yes"}']],
-  ["parseFinishReview", ["nothing"]],
-  [
-    "finishFullPrompt",
-    [
-      "P.md",
-      BRIEFS,
-      { findings: ["a"], stillOpen: ["b", "c"] },
-      FINISH.checks,
-      Array.from({ length: 62 }, (_, i) => `f${i}.ts`),
-    ],
-  ],
-  ["finishFullPrompt", ["P.md", [], { findings: [], stillOpen: [] }, null, []]],
-  [
-    "stillOpenIn",
-    ["Done.\r\n\r\n### **Still open:** first thing\r\n- second\r\n  * third\r\n- None.\r\n3) fourth\r\nEnd."],
-  ],
-  ["stillOpenIn", ["Still open: none\nStill open\n- last heading wins"]],
-  ["stillOpenIn", ["still open\n\n- after a blank"]],
-  ["stillOpenIn", ["Nothing here"]],
-  ["doneNotes", [["  - Done: x ", "- DONE: y", "-Done: z", "  - Model: m"]]],
-  ["isPlanFile", ["sub\\docs\\PLAN.md", "docs\\PLAN.md", "logs"]],
-  ["isPlanFile", ["docs/PLAN.ARCHIVE.md", "docs/PLAN.MD", "logs"]],
-  ["isPlanFile", ["logs/x.md", "P.md", "logs"]],
-  ["isPlanFile", ["logsx/x.md", "P.md", "logs"]],
-  ["finishEntry", [FINISH]],
-  ["finishEntry", [{ ...FINISH, checks: null, findings: [], stillOpen: [], note: "", costUsd: 0.125, seconds: 2.5 }]],
 ];
 
-function outputs() {
-  return cases.map(([fn, args]) => {
+interface Recorded {
+  fn: string;
+  args: unknown[];
+  out: unknown;
+}
+
+/** The recorded cases of functions that no longer exist in TypeScript, in their recorded order. */
+function frozen(): Recorded[] {
+  const recorded: Recorded[] = JSON.parse(recordedText);
+  return recorded.filter((r) => !(r.fn in fns));
+}
+
+function outputs(): Recorded[] {
+  const now = cases.map(([fn, args]) => {
     const out = fns[fn](...args);
     return { fn, args, out: out === undefined ? null : JSON.parse(JSON.stringify(out)) };
   });
+  return [...now, ...frozen()];
 }
 
 describe("the comparison check with the Rust port", () => {

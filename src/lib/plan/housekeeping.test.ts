@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { archiveFinished, archivePath, doneNumbers, isArchive, mergePlans, stepNumbers } from "./housekeeping";
+import { archiveFinished, archivePath, mergePlans, stepNumbers } from "./housekeeping";
 import { findTaskLists, parsePlan } from "./tasklist";
 
 const PLAN = [
@@ -28,8 +28,6 @@ const PLAN = [
 describe("archivePath", () => {
   it("puts the archive next to the plan", () => {
     expect(archivePath("docs/PLAN.md")).toBe("docs/PLAN.archive.md");
-    expect(isArchive("docs/PLAN.archive.md")).toBe(true);
-    expect(isArchive("docs/PLAN.md")).toBe(false);
   });
 
   it("is never offered as a task list", () => {
@@ -78,13 +76,6 @@ describe("archiveFinished", () => {
 
   it("returns null when nothing is finished", () => {
     expect(archiveFinished("## A\n\n- [ ] **1. Open**\n", null, "PLAN.md")).toBeNull();
-  });
-
-  it("archived steps still count as done", () => {
-    const r = archiveFinished(PLAN, null, "PLAN.md")!;
-    const done = doneNumbers(r.plan, r.archive);
-    expect(["1", "2", "3", "5"].every((n) => done.has(n))).toBe(true);
-    expect(parsePlan(r.plan).steps.map((s) => s.number)).toEqual(["3", "4"]);
   });
 });
 

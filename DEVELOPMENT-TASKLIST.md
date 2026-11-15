@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 10:15): R2e fixes DRIVEN LIVE (see 24z "R2e fixes driven live"): (a), (c), (d),
+    RESUME HERE (newest, 2026-11-15 11:00): TYPESCRIPT RUNNER LEFTOVERS DELETED (first item of the agreed order).
+    Every run function the window no longer calls is gone from src/lib/plan and core/decider.ts (packet.ts and
+    setaside's logic whole; nextModel, stepPrompt, replan/replaceStep, closings, handover, notes, logs, finishing
+    prompts and more), with their tests; what stays is what the window shows with (run types, totals, savings, step
+    ranges, Plan view state, routing, planner, housekeeping, holdask's reply, finishing estimate). Tests that mixed a
+    live and a deleted function keep their live part. The comparison check keeps the recorded cases of deleted
+    functions in compare.json untouched (all 457 kept, only reordered), so the Rust port is still held to them; Rust
+    plan::compare passes. 323 TS tests pass (83 went with deleted functions), svelte-check clean, prettier clean.
+    Not run: full Rust suite and clippy (no Rust code changed). NEXT: R3 (queue, migration 10), then R4, R5, full
+    check, publish 0.1.23 (owner's yes first).
+    RESUME HERE (before, 2026-11-15 10:15): R2e fixes DRIVEN LIVE (see 24z "R2e fixes driven live"): (a), (c), (d),
     (g), (h), (i) and the planner Model lines work in the test build; (b) and (e) not reached (no long reason, no try
     2). Found and fixed (owner's yes): a step whose Needs name a later step of the same run was skipped instead of
     waiting for it (scenario first, driven live); the Inbox called a paused run "stopped"; the sidebar's Sessions list

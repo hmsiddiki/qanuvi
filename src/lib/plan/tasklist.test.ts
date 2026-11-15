@@ -8,7 +8,6 @@ import {
   setStepModel,
   setStepStatus,
   setStepTitle,
-  setStepSkipped,
 } from "./tasklist";
 
 const SAMPLE = [
@@ -215,36 +214,5 @@ describe("needs and skipped lines (24f)", () => {
     const steps = parsePlan(text).steps;
     expect(steps[1].needs).toEqual(["1", "docs/OTHER.md#4"]);
     expect(steps[0].needs).toEqual([]);
-  });
-
-  it("writes, replaces and removes the skipped line, leaving the rest", () => {
-    const once = setStepSkipped(text, 2, "needs step 1, which is not done", "Second");
-    expect(once).toContain(
-      "  - Needs: 1, docs/OTHER.md#4\n  - Skipped: needs step 1, which is not done\n- [ ] **3. Third**",
-    );
-    const twice = setStepSkipped(once, 2, "blocked", "Second");
-    expect(twice.match(/Skipped:/g)).toHaveLength(1);
-    expect(setStepSkipped(twice, 2, null, "Second")).toBe(text);
-  });
-});
-
-import { clearStaleSkips } from "./tasklist";
-
-describe("clearStaleSkips", () => {
-  it("removes skip lines whose needed steps are done, and keeps the rest", () => {
-    const text = [
-      "- [x] **1. One**",
-      "- [ ] **2. Two**",
-      "  - Needs: 1",
-      "  - Skipped: needs step 1, which is not done",
-      "- [ ] **3. Three**",
-      "  - Needs: 2",
-      "  - Skipped: needs step 2, which is not done",
-      "",
-    ].join("\n");
-    const out = clearStaleSkips(text);
-    expect(out).not.toContain("needs step 1");
-    expect(out).toContain("needs step 2");
-    expect(clearStaleSkips(out)).toBe(out);
   });
 });

@@ -10,18 +10,6 @@ export function archivePath(planPath: string): string {
   return /\.md$/i.test(planPath) ? planPath.replace(/\.md$/i, ".archive.md") : `${planPath}.archive.md`;
 }
 
-/** Whether a file is a plan archive (never offered as a task list itself). */
-export function isArchive(path: string): boolean {
-  return /\.archive\.md$/i.test(path);
-}
-
-/** Step numbers marked done in a plan's text (its archive included, when given). */
-export function doneNumbers(...texts: (string | null | undefined)[]): Set<string> {
-  const out = new Set<string>();
-  for (const t of texts) if (t) for (const s of parsePlan(t).steps) if (s.status === "x" && s.number) out.add(s.number);
-  return out;
-}
-
 export interface ArchivedSection {
   title: string;
   steps: number;

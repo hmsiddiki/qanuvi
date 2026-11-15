@@ -1,6 +1,6 @@
 /**
- * Learned routing (Milestone 13): which model a step starts on when the step does not name one. Plain functions; the
- * run uses them in stores/runner.svelte.ts.
+ * Learned routing (Milestone 13): which model a step starts on when the step does not name one. Plain functions for
+ * the window (Plan view, Routing settings, status bar); runs use the Rust port in src-tauri/src/plan/.
  *
  * Order: the step's own "- Model:" line > the project's rules > what earlier runs showed > the agent's default.
  * A monthly budget then may move the choice one model cheaper (never for money and security work).

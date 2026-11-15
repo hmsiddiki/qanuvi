@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  clipReason,
-  decidedNote,
-  parsePreflight,
-  preflightPrompt,
-  recommendedRisk,
-  settleCheck,
-  waitsBefore,
-} from "./preflight";
+import { clipReason, decidedNote, parsePreflight, preflightPrompt, recommendedRisk, settleCheck } from "./preflight";
 
 describe("the check before a run", () => {
   it("asks with what is known and the open steps", () => {
@@ -41,13 +33,6 @@ describe("the check before a run", () => {
       { step: "1b", after: ["1c"], why: "README lists the final exports" },
       { step: "2", after: ["1"], why: "" },
     ]);
-  });
-
-  it("knows the steps to wait at", () => {
-    const wait = [{ step: "84a", why: "refunds" }];
-    expect(waitsBefore("84a", wait)).toBe("refunds");
-    expect(waitsBefore("84b", wait)).toBeNull();
-    expect(waitsBefore(null, wait)).toBeNull();
   });
 
   it("sorts asks: unsorted risky steps wait, a question with no recommended answer needs the owner", () => {

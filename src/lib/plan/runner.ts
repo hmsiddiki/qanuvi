@@ -1,11 +1,10 @@
 /**
- * Running a task list step by step, each step on its own model. Plain functions only (the decisions), so they can be
- * tested; the run itself is in stores/runner.svelte.ts.
+ * A plan run as the window sees it: the run record's types and the helpers the Run panel shows with (totals, savings,
+ * step ranges). The run itself, with its decisions, is in the Rust core (src-tauri/src/plan/); stores/runner.svelte.ts
+ * only starts it and follows its updates.
  */
 import type { AgentModel } from "$lib/agents/providers";
-import { parsePlan, type Step } from "./tasklist";
 import { FINISHER } from "./finishing";
-import type { TeamMode } from "$lib/core/decider";
 
 export interface RunOptions {
   /** Line of the first step to run; earlier steps are skipped. */
@@ -169,31 +168,6 @@ export interface PlanRun {
 
 export type RunTeam = "settings" | "paid" | "free" | "free-only";
 
-/** The models a step may move up to after failures: the agent's list, or none when the run stays on one model. */
-export function ladder(models: AgentModel[], strongerOnFail: boolean | undefined): AgentModel[] {
-  return strongerOnFail === false ? [] : models;
-}
-
-/** Whether free models go first in a run, by the run's own Team choice. */
-export function freeFirstFor(team: RunTeam | undefined, teamAllows: boolean, canFree: boolean): boolean {
-  if (!canFree || team === "paid") return false;
-  return team === "free" ? true : teamAllows;
-}
-
-/**
- * Whether the run's Team choice wanted free models but none are set up, so every step goes to the paid agent
- * (the run says so once in its decisions). Not for runs on Qanuvi's own agent, or ones set to paid only.
- */
-export function freeWantedButMissing(
-  team: RunTeam | undefined,
-  mode: TeamMode,
-  hasFree: boolean,
-  ownAgent: boolean,
-): boolean {
-  if (hasFree || ownAgent || team === "paid") return false;
-  return team === "free" || team === "free-only" || mode !== "direct";
-}
-
 /**
  * Roughly how much one model on every step costs against the plan's own models (by output price; tokens per step
  * taken as alike). Null when a price is unknown.
@@ -213,14 +187,6 @@ export function costRatio(models: AgentModel[], stepModels: string[], one: strin
 
 /** The run lines' key for the decider's calls on a model. */
 export const DECIDER = "decider:";
-
-/** The steps a run covers: open steps (not done, not blocked) from the chosen one on. */
-export function stepsToRun(steps: Step[], fromLine: number, onlyOne: boolean, ranges: [number, number][] = []): Step[] {
-  const open = steps.filter((s) => s.status !== "x" && s.status !== "!");
-  if (ranges.length && !onlyOne) return open.filter((s) => inRanges(s.number, ranges));
-  const from = open.filter((s) => s.line >= fromLine);
-  return onlyOne ? from.filter((s) => s.line === fromLine).slice(0, 1) : from;
-}
 
 /** Reads step ranges such as "2-6, 10-15, 20". Unreadable parts are reported, not guessed. */
 export function parseRanges(text: string | undefined): { ranges: [number, number][]; error: string } {
@@ -246,155 +212,6 @@ export function parseRanges(text: string | undefined): { ranges: [number, number
 export function inRanges(number: string | null, ranges: [number, number][]): boolean {
   const n = number ? parseInt(number, 10) : NaN;
   return !Number.isNaN(n) && ranges.some(([a, b]) => n >= a && n <= b);
-}
-
-/**
- * The first thing a step needs that is not done, as a reason to skip it; null when all is done (24f). `done` holds
- * this plan's finished step numbers; `others` the finished numbers of other plans by file (missing: not read).
- */
-export function unmetNeed(
-  needs: string[] | undefined,
-  done: Set<string>,
-  others: Map<string, Set<string>> = new Map(),
-): string | null {
-  for (const need of needs ?? []) {
-    const hash = need.lastIndexOf("#");
-    if (hash > 0) {
-      const file = need.slice(0, hash);
-      const num = need.slice(hash + 1);
-      const there = others.get(file);
-      if (!there) return `needs step ${num} of ${file}, which could not be read`;
-      if (!there.has(num)) return `needs step ${num} of ${file}, which is not done`;
-    } else if (!done.has(need)) return `needs step ${need}, which is not done`;
-  }
-  return null;
-}
-
-/**
- * How a run that went through its steps ends: "needs-you" while steps are still held or set aside (the owner ended it
- * without answering), else "done".
- */
-export function endStatus(run: Pick<PlanRun, "steps">): "done" | "needs-you" {
-  return run.steps.some((s) => s.status === "held" || s.status === "set-aside") ? "needs-you" : "done";
-}
-
-/**
- * A review that cannot see the change must never turn a step down for that alone (PLAN-F 97a, 2026-11-14: git saw no
- * diff in a folder it ignores and real work was rejected twice). The changes could not be read, or the step changed
- * files but no diff came back: the tests decide, and the reason is said. Null: the review goes ahead (a truly empty
- * change is the reviewer's to judge).
- */
-export function reviewWithoutDiff(
-  changed: { parts: string[]; error?: string },
-  touched: string[],
-  testsPassed: boolean | null | undefined,
-): { ok: boolean; why: string } | null {
-  let cause = "";
-  if (changed.error) cause = `the changes could not be read (${changed.error})`;
-  else if (!changed.parts.length && touched.length) {
-    const names = touched.slice(0, 3).join(", ") + (touched.length > 3 ? ` and ${touched.length - 3} more` : "");
-    cause = `the step changed ${touched.length === 1 ? "a file" : `${touched.length} files`} (${names}) but no diff could be shown`;
-  }
-  if (!cause) return null;
-  if (testsPassed === false) return { ok: false, why: `the tests failed, and ${cause}` };
-  return {
-    ok: true,
-    why: `not reviewed: ${cause}; ${testsPassed === true ? "the tests passed" : "no tests ran"}, so it counts as done`,
-  };
-}
-
-/** Whether every replacement step of the step `key` is done (false when it has none). */
-export function replacementsDone(run: Pick<PlanRun, "steps">, key: string): boolean {
-  const mine = run.steps.filter((s) => s.replaces === key);
-  return mine.length > 0 && mine.every((s) => s.status === "done");
-}
-
-/** The end-of-run report (24f): what was done, and what was skipped or left, with why. */
-export function runSummary(run: Pick<PlanRun, "steps">): string {
-  const done = run.steps.filter((s) => s.status === "done").length;
-  const name = (s: StepRun) => (s.number ? `step ${s.number}` : s.title);
-  const parts = [`${done} done`];
-  const why = (s: StepRun) =>
-    s.status === "held"
-      ? s.held?.why
-      : s.status === "set-aside" && s.waitsFor
-        ? `waits for ${s.waitsFor.step}`
-        : s.reason;
-  const kinds = [
-    ["skipped", "skipped"],
-    ["blocked", "blocked"],
-    ["failed", "failed"],
-    ["held", "waiting for your answer"],
-    ["set-aside", "set aside"],
-  ] as const;
-  for (const [kind, word] of kinds) {
-    const these = run.steps.filter((s) => s.status === kind);
-    if (these.length)
-      parts.push(
-        `${these.length} ${word}: ${these.map((s) => `${name(s)}${why(s) ? ` (${why(s)})` : ""}`).join("; ")}`,
-      );
-  }
-  return parts.join(" · ");
-}
-
-/** The model a step starts on: its own "- Model:" line, else the agent's default. */
-export function startModel(step: Pick<Step, "model">, defaultModel: string): string {
-  return step.model?.trim() || defaultModel;
-}
-
-/**
- * The model for the next attempt. Models are listed strongest first. After `perModel` failed attempts on a model the
- * step moves one model up; null means the strongest model has failed too, so the run needs the user.
- */
-export function nextModel(
-  models: AgentModel[],
-  attempts: Pick<Attempt, "model" | "outcome">[],
-  first: string,
-  perModel: number,
-): string | null {
-  const failed = attempts.filter((a) => a.outcome === "open" || a.outcome === "error");
-  if (failed.length === 0) return first;
-  const current = failed[failed.length - 1].model;
-  const onCurrent = failed.filter((a) => a.model === current).length;
-  if (onCurrent < Math.max(1, perModel)) return current;
-  const index = models.findIndex((m) => m.id === current);
-  if (index <= 0) return null; // already the strongest (or a model outside the list): ask the user
-  return models[index - 1].id;
-}
-
-/** What the task list says about a step after an attempt. The step is found by its number and title, not its line. */
-export function stepOutcome(
-  text: string,
-  step: Pick<Step, "number" | "title">,
-): "done" | "blocked" | "open" | "missing" {
-  const found = parsePlan(text).steps.find((s) => s.number === step.number && s.title === step.title);
-  if (!found) return "missing";
-  if (found.status === "x") return "done";
-  if (found.status === "!") return "blocked";
-  return "open";
-}
-
-/** The request for one step: only what the step needs, not the whole history. */
-export function stepPrompt(file: string, step: Step, done: { number: string | null; title: string }[]): string {
-  const label = step.number ? `${step.number}. ${step.title}` : step.title;
-  const lines = [
-    `You are working through the task list ${file} in this project, one step at a time. Your step:`,
-    "",
-    `**${label}**${step.note ? ` ${step.note}` : ""}`,
-  ];
-  if (step.details.length) lines.push(...step.details.map((d) => `  ${d}`));
-  if (done.length) {
-    lines.push("", "Already done in this run (for context only):");
-    for (const d of done.slice(-10)) lines.push(`- ${d.number ? `${d.number}. ` : ""}${d.title}`);
-  }
-  lines.push(
-    "",
-    "Rules:",
-    "- Work only on this step.",
-    `- When the step is complete and checked, change its line in ${file} to "- [x]" and add a short "  - Done: ..." line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as "$45" or "$0" in the note.`,
-    `- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it "- [!]" and add the reason under it.`,
-  );
-  return lines.join("\n");
 }
 
 /** Totals for a run, per model and overall. */
@@ -436,27 +253,6 @@ export function runTotals(run: Pick<PlanRun, "steps"> & Pick<Partial<PlanRun>, "
     byModel.set(key, m);
   }
   return { costUsd, inputTokens, outputTokens, seconds, byModel };
-}
-
-/**
- * The model for a step's next attempt when free models go first: the free agent (as often as one model gets tries),
- * then the paid agent from `paidFirst` up, as without free models. Null: even the strongest paid model failed.
- */
-export function nextModelFreeFirst(
-  models: AgentModel[],
-  attempts: Pick<Attempt, "model" | "outcome">[],
-  start: string,
-  paidFirst: string,
-  perModel: number,
-): string | null {
-  const failed = attempts.filter((a) => a.outcome === "open" || a.outcome === "error");
-  if (failed.length === 0) return start;
-  const paid = attempts.filter((a) => !isFree(a.model));
-  if (!paid.length) {
-    const onFree = failed.filter((a) => isFree(a.model)).length;
-    return onFree < Math.max(1, perModel) ? start : paidFirst;
-  }
-  return nextModel(models, paid, paidFirst, perModel);
 }
 
 /**

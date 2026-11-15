@@ -33,20 +33,6 @@ export function plannerPrompt(request: string, file: string, models: AgentModel[
   ].join("\n");
 }
 
-export function replanPrompt(file: string, step: Step, failure: string, models: AgentModel[]): string {
-  const ids = models.map((m) => m.id).join(", ");
-  return [
-    `A step in ${file} was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one \`\`\`tasklist block, in the same format as the task list (with Validate and Model lines; models: ${ids}).`,
-    "",
-    "The step:",
-    `**${step.number ? `${step.number}. ` : ""}${step.title}**${step.note ? ` ${step.note}` : ""}`,
-    ...step.details.map((d) => `  ${d}`),
-    "",
-    "What went wrong:",
-    failure.trim() || "(no details)",
-  ].join("\n");
-}
-
 /** The steps block in a planner's answer: the ```tasklist (or markdown) block, else the whole answer. */
 export function extractSteps(answer: string): { block: string; steps: Step[] } {
   const m = FENCE_RE.exec(answer);
@@ -92,76 +78,6 @@ export function renumber(block: string, start: number | string): string {
 }
 
 /**
- * Numbers for `count` replacement steps of the step `number` that no step in the plan or its archive has (PLAN-F,
- * 2026-11-14: 97a's replacements were numbered 97a–97d next to the real 97b–97d and everything waited on 97a).
- * "12" → 12a, 12b, … (letters in use skipped; past z, 12-1, 12-2, …); "97a" → 97a-1, 97a-2, …; "97a-2" (itself a
- * replacement) → the next free 97a-n; no number → after the highest whole number.
- */
-export function freeLabels(text: string, archive: string, number: string | null, count: number): string[] {
-  const used = new Set(
-    [...parsePlan(text).steps, ...parsePlan(archive).steps].map((s) => s.number).filter(Boolean) as string[],
-  );
-  const out: string[] = [];
-  const take = (l: string) => {
-    if (used.has(l) || out.includes(l)) return;
-    out.push(l);
-  };
-  if (!number) {
-    let n = Math.max(lastNumber(text), lastNumber(archive)) + 1;
-    while (out.length < count) take(String(n++));
-    return out;
-  }
-  if (/^\d+$/.test(number)) {
-    for (let c = 0; c < 26 && out.length < count; c++) take(`${number}${String.fromCharCode(97 + c)}`);
-    for (let k = 1; out.length < count; k++) take(`${number}-${k}`);
-    return out;
-  }
-  const base = number.replace(/-\d+$/, "");
-  for (let k = 1; out.length < count; k++) take(`${base}-${k}`);
-  return out;
-}
-
-/** Gives the steps of a block the given numbers in order, dropping any number or label a planner wrote before a
- * title ("97a1. Make …", "97a-2a. Check …" → "Make …", "Check …"). Steps past the end of `labels` keep no number.
- * The block's Needs lines follow: a planner's own label there becomes the step's new number (PLAN-F 97a: "Needs:
- * 97a-2a" was left pointing at no step, and every step after it was skipped). */
-export function renumberWith(block: string, labels: string[]): string {
-  let i = 0;
-  const renamed = new Map<string, string>();
-  // Every leading label goes ("97b. 97a2. Schema" → "Schema"); each one is remembered for the Needs lines.
-  const strip = (t: string, label: string | undefined) => {
-    let s = t.trim();
-    for (let prev = ""; prev !== s;) {
-      prev = s;
-      const m = /^(\d+[a-z0-9]*(?:-\d+[a-z0-9]*)*)\.\s+/.exec(s);
-      if (m) {
-        if (label && !renamed.has(m[1])) renamed.set(m[1], label);
-        s = s.slice(m[0].length);
-      }
-    }
-    return s.trim();
-  };
-  const lines = block.split("\n").map((l) => {
-    const m = /^(- \[ \] )(?:\*\*(.+?)\*\*(.*)|(.+))$/.exec(l);
-    if (!m) return l;
-    const label = labels[i++];
-    const title = strip((m[2] ?? m[4]).trim(), label);
-    return `${m[1]}**${label ? `${label}. ` : ""}${title}**${m[3] ?? ""}`;
-  });
-  return lines
-    .map((l) => {
-      const m = /^(\s*- Needs:\s*)(.*)$/.exec(l);
-      if (!m || !renamed.size) return l;
-      const needs = m[2].split(",").map((n) => {
-        const t = n.trim();
-        return renamed.get(t) ?? t;
-      });
-      return `${m[1]}${needs.join(", ")}`;
-    })
-    .join("\n");
-}
-
-/**
  * Takes the planner's "- Model:" lines out of a numbered block (R2e i): the plan file gets the steps without them, and
  * each suggestion is kept in the plan's own data instead (an agent reading the file took them for model attribution).
  */
@@ -187,32 +103,6 @@ export function appendSection(text: string, title: string, block: string): strin
   const body = [heading, "", block.trim(), ""].join("\n").replace(/\n/g, eol);
   const base = text.replace(/[\r\n\s]*$/, "");
   return base ? `${base}${eol}${eol}${body}` : body;
-}
-
-/**
- * Marks a failed step blocked with a note pointing at its replacement, and puts the replacement steps right after it
- * (after its details). The step is found by number and title, so other edits in the file do not matter.
- */
-export function replaceStep(text: string, step: Pick<Step, "number" | "title">, block: string, labels: string): string {
-  const plan = parsePlan(text);
-  const found = plan.steps.find((s) => s.number === step.number && s.title === step.title);
-  if (!found) throw new Error("The step is no longer in the task list.");
-  const { lines, eol } = splitLines(text);
-  lines[found.line] = lines[found.line].replace(/^( ?- \[)[ xX!-](\])/, "$1!$2");
-  const note = `  - Replaced by steps ${labels}, rewritten by the planner after it failed on every model.`;
-  const insertAt = found.end;
-  lines.splice(insertAt, 0, note, ...block.trim().split("\n"));
-  // The note belongs to the failed step: it goes right after its details, before the new steps.
-  return lines.join(eol);
-}
-
-/** "12a–12c" for a block numbered from base 12 with three steps. */
-export function labelRange(block: string): string {
-  const nums = parsePlan(block)
-    .steps.map((s) => s.number)
-    .filter(Boolean) as string[];
-  if (nums.length === 0) return "";
-  return nums.length === 1 ? nums[0] : `${nums[0]}–${nums[nums.length - 1]}`;
 }
 
 /** A short section title from a request: its first sentence, cut at a word boundary to at most 60 characters. */

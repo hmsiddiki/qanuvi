@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignPrompt,
   chatModelPrompt,
   deciderSeat,
   freeWorks,
@@ -9,7 +8,6 @@ import {
   parseReview,
   parseTeam,
   reviewPrompt,
-  stepDiff,
   overruleIn,
   overruleNote,
   withoutOverruleNote,
@@ -49,8 +47,7 @@ describe("the decider", () => {
     expect(parseTeam({ mode: "nonsense", priority: "solve" })).toEqual({ mode: "paid-decides", priority: "solve" });
   });
 
-  it("asks once for the whole plan and keeps money and security work paid whatever it says", () => {
-    expect(assignPrompt(steps, "save")).toContain("Save the paid model's tokens");
+  it("keeps money and security work paid whatever the assignment says", () => {
     const answer =
       'Sure:\n```json\n{"steps":[{"number":"1","worker":"free","why":"plain docs"},{"number":"2","worker":"free","why":"easy"}]}\n```';
     const a = parseAssignment(answer, steps, "balanced");
@@ -95,24 +92,6 @@ describe("the decider", () => {
       why: "small",
     });
     expect(parseChatModel('{"model":"gpt-9"}', models)).toBeNull();
-  });
-});
-
-describe("stepDiff", () => {
-  it("shows only what changed since the step started, not earlier steps' changes", () => {
-    // Step 2 added butter (not committed); step 3 sorts. The review must see the sort only.
-    const before = "Shopping list\n- milk\n- apples\n- bread\n- butter\n";
-    const after = "Shopping list\n- apples\n- bread\n- butter\n- milk\n";
-    const d = stepDiff("notes.txt", before, after)!;
-    expect(d).toContain("-- milk");
-    expect(d).toContain("+- milk");
-    expect(d).not.toContain("+- butter");
-  });
-
-  it("is empty when nothing changed, and gives up on very long files", () => {
-    expect(stepDiff("a", "x\ny", "x\ny")).toBe("");
-    const big = "l\n".repeat(3000);
-    expect(stepDiff("a", big, big + "x")).toBeNull();
   });
 });
 

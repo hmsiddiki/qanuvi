@@ -169,57 +169,6 @@ export function keepAnswer(
 }
 
 /**
- * Drops what belongs to steps no longer open (done, or gone from the plan); a closing record stays while its closing
- * step is in the plan and something is still waiting or done late.
- */
-export function pruneState(state: PlanState, open: Set<string>, all: Set<string> = open): PlanState {
-  return {
-    holds: state.holds.filter((h) => open.has(h.step)),
-    answers: state.answers.filter((a) => open.has(a.step)),
-    // Decided choices stay while their step is in the plan (the owner may still want to see or change them).
-    decided: state.decided.filter((d) => all.has(d.step)),
-    checks: state.checks.filter((c) => open.has(c.step)),
-    // The owner's model for a step stays while the step is in the plan (set to Open again, it runs on it).
-    models: (state.models ?? []).filter((m) => all.has(m.step)),
-    closings: state.closings
-      .filter((c) => all.has(c.closing))
-      // A waited-for step done meanwhile (by hand, or outside a run) counts as late; one gone from the plan drops.
-      .map((c) => ({
-        ...c,
-        waiting: c.waiting.filter((w) => open.has(w)),
-        late: [...c.late, ...c.waiting.filter((w) => all.has(w) && !open.has(w) && !c.late.includes(w))],
-      }))
-      .filter((c) => c.waiting.length || c.late.length),
-  };
-}
-
-/** A closing step finished: what of its section is still set aside is what it waits for now; late ones are seen. */
-export function closingRan(state: PlanState, closing: string, waiting: string[]): PlanState {
-  const rest = state.closings.filter((c) => c.closing !== closing);
-  return { ...state, closings: waiting.length ? [...rest, { closing, waiting, late: [] }] : rest };
-}
-
-/** A step finished: closing steps that ran without it note it as late. */
-export function markLate(state: PlanState, step: string): PlanState {
-  return {
-    ...state,
-    closings: state.closings.map((c) =>
-      c.waiting.includes(step)
-        ? { ...c, waiting: c.waiting.filter((w) => w !== step), late: [...c.late.filter((l) => l !== step), step] }
-        : c,
-    ),
-  };
-}
-
-/**
- * The closing steps to run again now: something came in late and nothing they wait for is still pending (once for
- * the whole section, not once per late step). `ending`: the run is about to end, so pending steps no longer count.
- */
-export function closingsDue(state: PlanState, pending: (step: string) => boolean, ending: boolean): KeptClosing[] {
-  return state.closings.filter((c) => c.late.length && (ending || !c.waiting.some(pending)));
-}
-
-/**
  * A check's decided-for-you choices and extra-check steps: they replace the kept ones of the same steps. A decision
  * the owner already changed stays changed.
  */

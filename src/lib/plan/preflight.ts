@@ -245,9 +245,3 @@ export function settleCheck(
   out.cleared = out.cleared.filter((s) => !out.holds.some((h) => h.step === s));
   return out;
 }
-
-/** Whether the run pauses before this step (a risky step to wait at, or a question left open). */
-export function waitsBefore(step: string | null, wait: { step: string; why: string }[] | undefined): string | null {
-  if (!step || !wait?.length) return null;
-  return wait.find((w) => w.step === step)?.why ?? null;
-}
