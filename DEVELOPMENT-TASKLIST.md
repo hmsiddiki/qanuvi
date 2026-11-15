@@ -1205,8 +1205,13 @@ runs on or off; with it off nothing is sent anywhere.
   - Part F, drive live: This PC and the "This PC" test master side by side on scratch projects only; then the VPS.
   - Later, not in this milestone: moving work between machines ("send this queued plan to the VPS") as an explicit
     copy, never a sync.
-  - Open for the owner's review: whether This PC's own entry can be hidden on a window that only ever drives a master
-    (a laptop as a handler).
+  - This PC always stays in the switcher, never hidden (owner, 2026-11-15): every PC has its own workspace, used or not.
+  - Light with many masters (owner, 2026-11-15): a machine not shown is wiped from the window completely (no live
+    editors, chats or terminals kept); picking it again rebuilds its screen from the machine (1-2 seconds on a good
+    connection is fine). A hidden machine costs only its connection, its Inbox stream and a "run ended/stopped"
+    notice; its run and agent streams reach the window only while it is shown. Terminals and agents go on on the
+    machine and the window picks up their recent output on return. Part F measures the window's memory with several
+    masters connected.
 - [ ] **24z2. Tidy, safe code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
   safe code added the same day; build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
   over files, and edit folders they should not touch. Qanuvi fixes that by itself, with zero noise: no tidiness
