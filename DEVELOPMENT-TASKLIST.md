@@ -369,7 +369,28 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 04:45): 24z3 D6 BUILT (not driven live yet). Memory disk per machine: each core
+    RESUME HERE (newest, 2026-11-16 05:20): 24z3 D6 DRIVEN LIVE on the local test master, all pass (release test
+    build 04:55). Master shown -> Memory: "Only on this machine / A folder", typed path (no Browse), text names
+    DESKTOP-R8G3PAK (test); folder + passphrase saved -> "Passphrase kept on DESKTOP-R8G3PAK (test)", its own file
+    <lasting id>.qxm in the folder, credential master-memory-disk (This PC's stays memory-disk). Window CLOSED, master
+    alone synced on its own at 05:07:41 (start + 90 s + 10 min; memoryDiskLast in its DB). This PC: test entry + same
+    folder and passphrase -> its own file, "1 entries ... read DESKTOP-R8G3PAK". Switch to the master -> its own
+    status ("2 minutes ago"), not This PC's; master Sync now -> "1 new" from This PC. Remote access with the master
+    shown: heading/text name it; local relay (qanuvi-relay 127.0.0.1:47300) -> "Connected to the relay", link saved
+    in the master's own relay.json; This PC's panel still off; turned off again after. Master Agents page: its config
+    files (home + master-proj), no "cannot be done" line. Clean up now not pressed (logic tested).
+    NOT DONE: VPS swap. Linux server build cross-built 05:14 (zigbuild -j 2, 2m 27s, 9.3 MB) but the upload + swap
+    was held for the owner's yes (VPS still runs the D5 build).
+    FINDINGS, owner to agree (no code yet): (a) memory entries on a master: memory_list/save/search/slice/delete are
+    in no batch (Part A map group 1), so the master's Memory page shows "cannot be done ... (memory_list)" and the
+    entry it merged from the disk cannot be seen; proposal: a small batch D7 after D6, before Part B. (b) the disk
+    names This PC's file by the bare hostname, so the master reads "from DESKTOP-R8G3PAK (test); read
+    DESKTOP-R8G3PAK" (looks like itself); proposal: write This PC's machine name (or "This PC") into its file.
+    (c) "1 entries": singular. (d) the window always opens on This PC after a restart, even when a master was
+    shown; proposal: leave to Part B (switcher remembers the shown machine). Left behind: test entry "D6 disk test
+    fact" (This PC test data + master), disk folder in this session's scratchpad. NEXT: owner's yes for the VPS
+    swap, then the findings, then Part B (switcher).
+    RESUME HERE (before, 2026-11-16 04:45): 24z3 D6 BUILT (not driven live yet). Memory disk per machine: each core
     keeps its own passphrase (memory_disk.rs passphrase(): This PC "memory-disk", a desktop master
     "master-memory-disk", a server reads QANUVI_MEMORY_DISK_PASSPHRASE and says so on Save/Forget), reads its own disk
     from its own settings (memoryDisk; a server disk now carries target + identity, written in by the window with
