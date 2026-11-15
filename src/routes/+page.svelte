@@ -56,7 +56,8 @@
     windows.init(() => projects.currentId);
     projects.persist = !projects.startWith;
     terminals.remote = (id) => !!projects.list.find((p) => p.id === id)?.master;
-    // Servers marked to connect at start-up add their projects once the local ones are listed.
+    // Servers marked to connect at start-up connect once This PC's projects are listed (the sidebar keeps showing
+    // This PC; a project window for a server's project shows that server).
     projects.load().then(() => masters.autoConnect());
     // The memory disk syncs at start-up (in the main window only: one sync per machine is enough).
     if (!projects.startWith) memoryDisk.init();

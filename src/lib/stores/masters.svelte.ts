@@ -1,6 +1,7 @@
 /**
- * Servers running Qanuvi without a window (Milestone 16): connecting over SSH, their projects in the sidebar, and
- * what happens when a connection ends. The calls themselves are routed in remote.ts.
+ * Servers running Qanuvi without a window (Milestone 16): connecting over SSH or the relay, and what happens when a
+ * connection ends. The calls themselves are routed in remote.ts; the sidebar lists only the machine on screen
+ * (24z3 Part A2), so a master's projects show once it is shown.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -32,6 +33,8 @@ nameMachines((id) => settings.value.masters.find((m) => m.id === id)?.name || id
 
 class MastersStore {
   status = $state<Record<string, MasterStatus>>({});
+  /** How many projects each connected master has (the Servers screen), whichever machine is shown. */
+  projectCount = $state<Record<string, number>>({});
   #listening = false;
 
   get list(): MasterSettings[] {
@@ -60,7 +63,9 @@ class MastersStore {
 
   #dropped(id: string, error?: string) {
     forgetMaster(id);
-    projects.dropRemote(id);
+    void projects.dropRemote(id);
+    const { [id]: _gone, ...counts } = this.projectCount;
+    this.projectCount = counts;
     inbox.dropMaster(id);
     runner.dropMaster(id);
     this.#set(id, error ? { state: "error", error } : { state: "off" });
@@ -77,11 +82,18 @@ class MastersStore {
         identity: m.identity || null,
         relay: m.relay ?? null,
       });
+      // Listing them notes which ids are the master's (remote.ts), so runs and Inbox questions about them go there.
       const list = await callMaster<Project[]>(m.id, "projects_list", {});
       // Projects this computer has itself keep working here, not through the server.
       for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
-      projects.addRemote(m.id, list);
+      const theirs = list.filter((p) => !projects.isLocal(p.id));
+      this.projectCount = { ...this.projectCount, [m.id]: theirs.length };
       this.#set(m.id, { state: "on", info });
+      // A project window opened for one of its projects shows this machine.
+      const want = projects.startWith;
+      if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want))
+        void projects.show(m.id);
+      else if (projects.machine === m.id) void projects.load();
       // Its plans' kept data (holds, picks, run settings) lives there, where its runner reads it.
       void planData.loadMaster(m.id);
       // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
@@ -148,13 +160,16 @@ class MastersStore {
     );
   }
 
-  /** Adds a folder on the server as a project and opens it. */
+  /** Adds a folder on the server as a project; it opens when that machine is on screen. */
   async addFolder(id: string, path: string): Promise<string> {
     try {
       const p = await callMaster<Project>(id, "projects_add", { path: path.trim() });
       own(p.id, id);
-      projects.addRemote(id, [p]);
-      projects.select(p.id);
+      this.projectCount = { ...this.projectCount, [id]: (this.projectCount[id] ?? 0) + 1 };
+      if (projects.machine === id) {
+        await projects.load();
+        projects.select(p.id);
+      }
       return "";
     } catch (e) {
       return errorText(e);

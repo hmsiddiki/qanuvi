@@ -1,11 +1,25 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Project, type ProjectSettings } from "$lib/api";
+import { showMachine, shownMachine } from "$lib/remote";
 
-const CURRENT_KEY = "qanuvi.currentProject";
+/** The project each machine opens with: This PC keeps the old key, a master its own. */
+export const currentKey = (machine: string | null) =>
+  machine ? `qanuvi.currentProject.${machine}` : "qanuvi.currentProject";
 
-/** The project list and the project being worked on. */
+/**
+ * The project list and the project being worked on (24z3 Part A2): the list is the shown machine's only, never
+ * mixed with another machine's.
+ */
 class ProjectsStore {
   list = $state<Project[]>([]);
+  /** The machine the list belongs to: null is This PC. */
+  machine = $state<string | null>(null);
+  /** This PC's own project ids, kept while a master is shown (pairing a computer with itself lists the same ones). */
+  #localIds = new Set<string>();
+  /** Bumped by each load, so an older answer that comes late is dropped. */
+  #loads = 0;
+  /** The start-up folder (`qanuvi <folder>`) was looked at. */
+  #started = false;
   currentId = $state<string | null>(null);
   error = $state("");
   /** The project this window opens with (a project window), instead of the last one used. */
@@ -17,11 +31,19 @@ class ProjectsStore {
     return this.list.find((p) => p.id === this.currentId) ?? null;
   }
 
+  /** Lists the shown machine's projects (calls without an id go to it, remote.ts). */
   async load(): Promise<void> {
+    const machine = shownMachine();
+    const load = ++this.#loads;
     try {
-      const local = await api.projects.list();
-      this.list = [...local, ...this.list.filter((p) => p.master)];
-      const saved = this.startWith ?? localStorage.getItem(CURRENT_KEY);
+      const found = await api.projects.list();
+      if (load !== this.#loads) return;
+      if (!machine) this.#localIds = new Set(found.map((p) => p.id));
+      this.machine = machine;
+      this.list = machine
+        ? found.filter((p) => !this.#localIds.has(p.id)).map((p) => ({ ...p, master: machine }))
+        : found;
+      const saved = this.startWith ?? localStorage.getItem(currentKey(machine));
       // A project window waits for its project (a server project comes once the server answers) rather than
       // showing another one.
       this.currentId = this.list.some((p) => p.id === saved)
@@ -29,44 +51,46 @@ class ProjectsStore {
         : this.startWith
           ? null
           : (this.list[0]?.id ?? null);
-      // `qanuvi <folder>` opens that folder as the current project.
-      const start = this.startWith ? null : await api.startupPath();
+      // `qanuvi <folder>` opens that folder as the current project (This PC's, once, at start-up).
+      const start = this.startWith || machine || this.#started ? null : await api.startupPath();
+      this.#started = true;
       if (start) await this.add(start);
     } catch (e) {
-      this.error = errorText(e);
+      if (load === this.#loads) this.error = errorText(e);
     }
   }
 
-  /** Adds (or refreshes) projects of a server; a project the window was on last time is opened again. */
-  addRemote(master: string, list: Project[]): void {
-    // A project that is on this computer stays this computer's (pairing a computer with itself lists the same ones).
-    const tagged = list.filter((p) => !this.isLocal(p.id)).map((p) => ({ ...p, master }));
-    const ids = new Set(tagged.map((p) => p.id));
-    this.list = [...this.list.filter((p) => !ids.has(p.id)), ...tagged];
-    const saved = this.startWith ?? localStorage.getItem(CURRENT_KEY);
-    if (saved && ids.has(saved) && this.currentId !== saved) this.currentId = saved;
+  /** Puts a machine on screen and lists its projects (null: This PC). */
+  async show(machine: string | null): Promise<void> {
+    showMachine(machine);
+    this.error = "";
+    await this.load();
   }
 
   /** A project this computer has itself (not one of a server's). */
   isLocal(id: string): boolean {
-    return this.list.some((p) => p.id === id && !p.master);
+    return this.#localIds.has(id);
   }
 
-  /** Takes a server's projects out of the list (its connection ended). */
-  dropRemote(master: string): void {
-    this.list = this.list.filter((p) => p.master !== master);
-    if (this.currentId && !this.list.some((p) => p.id === this.currentId)) this.currentId = this.list[0]?.id ?? null;
+  /** A master's connection ended: when it was on screen, This PC is shown again (forgetMaster already moved it). */
+  async dropRemote(master: string): Promise<void> {
+    if (this.machine === master) await this.show(null);
   }
 
   select(id: string): void {
     if (!this.list.some((p) => p.id === id)) return;
     this.currentId = id;
-    if (this.persist) localStorage.setItem(CURRENT_KEY, id);
+    if (this.persist) localStorage.setItem(currentKey(this.machine), id);
     api.projects.touch(id).catch(() => {});
   }
 
   /** Opens the system folder picker and adds the chosen folder. */
   async addWithPicker(): Promise<Project | null> {
+    // The picker shows this PC's folders: a server's folder is typed in on the Servers screen.
+    if (this.machine) {
+      this.error = "This picks a folder on this PC. Add a folder of the server on the Servers screen.";
+      return null;
+    }
     const picked = await open({ directory: true, multiple: false, title: "Add a project folder" });
     if (typeof picked !== "string") return null;
     return this.add(picked);
@@ -75,7 +99,9 @@ class ProjectsStore {
   async add(path: string): Promise<Project | null> {
     this.error = "";
     try {
-      const project = await api.projects.add(path);
+      const added = await api.projects.add(path);
+      const project = this.machine ? { ...added, master: this.machine } : added;
+      if (!this.machine) this.#localIds.add(project.id);
       if (!this.list.some((p) => p.id === project.id)) this.list = [project, ...this.list];
       this.select(project.id);
       return project;
@@ -89,10 +115,12 @@ class ProjectsStore {
     try {
       await api.projects.remove(id);
       this.list = this.list.filter((p) => p.id !== id);
+      if (!this.machine) this.#localIds.delete(id);
       if (this.currentId === id) {
         this.currentId = this.list[0]?.id ?? null;
-        if (this.currentId) localStorage.setItem(CURRENT_KEY, this.currentId);
-        else localStorage.removeItem(CURRENT_KEY);
+        const key = currentKey(this.machine);
+        if (this.currentId) localStorage.setItem(key, this.currentId);
+        else localStorage.removeItem(key);
       }
     } catch (e) {
       this.error = errorText(e);

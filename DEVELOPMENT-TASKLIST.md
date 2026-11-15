@@ -369,7 +369,19 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 13:00): 24z3 A1 BUILT (the shown machine). Owner agreed both map questions
+    RESUME HERE (newest, 2026-11-15 afternoon): 24z3 A2 BUILT (the sidebar lists one machine). projects.svelte.ts
+    lists only the shown machine's projects (projects_list goes to it through the router), tags a master's with
+    master, keeps This PC's ids so a computer paired with itself does not list them twice, and keeps each machine's
+    last project (qanuvi.currentProject for This PC, qanuvi.currentProject.<id> for a master). projects.show(machine)
+    puts a machine on screen and lists it; a late older list is dropped. projects.addRemote is gone: connecting still
+    lists the master's projects (so their ids route there) but only counts them (masters.projectCount, the Servers
+    screen); a project window for a master's project shows that master; the shown master's connection ending shows
+    This PC again. Adding with the folder picker while a master is shown says to use the Servers screen. STOPGAP
+    until Part B's switcher: the Servers screen has "Show in the sidebar" per connected server and "Show This PC".
+    338 TS tests (8 new in projects.test.ts), svelte-check and prettier clean; NOT driven live yet (needs a test
+    build with a master connected). NEXT: drive A2 live on a test build with a scratch master, then A3 (settings
+    on the machine) in a fresh conversation.
+    RESUME HERE (before, 2026-11-15 13:00): 24z3 A1 BUILT (the shown machine). Owner agreed both map questions
     (Qlopy sign-in stays with the window: it will decide which machines a device such as a phone connects to, a topic
     for another day; each machine keeps its own memory disk sync; lsp/dap on a master later, said on screen until
     then) and the order A1-A4. Owner restated: a complete separate screen per machine, only the Inbox shared.

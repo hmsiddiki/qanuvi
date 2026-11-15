@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
    * Servers (Milestone 16): Qanuvi without a window on a Linux server or VPS, reached over SSH. Add a server,
-   * connect, and add its folders as projects; they then work like this PC's projects.
+   * connect, and add its folders as projects; they then work like this PC's projects. The sidebar lists one machine
+   * at a time (24z3 Part A2); until the switcher (Part B), "Show" here puts a server on screen.
    */
+  import Eye from "@lucide/svelte/icons/eye";
   import Server from "@lucide/svelte/icons/server";
   import Plug from "@lucide/svelte/icons/plug";
   import Unplug from "@lucide/svelte/icons/unplug";
@@ -62,7 +64,7 @@
 
   async function remove(m: MasterSettings) {
     const ok = await ask(
-      `Remove ${m.name} from Qanuvi? Nothing on the server is changed; its projects just leave the sidebar.`,
+      `Remove ${m.name} from Qanuvi? Nothing on the server is changed; it just leaves this window.`,
       { title: "Remove server", okLabel: "Remove", cancelLabel: "Keep" },
     );
     if (ok) await masters.remove(m.id);
@@ -76,15 +78,24 @@
     if (!err) folder = { ...folder, [m.id]: "" };
   }
 
-  const count = (id: string) => projects.list.filter((p) => p.master === id).length;
+  const count = (id: string) => masters.projectCount[id] ?? 0;
 </script>
 
 <div class="servers">
   <h2><Server size={16} /> Servers</h2>
   <p class="lead">
-    Qanuvi without a window on a Linux server or VPS. Its projects show in the sidebar and work like this PC's: files,
+    Qanuvi without a window on a Linux server or VPS. Shown in the sidebar, its projects work like this PC's: files,
     git, search, terminals and agents run on the server, and agent sessions keep going when this PC is off.
   </p>
+
+  {#if projects.machine}
+    <p class="row">
+      <span class="muted"
+        >The sidebar shows {masters.list.find((m) => m.id === projects.machine)?.name ?? "a server"}.</span
+      >
+      <button type="button" class="btn" onclick={() => projects.show(null)}><Eye size={14} /> Show This PC</button>
+    </p>
+  {/if}
 
   <DataFolderPanel />
   <RemoteAccessPanel />
@@ -97,6 +108,9 @@
         <strong>{m.name}</strong>
         <span class="muted">{m.relay ? "through the relay" : m.target === "local" ? "this PC" : m.target}</span>
         <span class="spacer"></span>
+        {#if st.state === "on" && projects.machine !== m.id}
+          <IconButton label="Show in the sidebar" onclick={() => projects.show(m.id)}><Eye size={14} /></IconButton>
+        {/if}
         {#if st.state === "on"}
           <IconButton label="Disconnect" onclick={() => masters.disconnect(m.id)}><Unplug size={14} /></IconButton>
         {:else}
