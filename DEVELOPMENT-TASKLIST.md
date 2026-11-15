@@ -369,7 +369,16 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 02:45, CHECKPOINT for a fresh conversation): "Decided for you" REMEMBERS a fold
+    RESUME HERE (newest, 2026-11-16 02:55): the "Decided for you" fold DRIVEN LIVE, FAILS at a step change
+    (release test build 02:45, scratch projk/PLAN-K.md, Haiku 5.5, $0.02, 3 of 3 done, 4/4 tests). The check
+    decided 1a (date format) and 1b (slug rules); "Decided for you (2)" opened, folded during 1a, stayed folded
+    when the plan reloaded (1/3); when the run moved to 1b it OPENED AGAIN with no new choice. Cause: the core's
+    PlanState (src-tauri/src/plan/planstate.rs) has no decidedFolded, so when the runner in the core writes the
+    plan state back (plan_data, echoed to the window) the fold is dropped; the TS tests never pass through it.
+    Proposed fix (owner to agree): `decided_folded: Option<u32>` in the Rust PlanState (serde rename
+    "decidedFolded", default, skipped when None), kept by from_json; a Rust test that load + save keeps it; then
+    drive again (fold, step change, handover, restart, a new choice opens it). Then D4 leftovers, then D5.
+    RESUME HERE (before, 2026-11-16 02:45, CHECKPOINT for a fresh conversation): "Decided for you" REMEMBERS a fold
     (owner: "yes it should remember"; questions that need the owner are outside it, in "Needs your answer" and the
     Inbox). Before, `open={some unchanged}` was set again on every step change/handover (the list reloads), so a fold
     never lasted. Now the plan state keeps decidedFolded (how many choices it held when folded): planstate.ts
