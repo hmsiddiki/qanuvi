@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
+    RESUME HERE (newest, 2026-11-16 00:00): finding (b) DONE (owner: "do what suits better"). A master's default
+    backups folder now follows the system: Windows and macOS keep Documents/"Qanuvi master backups" ("(test build)"
+    for a test build); Linux and other systems (usually a server without a desktop) use ~/qanuvi-backups
+    (~/qanuvi-backups-test-build): in sight, easy to copy off with rsync/scp, no Documents folder made on a server;
+    decided by the system only, so it never moves (backups::master_default_for, new test). Green: rustfmt, clippy
+    desktop + server, backups + master backup tests on both builds. Driven live on the VPS: "/root/qanuvi-backups
+    (the default)"; the two test backups were moved there from /root/Documents (removed) and listed. Seen: the green
+    "Restored the backup ..." note still shows after a later plain restart of the master (stays until the next
+    restore?): check what the desktop does and decide. Finding (a) is a PROPOSAL waiting for the owner (owner: not
+    "as typed" blindly, make it professional): see the reply of 2026-11-16; not built. Then D4.
+    RESUME HERE (before, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
     projects pc-proj and master-proj, the "This PC" test master). This PC's Backups page unchanged (its test-build
     default folder, on, its 3 daily backups, Choose…). With the master shown: "Backups: This PC", on by default, the
     folder Documents\"Qanuvi master backups (test build)" (the default), a typed path (no Choose…), no window-settings

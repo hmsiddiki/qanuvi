@@ -438,7 +438,7 @@ impl Master {
                 Ok(Value::Null)
             }
             // Backups and the data folder (24z3 D3): the master's own, on by default like the desktop app's (in
-            // Documents/Qanuvi master backups); its pointer file is in its own data folder; the data folder itself is
+            // backups::master_default_dir: Documents on Windows/macOS, ~/qanuvi-backups on Linux); its pointer file is in its own data folder; the data folder itself is
             // set where it starts (--data or QANUVI_MASTER_DATA), so Settings only shows it.
             "backups_info" => {
                 let d = &self.dir;
@@ -1147,7 +1147,12 @@ mod tests {
             (i["off"].as_bool(), i["custom"].as_bool()),
             (Some(false), Some(false))
         );
-        assert!(def.contains("Qanuvi master backups"), "{def}");
+        let expected = if cfg!(any(windows, target_os = "macos")) {
+            "Qanuvi master backups"
+        } else {
+            "qanuvi-backups"
+        };
+        assert!(def.contains(expected), "{def}");
         assert_ne!(backups_default(), crate::backups::default_dir(false));
         assert_ne!(backups_default(), crate::backups::default_dir(true));
 

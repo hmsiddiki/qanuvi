@@ -124,20 +124,30 @@ pub fn default_dir(test_build: bool) -> PathBuf {
 
 /// A master's default backups folder (24z3 D3): on like the desktop app's, in the same Documents folder, under its
 /// own name, so a master on the same computer as a desktop app never lists or prunes the desktop's backups.
+/// Windows and macOS: Documents/"Qanuvi master backups", where people look there. Linux and other systems, usually a
+/// server without a desktop: ~/qanuvi-backups, in sight in the home folder and easy to copy off the machine (rsync,
+/// scp), with no Documents folder made on a server. Decided by the system only, so the default never moves.
 pub fn master_default_dir(test_build: bool) -> PathBuf {
-    documents(if test_build {
-        "Qanuvi master backups (test build)"
-    } else {
-        "Qanuvi master backups"
-    })
+    master_default_for(cfg!(any(windows, target_os = "macos")), test_build)
 }
 
-fn documents(name: &str) -> PathBuf {
+fn master_default_for(desktop_system: bool, test_build: bool) -> PathBuf {
+    match (desktop_system, test_build) {
+        (true, false) => documents("Qanuvi master backups"),
+        (true, true) => documents("Qanuvi master backups (test build)"),
+        (false, false) => home().join("qanuvi-backups"),
+        (false, true) => home().join("qanuvi-backups-test-build"),
+    }
+}
+
+fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
-        .join("Documents")
-        .join(name)
+}
+
+fn documents(name: &str) -> PathBuf {
+    home().join("Documents").join(name)
 }
 
 pub fn read_config(data: &Path) -> Config {
@@ -566,6 +576,31 @@ pub fn apply_pending(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_master_default_folder_follows_the_system() {
+        let h = home();
+        // Windows and macOS: Documents; Linux and other systems (servers): ~/qanuvi-backups.
+        assert_eq!(
+            master_default_for(true, false),
+            h.join("Documents").join("Qanuvi master backups")
+        );
+        assert_eq!(
+            master_default_for(true, true),
+            h.join("Documents")
+                .join("Qanuvi master backups (test build)")
+        );
+        assert_eq!(master_default_for(false, false), h.join("qanuvi-backups"));
+        assert_eq!(
+            master_default_for(false, true),
+            h.join("qanuvi-backups-test-build")
+        );
+        // Never the desktop app's folder, on any system.
+        for (d, t) in [(true, false), (true, true), (false, false), (false, true)] {
+            assert_ne!(master_default_for(d, t), default_dir(false));
+            assert_ne!(master_default_for(d, t), default_dir(true));
+        }
+    }
 
     /// A data folder with a database in WAL mode; the connection is answered so the caller decides how long it stays
     /// open (while it is, the rows are still in the WAL, as in a running Qanuvi).
