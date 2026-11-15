@@ -263,6 +263,12 @@ impl Master {
                 &s(args, "path"),
                 &s(args, "text"),
             )),
+            // This machine's settings (24z3 A3): the window's Settings page while this master is shown.
+            "settings_get" => to(crate::settings::get_all(db)),
+            "settings_set" => {
+                crate::settings::set_many(db, crate::settings::values_arg(&args["values"])?)?;
+                Ok(Value::Null)
+            }
             // What a plan keeps between runs, in this master's database, where its runner reads it.
             "plan_data_list" => to(crate::plan_data::list(db)),
             "plan_data_set" => {
@@ -846,6 +852,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(call(&m, "plan_data_list", json!({})).unwrap(), json!([]));
+    }
+
+    #[test]
+    fn keeps_its_own_settings_and_refuses_the_windows() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        assert_eq!(call(&m, "settings_get", json!({})).unwrap(), json!({}));
+        call(
+            &m,
+            "settings_set",
+            json!({"values": {"approveMinutes": 20}}),
+        )
+        .unwrap();
+        assert_eq!(
+            call(&m, "settings_get", json!({})).unwrap(),
+            json!({"approveMinutes": 20})
+        );
+        assert!(call(&m, "settings_set", json!({"values": {"masters": []}})).is_err());
+        assert!(call(&m, "settings_set", json!({"values": [1]})).is_err());
     }
 
     struct Captured(Arc<Mutex<Vec<u8>>>);

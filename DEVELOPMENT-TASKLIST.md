@@ -369,7 +369,22 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 afternoon): 24z3 A2 BUILT (the sidebar lists one machine). projects.svelte.ts
+    RESUME HERE (newest, 2026-11-15 evening): 24z3 A3 FIRST PART BUILT (settings on the machine). Each machine's DB
+    has a settings table (migration 10, settings.rs: one JSON value per top-level key, "masters" and "account"
+    refused, they stay with the window); settings_get / settings_set in the desktop core and in master.rs.
+    settings.svelte.ts reads and writes the shown machine's (only changed keys, sent in order to the machine the
+    values came from; a change made before the first read is kept and sent after it); This PC's first read moves
+    the old localStorage copy into its DB once; localStorage stays as This PC's start-up copy plus the window keys.
+    An older master without settings_get: the Settings page says "VPS cannot do this yet" and shows defaults, never
+    This PC's. New stores/machines.ts show(machine): remote.ts, the project list and Settings follow it (the Servers
+    screen's stopgap buttons and a dropped connection call it; Part B's switcher will, and deletes the stopgap
+    buttons). Owner confirmed 2026-11-15: those buttons are placeholders only. Verify parts green: 345 TS tests,
+    svelte-check, prettier, rustfmt, clippy, 387 Rust tests, server-only build compiles; NOT driven live.
+    KNOWN, for Part D's Settings batches: remoteAccess and memoryDisk values switch with the machine but their
+    stores still act on This PC; two windows on This PC do not see each other's changes until reopened (as before).
+    NEXT: A3 second part, keys (secrets_*) on the master; then the Settings groups in batches; drive A2 + A3 live on
+    a test build with a scratch master.
+    RESUME HERE (before, 2026-11-15 afternoon): 24z3 A2 BUILT (the sidebar lists one machine). projects.svelte.ts
     lists only the shown machine's projects (projects_list goes to it through the router), tags a master's with
     master, keeps This PC's ids so a computer paired with itself does not list them twice, and keeps each machine's
     last project (qanuvi.currentProject for This PC, qanuvi.currentProject.<id> for a master). projects.show(machine)

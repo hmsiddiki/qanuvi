@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Project, type ProjectSettings } from "$lib/api";
-import { showMachine, shownMachine } from "$lib/remote";
+import { shownMachine } from "$lib/remote";
 
 /** The project each machine opens with: This PC keeps the old key, a master its own. */
 export const currentKey = (machine: string | null) =>
@@ -35,6 +35,7 @@ class ProjectsStore {
   async load(): Promise<void> {
     const machine = shownMachine();
     const load = ++this.#loads;
+    this.error = "";
     try {
       const found = await api.projects.list();
       if (load !== this.#loads) return;
@@ -60,21 +61,9 @@ class ProjectsStore {
     }
   }
 
-  /** Puts a machine on screen and lists its projects (null: This PC). */
-  async show(machine: string | null): Promise<void> {
-    showMachine(machine);
-    this.error = "";
-    await this.load();
-  }
-
   /** A project this computer has itself (not one of a server's). */
   isLocal(id: string): boolean {
     return this.#localIds.has(id);
-  }
-
-  /** A master's connection ended: when it was on screen, This PC is shown again (forgetMaster already moved it). */
-  async dropRemote(master: string): Promise<void> {
-    if (this.machine === master) await this.show(null);
   }
 
   select(id: string): void {

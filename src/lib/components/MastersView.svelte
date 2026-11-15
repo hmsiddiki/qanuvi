@@ -12,6 +12,7 @@
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
   import { ask } from "$lib/stores/confirm.svelte";
   import { masters } from "$lib/stores/masters.svelte";
+  import { show } from "$lib/stores/machines";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
   import IconButton from "./IconButton.svelte";
@@ -93,7 +94,7 @@
       <span class="muted"
         >The sidebar shows {masters.list.find((m) => m.id === projects.machine)?.name ?? "a server"}.</span
       >
-      <button type="button" class="btn" onclick={() => projects.show(null)}><Eye size={14} /> Show This PC</button>
+      <button type="button" class="btn" onclick={() => show(null)}><Eye size={14} /> Show This PC</button>
     </p>
   {/if}
 
@@ -109,7 +110,7 @@
         <span class="muted">{m.relay ? "through the relay" : m.target === "local" ? "this PC" : m.target}</span>
         <span class="spacer"></span>
         {#if st.state === "on" && projects.machine !== m.id}
-          <IconButton label="Show in the sidebar" onclick={() => projects.show(m.id)}><Eye size={14} /></IconButton>
+          <IconButton label="Show in the sidebar" onclick={() => show(m.id)}><Eye size={14} /></IconButton>
         {/if}
         {#if st.state === "on"}
           <IconButton label="Disconnect" onclick={() => masters.disconnect(m.id)}><Unplug size={14} /></IconButton>

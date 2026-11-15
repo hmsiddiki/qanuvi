@@ -9,6 +9,7 @@ import { errorText, type Project } from "$lib/api";
 import { callMaster, disown, forgetMaster, nameMachines, own } from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
+import { show } from "./machines";
 import { projects } from "./projects.svelte";
 import { runner } from "./runner.svelte";
 import { settings, type MasterSettings } from "./settings.svelte";
@@ -63,7 +64,8 @@ class MastersStore {
 
   #dropped(id: string, error?: string) {
     forgetMaster(id);
-    void projects.dropRemote(id);
+    // The machine on screen went away: This PC is shown again (forgetMaster already sends calls there).
+    if (projects.machine === id || settings.machine === id) void show(null);
     const { [id]: _gone, ...counts } = this.projectCount;
     this.projectCount = counts;
     inbox.dropMaster(id);
@@ -91,8 +93,7 @@ class MastersStore {
       this.#set(m.id, { state: "on", info });
       // A project window opened for one of its projects shows this machine.
       const want = projects.startWith;
-      if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want))
-        void projects.show(m.id);
+      if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want)) void show(m.id);
       else if (projects.machine === m.id) void projects.load();
       // Its plans' kept data (holds, picks, run settings) lives there, where its runner reads it.
       void planData.loadMaster(m.id);

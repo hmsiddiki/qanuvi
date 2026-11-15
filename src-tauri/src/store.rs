@@ -217,6 +217,20 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 10 {
+        // A machine's settings (24z3 Part A3), once only in the window's localStorage: one JSON value per top-level
+        // key, so the window showing this machine (here or over a connection) reads and changes this machine's own.
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE settings (
+                 key TEXT PRIMARY KEY,
+                 value TEXT NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
+             PRAGMA user_version = 10;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -239,7 +253,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 9);
+        assert_eq!(version, 10);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

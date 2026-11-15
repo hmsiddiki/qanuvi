@@ -47,6 +47,8 @@
   onMount(() => {
     layout.load();
     settings.load();
+    // Then This PC's own settings from its database (the window's copy is moved in the first time).
+    void settings.loadMachine();
     // First: what plans keep (picks, plan state, notes, run settings) reads at once from its copy.
     planData.start().catch(() => {});
     ready = true;

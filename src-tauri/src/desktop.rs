@@ -1874,6 +1874,20 @@ fn plan_data_changed(
     );
 }
 
+// This PC's settings (24z3 A3): the Settings page while This PC is shown.
+#[tauri::command]
+fn settings_get(state: State<AppState>) -> Res<serde_json::Map<String, serde_json::Value>> {
+    crate::settings::get_all(&state.db)
+}
+
+#[tauri::command]
+fn settings_set(
+    state: State<AppState>,
+    values: serde_json::Map<String, serde_json::Value>,
+) -> Res<()> {
+    crate::settings::set_many(&state.db, &values)
+}
+
 #[tauri::command]
 fn plan_data_list(state: State<AppState>) -> Res<Vec<crate::plan_data::Entry>> {
     crate::plan_data::list(&state.db)
@@ -2302,6 +2316,8 @@ pub fn run() {
             inbox_remove,
             inbox_clear,
             inbox_import,
+            settings_get,
+            settings_set,
             plan_data_list,
             plan_data_set,
             plan_data_import,

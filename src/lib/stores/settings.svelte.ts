@@ -1,9 +1,45 @@
-/** User preferences kept in local storage. */
+/**
+ * User preferences (24z3 Part A3): the Settings page is the shown machine's, kept in that machine's database
+ * (settings_get / settings_set, one value per top-level key). The window keeps its own things (its list of masters,
+ * its sign-in) and a copy of This PC's settings in local storage, so it starts at once with them.
+ */
+import { invoke } from "@tauri-apps/api/core";
+import { callMaster, shownMachine } from "$lib/remote";
 import { DEFAULT_TEAM, parseTeam } from "$lib/core/decider";
 import { PROVIDERS, providerById } from "$lib/agents/providers";
 import { own } from "$lib/agents/ownModels.svelte";
 
 const KEY = "qanuvi.settings.v1";
+
+/** Settings that stay with the window, never kept by a machine (settings.rs refuses them too). */
+export const WINDOW_KEYS = ["masters", "account"] as const;
+const isWindowKey = (k: string) => (WINDOW_KEYS as readonly string[]).includes(k);
+
+type Values = Record<string, unknown>;
+
+/** The keys of a settings object a machine keeps. */
+export function machinePart(v: Values): Values {
+  return Object.fromEntries(Object.entries(v).filter(([k]) => !isWindowKey(k)));
+}
+
+/** The keys whose value differs between two settings objects (a machine's keys only). */
+export function changedKeys(before: Values, after: Values): Values {
+  const out: Values = {};
+  for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (isWindowKey(k)) continue;
+    if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) out[k] = after[k] ?? null;
+  }
+  return out;
+}
+
+function readLocal(): Values {
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY) ?? "null");
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Values) : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Per-agent choices; anything left empty falls back to the agent's own default. */
 export interface AgentSettings {
@@ -393,12 +429,88 @@ export function parseBrain(raw: unknown): Settings["brain"] {
   return { providers, models, local: b.local !== false, omniAssist: b.omniAssist !== false };
 }
 
+/** A machine's settings call: null is This PC. */
+function call<T>(machine: string | null, cmd: string, args: Values = {}): Promise<T> {
+  return machine ? callMaster<T>(machine, cmd, args) : invoke<T>(cmd, args);
+}
+
 class SettingsStore {
   value = $state<Settings>(parseSettings(null));
+  /** The machine the shown settings are of: null is This PC. */
+  machine = $state<string | null>(null);
+  /** A machine's settings could not be read or kept (said on the Settings page). */
+  error = $state("");
+  /** The machine's settings were read: until then changes are only kept in the window, then sent. */
+  #read = false;
+  #unsent: Values = {};
+  #loads = 0;
+  /** Changes go to the machine one after another, in the order they were made. */
+  #queue: Promise<unknown> = Promise.resolve();
 
+  /** Starts with the window's copy of This PC's settings (at once, before the database answers). */
   load(): void {
     this.value = parseSettings(localStorage.getItem(KEY));
     this.#sync();
+  }
+
+  /**
+   * Reads the shown machine's settings from its database. This PC's first read moves the window's old copy in
+   * (Qanuvi kept them only in the window before).
+   */
+  async loadMachine(): Promise<void> {
+    const machine = shownMachine();
+    const load = ++this.#loads;
+    if (machine !== this.machine) {
+      this.#read = false;
+      this.#unsent = {};
+    }
+    try {
+      let kept = await call<Values>(machine, "settings_get");
+      if (load !== this.#loads) return;
+      if (!machine && Object.keys(kept).length === 0) {
+        const moved = machinePart(readLocal());
+        if (Object.keys(moved).length) await call(null, "settings_set", { values: moved });
+        if (load !== this.#loads) return;
+        kept = moved;
+      }
+      const unsent = this.machine === machine ? this.#unsent : {};
+      this.machine = machine;
+      this.error = "";
+      this.value = parseSettings(JSON.stringify({ ...kept, ...unsent, ...this.#windowPart() }));
+      this.#read = true;
+      this.#unsent = {};
+      if (Object.keys(unsent).length) this.#send(machine, unsent);
+      this.#keepLocal();
+      this.#sync();
+    } catch (e) {
+      if (load !== this.#loads) return;
+      this.error = e instanceof Error ? e.message : String(e);
+      // Another machine's settings are never shown as this one's: its page shows the defaults and says why.
+      if (machine !== this.machine) {
+        this.machine = machine;
+        this.value = parseSettings(JSON.stringify(this.#windowPart()));
+        this.#sync();
+      }
+    }
+  }
+
+  #windowPart(): Values {
+    const v = this.value as unknown as Values;
+    return Object.fromEntries(WINDOW_KEYS.map((k) => [k, v[k]]));
+  }
+
+  /** The window's copy: its own keys always, This PC's settings when This PC is shown. */
+  #keepLocal(): void {
+    const base = this.machine ? readLocal() : machinePart(this.value as unknown as Values);
+    localStorage.setItem(KEY, JSON.stringify({ ...base, ...this.#windowPart() }));
+  }
+
+  #send(machine: string | null, values: Values): void {
+    this.#queue = this.#queue
+      .then(() => call(machine, "settings_set", { values }))
+      .catch((e) => {
+        if (this.machine === machine) this.error = e instanceof Error ? e.message : String(e);
+      });
   }
 
   /** The agent list shows the chosen models of Qanuvi's own agent. */
@@ -407,9 +519,19 @@ class SettingsStore {
   }
 
   #save(next: Settings): void {
+    const before = this.value as unknown as Values;
     this.value = parseSettings(JSON.stringify(next));
-    localStorage.setItem(KEY, JSON.stringify(this.value));
+    const changed = changedKeys(before, this.value as unknown as Values);
+    this.#keepLocal();
     this.#sync();
+    if (!Object.keys(changed).length) return;
+    if (this.#read) this.#send(this.machine, changed);
+    else this.#unsent = { ...this.#unsent, ...changed };
+  }
+
+  /** Waits until the changes made so far reached the machine (tests, and before the window closes). */
+  flushed(): Promise<unknown> {
+    return this.#queue;
   }
 
   set<K extends keyof Settings>(key: K, v: Settings[K]): void {

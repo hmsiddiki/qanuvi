@@ -173,6 +173,7 @@
       <X size={16} />
     </button>
     <div class="page">
+      {#if settings.error}<p class="machine-error" role="alert">Settings: {settings.error}</p>{/if}
       {#if tab === "agents"}
         <AgentsView team={false} ownModels={false} />
       {:else if tab === "models"}
@@ -212,6 +213,13 @@
 </div>
 
 <style>
+  .machine-error {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--qx-status-failed) 15%, transparent);
+    color: var(--qx-status-failed);
+  }
   .settings {
     position: absolute;
     inset: 0;
