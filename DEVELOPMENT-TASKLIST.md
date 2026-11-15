@@ -369,7 +369,27 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 00:30): 24z3 MACHINE NAMES BATCH (1)-(9) BUILT (not driven live). New
+    RESUME HERE (newest, 2026-11-16 00:50): 24z3 MACHINE NAMES BATCH DRIVEN LIVE, all pass (release test build
+    00:30, scratch pc-proj; the local test master and the owner's VPS). Old test master "This PC": red line asking
+    to rename; Rename to "VPS TEST" -> 'Another machine is already named "vps test"' (case ignored); "this
+    computer" refused; 41 characters -> "The name has 41 characters; at most 40."; renamed "local test", kept its place
+    in the list, connect gave it the first unused colour (purple; the VPS had blue). Colour changed to teal on the
+    card -> teal chip "local test" in the status bar while it is shown; This PC plain. Adding `local` again ->
+    "This is the same computer as local test. It was not added again." (count stays 2/2). Dismiss on the Backups
+    page took the restore note away there AND from the Servers page's data-folder panel. VPS: the server build was
+    re-cross-built (zigbuild, 9.0 MB) and swapped into ~/.local/bin (the old one from 2026-11-15 had no lasting id,
+    so an SSH twin was added silently before the swap: expected, an old master answers no machineId). Removed and
+    re-added with an empty Name: the address shown until hello, then "basevm378" (blue). An older twin entry ->
+    "This is the same computer as basevm378. Remove one of the two."; a fresh add -> "... It was not added again.";
+    <data>/machine-id written on the VPS. Left: the test build's list is "This PC (test)" (local, auto-connect) and
+    "basevm378" (VPS, auto-connect); the VPS master is running the new build. FOUND, small, for the owner: (a) an
+    empty Name with the address `local` becomes "This PC (test)" (MastersView add(); passes the rules since only
+    the exact "This PC" is refused, but it says "This PC" for another machine: maybe "Test master" or
+    "<hostname> (test)"); (b) Dismiss is only on the Backups page; the Servers page shows the same note without it;
+    (c) before the first hello an empty-name card shows the address twice (as the name and beside it); (d) a card
+    cannot change its program path or key file: a wrong path means Remove and add again. NEXT: owner's answer on
+    (a)-(d), then D4 (start-up/Headroom + Claude Code updates) in a fresh conversation.
+    RESUME HERE (before, 2026-11-16 00:30): 24z3 MACHINE NAMES BATCH (1)-(9) BUILT (not driven live). New
     src/lib/machineNames.ts: nameProblem (trimmed; at most 40 characters; invisible characters refused: control,
     zero-width, direction marks, private/unassigned; taken names refused case-insensitively after NFKC; "This PC"
     and "This computer" refused, the second added because sentences say "this computer"), uniqueName (names
