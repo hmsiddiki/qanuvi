@@ -1178,7 +1178,8 @@ runs on or off; with it off nothing is sent anywhere.
   - Owned by each machine (its own database, never mixed with another's): projects (workspaces), plan files and plan
     data, the queue and the runs, the Inbox (questions and answers), schedules, notes and automations, terminals and
     agent sessions running on it; in separate mode also its own model history, costs and settings.
-  - Owned by the window (this install): layout, theme, open tabs per machine, the list of paired masters.
+  - Owned by the window (this install): only the switcher (the list of paired masters) and which machine is shown;
+    everything else on screen, Settings included, is the shown machine's (Part D).
   - Owned by the account: the owner's local brain and behaviour; in synced mode the shared history on top. Passwords
     and keys never sync (as decided for the master accounts milestone).
   - Today (to change): the sidebar mixes machines, a master's projects sit in the same list with a server icon
@@ -1193,15 +1194,19 @@ runs on or off; with it off nothing is sent anywhere.
   - Part C, other machines keep working: runs on This PC go on while the VPS is shown (and the other way). The window
     keeps listening to every connected machine's Inbox: the switcher shows a badge per machine ("VPS 2"), a desktop
     notification names its machine, clicking it switches there and opens the question.
-  - Part D, settings split: Settings shows what belongs to the shown machine (its models, routing, team, budget, its
-    keys entered on it) apart from what belongs to the window (layout, theme, notifications) and the account.
+  - Part D, Settings is the shown machine's too (owner, 2026-11-15: "you switch the PC, the whole screen becomes that
+    PC's"): no fixed window group, no split. With the VPS shown, the whole Settings page is the VPS's (models,
+    routing, team, budget, keys, startup, backups, data folder, and also its appearance, layout and notifications,
+    kept on the VPS). The page header names the machine ("Settings: VPS"). Keys typed there go to that machine and
+    are kept there, never sent back (a master gets its own key store; today it reads QANUVI_KEY_... only). Only the
+    switcher itself (the list of paired masters and how to reach them) stays with the window.
   - Part E, a machine not reachable: the switcher shows it offline; picking it shows "VPS not connected" and
     Reconnect, never a stale copy taken for live. Its work goes on there.
   - Part F, drive live: This PC and the "This PC" test master side by side on scratch projects only; then the VPS.
   - Later, not in this milestone: moving work between machines ("send this queued plan to the VPS") as an explicit
     copy, never a sync.
-  - Open for the owner's review: Part D's split item by item; whether This PC's own entry can be hidden on a window
-    that only ever drives a master (a laptop as a handler).
+  - Open for the owner's review: whether This PC's own entry can be hidden on a window that only ever drives a master
+    (a laptop as a handler).
 - [ ] **24z2. Tidy, safe code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
   safe code added the same day; build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
   over files, and edit folders they should not touch. Qanuvi fixes that by itself, with zero noise: no tidiness
