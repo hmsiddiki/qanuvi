@@ -378,8 +378,12 @@ runs on or off; with it off nothing is sent anywhere.
     (the default)"; the two test backups were moved there from /root/Documents (removed) and listed. Seen: the green
     "Restored the backup ..." note still shows after a later plain restart of the master (stays until the next
     restore): by design and the same on the desktop (shared code: booking a restore clears it); proposed to the owner
-    as a small "Dismiss" on the note. Finding (a) is a PROPOSAL waiting for the owner (owner: not
-    "as typed" blindly, make it professional): see the reply of 2026-11-16; not built. Then D4.
+    as a small "Dismiss" on the note. Finding (a), machine names: OWNER AGREED (2026-11-16), not built yet:
+    (1) the server's Name field is shown exactly as typed everywhere (no capitalising; sentences reworded so a name
+    never starts one; shownPlaceTitle only for "This computer"); (2) an empty Name becomes the machine's own name
+    from hello (hostname, e.g. basevm378), not the SSH address; (3) the Name editable later on the server card;
+    (4) refused: a name another server has (case-insensitive) and "This PC". More ideas offered, owner to choose:
+    see the reply of 2026-11-16. Then D4.
     RESUME HERE (before, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
     projects pc-proj and master-proj, the "This PC" test master). This PC's Backups page unchanged (its test-build
     default folder, on, its 3 daily backups, Choose…). With the master shown: "Backups: This PC", on by default, the
