@@ -534,6 +534,8 @@ export const api = {
     interrupt: (sessionId: string) => invoke<void>("agent_interrupt", { sessionId }),
     /** A project's secrets: only their names come back. */
     secretNames: (projectId: string) => invoke<string[]>("secrets_names", { projectId }),
+    /** Where the project's machine keeps them: its credential store, or (a server) its environment. */
+    secretStore: (projectId: string) => invoke<"store" | "environment">("secrets_store", { projectId }),
     setSecret: (projectId: string, name: string, value: string) =>
       invoke<void>("secrets_set", { projectId, name, value }),
     removeSecret: (projectId: string, name: string) => invoke<void>("secrets_remove", { projectId, name }),

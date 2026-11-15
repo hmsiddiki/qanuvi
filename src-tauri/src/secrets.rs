@@ -1,7 +1,9 @@
 //! Project secrets: logins, passwords and keys a project's work needs (a test database login, for example). The values
 //! live in the system's credential store, one entry per project, and never go back to the window, into plans, chats,
 //! memory or Qanuvi's database. Every agent session and the project's test command get them as environment variables,
-//! so every step and every model has them without anyone seeing or typing them again.
+//! so every step and every model has them without anyone seeing or typing them again. A server build (no credential
+//! store, 24z3 A3) reads them from its own environment instead: `QANUVI_SECRET_DB_PASSWORD` gives `DB_PASSWORD` to
+//! every project's work there; the window cannot add or remove them, and says where to set them.
 
 use std::collections::BTreeMap;
 
@@ -44,6 +46,34 @@ mod store {
     }
 }
 
+/// The prefix of a server build's secrets in its environment.
+pub const ENV_PREFIX: &str = "QANUVI_SECRET_";
+
+/// Where this build keeps project secrets: "store" (the system's credential store) or "environment" (a server).
+pub fn kind() -> &'static str {
+    if cfg!(feature = "desktop") {
+        "store"
+    } else {
+        "environment"
+    }
+}
+
+/// A server's secrets from its environment: each `QANUVI_SECRET_<NAME>` with a value, as `<NAME>`.
+pub fn from_env(vars: impl Iterator<Item = (String, String)>) -> BTreeMap<String, String> {
+    vars.filter_map(|(k, v)| {
+        let name = k.strip_prefix(ENV_PREFIX)?;
+        (valid_name(name) && !v.is_empty()).then(|| (name.to_string(), v))
+    })
+    .collect()
+}
+
+/// What a server says when the window tries to add or remove a secret.
+pub fn env_only(name: &str) -> String {
+    format!(
+        "This server keeps secrets in its environment. Set (or remove) {ENV_PREFIX}{name} where qanuvi-master          starts, for example in its systemd unit, then restart it."
+    )
+}
+
 fn key(project_id: &str) -> String {
     format!("secrets:{project_id}")
 }
@@ -62,6 +92,9 @@ pub fn parse(text: &str) -> BTreeMap<String, String> {
 }
 
 fn load(project_id: &str) -> BTreeMap<String, String> {
+    if kind() == "environment" {
+        return from_env(std::env::vars());
+    }
     store::read(&key(project_id))
         .map(|t| parse(&t))
         .unwrap_or_default()
@@ -88,12 +121,18 @@ pub fn set(project_id: &str, name: &str, value: &str) -> Result<(), String> {
     if value.is_empty() {
         return Err("The secret has no value.".into());
     }
+    if kind() == "environment" {
+        return Err(env_only(name));
+    }
     let mut all = load(project_id);
     all.insert(name.to_string(), value.to_string());
     save(project_id, &all)
 }
 
 pub fn remove(project_id: &str, name: &str) -> Result<(), String> {
+    if kind() == "environment" {
+        return Err(env_only(name));
+    }
     let mut all = load(project_id);
     all.remove(name);
     save(project_id, &all)
@@ -143,6 +182,33 @@ pub fn plan_private_clear(project_id: &str, file: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_server_reads_its_secrets_from_its_environment() {
+        let vars = [
+            ("QANUVI_SECRET_DB_PASSWORD", "pw"),
+            ("QANUVI_SECRET_EMPTY", ""),
+            ("QANUVI_SECRET_9BAD", "x"),
+            ("QANUVI_SECRET_", "x"),
+            ("QANUVI_KEY_OPENROUTER", "not a project secret"),
+            ("PATH", "/usr/bin"),
+        ]
+        .map(|(k, v)| (k.to_string(), v.to_string()));
+        let got = from_env(vars.into_iter());
+        assert_eq!(
+            got.into_iter().collect::<Vec<_>>(),
+            vec![("DB_PASSWORD".to_string(), "pw".to_string())]
+        );
+        assert!(env_only("DB_PASSWORD").contains("QANUVI_SECRET_DB_PASSWORD"));
+        assert_eq!(
+            kind(),
+            if cfg!(feature = "desktop") {
+                "store"
+            } else {
+                "environment"
+            }
+        );
+    }
 
     #[test]
     fn names_are_environment_variable_names_and_bad_text_reads_as_none() {

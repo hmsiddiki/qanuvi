@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 evening): 24z3 A3 FIRST PART BUILT (settings on the machine). Each machine's DB
+    RESUME HERE (newest, 2026-11-15 night): 24z3 A3 SECOND PART BUILT (project secrets on a master). Owner chose
+    2026-11-15: a server keeps secrets in its ENVIRONMENT for now (no key file). secrets.rs: kind() is "store"
+    (desktop, credential store) or "environment" (server build); a server reads QANUVI_SECRET_<NAME> and gives
+    <NAME> to every project's agents and test command; adding/removing there answers how to set it (systemd unit,
+    restart). master.rs answers secrets_store / secrets_names / secrets_set / secrets_remove (only for its own
+    projects); new secrets_store in the desktop core. Project Settings shows the server's text, hides Add and Remove
+    there, and shows a master's error instead of an empty list. Green: 345 TS tests, svelte-check, prettier, rustfmt,
+    clippy (desktop and server builds), 389 Rust tests, server-build secrets tests; NOT driven live. Model keys
+    (model_key_*) stay for the Models batch (server: QANUVI_KEY_<PROVIDER>, as now). NEXT (fresh conversation): the
+    Settings groups in batches (map group 2), and drive A2 + A3 live on a test build with a scratch master.
+    RESUME HERE (before, 2026-11-15 evening): 24z3 A3 FIRST PART BUILT (settings on the machine). Each machine's DB
     has a settings table (migration 10, settings.rs: one JSON value per top-level key, "masters" and "account"
     refused, they stay with the window); settings_get / settings_set in the desktop core and in master.rs.
     settings.svelte.ts reads and writes the shown machine's (only changed keys, sent in order to the machine the

@@ -24,12 +24,22 @@
   let secretName = $state("");
   let secretValue = $state("");
   let secretError = $state("");
+  /** A server keeps them in its environment (QANUVI_SECRET_<NAME>): shown, not added or removed here. */
+  let secretStore = $state<"store" | "environment">("store");
   $effect(() => {
     if (!projectId) return;
+    secretError = "";
+    api.agent
+      .secretStore(projectId)
+      .then((k) => (secretStore = k))
+      .catch(() => (secretStore = "store"));
     api.agent
       .secretNames(projectId)
       .then((n) => (secretNames = n))
-      .catch(() => (secretNames = []));
+      .catch((e) => {
+        secretNames = [];
+        secretError = errorText(e);
+      });
   });
   async function addSecret() {
     secretError = "";
@@ -111,21 +121,37 @@
       </p>
 
       <h3>Secrets</h3>
-      <p class="note">
-        Logins and passwords this project's work needs, for example a test database's. They are kept in Windows'
-        credential store and given to every agent and the test command as environment variables; no model sees them.
-      </p>
+      {#if secretStore === "environment"}
+        <p class="note">
+          Logins and passwords this project's work needs. This server keeps them in its own environment: set
+          <code>QANUVI_SECRET_DB_PASSWORD</code> where qanuvi-master starts (for example in its systemd unit) and
+          restart it; every project's agents and test command there get it as <code>DB_PASSWORD</code>. No model sees
+          them.
+        </p>
+      {:else}
+        <p class="note">
+          Logins and passwords this project's work needs, for example a test database's. They are kept in the system's
+          credential store and given to every agent and the test command as environment variables; no model sees them.
+        </p>
+      {/if}
       {#each secretNames as n (n)}
         <div class="secret">
           <code>{n}</code><span class="dots">••••••</span>
-          <button type="button" class="link" onclick={() => removeSecret(n)}>Remove</button>
+          {#if secretStore === "store"}
+            <button type="button" class="link" onclick={() => removeSecret(n)}>Remove</button>
+          {/if}
         </div>
       {/each}
-      <div class="secret add">
-        <input bind:value={secretName} placeholder="NAME, for example DB_PASSWORD" spellcheck="false" />
-        <input bind:value={secretValue} type="password" placeholder="value" autocomplete="off" />
-        <button type="button" disabled={!secretName.trim() || !secretValue} onclick={addSecret}>Add</button>
-      </div>
+      {#if secretStore === "environment" && !secretNames.length && !secretError}
+        <p class="note">None set on this server.</p>
+      {/if}
+      {#if secretStore === "store"}
+        <div class="secret add">
+          <input bind:value={secretName} placeholder="NAME, for example DB_PASSWORD" spellcheck="false" />
+          <input bind:value={secretValue} type="password" placeholder="value" autocomplete="off" />
+          <button type="button" disabled={!secretName.trim() || !secretValue} onclick={addSecret}>Add</button>
+        </div>
+      {/if}
       {#if secretError}<p class="error">{secretError}</p>{/if}
 
       <h3>For all projects</h3>

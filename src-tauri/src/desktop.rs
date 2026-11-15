@@ -361,6 +361,13 @@ fn secrets_names(project_id: String) -> Vec<String> {
     crate::secrets::names(&project_id)
 }
 
+/// Where this machine keeps project secrets ("store"; a server build answers "environment").
+#[tauri::command]
+fn secrets_store(project_id: String) -> &'static str {
+    let _ = project_id;
+    crate::secrets::kind()
+}
+
 #[tauri::command]
 fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
     crate::secrets::set(&project_id, &name, &value)
@@ -2342,6 +2349,7 @@ pub fn run() {
             agent_interrupt,
             agent_configure,
             secrets_names,
+            secrets_store,
             secrets_set,
             secrets_remove,
             plan_private,

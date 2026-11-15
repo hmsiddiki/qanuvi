@@ -263,6 +263,26 @@ impl Master {
                 &s(args, "path"),
                 &s(args, "text"),
             )),
+            // A project's secrets (24z3 A3): names only, never values. A server build reads them from its
+            // environment (QANUVI_SECRET_<NAME>) and says where to set them; a desktop master uses its credential store.
+            "secrets_store" => Ok(json!(crate::secrets::kind())),
+            "secrets_names" => {
+                let id = s(args, "projectId");
+                projects::get(db, &id)?;
+                to(Ok(crate::secrets::names(&id)))
+            }
+            "secrets_set" => {
+                let id = s(args, "projectId");
+                projects::get(db, &id)?;
+                crate::secrets::set(&id, &s(args, "name"), &s(args, "value"))?;
+                Ok(Value::Null)
+            }
+            "secrets_remove" => {
+                let id = s(args, "projectId");
+                projects::get(db, &id)?;
+                crate::secrets::remove(&id, &s(args, "name"))?;
+                Ok(Value::Null)
+            }
             // This machine's settings (24z3 A3): the window's Settings page while this master is shown.
             "settings_get" => to(crate::settings::get_all(db)),
             "settings_set" => {
@@ -852,6 +872,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(call(&m, "plan_data_list", json!({})).unwrap(), json!([]));
+    }
+
+    #[test]
+    fn says_where_it_keeps_secrets_and_only_for_its_projects() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        assert_eq!(
+            call(&m, "secrets_store", json!({})).unwrap(),
+            json!(crate::secrets::kind())
+        );
+        for cmd in ["secrets_names", "secrets_set", "secrets_remove"] {
+            let args = json!({"projectId": "not-a-project", "name": "DB_PASSWORD", "value": "x"});
+            assert!(call(&m, cmd, args).is_err(), "{cmd}");
+        }
     }
 
     #[test]
