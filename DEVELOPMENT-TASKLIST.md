@@ -369,7 +369,23 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 03:30): fold FIXED (owner: "yes fix it and continue") and DRIVEN LIVE, all
+    RESUME HERE (newest, 2026-11-16 03:45): D4 leftovers DRIVEN LIVE (release test build 03:09, Haiku not used).
+    PASS: local test master shown -> Settings, Agents shows that machine's own Claude Code versions ("2.1.325 is out
+    (this one is 2.1.318)"; Update not pressed: the local master shares This PC's real Claude Code). VPS: server
+    build re-cross-built (zigbuild -j 4, 9.1 MB, 2m 49s) and swapped into ~/.local/bin (old serve and --stdio ended
+    with `pkill -x`; `pkill -f "qanuvi-master serve"` over ssh matches its own bash line and drops the ssh, exit 255);
+    reconnect from the Servers card -> basevm378 green; Start-up on basevm378 names "the Qanuvi master on basevm378",
+    no "cannot be done" line (the D4 commands answer). FINDINGS, owner to agree: (a) BUG: with basevm378 shown, the
+    Claude Code card still reads This PC's agent info: "Connected · 2.1.318" and the Windows path of claude.EXE,
+    though the VPS has no Claude Code (should be "Not found" + install hint). machines.ts show() never asks the agent
+    store again (agent.loadInfo; api.agent.info is routed). Proposed fix: `await agent.loadInfo()` in show() after
+    settings.loadMachine() (loadInfo may switch that machine's default agent to Qanuvi's own when it has free models
+    and no Claude Code: that is the machine's own setting, so it is right), plus a machine test that a switch asks
+    agent_info again and drops the old path; then drive This PC -> VPS -> This PC. (b) GAP, not D4: on any master the
+    Agents page shows "This cannot be done on <machine> yet (agent_config_list)": the master answers none of Part A
+    map's "Agent setup" group (agent_config_list/read/write, agent_configure, agent_clean_up); no 24z3 batch owns it
+    yet. Proposal: add it to D6 or a small D7 before Part B. NEXT after (a): D5 OmniRoute.
+    RESUME HERE (before, 2026-11-16 03:30): fold FIXED (owner: "yes fix it and continue") and DRIVEN LIVE, all
     pass (release test build, scratch projl/PLAN-L.md, Haiku 5.5, about $0.05). The core's PlanState keeps
     decidedFolded (serde "decidedFolded", from_json reads it, prune keeps it capped to the kept choices; new Rust
     test). Live: 4 choices decided, folded in 1a, stayed folded through 1b, 1z, the run's end and a window restart; a
