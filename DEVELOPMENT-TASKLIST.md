@@ -369,7 +369,22 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 21:40): 24z3 D3 CHANGED (owner: "no different, if on or off same for master or
+    RESUME HERE (newest, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
+    projects pc-proj and master-proj, the "This PC" test master). This PC's Backups page unchanged (its test-build
+    default folder, on, its 3 daily backups, Choose…). With the master shown: "Backups: This PC", on by default, the
+    folder Documents\"Qanuvi master backups (test build)" (the default), a typed path (no Choose…), no window-settings
+    texts. Back up now: "Backed up.", "Made by you · 0.5 MB · 10 files" (no master.json in it). Then "Several at once
+    as one" turned off on the master, Restore… on that backup (the box: "applied when This PC starts again"), the
+    restore card, Restore… greyed; "Restart This PC now" asked "Nothing is running there now"; Restart: the old serve
+    ended, a new `serve --after-pid=<old>` took over, no restart mark left, the window connected again and still
+    showed the master; the green note "Restored the backup ... kept as ...-before-restore", a "Before restore" backup
+    listed, and the setting back On. A typed scratch folder: the master made it, Back up now put a backup there,
+    "Back to the default" brought the default back. Servers page with the master shown: "Where This PC keeps its
+    data" is read-only (its --data path, the restore note, "Moving it from here comes later"). Back on This PC: page
+    and its "Several at once as one" unchanged. Seen, not new: the box says "Restart This PC?" because the old test
+    master is named "This PC" (Part B refuses that name). NOT driven: a master on Linux/Mac, the daily check (2 min
+    after start). NEXT: D4 (start-up/Headroom + Claude Code updates) in a fresh conversation.
+    RESUME HERE (before, 2026-11-15 21:40): 24z3 D3 CHANGED (owner: "no different, if on or off same for master or
     pc"; then yes to "on everywhere"): backups are ON by default on every machine, the same rules everywhere. A
     master's default folder is Documents/"Qanuvi master backups" (test build: "... (test build)"), its own name so a
     master on the same computer as a desktop app never lists or prunes the desktop's backups (two masters with
