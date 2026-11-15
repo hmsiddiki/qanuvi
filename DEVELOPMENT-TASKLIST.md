@@ -1183,11 +1183,12 @@ runs on or off; with it off nothing is sent anywhere.
     data, the queue and the runs, the Inbox (questions and answers), schedules, notes and automations, terminals and
     agent sessions running on it; in separate mode also its own model history, costs and settings.
   - Owned by the window (this install): only the switcher (the list of paired masters) and which machine is shown;
-    everything else on screen, Settings included, is the shown machine's (Part D).
+    everything else on screen, Settings included, is the shown machine's (Part D). One exception: the Inbox screen
+    (Part C2).
   - Owned by the account: the owner's local brain and behaviour; in synced mode the shared history on top. Passwords
     and keys never sync (as decided for the master accounts milestone).
   - Today (to change): the sidebar mixes machines, a master's projects sit in the same list with a server icon
-    (Sidebar.svelte, p.master); the Inbox view gathers every machine's questions.
+    (Sidebar.svelte, p.master); the Inbox view gathers every machine's questions (kept, with badges: Part C2).
   - Part A, one path to the shown machine: every screen (projects, files, git, terminals, agent, Plan view, Run panel,
     Inbox, queue) calls "the shown machine", never invoke or a master directly; This PC is a direct call, a master goes
     over its connection (relay or SSH). Map first which stores call invoke, which already pick a master, and which
@@ -1198,6 +1199,12 @@ runs on or off; with it off nothing is sent anywhere.
   - Part C, other machines keep working: runs on This PC go on while the VPS is shown (and the other way). The window
     keeps listening to every connected machine's Inbox: the switcher shows a badge per machine ("VPS 2"), a desktop
     notification names its machine, clicking it switches there and opens the question.
+  - Part C2, one Inbox screen for all machines (owner, 2026-11-15): the only shared view. Questions stay stored on the
+    machine that asked them (nothing copied or synced); the Inbox screen lists every connected machine's questions,
+    each with a machine badge, filter "All machines" or one machine. Answering works from the list without switching;
+    the answer goes to the owning machine. Only "Open the step" / "Open the plan" switches to that machine. A machine
+    not reachable shows its questions as "VPS not connected" until it is back, never an old copy that can be answered.
+    The switcher badges and notifications stay. Costs nothing extra: Part C already keeps every Inbox stream.
   - Part D, Settings is the shown machine's too (owner, 2026-11-15: "you switch the PC, the whole screen becomes that
     PC's"): no fixed window group, no split. With the VPS shown, the whole Settings page is the VPS's (models,
     routing, team, budget, keys, startup, backups, data folder, and also its appearance, layout and notifications,
