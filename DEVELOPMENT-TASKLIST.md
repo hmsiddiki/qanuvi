@@ -370,8 +370,12 @@ runs on or off; with it off nothing is sent anywhere.
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
     RESUME HERE (newest, 2026-11-15): NEW DESIGN MILESTONE 24z3 (machines, one at a time through a switcher) comes
-    BEFORE R3 (owner agreed). Written out in parts A-F in item 24z3; owner reviews it, then Part A starts with a map
-    of the window's calls. R3's proposal is noted under R3, to discuss again after 24z3. Nothing built.
+    BEFORE R3 (owner agreed). DESIGN COMPLETE: parts A-F plus the owner's decisions (whole screen and Settings are
+    the shown machine's, This PC never hidden, hidden machines wiped and rebuilt, drafts, connection overlay, two
+    screens, a window per machine, working icon) are all in item 24z3. NEXT (fresh conversation): owner's final
+    read-through of 24z3, then Part A step 1, a READ-ONLY map: which stores/components call invoke directly, which
+    already pick a master, which commands a master does not answer yet; show the map to the owner before any code.
+    R3's proposal is noted under R3, to discuss again after 24z3. Nothing built, nothing published.
     RESUME HERE (before, 2026-11-15 11:00): TYPESCRIPT RUNNER LEFTOVERS DELETED (first item of the agreed order).
     Every run function the window no longer calls is gone from src/lib/plan and core/decider.ts (packet.ts and
     setaside's logic whole; nextModel, stepPrompt, replan/replaceStep, closings, handover, notes, logs, finishing
