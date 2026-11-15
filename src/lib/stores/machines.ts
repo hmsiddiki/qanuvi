@@ -8,13 +8,17 @@ import { projects } from "./projects.svelte";
 import { settings } from "./settings.svelte";
 import { guides } from "./guides.svelte";
 import { usage } from "./usage.svelte";
+import { startup } from "./startup.svelte";
+import { claudeUpdate } from "./claudeUpdate.svelte";
 
 /** Shows a machine: null is This PC. */
 export async function show(machine: string | null): Promise<void> {
   showMachine(machine);
-  // The status bar and the setup guide's machine facts are the new machine's.
+  // The status bar, the setup guide's machine facts, Start-up and Claude Code's version are the new machine's.
   usage.switched();
   guides.switched();
+  startup.switched();
+  claudeUpdate.switched();
   await Promise.all([projects.load(), settings.loadMachine()]);
   // The Models page: its keys and records are the machine's, read once its provider list is in.
   await brain.switched();

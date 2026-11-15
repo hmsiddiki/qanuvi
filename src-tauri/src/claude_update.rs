@@ -100,6 +100,46 @@ pub fn versions() -> Result<Versions, String> {
     })
 }
 
+/// The proxy address Claude Code's own user settings on this machine send it to (headroom wrap sets one), if any:
+/// then every Claude Code there, Qanuvi's too, goes through it already.
+pub fn settings_base_url() -> Option<String> {
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
+    let path = std::path::Path::new(&home)
+        .join(".claude")
+        .join("settings.json");
+    base_url_in(&std::fs::read_to_string(path).ok()?)
+}
+
+fn base_url_in(text: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    v["env"]["ANTHROPIC_BASE_URL"].as_str().map(str::to_string)
+}
+
+/// Whether the machine's settings ask to keep Claude Code up to date by itself (Settings, Agents).
+pub fn auto_wanted(settings: &serde_json::Map<String, serde_json::Value>) -> bool {
+    settings
+        .get("updates")
+        .and_then(|u| u["claudeAuto"].as_bool())
+        .unwrap_or(false)
+}
+
+/// Keeps this machine's Claude Code current by itself when its settings ask for that and no agent is working
+/// (24z3 D4: each machine's core does it, This PC's and every master's, with or without a window).
+pub fn auto_update(db: &crate::store::Db) {
+    let settings = crate::settings::get_all(db).unwrap_or_default();
+    if !auto_wanted(&settings) || crate::agent::any_working(db) {
+        return;
+    }
+    if let Ok(v) = versions()
+        && v.newer
+    {
+        match update() {
+            Ok(_) => eprintln!("Claude Code updated from {} to {}.", v.installed, v.latest),
+            Err(e) => eprintln!("The Claude Code update did not finish: {e}"),
+        }
+    }
+}
+
 /// Runs Claude Code's own update; answers what it printed.
 pub fn update() -> Result<String, String> {
     let path = crate::terminal::find_on_path("claude").ok_or("Claude Code is not installed.")?;
@@ -175,5 +215,18 @@ mod tests {
         assert!(is_newer("2.2.0", "2.1.999"));
         assert!(!is_newer("2.1.302", "2.1.302"));
         assert!(!is_newer("2.1.300", "2.1.302"));
+    }
+
+    #[test]
+    fn reads_the_proxy_address_and_the_auto_choice() {
+        assert_eq!(
+            base_url_in(r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:8787"}}"#).as_deref(),
+            Some("http://127.0.0.1:8787")
+        );
+        assert_eq!(base_url_in("{}"), None);
+        assert_eq!(base_url_in("not json"), None);
+        let on = serde_json::json!({"updates": {"claudeAuto": true}});
+        assert!(auto_wanted(on.as_object().unwrap()));
+        assert!(!auto_wanted(&serde_json::Map::new()));
     }
 }

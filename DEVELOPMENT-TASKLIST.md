@@ -369,7 +369,24 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 01:20): the four findings (a)-(d) BUILT AND DRIVEN LIVE, all pass (owner:
+    RESUME HERE (newest, 2026-11-16 01:40): 24z3 D4 BUILT (start-up/Headroom + Claude Code updates on the shown
+    machine), NOT driven live. A master answers startup_start/status/restart/stop, startup_headroom,
+    claude_settings_base_url, claude_versions, claude_update (master.rs; its own Startup). Each core starts its OWN
+    start-up list from its own settings DB with no window needed: a master in serve (Master::start_own), This PC's app
+    at launch (desktop.rs setup; the window still applies it when This PC is shown, each command starts once); a
+    master stops what it started on stop and restart. Claude Code "keep it up to date by itself" moved out of the
+    window into each core (claude_update::auto_update: own settings updates.claudeAuto, never while an agent works;
+    20 s after start, then daily), so a machine not shown is kept current too and Part B's remembered machine cannot
+    skip This PC. Window: startup and claudeUpdate stores follow the shown machine (switched() in machines.show; a late
+    answer from the machine before is dropped; an update on This PC never shows as busy on the VPS's page); Start-up
+    page re-asks Headroom and Claude Code's proxy per machine, names the master ("the Qanuvi master on VPS ... keep
+    running with no window connected"), shows a machine's error line (an older master: "cannot be done on VPS yet").
+    Green: 372 TS tests (3 new, startup.machine.test.ts), svelte-check 0/0, prettier, rustfmt, clippy desktop and
+    server, 404 Rust tests (3 new), new tests on the server build too. NEXT: drive D4 live (test build, scratch
+    projects: local test master shown -> Start-up adds a command waiting on a port, state from the master, restart
+    the master -> it starts again by itself with no window; Claude Code version on the master's Agents page; then the
+    VPS as a Linux master), then D5 OmniRoute.
+    RESUME HERE (before, 2026-11-16 01:20): the four findings (a)-(d) BUILT AND DRIVEN LIVE, all pass (owner:
     "yes for a, b okay, c okay, d as you proposed"). (a) `local` with an empty name becomes "<computer name> (test)"
     from its first hello (masters #ownName; the "This PC (test)" default in MastersView add() is gone): live, the
     local test master's emptied name became "DESKTOP-R8G3PAK (test)". (b) Dismiss beside the restore note in the

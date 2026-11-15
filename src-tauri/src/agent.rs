@@ -382,6 +382,17 @@ pub fn list_sessions(db: &Db, project_id: &str) -> Result<Vec<Session>, String> 
         .map_err(|e| e.to_string())
 }
 
+/// Whether any agent on this machine is working now (a Claude Code update waits for that).
+pub fn any_working(db: &Db) -> bool {
+    db.conn()
+        .query_row(
+            "SELECT COUNT(*) FROM sessions WHERE status IN ('running', 'waiting')",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .is_ok_and(|n| n > 0)
+}
+
 /// An agent session that changed a file (the project panel's Timeline, 15h).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

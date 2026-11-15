@@ -259,6 +259,23 @@ impl Startup {
     }
 }
 
+/// The start-up list kept in a machine's settings (the `startup` key, as the Settings page writes it): the enabled
+/// ones.
+pub fn items_from_settings(settings: &serde_json::Map<String, serde_json::Value>) -> Vec<Item> {
+    settings
+        .get("startup")
+        .and_then(|v| serde_json::from_value::<Vec<Item>>(v.clone()).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|i| i.enabled)
+        .collect()
+}
+
+/// Where Headroom is installed on this machine, if it is (for the one-click setup).
+pub fn headroom_path() -> Option<String> {
+    crate::terminal::find_on_path("headroom").map(|p| p.to_string_lossy().into_owned())
+}
+
 /// Starts the command hidden, with its output kept. The program is found on the PATH; the rest are its arguments.
 fn spawn(command: &str) -> Result<Child, String> {
     let words = crate::local_servers::words(command);
@@ -322,6 +339,20 @@ mod tests {
         );
         assert_eq!(host_port(""), None);
         assert_eq!(host_port("nonsense:port"), None);
+    }
+
+    #[test]
+    fn reads_the_enabled_items_from_settings() {
+        let v = serde_json::json!({"startup": [
+            {"id": "a", "name": "Headroom", "command": "headroom proxy", "waitFor": "127.0.0.1:8787", "enabled": true},
+            {"id": "b", "name": "Off", "command": "x", "enabled": false}
+        ]});
+        let items = items_from_settings(v.as_object().unwrap());
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].wait_for, "127.0.0.1:8787");
+        assert!(items_from_settings(&serde_json::Map::new()).is_empty());
+        let broken = serde_json::json!({"startup": "nonsense"});
+        assert!(items_from_settings(broken.as_object().unwrap()).is_empty());
     }
 
     #[test]

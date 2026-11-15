@@ -1,6 +1,6 @@
 <script lang="ts">
   /** Settings, Start-up: commands Qanuvi starts with itself (Headroom, for example), their state and output. */
-  import { routed as invoke } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace } from "$lib/remote";
   import { settings, type StartupItem } from "$lib/stores/settings.svelte";
   import { startup } from "$lib/stores/startup.svelte";
 
@@ -12,13 +12,29 @@
   let note = $state("");
   /** Claude Code's own settings already send it through a proxy (headroom wrap): Qanuvi keeps that address. */
   let claudeRoute = $state<string | null>(null);
-  invoke<string | null>("claude_settings_base_url")
-    .then((u) => (claudeRoute = u))
-    .catch(() => {});
+  /** The machine this page shows (null: This PC), and its name for sentences. */
+  let machine = $state<string | null>(null);
+  let place = $state("this computer");
 
-  invoke<string | null>("startup_headroom")
-    .then((p) => (headroom = p))
-    .catch(() => {});
+  // Asked again when another machine is shown: its Headroom, its Claude Code settings (24z3 D4).
+  $effect(() => {
+    void settings.machine;
+    const m = shownMachine();
+    machine = m;
+    place = shownPlace();
+    headroom = claudeRoute = null;
+    note = "";
+    invoke<string | null>("claude_settings_base_url")
+      .then((u) => m === shownMachine() && (claudeRoute = u))
+      .catch(() => {});
+    invoke<string | null>("startup_headroom")
+      .then((p) => m === shownMachine() && (headroom = p))
+      .catch(() => {});
+    void startup.refresh();
+  });
+
+  /** "Qanuvi" on This PC; on a master, the service that runs there. */
+  let starter = $derived(machine ? "the Qanuvi master" : "Qanuvi");
 
   function save(next: StartupItem[]) {
     settings.set("startup", next);
@@ -63,11 +79,11 @@
         },
       ]);
     if (claudeRoute) {
-      note = `Headroom starts with Qanuvi now. Claude Code already goes through it (its own settings send it to ${claudeRoute}), so that stays as it is.`;
+      note = `Headroom starts with ${starter} now. Claude Code already goes through it (its own settings send it to ${claudeRoute}), so that stays as it is.`;
       return;
     }
     if (!settings.agent("claude-code").baseUrl) settings.setAgent("claude-code", { baseUrl: "http://127.0.0.1:8787" });
-    note = "Headroom starts with Qanuvi now, and Claude Code goes through it (Settings, Agents shows the address).";
+    note = `Headroom starts with ${starter} now, and Claude Code goes through it (Settings, Agents shows the address).`;
   }
 
   const colour = (s?: string) =>
@@ -75,22 +91,32 @@
 </script>
 
 <h2>Start-up</h2>
-<p class="intro">
-  Commands Qanuvi starts with itself, hidden, for example a Headroom proxy that makes Claude Code use fewer tokens. When
-  one has an address to wait for, agents wait until it answers; when it already answers (you started it), Qanuvi leaves
-  it alone. Qanuvi stops only what it started, when it closes.
-</p>
+{#if machine}
+  <p class="intro">
+    Commands the Qanuvi master on {place} starts with itself, hidden, on that machine, for example a Headroom proxy that makes
+    Claude Code there use fewer tokens. They start when the master starts and keep running with no window connected. When
+    one has an address to wait for, agents wait until it answers; when it already answers (started there by hand), the master
+    leaves it alone. The master stops only what it started, when it stops.
+  </p>
+{:else}
+  <p class="intro">
+    Commands Qanuvi starts with itself, hidden, for example a Headroom proxy that makes Claude Code use fewer tokens.
+    When one has an address to wait for, agents wait until it answers; when it already answers (you started it), Qanuvi
+    leaves it alone. Qanuvi stops only what it started, when it closes.
+  </p>
+{/if}
 
+{#if startup.problem}<p class="note bad">{startup.problem}</p>{/if}
 {#if headroom && !items.some((i) => /headroom/i.test(i.command))}
   <div class="card offer">
     <span><strong>Headroom is installed</strong> <span class="muted">({headroom})</span></span>
-    <button type="button" class="btn primary" onclick={addHeadroom}>Start it with Qanuvi</button>
+    <button type="button" class="btn primary" onclick={addHeadroom}>Start it with {starter}</button>
   </div>
 {/if}
 {#if claudeRoute}
   <p class="note">
-    Claude Code's own settings send every Claude Code (Qanuvi's too) to <code>{claudeRoute}</code>. Start-up here only
-    makes sure that proxy runs while Qanuvi is open.
+    Claude Code's own settings on {place} send every Claude Code there (Qanuvi's too) to <code>{claudeRoute}</code>.
+    Start-up here only makes sure that proxy runs while {starter} runs.
   </p>
 {/if}
 {#if note}<p class="note">{note}</p>{/if}
@@ -176,6 +202,10 @@
     margin: 0 0 12px;
     color: var(--qx-text-secondary);
     font-size: 12.5px;
+  }
+
+  .note.bad {
+    color: var(--qx-status-failed);
   }
 
   .card {

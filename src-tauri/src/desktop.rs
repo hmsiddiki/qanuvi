@@ -424,22 +424,14 @@ async fn claude_update() -> Res<String> {
 /// Where Headroom is installed, if it is (for the one-click setup).
 #[tauri::command]
 fn startup_headroom() -> Option<String> {
-    crate::terminal::find_on_path("headroom").map(|p| p.to_string_lossy().into_owned())
+    crate::startup::headroom_path()
 }
 
 /// The proxy address Claude Code's own user settings send it to (headroom wrap sets one), if any: then every Claude
 /// Code, Qanuvi's too, goes through it already.
 #[tauri::command]
 fn claude_settings_base_url() -> Option<String> {
-    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
-    let text = std::fs::read_to_string(
-        std::path::Path::new(&home)
-            .join(".claude")
-            .join("settings.json"),
-    )
-    .ok()?;
-    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
-    v["env"]["ANTHROPIC_BASE_URL"].as_str().map(str::to_string)
+    crate::claude_update::settings_base_url()
 }
 
 /// A plan's private details (the plan run puts them into each step's request).
@@ -2043,6 +2035,26 @@ pub fn run() {
                 accounts: crate::account::Accounts::default(),
                 startup: crate::startup::Startup::default(),
                 runs: std::sync::Arc::default(),
+            });
+            // This PC's own start-up list and Claude Code update (24z3 D4), from its own settings, whichever machine
+            // the window shows: started here, as a master does in serve. The window still starts the list again
+            // when This PC is shown (each command starts only once).
+            {
+                let state = app.state::<AppState>();
+                let settings = crate::settings::get_all(&state.db).unwrap_or_default();
+                state
+                    .startup
+                    .start_all(&crate::startup::items_from_settings(&settings));
+            }
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(20));
+                loop {
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        crate::claude_update::auto_update(&state.db);
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(24 * 3600));
+                }
             });
             // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
             // when the last good one is a day old.

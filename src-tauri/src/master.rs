@@ -37,6 +37,8 @@ pub struct Master {
     terminals: Terminals,
     agents: Agents,
     indexes: index::Indexes,
+    /// Start-up commands this master started (24z3 D4: its own list, from its own settings).
+    startup: crate::startup::Startup,
     /// Plan runs on this master, and the connections that follow them.
     runs: Arc<crate::plan::live::Runs>,
     watchers: Arc<plan_runs::Watchers>,
@@ -118,6 +120,7 @@ impl Master {
             terminals: Terminals::default(),
             agents: Agents::default(),
             indexes: index::Indexes::default(),
+            startup: crate::startup::Startup::default(),
             runs: Arc::default(),
             watchers: Arc::default(),
             inbox_watchers: Arc::default(),
@@ -523,6 +526,28 @@ impl Master {
                 Ok(json!(id))
             }
             "qanuvi_usage" => to(Ok(crate::usage::usage())),
+            // Start-up and Claude Code updates (24z3 D4): this master's own list, started with the master.
+            "startup_start" => {
+                let items: Vec<crate::startup::Item> =
+                    serde_json::from_value(args["items"].clone()).map_err(|e| e.to_string())?;
+                self.startup.start_all(&items);
+                to(Ok(self.startup.statuses()))
+            }
+            "startup_status" => to(Ok(self.startup.statuses())),
+            "startup_restart" => {
+                let item: crate::startup::Item =
+                    serde_json::from_value(args["item"].clone()).map_err(|e| e.to_string())?;
+                self.startup.restart(&item);
+                to(Ok(self.startup.statuses()))
+            }
+            "startup_stop" => {
+                self.startup.stop(&s(args, "id"));
+                to(Ok(self.startup.statuses()))
+            }
+            "startup_headroom" => to(Ok(crate::startup::headroom_path())),
+            "claude_settings_base_url" => to(Ok(crate::claude_update::settings_base_url())),
+            "claude_versions" => to(crate::claude_update::versions()),
+            "claude_update" => to(crate::claude_update::update()),
             // Git.
             "git_status" => to(git::status(&self.root(args)?)),
             "git_diff" => to(git::diff(&self.root(args)?, &s(args, "path"))),
@@ -757,6 +782,25 @@ fn restarting(dir: &Path) -> bool {
 }
 
 impl Master {
+    /// What this master does by itself once it runs (24z3 D4), with no window connected: starts its own start-up
+    /// list, and keeps Claude Code current when its settings ask for that (20 seconds after start, then once a day;
+    /// never while an agent is working).
+    pub fn start_own(self: &Arc<Self>) {
+        let settings = crate::settings::get_all(&self.db).unwrap_or_default();
+        self.startup
+            .start_all(&crate::startup::items_from_settings(&settings));
+        let me = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(20));
+            loop {
+                let Some(m) = me.upgrade() else { return };
+                crate::claude_update::auto_update(&m.db);
+                drop(m);
+                std::thread::sleep(Duration::from_secs(24 * 3600));
+            }
+        });
+    }
+
     /// Starts a new service that waits for this one to end, then ends this one: its agent sessions and terminals
     /// stop, a booked restore is applied by the new one before its database opens. The answer goes out first.
     fn restart(&self, dir: &Path) -> Result<(), String> {
@@ -775,6 +819,7 @@ impl Master {
             std::thread::sleep(Duration::from_millis(400));
             me.agents.stop_all();
             me.terminals.kill_all();
+            me.startup.stop_all();
             let _ = std::fs::remove_file(service_file(&dir));
             std::process::exit(0);
         });
@@ -785,6 +830,7 @@ impl Master {
 /// Runs the background service until it is stopped.
 pub fn serve(dir: &Path) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
+    master.start_own();
     // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour.
     let backup_dir = dir.to_path_buf();
     std::thread::spawn(move || {
@@ -833,6 +879,7 @@ pub fn serve(dir: &Path) -> Result<(), String> {
                 // Agent sessions and terminals end with the service.
                 master.agents.stop_all();
                 master.terminals.kill_all();
+                master.startup.stop_all();
                 std::process::exit(0);
             }
             let out: Out = Arc::new(Mutex::new(Box::new(write_half)));
@@ -1231,6 +1278,38 @@ mod tests {
             .unwrap_err();
             assert!(e.contains("QANUVI_KEY_OPENROUTER"), "{e}");
         }
+    }
+
+    #[test]
+    fn starts_its_own_start_up_list_and_answers_its_commands() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        // Something already answers at this address: started with the master, it is left alone.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let item = |id: &str, enabled: bool| json!({"id": id, "name": id, "command": "no-such-program-xyz", "waitFor": addr, "enabled": enabled});
+        call(
+            &m,
+            "settings_set",
+            json!({"values": {"startup": [item("proxy", true), item("off", false)]}}),
+        )
+        .unwrap();
+        m.start_own();
+        let st = call(&m, "startup_status", json!({})).unwrap();
+        assert_eq!(st.as_array().unwrap().len(), 1, "{st}");
+        assert_eq!(st[0]["state"], "already running");
+        // The window's buttons: restart, stop, start again.
+        let st = call(&m, "startup_restart", json!({"item": item("proxy", true)})).unwrap();
+        assert_eq!(st[0]["state"], "already running");
+        let st = call(&m, "startup_stop", json!({"id": "proxy"})).unwrap();
+        assert!(st.as_array().unwrap().is_empty());
+        let st = call(&m, "startup_start", json!({"items": [item("proxy", true)]})).unwrap();
+        assert_eq!(st[0]["id"], "proxy");
+        assert!(call(&m, "startup_start", json!({"items": "nonsense"})).is_err());
+        // Answered on the master, never "does not know the command".
+        call(&m, "startup_headroom", json!({})).unwrap();
+        call(&m, "claude_settings_base_url", json!({})).unwrap();
+        m.startup.stop_all();
     }
 
     #[test]
