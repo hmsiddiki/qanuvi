@@ -74,19 +74,34 @@ describe("OmniRoute on the shown machine", () => {
 
   it("muting is the machine's setting, and its watch looks again at once", async () => {
     invoke.mockImplementation((cmd, args) =>
-      Promise.resolve(nameOf(cmd, args) === "omniroute_look" ? [conn("a"), conn("b")] : null),
+      Promise.resolve(
+        nameOf(cmd, args) === "omniroute_look"
+          ? [conn("a"), conn("b")]
+          : nameOf(cmd, args) === "settings_get"
+            ? {}
+            : null,
+      ),
     );
+    await settings.loadMachine();
     await omni.look();
     omni.setMuted(conn("a") as never, true);
     expect(settings.value.omniMuted).toEqual(["a"]);
     expect(omni.problems.map((c) => c.id)).toEqual(["b"]);
-    expect(invoke.mock.calls.filter(([c, a]) => nameOf(c, a) === "omniroute_look").length).toBe(2);
+    // The look waits for the muted list to reach the machine: its watch must read the new list.
+    const order = () => invoke.mock.calls.map(([c, a]) => nameOf(c, a)).filter((n) => n !== "settings_get");
+    await settings.flushed();
+    await new Promise((r) => setTimeout(r, 0));
+    const calls = order();
+    expect(calls).toContain("settings_set");
+    expect(calls.lastIndexOf("omniroute_look")).toBeGreaterThan(calls.lastIndexOf("settings_set"));
+    expect(calls.filter((n) => n === "omniroute_look").length).toBe(2);
     omni.setMuted(conn("a") as never, false);
     expect(settings.value.omniMuted).toEqual([]);
   });
 
   it("the window's old muted list moves to This PC's settings once", () => {
     invoke.mockResolvedValue(null);
+    settings.set("omniMuted", []);
     kept.set("qanuvi.omni.muted", JSON.stringify(["k1", 5, "k2"]));
     showMachine("vps");
     moveOldMuted();

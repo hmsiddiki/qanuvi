@@ -369,7 +369,22 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 04:20): owner: "fix a and continue to d5, keep them in d6".
+    RESUME HERE (newest, 2026-11-16 05:20): (a) + D5 DRIVEN LIVE, all pass, one bug found and fixed (release test
+    build 05:05; VPS got the D5 server build, swapped with `pkill -x`). (a): basevm378 shown -> Claude Code "Not
+    found" + install hint, no Windows path; the master on this PC shows its own. D5: This PC's status bar warning
+    ("kiro: sign in again (+1)") now comes from its core's omniroute_look; an older master (VPS before the swap) shows
+    no warning and no error; the local test master: Connect Qanuvi made a key named Qanuvi in this PC's OmniRoute
+    (port 20128), kept as master-models:omniroute ("kept in DESKTOP-R8G3PAK (test)'s credential store"); its
+    OmniRoute panel lists that machine's connections; each core's watch filed its own items (This PC's a minute after
+    start, the master's on its look). BUG FOUND + FIXED: "Don't warn" saved the muted list and asked for a look at the
+    same moment, so the machine could look with the old list (kiro filed although muted). setMuted now looks after
+    settings.flushed() (test proves the order; fails without the fix). Driven in the master's DB: Warn again -> kiro
+    filed at once; Don't warn -> resolved at once, omniMuted saved there. VPS (D5 build): no Connect Qanuvi, the
+    QANUVI_KEY_OMNIROUTE text, no warnings from This PC. Back on This PC: its own warnings again. Not driven: "Open
+    OmniRoute's panel" on a remote master (the note; logic tested), the old window list moving once. Left behind:
+    the Qanuvi key in this PC's OmniRoute for the local test master (and its master-models:omniroute entry). Green:
+    384 TS, svelte-check 0/0, prettier. NEXT: D6 (memory disk + remote access + agent setup on a master).
+    RESUME HERE (before, 2026-11-16 04:20): owner: "fix a and continue to d5, keep them in d6".
     (a) FIXED: machines.ts show() empties agent.info and asks the shown machine again (after its settings and Models,
     so a machine with free models and no Claude Code gets Qanuvi's own agent as ITS default); loadInfo drops an answer
     that comes after a switch and takes a missing answer as "not found" (2 new tests in startup.machine.test.ts; the

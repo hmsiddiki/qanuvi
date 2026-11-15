@@ -69,8 +69,9 @@ class OmniStore {
   /** No more warnings about this connection (or warnings again); it stays in OmniRoute either way. */
   setMuted(c: OmniConnection, on: boolean): void {
     settings.set("omniMuted", on ? [...new Set([...this.muted, c.id])] : this.muted.filter((id) => id !== c.id));
-    // The machine's watch files or resolves its Inbox item now, not in half an hour.
-    void this.look();
+    // The machine's watch files or resolves its Inbox item now, not in half an hour: once the list is saved there,
+    // or it would look with the list before.
+    void settings.flushed().then(() => this.look());
   }
 
   /**
