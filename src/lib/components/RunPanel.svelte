@@ -30,8 +30,10 @@
     holdWording,
     keepDecided,
     keepHolds,
+    keptModel,
     loadPlanState,
     savePlanState,
+    setKeptModel,
     type KeptDecided,
     type KeptHold,
   } from "$lib/plan/planstate";
@@ -120,9 +122,16 @@
   let replan = $state(true);
   /** Free models can go first when the run's agent is a paid one and Qanuvi core has models. */
   let canFree = $derived(provider.id !== "qanuvi" && settings.value.brain.models.length > 0);
+  /** The plan's own data (the models chosen for steps in Qanuvi among it). */
+  let keptState = $derived.by(() => {
+    void planData.changed;
+    return loadPlanState(project.id, file);
+  });
   /** The steps the run would cover, with the model each would use by the plan. */
   let stepModels = $derived(
-    openSteps.map((s) => s.model?.trim() || settings.agent(provider.id).model).filter((m) => !!m),
+    openSteps
+      .map((s) => s.model?.trim() || keptModel(keptState, s) || settings.agent(provider.id).model)
+      .filter((m) => !!m),
   );
   let ratio = $derived(oneModel ? costRatio(provider.models, stepModels, oneModel) : null);
 
@@ -233,7 +242,10 @@
     strongerOnFail = !id;
   }
 
-  /** Writes the chosen model into every open step's Model line, so the plan keeps it. */
+  /**
+   * Keeps the chosen model for every open step in the plan's own data (R2e i), not in the plan file. "- Model:" lines
+   * the steps have go, as they would win over it.
+   */
   let writing = $state(false);
   async function writeIntoPlan() {
     if (!oneModel) return;
@@ -242,11 +254,16 @@
     try {
       const now = await api.files.read(project.id, file);
       let text = now.text;
-      // From the bottom up: a Model line added to a step moves the lines below it.
+      // From the bottom up: a Model line taken out of a step moves the lines below it.
       for (const s of [...openSteps].sort((a, b) => b.line - a.line))
-        text = setStepModel(text, s.line, oneModel, s.title);
-      await api.files.write(project.id, file, text, now.hash);
-      onchanged?.();
+        if (s.model) text = setStepModel(text, s.line, null, s.title);
+      if (text !== now.text) {
+        await api.files.write(project.id, file, text, now.hash);
+        onchanged?.();
+      }
+      let state = loadPlanState(project.id, file);
+      for (const s of openSteps) state = setKeptModel(state, s, oneModel);
+      savePlanState(project.id, file, state);
     } catch (e) {
       error = errorText(e);
     } finally {
@@ -608,9 +625,13 @@
               : "the same as"}
           the plan's own models.
         {/if}
-        Only for this run; the plan file is not changed.
-        <button type="button" class="link" disabled={writing} onclick={writeIntoPlan}
-          >{writing ? "Writing…" : "Write it into the plan"}</button
+        Only for this run.
+        <button
+          type="button"
+          class="link"
+          disabled={writing}
+          title="Every open step keeps this model in the plan's own data (the plan file is not changed)"
+          onclick={writeIntoPlan}>{writing ? "Keeping…" : "Keep it for every open step"}</button
         >
       </p>
     {/if}

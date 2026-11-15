@@ -420,6 +420,10 @@ const PS = {
     { step: "2a", why: "migrates" },
     { step: "4a", why: "x" },
   ],
+  models: [
+    { step: "1a", title: "Prices", model: "claude-sonnet-5-5" },
+    { step: "gone", title: "Gone", model: "claude-haiku-5-5" },
+  ],
 };
 const DEC = (step: string, what: string, answer: string) => ({ step, what, answer, because: "" });
 const HK_TARGET = "# Plan\n\n## A\n\n- [ ] **1. One**\n- [ ] **2. Two**\n";

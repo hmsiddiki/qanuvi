@@ -50,6 +50,7 @@
   import { chooseModel, jobType, monthStart, type ModelStats } from "$lib/plan/routing";
   import { loadPicks, pickFor } from "$lib/plan/picks";
   import { planData } from "$lib/plan/planData.svelte";
+  import { keptModel, loadPlanState, savePlanState, setKeptModel } from "$lib/plan/planstate";
   import BrainCircuit from "@lucide/svelte/icons/brain-circuit";
   import { formatCost } from "$lib/agent/events";
 
@@ -142,6 +143,19 @@
     void planData.changed;
     return file ? loadPicks(planData, project.id, file) : null;
   });
+  /** The plan's own data with the models the owner chose for steps here (R2e i): not written into the plan file. */
+  let planState = $derived.by(() => {
+    void planData.changed;
+    return file ? loadPlanState(project.id, file) : null;
+  });
+  /** The step's model: its own "- Model:" line (written by hand), else the one chosen in Qanuvi. */
+  const modelOf = (s: Step): string | null => s.model ?? (planState ? keptModel(planState, s) : null);
+  /** Keeps the owner's choice in the plan's data; a "- Model:" line the step has goes, as it would win over it. */
+  async function chooseStepModel(step: Step, model: string | null): Promise<boolean> {
+    if (step.model && !(await applyToStep(step, (t, line, title) => setStepModel(t, line, null, title)))) return false;
+    savePlanState(project.id, file, setKeptModel(loadPlanState(project.id, file), step, model));
+    return true;
+  }
   let pickNote = $state("");
   async function pickModels() {
     pickNote = "";
@@ -554,32 +568,30 @@
                   {/if}
                   <select
                     class="model"
-                    value={step.model ?? ""}
-                    title={!step.model
+                    value={modelOf(step) ?? ""}
+                    title={!modelOf(step)
                       ? autoPick(step).picked
                         ? `Picked by the decider (Pick models): ${autoPick(step).label}: ${autoPick(step).why}. The run uses it. Choose a model to pin this step to another one.`
                         : `Auto: picked when the step runs. Now that would be ${autoPick(step).label}: ${autoPick(step).why}. Choose a model to pin this step to it.`
                       : "Model for this step (Auto lets the run pick)"}
                     onchange={async (e) => {
                       const el = e.target as HTMLSelectElement;
-                      const saved = await applyToStep(step, (t, line, title) =>
-                        setStepModel(t, line, el.value || null, title),
-                      );
-                      // Not saved: show what the file says, not the choice that did not stick.
-                      if (!saved) el.value = findStep(plan?.steps ?? [], step)?.model ?? "";
+                      const saved = await chooseStepModel(step, el.value || null);
+                      // Not saved: show what is kept, not the choice that did not stick.
+                      if (!saved) el.value = modelOf(findStep(plan?.steps ?? [], step) ?? step) ?? "";
                       // The step that is running hands over to the chosen model after the edit in hand; any other
                       // step starts on it when its turn comes.
                       else if (el.value) runner.switchStepModel(project.id, file, step.number, step.title, el.value);
                     }}
                   >
                     <option value=""
-                      >{step.model
+                      >{modelOf(step)
                         ? "Auto"
                         : `${autoPick(step).picked ? "Picked" : "Auto"} · ${autoPick(step).label}`}</option
                     >
                     {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
-                    {#if step.model && !agent.provider.models.some((m) => m.id === step.model)}
-                      <option value={step.model}>{step.model}</option>
+                    {#if modelOf(step) && !agent.provider.models.some((m) => m.id === modelOf(step))}
+                      <option value={modelOf(step)}>{modelOf(step)}</option>
                     {/if}
                   </select>
                 </div>

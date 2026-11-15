@@ -914,6 +914,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    [
@@ -1023,6 +1035,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -1110,6 +1134,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -1200,6 +1236,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -1287,6 +1335,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -1377,6 +1437,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -1465,6 +1537,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    [
@@ -1527,6 +1611,13 @@
     {
      "step": "2a",
      "why": "migrates"
+    }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
     }
    ],
    "closings": [
@@ -1628,6 +1719,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    [
@@ -1655,6 +1758,13 @@
     }
    ],
    "checks": [],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    }
+   ],
    "closings": []
   }
  },
@@ -1743,6 +1853,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    [],
@@ -1753,6 +1875,7 @@
    "answers": [],
    "decided": [],
    "checks": [],
+   "models": [],
    "closings": []
   }
  },
@@ -1841,6 +1964,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    "1z",
@@ -1916,6 +2051,18 @@
     {
      "step": "4a",
      "why": "x"
+    }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
     }
    ]
   }
@@ -2004,6 +2151,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2103,6 +2262,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -2190,6 +2361,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2277,6 +2460,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -2365,6 +2560,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    "nope"
@@ -2450,6 +2657,18 @@
     {
      "step": "4a",
      "why": "x"
+    }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
     }
    ]
   }
@@ -2538,6 +2757,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2632,6 +2863,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2736,6 +2979,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2843,6 +3098,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -2967,6 +3234,18 @@
      "step": "4a",
      "why": "new check"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -3054,6 +3333,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -3144,6 +3435,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -3231,6 +3534,18 @@
      {
       "step": "4a",
       "why": "x"
+     }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
      }
     ]
    },
@@ -3321,6 +3636,18 @@
      "step": "4a",
      "why": "x"
     }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
+    }
    ]
   }
  },
@@ -3409,6 +3736,18 @@
       "step": "4a",
       "why": "x"
      }
+    ],
+    "models": [
+     {
+      "step": "1a",
+      "title": "Prices",
+      "model": "claude-sonnet-5-5"
+     },
+     {
+      "step": "gone",
+      "title": "Gone",
+      "model": "claude-haiku-5-5"
+     }
     ]
    },
    "1a",
@@ -3496,6 +3835,18 @@
     {
      "step": "4a",
      "why": "x"
+    }
+   ],
+   "models": [
+    {
+     "step": "1a",
+     "title": "Prices",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "step": "gone",
+     "title": "Gone",
+     "model": "claude-haiku-5-5"
     }
    ]
   }

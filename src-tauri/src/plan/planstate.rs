@@ -67,6 +67,23 @@ pub struct PlanState {
     pub decided: Vec<KeptDecided>,
     /// Steps that count as done only after the decider's review and passing tests (24u part 3).
     pub checks: Vec<StepWhy>,
+    /// The models the owner chose for steps in Qanuvi (R2e i), kept here, not in the plan file.
+    #[serde(default)]
+    pub models: Vec<KeptModel>,
+}
+
+/// The model the owner chose for a step in Qanuvi (`KeptModel`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeptModel {
+    /// The step's number, else its title.
+    pub step: String,
+    pub title: String,
+    pub model: String,
+}
+
+/// A step's key in the plan state: its number, else its title.
+pub fn step_key(number: Option<&str>, title: &str) -> String {
+    number.unwrap_or(title).to_string()
 }
 
 impl PlanState {
@@ -77,6 +94,29 @@ impl PlanState {
             && self.closings.is_empty()
             && self.decided.is_empty()
             && self.checks.is_empty()
+            && self.models.is_empty()
+    }
+
+    /// The model the owner chose for the step in Qanuvi, if any.
+    pub fn kept_model(&self, number: Option<&str>, title: &str) -> Option<String> {
+        let key = step_key(number, title);
+        self.models
+            .iter()
+            .find(|m| m.step == key)
+            .map(|m| m.model.clone())
+    }
+
+    /// Sets (or with None, clears) the model the owner chose for the step.
+    pub fn set_kept_model(&mut self, number: Option<&str>, title: &str, model: Option<&str>) {
+        let key = step_key(number, title);
+        self.models.retain(|m| m.step != key);
+        if let Some(m) = model.map(str::trim).filter(|m| !m.is_empty()) {
+            self.models.push(KeptModel {
+                step: key,
+                title: title.to_string(),
+                model: m.to_string(),
+            });
+        }
     }
 
     /// A stored copy, keeping only the entries that can be read (anything else gives an empty state).
@@ -104,6 +144,12 @@ impl PlanState {
             }),
             decided: list(v, "decided", |x| s(x, "step") && s(x, "answer")),
             checks: list(v, "checks", |x| s(x, "step")),
+            models: list(v, "models", |x| {
+                s(x, "step")
+                    && x.get("model")
+                        .and_then(Value::as_str)
+                        .is_some_and(|m| !m.is_empty())
+            }),
         }
     }
 }
@@ -183,6 +229,13 @@ pub fn prune_state(state: &PlanState, open: &HashSet<String>, all: &HashSet<Stri
             .checks
             .iter()
             .filter(|c| open.contains(&c.step))
+            .cloned()
+            .collect(),
+        // The owner's model for a step stays while the step is in the plan (set to Open again, it runs on it).
+        models: state
+            .models
+            .iter()
+            .filter(|m| all.contains(&m.step))
             .cloned()
             .collect(),
         closings: state

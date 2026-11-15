@@ -1443,6 +1443,21 @@ impl<'a> Loop<'a> {
                 )
             })
             .map(|st| st.model);
+        // No "- Model:" line in the file (Qanuvi no longer writes them, R2e i): the model the owner chose for the
+        // step in Qanuvi, kept in the plan's own data.
+        let fresh_model = match fresh_model {
+            Some(None) | None => {
+                let kept = self.load_state().kept_model(
+                    self.run.steps[i].number.as_deref(),
+                    &self.run.steps[i].title,
+                );
+                match (fresh_model, kept) {
+                    (_, Some(m)) => Some(Some(m)),
+                    (f, None) => f,
+                }
+            }
+            some => some,
+        };
         self.run.steps[i].status = RunStepStatus::Running;
         // Released by the owner's answer: what it was held for and what they said go into its next try (24u).
         let mut answer_note = String::new();
@@ -2209,14 +2224,19 @@ impl<'a> Loop<'a> {
             .plan_data_set(&self.s.file, Kind::Run, &Value::Object(now));
     }
 
-    /// Writes the owner's model choice into the step's Model line.
+    /// Keeps the owner's model choice for the step in the plan's own data (R2e i), not in the plan file. A "- Model:"
+    /// line the step already has is taken out, as it would win over the new choice.
     fn write_step_model(&self, i: usize, model: &str) {
         let st = &self.run.steps[i];
+        let mut state = self.load_state();
+        state.set_kept_model(st.number.as_deref(), &st.title, Some(model));
+        self.save_state(&state);
         if let Some(now) = self.plan()
             && let Some(found) = find(&now.text, st.number.as_deref(), &st.title)
-            && let Ok(next) = set_step_model(&now.text, found.line, Some(model), Some(&found.title))
+            && found.model.is_some()
+            && let Ok(next) = set_step_model(&now.text, found.line, None, Some(&found.title))
         {
-            // The choice still holds for this run; only the file keeps its old line when this fails.
+            // The choice still holds (plan data); only the file keeps its old line when this fails.
             let _ = self.env.write(&self.s.file, &next, Some(&now.hash));
         }
     }

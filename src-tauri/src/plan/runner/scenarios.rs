@@ -699,8 +699,48 @@ fn the_owners_model_switch_hands_the_step_over_to_the_chosen_model() {
         "handed over to Sonnet 5.5 (the owner's choice)"
     );
     assert_eq!(tries[1].model, "claude-sonnet-5-5");
-    // The choice is kept in the step's Model line.
-    assert!(env.text(FILE).contains("claude-sonnet-5-5"));
+    // The choice is kept in the plan's own data (R2e i), not written into the plan file.
+    assert!(!env.text(FILE).contains("Model:"));
+    let state = crate::plan::planstate::PlanState::from_json(
+        &env.plan_data_get(FILE, crate::plan_data::Kind::State)
+            .unwrap(),
+    );
+    assert_eq!(
+        state.kept_model(Some("1"), "Rework").as_deref(),
+        Some("claude-sonnet-5-5")
+    );
+}
+
+#[test]
+fn a_step_runs_on_the_model_the_owner_chose_in_qanuvi() {
+    let env =
+        world("# Plan\n\n- [ ] **1. Rework**\n- [ ] **2. Docs**\n  - Model: claude-haiku-5-5\n");
+    let mut state = crate::plan::planstate::PlanState::default();
+    state.set_kept_model(Some("1"), "Rework", Some("claude-sonnet-5-5"));
+    // A "- Model:" line the owner wrote in the file wins over a kept choice.
+    state.set_kept_model(Some("2"), "Docs", Some("claude-opus-5-5"));
+    env.plan_data_set(
+        FILE,
+        crate::plan_data::Kind::State,
+        &serde_json::to_value(&state).unwrap(),
+    )
+    .unwrap();
+    env.set_agent(|c| {
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    // No one model for the whole run: each step's own choice counts.
+    let r = run(
+        &env,
+        RunOptions {
+            model: None,
+            ..options()
+        },
+    );
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(step(&r, "1").attempts[0].model, "claude-sonnet-5-5");
+    assert_eq!(step(&r, "2").attempts[0].model, "claude-haiku-5-5");
 }
 
 #[test]

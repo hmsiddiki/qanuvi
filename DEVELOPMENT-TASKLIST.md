@@ -369,7 +369,12 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15, after R2e part 2): R2e PART 2 DONE (see 24z "R2e part 2 DONE"): the master
+    RESUME HERE (newest, 2026-11-15, after the R2e fixes): the owner's decisions on R2e (a)-(i) are BUILT with tests
+    (see 24z "R2e FIXES DONE"); not driven live, nothing published. Open for the owner: the planner still writes
+    "- Model:" lines into new plans; move those to plan data too? NEXT: drive the fixes live in a test build on a
+    scratch project (check free RAM first; Rust parts one job at a time), then delete what is left of the
+    TypeScript runner, then write out the master accounts milestone in parts for the owner's review.
+    RESUME HERE (before, 2026-11-15, after R2e part 2): R2e PART 2 DONE (see 24z "R2e part 2 DONE"): the master
     paths driven live with a "This PC" master (target local) on a scratch project, one run (3 steps, about $0.22 plus
     the pre-run check): pre-run check, a step held ("Wait for me") answered in this window's Inbox and the run went on
     on the master, disconnecting while a step worked (the run finished on the master), reconnecting (finished run and
@@ -1042,6 +1047,23 @@ runs on or off; with it off nothing is sent anywhere.
         heavy" banner shows at 26k context. (i) Note: a step's model picked in the Plan view is written into the plan
         file as "- Model: <id>" (set_step_model); in part 1 an agent read those lines as model attribution in the
         project. Keep it in the file, or move it into plan data?
+      - [x] R2e FIXES DONE 2026-11-15 (owner decisions above; tests only, not driven live yet): (a) the finishing
+        pass estimate scales each step's cost by the pass model's price over the step model's (output price per
+        million; finishEstimate/finish_estimate take PassPrices; RunPanel passes the planner model's price). (b) check
+        reasons over 300 characters end at a word (from 200 on) with "…" (clipReason / clip_reason). (c) the Pause
+        button says "Pausing…" (full words in its tooltip) and never shrinks or wraps. (d) a new step's title from the
+        owner's words loses "Change:" / "New step:" labels, a closing "as a new step" and any ellipsis, and a long one
+        ends at a word (ownermsg::tidy_title, used by add_step). (e) once an attempt finished the step, its after-work
+        shows that try, not "(try 2)". (g) the pre-run check answers an "order" list ({step, after, why}); the check's
+        list shows it and, on start, addOrderNeeds writes each as a "- Needs:" line (only steps in the plan, never a
+        circle). (h) a session that goes on into the next step is renamed to that step (the window title follows it);
+        fix rounds keep the title. (i) the model chosen for a step in the Plan view, by a switch during a run, or by
+        "Keep it for every open step" in the Run panel goes into the plan state ("models": step, title, model), not
+        the file; a "- Model:" line the step had is taken out then; a hand-written "- Model:" line still wins over a
+        kept choice; kept models stay while the step is in the plan. Not changed: the planner still writes "- Model:"
+        lines into new plans (owner to choose whether those move to plan data too). Commits 6fa3523 and the (i)
+        commit after it. NEXT: drive (a)-(i) live in a test build on a scratch project, then delete what is left of
+        the TypeScript runner; then the master accounts milestone written out in parts for the owner's review.
       - [x] (agreed design, kept for reference) Owner messages in step chats (owner agreed 2026-11-15; build into R2c/R2d, Rust runner): a message the
         owner types into a chat the runner opened goes to the runner first, not straight into the agent's task. The
         decider (a cheap model) sorts it: (a) a correction or fact for this step: passed to the agent as a note, work

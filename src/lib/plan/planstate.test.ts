@@ -8,6 +8,8 @@ import {
   keepAnswer,
   keepDecided,
   keepHolds,
+  keptModel,
+  setKeptModel,
   markLate,
   pruneState,
 } from "./planstate";
@@ -103,5 +105,22 @@ describe("decided for you, kept per plan (24u part 3)", () => {
     expect(p.decided).toHaveLength(1);
     expect(p.checks).toEqual([]);
     expect(pruneState(s, new Set(), new Set()).decided).toEqual([]);
+  });
+});
+
+describe("models chosen for steps in Qanuvi (R2e i)", () => {
+  it("keeps a step's model in the plan's data, by number or title, and drops it with the step", () => {
+    let s = setKeptModel(emptyPlanState(), { number: "1", title: "Export" }, "claude-sonnet-5-5");
+    s = setKeptModel(s, { number: null, title: "Docs" }, "claude-haiku-5-5");
+    expect(keptModel(s, { number: "1", title: "Export" })).toBe("claude-sonnet-5-5");
+    expect(keptModel(s, { number: null, title: "Docs" })).toBe("claude-haiku-5-5");
+    s = setKeptModel(s, { number: "1", title: "Export" }, "claude-opus-5-5");
+    expect(s.models.filter((m) => m.step === "1")).toHaveLength(1);
+    expect(keptModel(setKeptModel(s, { number: "1", title: "Export" }, null), { number: "1", title: "Export" })).toBe(
+      null,
+    );
+    // Done steps keep it (opened again, they run on it); steps gone from the plan lose it.
+    const pruned = pruneState(s, new Set(), new Set(["1"]));
+    expect(pruned.models.map((m) => m.step)).toEqual(["1"]);
   });
 });

@@ -40,6 +40,17 @@ export interface KeptDecided extends DecidedForYou {
   at: number;
 }
 
+/**
+ * The model the owner chose for a step in Qanuvi (R2e i): kept in the plan's own data, not written into the plan
+ * file (an agent reading the file took "- Model:" lines for model attribution in the project).
+ */
+export interface KeptModel {
+  /** The step's number, else its title. */
+  step: string;
+  title: string;
+  model: string;
+}
+
 export interface PlanState {
   holds: KeptHold[];
   answers: KeptAnswer[];
@@ -47,9 +58,37 @@ export interface PlanState {
   decided: KeptDecided[];
   /** Steps that count as done only after the decider's review and passing tests (24u part 3). */
   checks: { step: string; why: string }[];
+  models: KeptModel[];
 }
 
-export const emptyPlanState = (): PlanState => ({ holds: [], answers: [], closings: [], decided: [], checks: [] });
+export const emptyPlanState = (): PlanState => ({
+  holds: [],
+  answers: [],
+  closings: [],
+  decided: [],
+  checks: [],
+  models: [],
+});
+
+/** A step's key in the plan state: its number, else its title. */
+export const stepKey = (s: { number: string | null; title: string }): string => s.number ?? s.title;
+
+/** The model the owner chose for the step in Qanuvi, if any. */
+export function keptModel(state: PlanState, s: { number: string | null; title: string }): string | null {
+  return state.models.find((m) => m.step === stepKey(s))?.model ?? null;
+}
+
+/** Sets (or with null, clears) the model the owner chose for the step. */
+export function setKeptModel(
+  state: PlanState,
+  s: { number: string | null; title: string },
+  model: string | null,
+): PlanState {
+  const key = stepKey(s);
+  const others = state.models.filter((m) => m.step !== key);
+  const value = model?.trim();
+  return { ...state, models: value ? [...others, { step: key, title: s.title, model: value }] : others };
+}
 
 function planStateKey(projectId: string, file: string): string {
   return `qanuvi.planstate.${projectId}.${file}`;
@@ -68,6 +107,9 @@ export function loadPlanState(projectId: string, file: string): PlanState {
         ? v.decided.filter((d) => typeof d?.step === "string" && typeof d.answer === "string")
         : [],
       checks: Array.isArray(v?.checks) ? v.checks.filter((c) => typeof c?.step === "string") : [],
+      models: Array.isArray(v?.models)
+        ? v.models.filter((m) => typeof m?.step === "string" && typeof m.model === "string" && m.model)
+        : [],
     };
   } catch {
     return emptyPlanState();
@@ -82,7 +124,8 @@ export function savePlanState(projectId: string, file: string, state: PlanState)
       !state.answers.length &&
       !state.closings.length &&
       !state.decided.length &&
-      !state.checks.length
+      !state.checks.length &&
+      !state.models?.length
     )
       planData.removeItem(key);
     else planData.setItem(key, JSON.stringify(state));
@@ -136,6 +179,8 @@ export function pruneState(state: PlanState, open: Set<string>, all: Set<string>
     // Decided choices stay while their step is in the plan (the owner may still want to see or change them).
     decided: state.decided.filter((d) => all.has(d.step)),
     checks: state.checks.filter((c) => open.has(c.step)),
+    // The owner's model for a step stays while the step is in the plan (set to Open again, it runs on it).
+    models: (state.models ?? []).filter((m) => all.has(m.step)),
     closings: state.closings
       .filter((c) => all.has(c.closing))
       // A waited-for step done meanwhile (by hand, or outside a run) counts as late; one gone from the plan drops.
