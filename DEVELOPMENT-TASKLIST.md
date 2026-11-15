@@ -369,7 +369,19 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 15:40): 24z3 D1 BUILT (Models + keys on the shown machine; owner agreed the
+    RESUME HERE (newest, 2026-11-15 18:10): 24z3 D1 DRIVEN LIVE, all pass (release test build 17:58, scratch
+    projects pc-proj and master-proj, the "This PC" test master, $0, no model run). This PC: OpenRouter key kept
+    (the owner's real one, not touched). Master shown: OpenRouter "Save key" (no key: not This PC's); Find models on
+    Ollama answered from the master, 2 models tagged with the master's name; a test key saved on the master went to
+    master-models:openrouter only ("Key kept in This PC's credential store", the master's name), This PC's
+    models:openrouter and models:omniroute unchanged; switched to This PC (its key and "this computer" texts back)
+    and to the master again (its own key back); Forget key removed master-models:openrouter only. Server build
+    (--no-default-features master swapped in, desktop master put back after): every provider shows "No key. This
+    server reads it from its environment: set QANUVI_KEY_<ID> ..."; no key fields, no Connect Qanuvi. FOUND, left
+    for later batches (not D1's commands): still "this computer" in the Models page's subtitle, the Ollama provider
+    name "Ollama (this computer)", the Ollama checkbox's help line, and the guide's "This computer: 15.3 GB memory"
+    (machine_info, D2). NEXT: D2 (machine/setup + usage + notifications), in a fresh conversation.
+    BEFORE (2026-11-15 15:40): 24z3 D1 BUILT (Models + keys on the shown machine; owner agreed the
     proposal and both questions: a desktop master keeps its own key names, brain records per machine). New
     model_keys.rs (one place for both builds): credential store first, then QANUVI_KEY_<PROVIDER>; a server build
     cannot save or forget a key and says where to set it; a master's store entries are master-models:<id>, so a
