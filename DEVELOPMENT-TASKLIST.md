@@ -379,17 +379,24 @@ runs on or off; with it off nothing is sent anywhere.
     shown: heading/text name it; local relay (qanuvi-relay 127.0.0.1:47300) -> "Connected to the relay", link saved
     in the master's own relay.json; This PC's panel still off; turned off again after. Master Agents page: its config
     files (home + master-proj), no "cannot be done" line. Clean up now not pressed (logic tested).
-    NOT DONE: VPS swap. Linux server build cross-built 05:14 (zigbuild -j 2, 2m 27s, 9.3 MB) but the upload + swap
-    was held for the owner's yes (VPS still runs the D5 build).
-    FINDINGS, owner to agree (no code yet): (a) memory entries on a master: memory_list/save/search/slice/delete are
+    VPS (owner yes): D6 server build (cross-built 05:14, zigbuild -j 2, 9.3 MB) swapped into ~/.local/bin with
+    `pkill -x`, reconnected from the card -> green. basevm378 shown: Memory names it; A folder + Save -> "This server
+    reads the memory disk's passphrase from its environment (QANUVI_MEMORY_DISK_PASSPHRASE)" (set back to Only on
+    this machine, nothing left on the VPS); Agents: Claude Code "Not found", its own config files, no "cannot be done".
+    OWNER AGREED ALL FOUR (2026-11-16): (a) new batch D7 = memory entries on a master (memory_list, memory_save,
+    memory_search, memory_slice, memory_delete answered by the master), before Part B; (b) This PC writes its machine
+    name (or "This PC") into its disk file, not the bare hostname; (c) "1 entry" singular; (d) Part B's switcher
+    remembers the shown machine across restarts. CHECKPOINT: NEXT (fresh conversation) build D7 + (b) + (c), drive
+    live (local test master + VPS), then Part B with (d).
+    FINDINGS (as found): (a) memory entries on a master: memory_list/save/search/slice/delete are
     in no batch (Part A map group 1), so the master's Memory page shows "cannot be done ... (memory_list)" and the
     entry it merged from the disk cannot be seen; proposal: a small batch D7 after D6, before Part B. (b) the disk
     names This PC's file by the bare hostname, so the master reads "from DESKTOP-R8G3PAK (test); read
     DESKTOP-R8G3PAK" (looks like itself); proposal: write This PC's machine name (or "This PC") into its file.
     (c) "1 entries": singular. (d) the window always opens on This PC after a restart, even when a master was
     shown; proposal: leave to Part B (switcher remembers the shown machine). Left behind: test entry "D6 disk test
-    fact" (This PC test data + master), disk folder in this session's scratchpad. NEXT: owner's yes for the VPS
-    swap, then the findings, then Part B (switcher).
+    fact" (This PC test data + master), disk folder in this session's scratchpad (59246cc1; helper scripts
+    ui.ps1, room.ps1, build.sh, lbuild.sh, mdb.js there too).
     RESUME HERE (before, 2026-11-16 04:45): 24z3 D6 BUILT (not driven live yet). Memory disk per machine: each core
     keeps its own passphrase (memory_disk.rs passphrase(): This PC "memory-disk", a desktop master
     "master-memory-disk", a server reads QANUVI_MEMORY_DISK_PASSPHRASE and says so on Save/Forget), reads its own disk
