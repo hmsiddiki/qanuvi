@@ -377,8 +377,13 @@ runs on or off; with it off nothing is sent anywhere.
     one third of the free height (owner's choice). Left as is: pausing right after a step's edits shows "0 of N done"
     until Resume (cosmetic). The test build started its "This PC" test master again (qanuvi-master.exe from
     target/release, still running; builds use --bin qanuvi until it is stopped from the Servers page). Nothing
-    published. NEXT: delete what is left of the TypeScript runner, then write out the master accounts milestone in
-    parts for the owner's review. Scripts + scratch project (proj, PLAN-R2F.md) in the scratchpad of session 98d99277.
+    published. ORDER (owner agreed 2026-11-15 10:30): delete what is left of the TypeScript runner, then R3 (queue),
+    R4 (tray mode, visible icon), R5 (drive live), then a full check and publish 0.1.23 (owner's yes first). The
+    master accounts milestone comes after that: qanuvi.com has no sign-in yet (domain only), so it is written out in
+    parts and its Qanuvi side built against a local stand-in sign-in server; the live check waits for the site.
+    The 0.1.22 release (2b4dd63) is the last TypeScript-runner version. The test master was stopped with the owner's
+    yes (10:25), so full builds run again. Scripts + scratch project (proj, PLAN-R2F.md) in the scratchpad of session
+    98d99277.
     RESUME HERE (before, 2026-11-15 09:10, checkpoint): planner Model lines committed (a1ca399; 406 TS + 188 Rust
     plan tests, clippy clean). Owner's new logo v13 (apex corner mark) everywhere (20c416b: app icon, generated
     icons, title-bar logo, favicon; v12 kept in docs/design; exe icon checked by pixels). Test build rebuilt in full
