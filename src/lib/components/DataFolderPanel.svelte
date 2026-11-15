@@ -65,6 +65,12 @@
     await load();
   }
 
+  /** The note about the last restore (shown here and on the Backups page) goes until the next restore. */
+  async function dismissNote() {
+    await invoke("backups_dismiss_note").catch((e) => (error = errorText(e)));
+    await load();
+  }
+
   async function removeOld() {
     if (!info?.old) return;
     const yes = await ask(
@@ -102,6 +108,9 @@
         class:error={info.note.startsWith("The data was not moved")}
       >
         {info.note}
+        {#if /^(Restored|The backup was not restored)/.test(info.note)}
+          <button type="button" class="link" onclick={dismissNote}>Dismiss</button>
+        {/if}
       </p>{/if}
 
     {#if info.fixed}
@@ -151,6 +160,14 @@
 {/if}
 
 <style>
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--qx-accent);
+    font: inherit;
+    cursor: pointer;
+  }
   .data {
     margin-bottom: var(--qx-space-4, 16px);
     padding: 10px 12px;

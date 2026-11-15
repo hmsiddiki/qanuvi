@@ -369,7 +369,24 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 00:50): 24z3 MACHINE NAMES BATCH DRIVEN LIVE, all pass (release test build
+    RESUME HERE (newest, 2026-11-16 01:20): the four findings (a)-(d) BUILT AND DRIVEN LIVE, all pass (owner:
+    "yes for a, b okay, c okay, d as you proposed"). (a) `local` with an empty name becomes "<computer name> (test)"
+    from its first hello (masters #ownName; the "This PC (test)" default in MastersView add() is gone): live, the
+    local test master's emptied name became "DESKTOP-R8G3PAK (test)". (b) Dismiss beside the restore note in the
+    Servers page's data-folder panel too (DataFolderPanel; "Restored..." and "The backup was not restored..."
+    notes, as backups::dismiss_note): live, a planted note on the local master dismissed there, its
+    data-location.json emptied. (c) the address beside the name is left out while the name IS that address (no
+    name yet): live with an unreachable nobody@127.0.0.9 card (removed after). (d) the card's pencil is now Edit:
+    Name, and for SSH the address, program and key file (Save/Cancel); a name-only change never reconnects; a
+    change to how it is reached disconnects, saves and connects again; reaching another machine in the list is
+    refused ("This is the same computer as X. The change was not saved.") and the old settings reconnect; colour,
+    auto-connect and place in the list stay (masters.edit). Live on the VPS: address -> `local` refused with that
+    text and basevm378 back on; a wrong program path saved and shown as the card's error; fixed from the card ->
+    connected again. Green: 369 TS tests (4 new in masters.names.test.ts), svelte-check 0/0, prettier; no Rust
+    change. Owner on order (2026-11-16): keep it: D4, D5, D6, then Part B (switcher). Owner rule: D4+ just follow
+    "the shown machine owns its whole screen" (setup wizard, local/free AI, Headroom, any agent, start-up,
+    updates); build them without asking that again. NEXT: D4 in a fresh conversation.
+    RESUME HERE (before, 2026-11-16 00:50): 24z3 MACHINE NAMES BATCH DRIVEN LIVE, all pass (release test build
     00:30, scratch pc-proj; the local test master and the owner's VPS). Old test master "This PC": red line asking
     to rename; Rename to "VPS TEST" -> 'Another machine is already named "vps test"' (case ignored); "this
     computer" refused; 41 characters -> "The name has 41 characters; at most 40."; renamed "local test", kept its place

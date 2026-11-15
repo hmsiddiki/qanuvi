@@ -112,6 +112,63 @@ describe("machine names on the Servers screen", () => {
     expect(masters.list[1].color).toBe(COLORS[3]);
   });
 
+  it("names the test master on this PC after this PC's computer name, with (test)", async () => {
+    hellos["local"] = { host: "DESKTOP-R8G3PAK", machineId: "loc" };
+    await masters.add(server("a", "local"));
+    expect(masters.list[0].name).toBe("DESKTOP-R8G3PAK (test)");
+  });
+
+  it("changes the address, program and key file on the card and connects again", async () => {
+    hellos["one"] = { host: "h1", machineId: "1" };
+    hellos["one-alias"] = { host: "h1", machineId: "1" };
+    await masters.add(server("a", "one"));
+    masters.setColor("a", COLORS[4]);
+    const err = await masters.edit("a", {
+      name: "",
+      target: "one-alias",
+      program: "~/.local/bin/qanuvi-master",
+      identity: "k",
+    });
+    expect(err).toBe("");
+    const m = masters.list[0];
+    expect([m.target, m.program, m.identity, m.name, m.color]).toEqual([
+      "one-alias",
+      "~/.local/bin/qanuvi-master",
+      "k",
+      "h1",
+      COLORS[4],
+    ]);
+    expect(masters.statusOf("a").state).toBe("on");
+  });
+
+  it("refuses a change that reaches another machine in the list and keeps the old settings", async () => {
+    hellos["one"] = { host: "h1", machineId: "1" };
+    hellos["two"] = { host: "h2", machineId: "2" };
+    await masters.add(server("a", "one"));
+    await masters.add(server("b", "two"));
+    const err = await masters.edit("a", { name: "h1", target: "two", program: "", identity: "" });
+    expect(err).toBe("This is the same computer as h2. The change was not saved.");
+    expect(masters.list[0].target).toBe("one");
+    expect(masters.statusOf("a").state).toBe("on");
+  });
+
+  it("edits only the name without connecting again, with the same rules", async () => {
+    hellos["one"] = { host: "h1", machineId: "1" };
+    hellos["two"] = { host: "h2", machineId: "2" };
+    await masters.add(server("a", "one"));
+    await masters.add(server("b", "two"));
+    vi.mocked(invoke).mockClear();
+    expect(await masters.edit("a", { name: "H2", target: "one", program: "qanuvi-master", identity: "" })).toBe(
+      'Another machine is already named "h2".',
+    );
+    expect(await masters.edit("a", { name: "Build box", target: "one", program: "qanuvi-master", identity: "" })).toBe(
+      "",
+    );
+    expect(await masters.edit("a", { name: "", target: "one", program: "qanuvi-master", identity: "" })).toBe("");
+    expect(masters.list[0].name).toBe("h1");
+    expect(vi.mocked(invoke).mock.calls.some(([c]) => c === "remote_connect")).toBe(false);
+  });
+
   it("numbers a computer name another machine already has", async () => {
     hellos["one"] = { host: "basevm378", machineId: "1" };
     hellos["two"] = { host: "basevm378", machineId: "2" };

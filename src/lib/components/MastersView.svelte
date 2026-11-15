@@ -13,7 +13,7 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import { ask } from "$lib/stores/confirm.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
-  import { COLORS, NAME_MAX, nameProblem, uniqueName } from "$lib/machineNames";
+  import { COLORS, NAME_MAX, nameProblem } from "$lib/machineNames";
   import { show } from "$lib/stores/machines";
   import { projects } from "$lib/stores/projects.svelte";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
@@ -54,8 +54,8 @@
     }
     const m: MasterSettings = {
       id: crypto.randomUUID(),
-      // Empty: the machine's own computer name, from its first answer (the test master on this PC has its own).
-      name: name.trim() || (t === "local" ? uniqueName("This PC (test)", masters.list.map(displayName)) : ""),
+      // Empty: the machine's own computer name, from its first answer ("<name> (test)" for the test master here).
+      name: name.trim(),
       target: t,
       program: program.trim() || "qanuvi-master",
       identity: identity.trim(),
@@ -70,22 +70,29 @@
     }
   }
 
-  /** The card being renamed, and what is typed there. */
-  let renaming = $state<string | null>(null);
-  let newName = $state("");
-  let renameError = $state("");
+  /** The card being edited, and what is typed there. */
+  let editing = $state<string | null>(null);
+  let draft = $state({ name: "", target: "", program: "", identity: "" });
+  let editError = $state("");
+  let saving = $state(false);
 
-  function startRename(m: MasterSettings) {
-    renaming = m.id;
-    newName = displayName(m);
-    renameError = "";
+  function startEdit(m: MasterSettings) {
+    editing = m.id;
+    draft = { name: m.name, target: m.target, program: m.program, identity: m.identity };
+    editError = "";
   }
 
-  function rename(e: SubmitEvent, id: string) {
+  async function saveEdit(e: SubmitEvent, id: string) {
     e.preventDefault();
-    renameError = masters.rename(id, newName);
-    if (!renameError) renaming = null;
+    saving = true;
+    editError = await masters.edit(id, draft);
+    saving = false;
+    if (!editError) editing = null;
   }
+
+  /** Beside the name: how it is reached, unless the name is that address already (no name yet). */
+  const reachedBy = (m: MasterSettings) =>
+    m.relay ? "through the relay" : m.target === "local" ? "this PC" : displayName(m) === m.target ? "" : m.target;
 
   /** A name kept from before the name rules (the same as another machine's, or "This PC"). */
   const nameIssue = (m: MasterSettings) => (m.name ? nameProblem(m.name, masters.namesBesides(m.id)) : "");
@@ -138,7 +145,7 @@
         <span class="dot {st.state}"></span>
         {#if m.color}<span class="swatch" style:background={m.color} title="Its colour"></span>{/if}
         <strong>{displayName(m)}</strong>
-        <span class="muted">{m.relay ? "through the relay" : m.target === "local" ? "this PC" : m.target}</span>
+        {#if reachedBy(m)}<span class="muted">{reachedBy(m)}</span>{/if}
         <span class="spacer"></span>
         {#if st.state === "on" && projects.machine !== m.id}
           <IconButton label="Show in the sidebar" onclick={() => show(m.id)}><Eye size={14} /></IconButton>
@@ -150,18 +157,41 @@
             <Plug size={14} />
           </IconButton>
         {/if}
-        <IconButton label="Rename" onclick={() => startRename(m)}><Pencil size={14} /></IconButton>
+        <IconButton label="Edit" onclick={() => startEdit(m)}><Pencil size={14} /></IconButton>
         <IconButton label="Remove" onclick={() => remove(m)}><Trash2 size={14} /></IconButton>
       </header>
-      {#if renaming === m.id}
-        <form class="row" onsubmit={(e) => rename(e, m.id)}>
-          <input bind:value={newName} maxlength={NAME_MAX + 10} aria-label="New name" />
-          <button type="submit" class="btn">Save</button>
-          <button type="button" class="btn" onclick={() => (renaming = null)}>Cancel</button>
+      {#if editing === m.id}
+        <form class="add" onsubmit={(e) => saveEdit(e, m.id)}>
+          <label>
+            Name (empty: the server's own computer name)
+            <input bind:value={draft.name} maxlength={NAME_MAX + 10} />
+          </label>
+          {#if !m.relay}
+            <label>
+              SSH address
+              <input bind:value={draft.target} spellcheck="false" />
+            </label>
+            <label>
+              Program on the server
+              <input bind:value={draft.program} placeholder="qanuvi-master" spellcheck="false" />
+            </label>
+            <label>
+              SSH key file (optional)
+              <input
+                bind:value={draft.identity}
+                placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults"
+                spellcheck="false"
+              />
+            </label>
+          {/if}
+          {#if editError}<p class="error">{editError}</p>{/if}
+          <div class="row">
+            <button type="submit" class="btn primary" disabled={saving}>{saving ? "Connecting…" : "Save"}</button>
+            <button type="button" class="btn" disabled={saving} onclick={() => (editing = null)}>Cancel</button>
+          </div>
         </form>
-        {#if renameError}<p class="error">{renameError}</p>{/if}
       {:else if nameIssue(m)}
-        <p class="error">{nameIssue(m)} Rename it so the two are never mixed up.</p>
+        <p class="error">{nameIssue(m)} Change the name so the two are never mixed up.</p>
       {/if}
       {#if st.state === "connecting"}<p class="muted">Connecting…</p>{/if}
       {#if st.state === "error"}<p class="error">{st.error}</p>{/if}

@@ -95,6 +95,14 @@ class MastersStore {
   }
 
   /**
+   * The name a machine without one gets: its computer name, made unique. The test master on this PC (`local`) has this
+   * PC's computer name, so it gets "(test)" after it ("DESKTOP-R8G3PAK (test)").
+   */
+  #ownName(m: MasterSettings, host: string): string {
+    return uniqueName(m.target === "local" && !m.relay ? `${host} (test)` : host, this.namesBesides(m.id));
+  }
+
+  /**
    * What the first hello fills in: the lasting id, the computer name when the owner gave none, and a colour.
    * The newest copy in the list is used, so a rename made while connecting is kept.
    */
@@ -103,7 +111,7 @@ class MastersStore {
     if (!m) return;
     const next = { ...m };
     if (info.machineId && m.machineId !== info.machineId) next.machineId = info.machineId;
-    if (!m.name && info.host) next.name = uniqueName(info.host, this.namesBesides(id));
+    if (!m.name && info.host) next.name = this.#ownName(m, info.host);
     if (!m.color) next.color = pickColor(this.list.filter((x) => x.id !== id).map((x) => x.color));
     if (next.machineId !== m.machineId || next.name !== m.name || next.color !== m.color) this.save(next);
   }
@@ -189,6 +197,52 @@ class MastersStore {
     const problem = nameProblem(n, this.namesBesides(id));
     if (problem) return problem;
     if (n !== m.name) this.save({ ...m, name: n });
+    return "";
+  }
+
+  /**
+   * Changes a server on its card: the name (same rules as rename; empty: its computer name) and, for SSH, the
+   * address, the program and the key file. Changing how it is reached connects again with the new settings; when
+   * that turns out to be another machine already in the list, the change is refused and the old settings stay.
+   * Its colour, "Connect when Qanuvi starts" and its place in the list stay. Answers an error text ("" when saved).
+   */
+  async edit(id: string, change: { name: string; target: string; program: string; identity: string }): Promise<string> {
+    const m = this.list.find((x) => x.id === id);
+    if (!m) return "That machine is not in the list.";
+    const name = change.name.trim();
+    const problem = name ? nameProblem(name, this.namesBesides(id)) : "";
+    if (problem) return problem;
+    const reach = m.relay
+      ? { target: m.target, program: m.program, identity: m.identity }
+      : {
+          target: change.target.trim(),
+          program: change.program.trim() || "qanuvi-master",
+          identity: change.identity.trim(),
+        };
+    if (!reach.target)
+      return "Give the server's SSH address, for example deploy@203.0.113.5 or an alias from your SSH config.";
+    const moved = reach.target !== m.target || reach.program !== m.program || reach.identity !== m.identity;
+    const next: MasterSettings = { ...m, ...reach, name };
+    if (!moved) {
+      // An emptied name: the computer name it already gave, if it is connected (else at its next hello).
+      const host = this.statusOf(id).info?.host;
+      if (!name && host) next.name = this.#ownName(next, host);
+      if (next.name !== m.name) this.save(next);
+      return "";
+    }
+    const wasOn = this.statusOf(id).state === "on";
+    const wasShown = shownMachine() === id;
+    await this.disconnect(id);
+    this.save(next);
+    const twin = await this.connect(next);
+    if (twin) {
+      // Another machine in the list: back to the old settings (and its connection, when it had one).
+      this.save(m);
+      if (wasOn) await this.connect(m);
+      else this.#set(id, { state: "off" });
+      return `${twin} The change was not saved.`;
+    }
+    if (wasShown && this.statusOf(id).state === "on") await show(id);
     return "";
   }
 
