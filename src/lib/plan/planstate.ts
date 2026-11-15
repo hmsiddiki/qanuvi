@@ -59,6 +59,8 @@ export interface PlanState {
   /** Steps that count as done only after the decider's review and passing tests (24u part 3). */
   checks: { step: string; why: string }[];
   models: KeptModel[];
+  /** The owner folded "Decided for you" when it held this many choices: it stays folded until a new one comes. */
+  decidedFolded?: number;
 }
 
 export const emptyPlanState = (): PlanState => ({
@@ -90,6 +92,21 @@ export function setKeptModel(
   return { ...state, models: value ? [...others, { step: key, title: s.title, model: value }] : others };
 }
 
+/**
+ * Whether "Decided for you" shows open: while a choice is unchanged, unless the owner folded it; a choice added after
+ * the fold opens it again (a new choice is worth a look), a step change or handover never does.
+ */
+export function decidedOpen(state: PlanState): boolean {
+  if (!state.decided.some((d) => !d.changed)) return false;
+  return state.decidedFolded === undefined || state.decided.length > state.decidedFolded;
+}
+
+/** The owner opened or folded "Decided for you": kept with the plan. */
+export function foldDecided(state: PlanState, open: boolean): PlanState {
+  const { decidedFolded: _, ...rest } = state;
+  return open ? rest : { ...rest, decidedFolded: state.decided.length };
+}
+
 function planStateKey(projectId: string, file: string): string {
   return `qanuvi.planstate.${projectId}.${file}`;
 }
@@ -110,6 +127,7 @@ export function loadPlanState(projectId: string, file: string): PlanState {
       models: Array.isArray(v?.models)
         ? v.models.filter((m) => typeof m?.step === "string" && typeof m.model === "string" && m.model)
         : [],
+      ...(typeof v?.decidedFolded === "number" ? { decidedFolded: v.decidedFolded } : {}),
     };
   } catch {
     return emptyPlanState();

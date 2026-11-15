@@ -369,7 +369,17 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 02:30): the On box (owner: "your proposal is just fine do it") BUILT AND
+    RESUME HERE (newest, 2026-11-16 02:45, CHECKPOINT for a fresh conversation): "Decided for you" REMEMBERS a fold
+    (owner: "yes it should remember"; questions that need the owner are outside it, in "Needs your answer" and the
+    Inbox). Before, `open={some unchanged}` was set again on every step change/handover (the list reloads), so a fold
+    never lasted. Now the plan state keeps decidedFolded (how many choices it held when folded): planstate.ts
+    decidedOpen/foldDecided, RunPanel ontoggle saves it per plan; it stays folded across steps, handovers and
+    restarts, and opens again only when a NEW choice is added. Green: 377 TS tests (2 new in planstate.test.ts),
+    svelte-check 0/0, prettier. NOT driven live (needs a plan run whose check decides something). NEXT, in order:
+    drive that fold live on a scratch plan; D4 leftovers (Claude Code version on the master's Agents page; VPS with
+    the new server build: zigbuild, swap into ~/.local/bin); then D5 OmniRoute. R7 (plan notes box) waits for the
+    owner to place it in the order.
+    RESUME HERE (before, 2026-11-16 02:30): the On box (owner: "your proposal is just fine do it") BUILT AND
     DRIVEN LIVE. Unticking On stops the command now when Qanuvi (or the master) started it; one started by hand is
     left alone (Rust stop only ends a child it owns); ticking On starts it now (startup.setEnabled; new test in
     startup.machine.test.ts). Live with the master shown: off -> the process under the master ended, grey dot, "off",

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   changeDecided,
+  decidedOpen,
+  foldDecided,
   emptyPlanState,
   holdWording,
   keepAnswer,
   keepDecided,
   keepHolds,
   keptModel,
+  type KeptDecided,
   setKeptModel,
 } from "./planstate";
 
@@ -78,5 +81,38 @@ describe("models chosen for steps in Qanuvi (R2e i)", () => {
     expect(keptModel(setKeptModel(s, { number: "1", title: "Export" }, null), { number: "1", title: "Export" })).toBe(
       null,
     );
+  });
+});
+
+describe('"Decided for you" open or folded', () => {
+  const choice = (what: string, changed?: string): KeptDecided => ({
+    step: "1",
+    what,
+    answer: "a",
+    because: "",
+    at: 0,
+    ...(changed ? { changed } : {}),
+  });
+  const withChoices = (n: number) => ({
+    ...emptyPlanState(),
+    decided: Array.from({ length: n }, (_, i) => choice(`q${i}`)),
+  });
+
+  it("opens while a choice is unchanged, until the owner folds it", () => {
+    expect(decidedOpen(emptyPlanState())).toBe(false);
+    expect(decidedOpen(withChoices(2))).toBe(true);
+    const folded = foldDecided(withChoices(2), false);
+    expect(folded.decidedFolded).toBe(2);
+    // A step change or handover reloads the same choices: it stays folded.
+    expect(decidedOpen(folded)).toBe(false);
+    // Opened again by the owner: the fold is forgotten.
+    expect(foldDecided(folded, true).decidedFolded).toBeUndefined();
+    expect(decidedOpen(foldDecided(folded, true))).toBe(true);
+  });
+
+  it("opens again for a new choice, never for all changed ones", () => {
+    const folded = foldDecided(withChoices(2), false);
+    expect(decidedOpen({ ...folded, decided: [...folded.decided, choice("new")] })).toBe(true);
+    expect(decidedOpen({ ...emptyPlanState(), decided: [choice("x", "b")] })).toBe(false);
   });
 });

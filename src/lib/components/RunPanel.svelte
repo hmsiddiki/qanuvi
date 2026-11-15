@@ -33,6 +33,8 @@
     keptModel,
     loadPlanState,
     savePlanState,
+    decidedOpen,
+    foldDecided,
     setKeptModel,
     type KeptDecided,
     type KeptHold,
@@ -297,11 +299,20 @@
   let decidedList = $state<KeptDecided[]>([]);
   let changing = $state<number | null>(null);
   let changeText = $state("");
+  /** Open or folded as the owner left it for this plan (kept with the plan state). */
+  let decidedShown = $state(false);
   $effect(() => {
     void runner.changed;
     void run?.id;
-    decidedList = loadPlanState(project.id, file).decided;
+    const state = loadPlanState(project.id, file);
+    decidedList = state.decided;
+    decidedShown = decidedOpen(state);
   });
+  function decidedToggled(open: boolean) {
+    if (open === decidedShown) return;
+    decidedShown = open;
+    savePlanState(project.id, file, foldDecided(loadPlanState(project.id, file), open));
+  }
   function saveChange(d: KeptDecided) {
     const text = changeText.trim();
     // The same answer again is no change.
@@ -1009,7 +1020,7 @@
       </p>
     {/if}
     {#if decidedList.length}
-      <details class="decisions" open={decidedList.some((d) => !d.changed)}>
+      <details class="decisions" open={decidedShown} ontoggle={(e) => decidedToggled(e.currentTarget.open)}>
         <summary>Decided for you ({decidedList.length}): Qanuvi's choices from the check. Change?</summary>
         <ul>
           {#each decidedList as d, i (d.step + d.what)}
