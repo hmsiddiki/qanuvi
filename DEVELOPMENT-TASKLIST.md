@@ -369,7 +369,10 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 11:00): TYPESCRIPT RUNNER LEFTOVERS DELETED (first item of the agreed order).
+    RESUME HERE (newest, 2026-11-15): NEW DESIGN MILESTONE 24z3 (machines, one at a time through a switcher) comes
+    BEFORE R3 (owner agreed). Written out in parts A-F in item 24z3; owner reviews it, then Part A starts with a map
+    of the window's calls. R3's proposal is noted under R3, to discuss again after 24z3. Nothing built.
+    RESUME HERE (before, 2026-11-15 11:00): TYPESCRIPT RUNNER LEFTOVERS DELETED (first item of the agreed order).
     Every run function the window no longer calls is gone from src/lib/plan and core/decider.ts (packet.ts and
     setaside's logic whole; nextModel, stepPrompt, replan/replaceStep, closings, handover, notes, logs, finishing
     prompts and more), with their tests; what stays is what the window shows with (run types, totals, savings, step
@@ -1158,11 +1161,47 @@ runs on or off; with it off nothing is sent anywhere.
       is saved into the plan's memory (FACTS.md, "Owner rules"), so every later step and model sees it, not only that
       session; a one-off correction stays with its step. The decider tells them apart (one more kind in
       ownermsg's sort: "rule"). Scenario first: a rule said in step 1 reaches step 3's prompt on another model.
-    - [ ] R3: the queue (DB table, migration 8): tasks and whole plans, one after another per project, side by side
-      across projects, holds and answers per plan, a hook for the paid monitor (24e, built later).
+    - [ ] R3: the queue (DB table, migration 10): tasks and whole plans, one after another per project, side by side
+      across projects, holds and answers per plan, a hook for the paid monitor (24e, built later). Waits for 24z3
+      (owner, 2026-11-15): the queue is owned by its machine, lives in that machine's own database, and its scheduler
+      runs in that machine's core; the window adds to and shows the queue of the machine it shows. R3 proposal (not
+      agreed yet, discuss again after 24z3): task = one-step plan in .qanuvi/tasks/TASK-<id>.md; done with skips goes
+      on, stopped or error holds that project's queue; after a restart the running item comes back stopped (Resume),
+      waiting items go on with one Inbox note; run settings saved when added ("Use current settings" on waiting items).
     - [ ] R4: tray mode (step B moved in): closing the window leaves a visible tray icon, runs and the queue go on,
       the web engine is unloaded; the icon opens everything again. Owner: never hidden from the user.
     - [ ] R5: drive live: a scratch plan, close to the tray, reopen, progress intact; then the VPS master over SSH.
+- [ ] **24z3. Machines: the window shows one machine at a time (owner, 2026-11-15; DESIGN MILESTONE, before R3;
+  parts written out for the owner's review, nothing built yet)**: every Qanuvi is a machine ("This PC" too: the desktop
+  runs the same core as a master). The work lives on a machine; the window owns no work, it shows one machine and
+  sends the owner's clicks to it. Owner chose the switcher over one mixed list (2026-11-15).
+  - Owned by each machine (its own database, never mixed with another's): projects (workspaces), plan files and plan
+    data, the queue and the runs, the Inbox (questions and answers), schedules, notes and automations, terminals and
+    agent sessions running on it; in separate mode also its own model history, costs and settings.
+  - Owned by the window (this install): layout, theme, open tabs per machine, the list of paired masters.
+  - Owned by the account: the owner's local brain and behaviour; in synced mode the shared history on top. Passwords
+    and keys never sync (as decided for the master accounts milestone).
+  - Today (to change): the sidebar mixes machines, a master's projects sit in the same list with a server icon
+    (Sidebar.svelte, p.master); the Inbox view gathers every machine's questions.
+  - Part A, one path to the shown machine: every screen (projects, files, git, terminals, agent, Plan view, Run panel,
+    Inbox, queue) calls "the shown machine", never invoke or a master directly; This PC is a direct call, a master goes
+    over its connection (relay or SSH). Map first which stores call invoke, which already pick a master, and which
+    commands a master does not answer yet (list them; a missing one says so on screen, never falls back to This PC).
+  - Part B, the switcher: at the top of the sidebar ("This PC", each paired master by name, its connection state).
+    Picking one switches the whole interface: its projects, queue, Inbox, Plan view, runs, history and costs. Tabs,
+    editors and terminals are kept per machine and come back on switching back. The machine shown is remembered.
+  - Part C, other machines keep working: runs on This PC go on while the VPS is shown (and the other way). The window
+    keeps listening to every connected machine's Inbox: the switcher shows a badge per machine ("VPS 2"), a desktop
+    notification names its machine, clicking it switches there and opens the question.
+  - Part D, settings split: Settings shows what belongs to the shown machine (its models, routing, team, budget, its
+    keys entered on it) apart from what belongs to the window (layout, theme, notifications) and the account.
+  - Part E, a machine not reachable: the switcher shows it offline; picking it shows "VPS not connected" and
+    Reconnect, never a stale copy taken for live. Its work goes on there.
+  - Part F, drive live: This PC and the "This PC" test master side by side on scratch projects only; then the VPS.
+  - Later, not in this milestone: moving work between machines ("send this queued plan to the VPS") as an explicit
+    copy, never a sync.
+  - Open for the owner's review: Part D's split item by item; whether This PC's own entry can be hidden on a window
+    that only ever drives a master (a laptop as a handler).
 - [ ] **24z2. Tidy, safe code and write scope for plan runs, any project and any language (owner agreed 2026-11-15;
   safe code added the same day; build after R2, on the Rust runner)**: AI agents add helpers that already exist under other names, scatter code
   over files, and edit folders they should not touch. Qanuvi fixes that by itself, with zero noise: no tidiness
