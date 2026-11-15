@@ -972,21 +972,13 @@ async fn account_sign_out(app: tauri::AppHandle) -> Res<()> {
     .map_err(|e| e.to_string())?
 }
 
-// Memory disk (Milestone 18). The passphrase lives in the system's credential store (Windows Credential Manager,
-// macOS Keychain, the Secret Service on Linux), never in a file.
+// Memory disk (Milestone 18; per machine since 24z3 D6). The passphrase lives in the system's credential store (Windows
+// Credential Manager, macOS Keychain, the Secret Service on Linux), never in a file; the disk is the one This PC's own
+// settings name, and This PC's core syncs it on its own (see `run`).
 
-fn passphrase_entry() -> Res<keyring::Entry> {
-    keyring_entry("Qanuvi")
-}
-
+#[cfg(test)]
 fn keyring_entry(service: &str) -> Res<keyring::Entry> {
     keyring::Entry::new(service, "memory-disk").map_err(|e| e.to_string())
-}
-
-fn passphrase() -> Res<String> {
-    passphrase_entry()?
-        .get_password()
-        .map_err(|_| "Set the memory disk's passphrase first.".to_string())
 }
 
 #[tauri::command]
@@ -997,55 +989,40 @@ fn memory_disk_device() -> Res<crate::memory_disk::Device> {
 
 #[tauri::command]
 fn memory_disk_passphrase_set(passphrase: String) -> Res<()> {
-    if passphrase.chars().count() < 8 {
-        return Err("The passphrase needs at least 8 characters.".into());
-    }
-    passphrase_entry()?
-        .set_password(&passphrase)
-        .map_err(|e| format!("The passphrase could not be saved: {e}"))
+    crate::memory_disk::passphrase_set(&passphrase)
 }
 
 #[tauri::command]
 fn memory_disk_passphrase_saved() -> bool {
-    passphrase().is_ok()
+    crate::memory_disk::passphrase().is_ok()
 }
 
 #[tauri::command]
 fn memory_disk_passphrase_forget() -> Res<()> {
-    match passphrase_entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    crate::memory_disk::passphrase_forget()
 }
 
 #[tauri::command]
-async fn memory_disk_sync(
-    state: State<'_, AppState>,
-    disk: crate::memory_disk::Disk,
-) -> Res<crate::memory_disk::Report> {
-    let pass = passphrase()?;
-    let me = crate::memory_disk::device(&crate::paths::data_dir());
+fn memory_disk_status(state: State<AppState>) -> crate::memory_disk::Status {
+    crate::memory_disk::status(&state.db)
+}
+
+#[tauri::command]
+async fn memory_disk_sync(state: State<'_, AppState>) -> Res<crate::memory_disk::Report> {
     let db = state.db.clone();
-    blocking(move || crate::memory_disk::sync(&db, &disk, &pass, &me)).await
+    blocking(move || crate::memory_disk::sync_here(&db, &crate::paths::data_dir())).await
 }
 
 #[tauri::command]
-async fn memory_disk_versions(
-    disk: crate::memory_disk::Disk,
-) -> Res<Vec<crate::memory_disk::Version>> {
-    let me = crate::memory_disk::device(&crate::paths::data_dir());
-    blocking(move || crate::memory_disk::versions(&disk, &me)).await
-}
-
-#[tauri::command]
-async fn memory_disk_restore(
-    state: State<'_, AppState>,
-    disk: crate::memory_disk::Disk,
-    name: String,
-) -> Res<usize> {
-    let pass = passphrase()?;
+async fn memory_disk_versions(state: State<'_, AppState>) -> Res<Vec<crate::memory_disk::Version>> {
     let db = state.db.clone();
-    blocking(move || crate::memory_disk::restore(&db, &disk, &pass, &name)).await
+    blocking(move || crate::memory_disk::versions_here(&db, &crate::paths::data_dir())).await
+}
+
+#[tauri::command]
+async fn memory_disk_restore(state: State<'_, AppState>, name: String) -> Res<usize> {
+    let db = state.db.clone();
+    blocking(move || crate::memory_disk::restore_here(&db, &crate::paths::data_dir(), &name)).await
 }
 
 // Masters without a window (Milestone 16) -------------------------------------------------------------------------
@@ -2066,6 +2043,22 @@ pub fn run() {
                     std::thread::sleep(crate::omniroute::WATCH_EVERY);
                 }
             });
+            // The memory disk (Milestone 18; in the core since 24z3 D6): 90 seconds after start, then every 10 minutes,
+            // with the disk and passphrase This PC keeps, shown or not.
+            let mem_dir = dir.clone();
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(90));
+                loop {
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        crate::memory_disk::sync_due(&state.db, &mem_dir);
+                    }
+                    std::thread::sleep(crate::memory_disk::SYNC_EVERY);
+                }
+            });
+            // This data folder is the app's own: a master service started on it (remote access) is This PC, and leaves
+            // the start-up list, watches, syncs and backups to this core.
+            crate::master::mark_app_data(&dir);
             // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
             // when the last good one is a day old.
             let backup_dir = dir.clone();
@@ -2203,6 +2196,7 @@ pub fn run() {
             memory_disk_passphrase_set,
             memory_disk_passphrase_saved,
             memory_disk_passphrase_forget,
+            memory_disk_status,
             memory_disk_sync,
             memory_disk_versions,
             memory_disk_restore,

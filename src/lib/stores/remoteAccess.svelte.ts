@@ -1,13 +1,21 @@
 /**
  * Remote access for this computer (Milestone 20): its master service runs on the app's own data and keeps a link to a
  * relay, so paired devices reach this computer's real projects from anywhere. Shows who is connected and stops them.
+ *
+ * Per machine (24z3 D6): with a master shown, the page is that master's own remote access (its relay link runs in its
+ * service, with its own pairings); with This PC shown, This PC's own master service.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { errorText } from "$lib/api";
-import { callMaster } from "$lib/remote";
+import { callMaster, shownMachine } from "$lib/remote";
 import { settings } from "./settings.svelte";
 
 const ME = "this-computer";
+
+/** Whose remote access the page shows: the shown master, or This PC's own master service. */
+function target(): string {
+  return shownMachine() ?? ME;
+}
 
 export interface RelayStatus {
   relay: string;
@@ -32,9 +40,12 @@ class RemoteAccessStore {
   error = $state("");
   busy = $state(false);
   #timer: ReturnType<typeof setInterval> | undefined;
+  /** Bumped on each switch: an answer about the machine before is dropped. */
+  #shown = 0;
 
-  /** Connects to this computer's own master service (starting it when needed). */
+  /** Connects to this computer's own master service (starting it when needed); a shown master is connected already. */
   async #attach(): Promise<void> {
+    if (shownMachine()) return;
     await invoke("remote_connect", { id: ME, target: "self", program: "", identity: null, relay: null });
   }
 
@@ -49,13 +60,27 @@ class RemoteAccessStore {
     }
   }
 
+  /** The window shows another machine: its remote access, never the machine before's devices or code. */
+  async switched(): Promise<void> {
+    this.#shown++;
+    clearInterval(this.#timer);
+    this.status = null;
+    this.activity = [];
+    this.error = "";
+    if (shownMachine()) this.#watch();
+    else await this.init();
+  }
+
   #watch() {
     clearInterval(this.#timer);
+    const shown = this.#shown;
+    const who = target();
     const tick = async () => {
       try {
-        this.status = await callMaster<RelayStatus>(ME, "relay_status", {});
+        const st = await callMaster<RelayStatus>(who, "relay_status", {});
+        if (shown === this.#shown) this.status = st;
       } catch {
-        this.status = null;
+        if (shown === this.#shown) this.status = null;
       }
     };
     tick();
@@ -67,7 +92,7 @@ class RemoteAccessStore {
     this.error = "";
     try {
       await this.#attach();
-      await callMaster(ME, "relay_configure", { relay: relay.trim(), name: name.trim(), enabled });
+      await callMaster(target(), "relay_configure", { relay: relay.trim(), name: name.trim(), enabled });
       settings.set("remoteAccess", { enabled, relay: relay.trim(), name: name.trim() });
       this.#watch();
     } catch (e) {
@@ -80,26 +105,26 @@ class RemoteAccessStore {
   async pairStart(): Promise<void> {
     this.error = "";
     try {
-      await callMaster<string>(ME, "relay_pair_start", {});
-      this.status = await callMaster<RelayStatus>(ME, "relay_status", {});
+      await callMaster<string>(target(), "relay_pair_start", {});
+      this.status = await callMaster<RelayStatus>(target(), "relay_status", {});
     } catch (e) {
       this.error = errorText(e);
     }
   }
 
   async removeDevice(pairing: string): Promise<void> {
-    await callMaster(ME, "relay_device_remove", { pairing }).catch((e) => (this.error = errorText(e)));
-    this.status = await callMaster<RelayStatus>(ME, "relay_status", {}).catch(() => this.status);
+    await callMaster(target(), "relay_device_remove", { pairing }).catch((e) => (this.error = errorText(e)));
+    this.status = await callMaster<RelayStatus>(target(), "relay_status", {}).catch(() => this.status);
   }
 
   /** Ends every remote connection now. */
   async stop(): Promise<void> {
-    await callMaster(ME, "relay_stop", {}).catch((e) => (this.error = errorText(e)));
-    this.status = await callMaster<RelayStatus>(ME, "relay_status", {}).catch(() => this.status);
+    await callMaster(target(), "relay_stop", {}).catch((e) => (this.error = errorText(e)));
+    this.status = await callMaster<RelayStatus>(target(), "relay_status", {}).catch(() => this.status);
   }
 
   async loadActivity(): Promise<void> {
-    this.activity = await callMaster<Activity[]>(ME, "relay_activity", {}).catch(() => []);
+    this.activity = await callMaster<Activity[]>(target(), "relay_activity", {}).catch(() => []);
   }
 }
 

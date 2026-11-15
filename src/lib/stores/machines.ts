@@ -12,6 +12,8 @@ import { startup } from "./startup.svelte";
 import { claudeUpdate } from "./claudeUpdate.svelte";
 import { agent } from "./agent.svelte";
 import { omni } from "./omniroute.svelte";
+import { memoryDisk } from "./memoryDisk.svelte";
+import { remoteAccess } from "./remoteAccess.svelte";
 
 /** Shows a machine: null is This PC. */
 export async function show(machine: string | null): Promise<void> {
@@ -31,4 +33,7 @@ export async function show(machine: string | null): Promise<void> {
   await agent.loadInfo();
   // The status bar's OmniRoute warnings: the new machine's own.
   void omni.look();
+  // The memory disk and remote access (24z3 D6): the new machine's own, read once its settings are in.
+  void memoryDisk.switched();
+  void remoteAccess.switched();
 }

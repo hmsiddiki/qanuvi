@@ -619,6 +619,191 @@ pub fn restore(db: &Db, disk: &Disk, passphrase: &str, name: &str) -> Result<usi
     Ok(kept.len())
 }
 
+// Per machine (24z3 D6) -------------------------------------------------------------------------------------------
+//
+// Each machine (This PC or a master) keeps its own passphrase, reads its own disk from its own settings and syncs on its
+// own, shown or not. The window only starts a sync now and reads how the last one went.
+
+/// Where a server build (no credential store) reads the passphrase.
+pub const PASS_ENV: &str = "QANUVI_MEMORY_DISK_PASSPHRASE";
+
+/// The settings key a machine keeps its last sync's result under (written by the machine, read by the window).
+pub const LAST_KEY: &str = "memoryDiskLast";
+
+/// How often a machine syncs on its own.
+pub const SYNC_EVERY: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// The passphrase's name in the credential store: a master on a desktop never shares This PC's.
+fn pass_entry() -> &'static str {
+    if crate::model_keys::is_master() {
+        "master-memory-disk"
+    } else {
+        "memory-disk"
+    }
+}
+
+fn env_only() -> String {
+    format!(
+        "This server reads the memory disk's passphrase from its environment. Set (or remove) {PASS_ENV} where qanuvi-master starts, for example in its systemd unit, then restart it."
+    )
+}
+
+/// This machine's passphrase: its credential store, or the environment variable.
+pub fn passphrase() -> Result<String, String> {
+    crate::secrets::store::read(pass_entry())
+        .or_else(|| std::env::var(PASS_ENV).ok())
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| {
+            if crate::secrets::kind() == "environment" {
+                env_only()
+            } else {
+                "Set the memory disk's passphrase first.".to_string()
+            }
+        })
+}
+
+pub fn passphrase_set(passphrase: &str) -> Result<(), String> {
+    if passphrase.chars().count() < 8 {
+        return Err("The passphrase needs at least 8 characters.".into());
+    }
+    if crate::secrets::kind() == "environment" {
+        return Err(env_only());
+    }
+    crate::secrets::store::write(pass_entry(), passphrase)
+        .map_err(|e| format!("The passphrase could not be saved: {e}"))
+}
+
+pub fn passphrase_forget() -> Result<(), String> {
+    if crate::secrets::kind() == "environment" {
+        return Err(env_only());
+    }
+    crate::secrets::store::delete(pass_entry())
+}
+
+/// The disk a machine's settings describe (`memoryDisk`), or None (memory kept on the machine only). A server disk
+/// carries its SSH address and key, written there by the window that chose it.
+pub fn disk_from_settings(settings: &serde_json::Map<String, serde_json::Value>) -> Option<Disk> {
+    let d = settings.get("memoryDisk")?;
+    let text = |k: &str| d[k].as_str().unwrap_or("").trim().to_string();
+    match d["mode"].as_str()? {
+        "folder" if !text("folder").is_empty() => Some(Disk::Folder {
+            path: text("folder"),
+        }),
+        "server" if !text("target").is_empty() && !text("serverDir").is_empty() => {
+            Some(Disk::Server {
+                target: text("target"),
+                identity: Some(text("identity")).filter(|i| !i.is_empty()),
+                dir: text("serverDir"),
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Whether the machine's settings ask for syncing on its own (on unless turned off).
+fn auto_on(settings: &serde_json::Map<String, serde_json::Value>) -> bool {
+    settings
+        .get("memoryDisk")
+        .is_none_or(|d| d["auto"].as_bool() != Some(false))
+}
+
+/// One sync at a time on a machine (its own timer and a window's Sync now).
+static BUSY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// How the machine's memory disk is: its last sync (or problem), whether one runs now, whether a passphrase is kept.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    pub busy: bool,
+    pub passphrase_saved: bool,
+    /// The last good sync (a `Report`), kept in the machine's settings.
+    pub last: Option<serde_json::Value>,
+    /// The last sync's problem, empty when it went well.
+    pub error: String,
+}
+
+pub fn status(db: &Db) -> Status {
+    let kept = crate::settings::get_all(db).unwrap_or_default();
+    let last = kept.get(LAST_KEY);
+    Status {
+        busy: matches!(BUSY.try_lock(), Err(std::sync::TryLockError::WouldBlock)),
+        passphrase_saved: passphrase().is_ok(),
+        last: last
+            .and_then(|l| l.get("report"))
+            .filter(|r| !r.is_null())
+            .cloned(),
+        error: last
+            .and_then(|l| l["error"].as_str())
+            .unwrap_or("")
+            .to_string(),
+    }
+}
+
+fn keep_last(db: &Db, report: Option<&Report>, error: &str) {
+    let before = crate::settings::get_all(db)
+        .unwrap_or_default()
+        .get(LAST_KEY)
+        .and_then(|l| l.get("report").cloned())
+        .unwrap_or(serde_json::Value::Null);
+    let report = report
+        .and_then(|r| serde_json::to_value(r).ok())
+        .unwrap_or(before);
+    let mut v = serde_json::Map::new();
+    v.insert(
+        LAST_KEY.into(),
+        serde_json::json!({"report": report, "error": error}),
+    );
+    let _ = crate::settings::set_many(db, &v);
+}
+
+/// Syncs this machine's memory with the disk its settings name. The result (or the problem) is kept for the window.
+pub fn sync_here(db: &Db, data_dir: &Path) -> Result<Report, String> {
+    let _one = BUSY.lock().unwrap_or_else(|e| e.into_inner());
+    let settings = crate::settings::get_all(db)?;
+    let result = disk_from_settings(&settings)
+        .ok_or_else(|| "Choose where the memory disk is first.".to_string())
+        .and_then(|disk| sync(db, &disk, &passphrase()?, &device(data_dir)));
+    match &result {
+        Ok(r) => keep_last(db, Some(r), ""),
+        Err(e) => keep_last(db, None, e),
+    }
+    result
+}
+
+/// The machine's own timer: syncs when a disk and a passphrase are set and syncing is automatic. Quiet otherwise.
+pub fn sync_due(db: &Db, data_dir: &Path) {
+    let settings = crate::settings::get_all(db).unwrap_or_default();
+    if auto_on(&settings)
+        && disk_from_settings(&settings).is_some()
+        && passphrase().is_ok()
+        && let Err(e) = sync_here(db, data_dir)
+    {
+        eprintln!("Memory disk sync failed: {e}");
+    }
+}
+
+/// This machine's kept versions on the disk its settings name.
+pub fn versions_here(db: &Db, data_dir: &Path) -> Result<Vec<Version>, String> {
+    let settings = crate::settings::get_all(db)?;
+    match disk_from_settings(&settings) {
+        Some(disk) => versions(&disk, &device(data_dir)),
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Restores a version from the disk its settings name, then syncs so the other machines hear of it.
+pub fn restore_here(db: &Db, data_dir: &Path, name: &str) -> Result<usize, String> {
+    let settings = crate::settings::get_all(db)?;
+    let disk = disk_from_settings(&settings)
+        .ok_or_else(|| "Choose where the memory disk is first.".to_string())?;
+    let n = {
+        let _one = BUSY.lock().unwrap_or_else(|e| e.into_inner());
+        restore(db, &disk, &passphrase()?, name)?
+    };
+    let _ = sync_here(db, data_dir);
+    Ok(n)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -854,5 +1039,75 @@ mod tests {
         );
         memory::save(&db, &entry("Written on the test laptop")).unwrap();
         sync(&db, &disk, &pass, &laptop).unwrap();
+    }
+
+    fn settings_with(disk: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+        let mut m = serde_json::Map::new();
+        m.insert("memoryDisk".into(), disk);
+        m
+    }
+
+    #[test]
+    fn a_machine_reads_its_disk_from_its_own_settings() {
+        // None kept, off, or a folder or server not filled in: no disk.
+        assert_eq!(disk_from_settings(&serde_json::Map::new()), None);
+        for d in [
+            serde_json::json!({"mode": "off", "folder": "D:/m"}),
+            serde_json::json!({"mode": "folder", "folder": "  "}),
+            serde_json::json!({"mode": "server", "server": "vps", "serverDir": "~/m"}),
+        ] {
+            assert_eq!(disk_from_settings(&settings_with(d.clone())), None, "{d}");
+        }
+        assert_eq!(
+            disk_from_settings(&settings_with(
+                serde_json::json!({"mode": "folder", "folder": " D:/memory "})
+            )),
+            Some(Disk::Folder {
+                path: "D:/memory".into()
+            })
+        );
+        // A server disk carries the address and key the window wrote with it.
+        assert_eq!(
+            disk_from_settings(&settings_with(serde_json::json!({
+                "mode": "server", "server": "vps", "serverDir": "~/.qanuvi-memory",
+                "target": "me@vps", "identity": ""
+            }))),
+            Some(Disk::Server {
+                target: "me@vps".into(),
+                identity: None,
+                dir: "~/.qanuvi-memory".into()
+            })
+        );
+        assert!(auto_on(&serde_json::Map::new()));
+        assert!(!auto_on(&settings_with(serde_json::json!({"auto": false}))));
+    }
+
+    #[test]
+    fn a_machine_keeps_its_last_sync_and_problem_for_the_window() {
+        let db = Db::open_in_memory().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        assert_eq!(status(&db).last, None);
+        assert_eq!(status(&db).error, "");
+        // No disk named: the problem is kept, and said again by the status.
+        let e = sync_here(&db, data.path()).unwrap_err();
+        assert!(e.contains("Choose where"), "{e}");
+        assert_eq!(status(&db).error, e);
+        // A good sync is kept; a later problem keeps the good one and adds the problem.
+        let report = Report {
+            devices: vec!["laptop".into()],
+            written: 3,
+            at: 42,
+            ..Report::default()
+        };
+        keep_last(&db, Some(&report), "");
+        let s = status(&db);
+        assert_eq!(s.last.as_ref().unwrap()["written"], 3);
+        assert_eq!(s.error, "");
+        keep_last(&db, None, "The folder is gone.");
+        let s = status(&db);
+        assert_eq!(s.last.as_ref().unwrap()["at"], 42);
+        assert_eq!(s.error, "The folder is gone.");
+        // Versions with no disk: none, never an error.
+        assert!(versions_here(&db, data.path()).unwrap().is_empty());
     }
 }

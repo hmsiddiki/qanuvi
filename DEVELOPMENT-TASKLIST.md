@@ -369,7 +369,29 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 05:20): (a) + D5 DRIVEN LIVE, all pass, one bug found and fixed (release test
+    RESUME HERE (newest, 2026-11-16 04:45): 24z3 D6 BUILT (not driven live yet). Memory disk per machine: each core
+    keeps its own passphrase (memory_disk.rs passphrase(): This PC "memory-disk", a desktop master
+    "master-memory-disk", a server reads QANUVI_MEMORY_DISK_PASSPHRASE and says so on Save/Forget), reads its own disk
+    from its own settings (memoryDisk; a server disk now carries target + identity, written in by the window with
+    withServer, also filled at start for disks chosen before D6), syncs ON ITS OWN 90 s after start then every 10 min
+    (desktop run() and master start_own; one sync at a time), keeps the last result + problem in its settings
+    (memoryDiskLast) for memory_disk_status. The window: no own 10-min timer, asks the shown machine's status every
+    minute and on a switch (drops late answers), Sync now / 15 s after a memory change calls the shown machine after
+    settings.flushed(), no disk sent. Panel on a master: its own folder (typed path, no Browse), "A folder on a server"
+    chosen on This computer for now (the SSH address and key are This PC's), wording names the machine. Remote access
+    per machine: relay_* go to the shown master (its own relay link and pairings), This PC still uses its own
+    this-computer service; panel heading/text/boxes follow the switch. Agent setup on a master: master answers
+    agent_config_list/read/write (its home folder, its projects), agent_configure, agent_clean_up, so the master's
+    Agents page loses the "cannot be done on <machine> yet (agent_config_list)" line. FOUND + FIXED on the way: the
+    this-computer master service (remote access) runs serve on the app's OWN data folder, so it started This PC's
+    start-up list, Claude Code update, OmniRoute watch and daily backups a second time (into the master backup
+    folder) and used master-models: key names for This PC. Now the desktop writes qanuvi-app.mark in its data folder;
+    a master opened there is This PC (app_data): This PC's key names, start_own and backups left to the desktop core.
+    Green: 413 Rust (3 new), clippy 0, server build check, 389 TS (5 new: memoryDisk.machine.test.ts + withServer),
+    svelte-check 0/0, prettier. NEXT: drive D6 live (release test build; local test master: folder disk, passphrase,
+    sync on its own with no window, status after switch; This PC still syncs; remote access panel on the master;
+    master Agents page config files; VPS gets the D6 server build, swap with `pkill -x`), then Part B (switcher).
+    RESUME HERE (before, 2026-11-16 05:20): (a) + D5 DRIVEN LIVE, all pass, one bug found and fixed (release test
     build 05:05; VPS got the D5 server build, swapped with `pkill -x`). (a): basevm378 shown -> Claude Code "Not
     found" + install hint, no Windows path; the master on this PC shows its own. D5: This PC's status bar warning
     ("kiro: sign in again (+1)") now comes from its core's omniroute_look; an older master (VPS before the swap) shows

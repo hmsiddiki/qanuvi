@@ -1,6 +1,10 @@
 /**
  * The memory disk (Milestone 18): where the encrypted copy of the memory is kept, and syncing it. Each machine writes
  * its own file there; syncing takes in what other machines changed (newest wins, deletions included).
+ *
+ * Per machine (24z3 D6): the shown machine keeps its own disk (in its settings), its own passphrase and its own last
+ * sync, and syncs on its own every 10 minutes, shown or not. The window shows how the shown machine's disk is, starts a
+ * sync when asked or soon after the memory changed, and never syncs another machine's memory with This PC's.
  */
 import { routed as invoke } from "$lib/remote";
 import { errorText } from "$lib/api";
@@ -22,6 +26,14 @@ export interface DiskVersion {
   at: number;
 }
 
+/** How a machine's memory disk is (memory_disk_status). */
+export interface DiskStatus {
+  busy: boolean;
+  passphraseSaved: boolean;
+  last: SyncReport | null;
+  error: string;
+}
+
 /** The disk the settings describe, or null when there is none (memory kept on this machine only). */
 export function diskFrom(
   s: MemoryDiskSettings,
@@ -36,8 +48,20 @@ export function diskFrom(
   return null;
 }
 
-const LAST_KEY = "qanuvi.memoryDisk.last";
-const PERIOD_MS = 10 * 60 * 1000;
+/**
+ * The settings with the chosen server's SSH address and key written in, so the machine finds its disk with no window
+ * (the list of servers is the window's own).
+ */
+export function withServer(
+  s: MemoryDiskSettings,
+  masters: { id: string; target: string; identity: string }[],
+): MemoryDiskSettings {
+  const m = s.mode === "server" ? masters.find((x) => x.id === s.server) : undefined;
+  return { ...s, target: m?.target ?? "", identity: m?.identity ?? "" };
+}
+
+/** How often the window asks the shown machine how its disk is (its own syncs happen without the window). */
+const LOOK_MS = 60 * 1000;
 const AFTER_CHANGE_MS = 15 * 1000;
 
 class MemoryDiskStore {
@@ -48,28 +72,84 @@ class MemoryDiskStore {
   #timer: ReturnType<typeof setInterval> | undefined;
   #soon: ReturnType<typeof setTimeout> | undefined;
   #seenChange = 0;
+  /** Bumped on each switch: an answer from the machine before is dropped. */
+  #shown = 0;
 
   get disk(): Disk | null {
     return diskFrom(settings.value.memoryDisk, settings.value.masters);
   }
 
   async init(): Promise<void> {
-    try {
-      const saved = localStorage.getItem(LAST_KEY);
-      if (saved) this.last = JSON.parse(saved);
-    } catch {
-      this.last = null;
-    }
-    this.passphraseSaved = await invoke<boolean>("memory_disk_passphrase_saved").catch(() => false);
+    // The window's old copy of This PC's last sync (before D6): the machine keeps it now.
+    localStorage.removeItem("qanuvi.memoryDisk.last");
     this.#seenChange = memory.changed;
     clearInterval(this.#timer);
-    this.#timer = setInterval(() => this.auto(), PERIOD_MS);
-    this.auto();
+    this.#timer = setInterval(() => void this.look(), LOOK_MS);
+    this.#fillServer();
+    await this.look();
   }
 
-  /** Syncs when a disk and a passphrase are set and syncing is automatic. */
+  /**
+   * This PC's disk on a server gets the server's SSH address and key written in (chosen before 24z3 D6, or the address
+   * changed since on the Servers page), so This PC's core finds it with no window.
+   */
+  #fillServer(): void {
+    if (settings.machine !== null) return;
+    const s = settings.value.memoryDisk;
+    if (s.mode !== "server") return;
+    const next = withServer(s, settings.value.masters);
+    if (next.target !== s.target || next.identity !== s.identity) settings.set("memoryDisk", next);
+  }
+
+  /** Asks the shown machine how its memory disk is: last sync, problem, passphrase kept, syncing now. */
+  async look(): Promise<void> {
+    const shown = this.#shown;
+    try {
+      const st = await invoke<DiskStatus>("memory_disk_status");
+      if (shown !== this.#shown) return;
+      this.passphraseSaved = st.passphraseSaved;
+      this.last = st.last;
+      if (!this.busy) this.error = st.error;
+      this.busy = this.busy || st.busy;
+      if (st.busy) setTimeout(() => void this.#settle(shown), 2000);
+    } catch (e) {
+      if (shown !== this.#shown) return;
+      // A machine that does not answer yet: its page says so, nothing of This PC's is shown instead.
+      this.passphraseSaved = false;
+      this.last = null;
+      this.error = settings.value.memoryDisk.mode === "off" ? "" : errorText(e);
+    }
+  }
+
+  /** The machine was syncing on its own: looks again until it is done. */
+  async #settle(shown: number): Promise<void> {
+    if (shown !== this.#shown) return;
+    this.busy = false;
+    await this.look();
+  }
+
+  /** The window shows another machine: its disk, its passphrase, its last sync. */
+  async switched(): Promise<void> {
+    this.#shown++;
+    clearTimeout(this.#soon);
+    this.busy = false;
+    this.error = "";
+    this.last = null;
+    this.passphraseSaved = false;
+    this.#seenChange = memory.changed;
+    this.#fillServer();
+    await this.look();
+  }
+
+  /** Syncs now when a disk and a passphrase are set and syncing is automatic (the machine also does every 10 min). */
   auto(): void {
-    if (settings.value.memoryDisk.auto && this.disk && this.passphraseSaved && !this.busy) this.sync();
+    if (
+      settings.value.memoryDisk.auto &&
+      settings.value.memoryDisk.mode !== "off" &&
+      this.passphraseSaved &&
+      !this.busy
+    )
+      void this.sync();
   }
 
   /** Called when the memory changed: syncs a little later (several edits make one sync). */
@@ -81,17 +161,19 @@ class MemoryDiskStore {
   }
 
   async sync(): Promise<boolean> {
-    const disk = this.disk;
-    if (!disk) {
+    if (settings.value.memoryDisk.mode === "off") {
       this.error = "Choose where the memory disk is first.";
       return false;
     }
+    const shown = this.#shown;
     this.busy = true;
     this.error = "";
     try {
-      const report = await invoke<SyncReport>("memory_disk_sync", { disk });
+      // The machine reads its disk from its settings: the change just made reaches it first.
+      await settings.flushed();
+      const report = await invoke<SyncReport>("memory_disk_sync");
+      if (shown !== this.#shown) return true;
       this.last = report;
-      localStorage.setItem(LAST_KEY, JSON.stringify(report));
       const m = report.merged;
       if (m.added || m.changed || m.deleted) {
         this.#seenChange = memory.changed + 1;
@@ -99,10 +181,10 @@ class MemoryDiskStore {
       }
       return true;
     } catch (e) {
-      this.error = errorText(e);
+      if (shown === this.#shown) this.error = errorText(e);
       return false;
     } finally {
-      this.busy = false;
+      if (shown === this.#shown) this.busy = false;
     }
   }
 
@@ -116,25 +198,30 @@ class MemoryDiskStore {
     }
   }
 
-  async forgetPassphrase(): Promise<void> {
-    await invoke("memory_disk_passphrase_forget").catch(() => {});
-    this.passphraseSaved = false;
+  async forgetPassphrase(): Promise<string> {
+    try {
+      await invoke("memory_disk_passphrase_forget");
+      this.passphraseSaved = false;
+      return "";
+    } catch (e) {
+      return errorText(e);
+    }
   }
 
   async versions(): Promise<DiskVersion[]> {
-    const disk = this.disk;
-    if (!disk) return [];
-    return invoke<DiskVersion[]>("memory_disk_versions", { disk });
+    if (settings.value.memoryDisk.mode === "off") return [];
+    await settings.flushed();
+    return invoke<DiskVersion[]>("memory_disk_versions");
   }
 
   async restore(name: string): Promise<string> {
-    const disk = this.disk;
-    if (!disk) return "Choose where the memory disk is first.";
+    if (settings.value.memoryDisk.mode === "off") return "Choose where the memory disk is first.";
     try {
-      await invoke<number>("memory_disk_restore", { disk, name });
+      await settings.flushed();
+      // The machine restores, then syncs at once so the other machines hear of it.
+      await invoke<number>("memory_disk_restore", { name });
       memory.touch();
-      // Tell the other machines at once.
-      await this.sync();
+      await this.look();
       return "";
     } catch (e) {
       return errorText(e);

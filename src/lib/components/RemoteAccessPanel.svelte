@@ -1,20 +1,31 @@
 <script lang="ts">
-  /** This computer's remote access (Milestone 20), on the Servers page. */
+  /** The shown machine's remote access (Milestone 20; per machine since 24z3 D6), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import { ask } from "$lib/stores/confirm.svelte";
   import { remoteAccess } from "$lib/stores/remoteAccess.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
+  import { placeTitle, shownPlace } from "$lib/remote";
 
   let relay = $state(settings.value.remoteAccess.relay);
   let name = $state(settings.value.remoteAccess.name);
   let showLog = $state(false);
 
   let st = $derived(remoteAccess.status);
+  let place = $derived((settings.machine, shownPlace()));
+  let here = $derived(place === "this computer");
+
+  // Another machine shown: its own relay address and name in the boxes.
+  $effect(() => {
+    void settings.machine;
+    relay = settings.value.remoteAccess.relay;
+    name = settings.value.remoteAccess.name;
+    showLog = false;
+  });
   let on = $derived(settings.value.remoteAccess.enabled);
 
   async function removeDevice(pairing: string, deviceName: string) {
-    const ok = await ask(`Remove ${deviceName}? It can no longer reach this computer until it pairs again.`, {
+    const ok = await ask(`Remove ${deviceName}? It can no longer reach ${place} until it pairs again.`, {
       title: "Remove device",
       okLabel: "Remove",
       cancelLabel: "Keep",
@@ -29,14 +40,14 @@
 </script>
 
 <section class="panel">
-  <h3><MonitorSmartphone size={14} /> This computer: remote access</h3>
+  <h3><MonitorSmartphone size={14} /> {placeTitle(place)}: remote access</h3>
   <p class="muted">
-    Let your other devices reach this computer's projects from anywhere, through a relay. Everything between them is
-    encrypted end to end; the relay only passes it on. Nothing is opened on this computer's network.
+    Let your other devices reach the projects on {place} from anywhere, through a relay. Everything between them is encrypted
+    end to end; the relay only passes it on. Nothing is opened on {here ? "this computer's" : "its"} network.
   </p>
   <div class="row">
     <input bind:value={relay} placeholder="Relay address, for example wss://relay.qanuvi.com" spellcheck="false" />
-    <input class="short" bind:value={name} placeholder="This computer's name" />
+    <input class="short" bind:value={name} placeholder={here ? "This computer's name" : "Its name on your devices"} />
   </div>
   <div class="row">
     {#if on}

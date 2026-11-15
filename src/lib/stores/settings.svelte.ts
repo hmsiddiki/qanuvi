@@ -200,8 +200,11 @@ export interface MemoryDiskSettings {
   /** A server from Servers (its SSH address and key are used). */
   server: string;
   serverDir: string;
-  /** Sync at start-up, shortly after changes and every 10 minutes. */
+  /** Sync at start-up, shortly after changes and every 10 minutes (the machine itself, 24z3 D6). */
   auto: boolean;
+  /** The chosen server's SSH address and key, written in so the machine finds its disk with no window (24z3 D6). */
+  target: string;
+  identity: string;
 }
 
 export interface MasterSettings {
@@ -237,7 +240,15 @@ const DEFAULTS: Settings = {
   masters: [],
   memoryContext: true,
   memoryBudget: 1500,
-  memoryDisk: { mode: "off", folder: "", server: "", serverDir: "~/.qanuvi-memory", auto: true },
+  memoryDisk: {
+    mode: "off",
+    folder: "",
+    server: "",
+    serverDir: "~/.qanuvi-memory",
+    auto: true,
+    target: "",
+    identity: "",
+  },
   account: { signedIn: false },
   remoteAccess: { enabled: false, relay: "", name: "" },
   brain: { providers: DEFAULT_MODEL_PROVIDERS, models: [], local: true, omniAssist: true },
@@ -288,6 +299,8 @@ export function parseSettings(json: string | null): Settings {
     server: text(disk.server, 60),
     serverDir: text(disk.serverDir, 300) || "~/.qanuvi-memory",
     auto: disk.auto !== false,
+    target: text(disk.target, 300),
+    identity: text(disk.identity, 500),
   };
   const acct = raw.account && typeof raw.account === "object" ? (raw.account as Record<string, unknown>) : {};
   s.account = { signedIn: acct.signedIn === true };

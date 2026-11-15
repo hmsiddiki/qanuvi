@@ -1,13 +1,25 @@
 <script lang="ts">
-  /** Memory disk settings and syncing (Milestone 18), on the Memory page. */
+  /**
+   * Memory disk settings and syncing (Milestone 18), on the Memory page: the shown machine's own (24z3 D6). On a
+   * server or another computer the folder is one on that machine; a folder on a server is chosen on This PC for now
+   * (the SSH address and key are This PC's).
+   */
   import HardDrive from "@lucide/svelte/icons/hard-drive";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import { ask, open } from "@tauri-apps/plugin-dialog";
-  import { memoryDisk, type DiskVersion } from "$lib/stores/memoryDisk.svelte";
+  import { memoryDisk, withServer, type DiskVersion } from "$lib/stores/memoryDisk.svelte";
   import { settings, type MemoryDiskSettings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
+  import { shownPlace } from "$lib/remote";
 
   let s = $derived(settings.value.memoryDisk);
+  /** A master is shown: its own folders, never a dialog of This PC's. */
+  let onMaster = $derived(settings.machine !== null);
+  let place = $derived((settings.machine, shownPlace()));
+  /** A disk the machine can sync with. */
+  let hasDisk = $derived(
+    (s.mode === "folder" && !!s.folder.trim()) || (s.mode === "server" && !!s.target.trim() && !!s.serverDir.trim()),
+  );
   let pass = $state("");
   let pass2 = $state("");
   let passError = $state("");
@@ -15,8 +27,19 @@
   let versions = $state<DiskVersion[] | null>(null);
   let versionError = $state("");
 
+  // Another machine shown: nothing typed or listed for the one before stays.
+  $effect(() => {
+    void settings.machine;
+    pass = "";
+    pass2 = "";
+    passError = "";
+    changingPass = false;
+    versions = null;
+    versionError = "";
+  });
+
   function set(patch: Partial<MemoryDiskSettings>) {
-    settings.set("memoryDisk", { ...settings.value.memoryDisk, ...patch });
+    settings.set("memoryDisk", withServer({ ...settings.value.memoryDisk, ...patch }, settings.value.masters));
     versions = null;
   }
 
@@ -41,11 +64,12 @@
   }
 
   async function forgetPass() {
+    const where = onMaster ? `on ${place}` : "on this computer";
     const ok = await ask(
-      "Forget the passphrase on this computer? The memory disk stays as it is; this computer stops syncing until you enter the passphrase again.",
+      `Forget the passphrase ${where}? The memory disk stays as it is; syncing there stops until you enter the passphrase again.`,
       { title: "Forget passphrase", okLabel: "Forget", cancelLabel: "Keep" },
     );
-    if (ok) await memoryDisk.forgetPassphrase();
+    if (ok) passError = await memoryDisk.forgetPassphrase();
   }
 
   async function showVersions() {
@@ -78,24 +102,40 @@
 
   <div class="modes" role="radiogroup" aria-label="Where the memory is kept">
     <label
-      ><input type="radio" checked={s.mode === "off"} onchange={() => set({ mode: "off" })} /> This computer only</label
+      ><input type="radio" checked={s.mode === "off"} onchange={() => set({ mode: "off" })} />
+      {onMaster ? "Only on this machine" : "This computer only"}</label
     >
     <label><input type="radio" checked={s.mode === "folder"} onchange={() => set({ mode: "folder" })} /> A folder</label
     >
-    <label>
-      <input type="radio" checked={s.mode === "server"} onchange={() => set({ mode: "server" })} /> A folder on a server
-    </label>
+    {#if !onMaster || s.mode === "server"}
+      <label>
+        <input
+          type="radio"
+          checked={s.mode === "server"}
+          disabled={onMaster}
+          onchange={() => set({ mode: "server" })}
+        /> A folder on a server
+      </label>
+    {/if}
   </div>
+  {#if onMaster}
+    <p class="muted">
+      These are the memory disk settings of {place}, kept there; it syncs on its own every 10 minutes. A folder here is
+      a folder on that machine. A folder on a server is chosen on This computer for now.
+    </p>
+  {/if}
 
   {#if s.mode === "folder"}
     <div class="row">
       <input
         value={s.folder}
         onchange={(e) => set({ folder: e.currentTarget.value })}
-        placeholder="For example a folder inside Google Drive, Dropbox or OneDrive"
+        placeholder={onMaster
+          ? "A folder on that machine, for example /srv/qanuvi-memory"
+          : "For example a folder inside Google Drive, Dropbox or OneDrive"}
         spellcheck="false"
       />
-      <button type="button" class="btn" onclick={browse}>Browse…</button>
+      {#if !onMaster}<button type="button" class="btn" onclick={browse}>Browse…</button>{/if}
     </div>
     <p class="muted">
       A folder that Google Drive, Dropbox or OneDrive keeps in sync shares the memory between your computers.
@@ -120,7 +160,7 @@
   {#if s.mode !== "off"}
     {#if memoryDisk.passphraseSaved && !changingPass}
       <p class="muted">
-        Passphrase saved in this computer's credential store.
+        {onMaster ? `Passphrase kept on ${place}.` : "Passphrase saved in this computer's credential store."}
         <button type="button" class="link" onclick={() => (changingPass = true)}>Change</button> ·
         <button type="button" class="link" onclick={forgetPass}>Forget</button>
       </p>
@@ -144,7 +184,7 @@
       <button
         type="button"
         class="btn primary"
-        disabled={memoryDisk.busy || !memoryDisk.passphraseSaved || !memoryDisk.disk}
+        disabled={memoryDisk.busy || !memoryDisk.passphraseSaved || !hasDisk}
         onclick={() => memoryDisk.sync()}
       >
         <RefreshCw size={13} />
@@ -159,7 +199,8 @@
     {#if memoryDisk.last}
       {@const l = memoryDisk.last}
       <p class="muted">
-        Last synced {ago(l.at)}: {l.written} entries on the disk from this computer{l.devices.length
+        Last synced {ago(l.at)}: {l.written} entries on the disk from {onMaster ? place : "this computer"}{l.devices
+          .length
           ? `; read ${l.devices.join(", ")}`
           : "; no other computer yet"}{l.merged.added || l.merged.changed || l.merged.deleted
           ? ` (${l.merged.added} new, ${l.merged.changed} changed, ${l.merged.deleted} deleted here)`
@@ -168,7 +209,7 @@
     {/if}
 
     <div class="row">
-      <button type="button" class="link" disabled={!memoryDisk.disk} onclick={showVersions}>Earlier versions…</button>
+      <button type="button" class="link" disabled={!hasDisk} onclick={showVersions}>Earlier versions…</button>
     </div>
     {#if versionError}<p class="error">{versionError}</p>{/if}
     {#if versions}

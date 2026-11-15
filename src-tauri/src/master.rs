@@ -33,6 +33,9 @@ pub struct Master {
     dir: PathBuf,
     /// Its lasting id (kept in its data folder), answered in hello so a window knows the same machine again.
     machine_id: String,
+    /// Opened on the desktop app's own data folder (remote access, Milestone 20): it is This PC, so it keeps This
+    /// PC's key names and leaves the start-up list, watches, syncs and backups to the desktop core (24z3 D6).
+    app_data: bool,
     db: Db,
     terminals: Terminals,
     agents: Agents,
@@ -59,6 +62,11 @@ fn send_line(out: &Out, v: &Value) -> bool {
 
 fn s(args: &Value, k: &str) -> String {
     args[k].as_str().unwrap_or("").to_string()
+}
+
+fn config_home() -> Result<PathBuf, String> {
+    crate::agent_config::home_dir()
+        .ok_or_else(|| "This machine's home folder could not be found.".to_string())
 }
 
 fn opt(args: &Value, k: &str) -> Option<String> {
@@ -103,7 +111,10 @@ impl Master {
     pub fn open(dir: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         paths::set_data_dir(dir.to_path_buf());
-        crate::model_keys::use_master_names();
+        let app_data = on_app_data(dir);
+        if !app_data {
+            crate::model_keys::use_master_names();
+        }
         // A restore booked in Settings, Backups (24z3 D3): applied now, before the database opens.
         if let Some(note) = crate::backups::apply_pending(dir, dir, None, Some(&backups_default()))
         {
@@ -116,6 +127,7 @@ impl Master {
         Ok(Self {
             dir: dir.to_path_buf(),
             machine_id,
+            app_data,
             db,
             terminals: Terminals::default(),
             agents: Agents::default(),
@@ -141,6 +153,15 @@ impl Master {
         Ok(PathBuf::from(
             projects::get(&self.db, &s(args, "projectId"))?.path,
         ))
+    }
+
+    /// The project a call names, when it names one (agent config files of a project or of the home folder only).
+    fn optional_root(&self, args: &Value) -> Result<Option<PathBuf>, String> {
+        if s(args, "projectId").is_empty() {
+            Ok(None)
+        } else {
+            self.root(args).map(Some)
+        }
     }
 
     /// Runs one command. `stream` makes a sink for commands that stream events (terminals, agent sessions);
@@ -548,6 +569,65 @@ impl Master {
             "claude_settings_base_url" => to(Ok(crate::claude_update::settings_base_url())),
             "claude_versions" => to(crate::claude_update::versions()),
             "claude_update" => to(crate::claude_update::update()),
+            // The memory disk (24z3 D6): this master's own disk (from its settings), passphrase and sync.
+            "memory_disk_device" => to(Ok(crate::memory_disk::device(&self.dir))),
+            "memory_disk_status" => to(Ok(crate::memory_disk::status(db))),
+            "memory_disk_passphrase_saved" => Ok(json!(crate::memory_disk::passphrase().is_ok())),
+            "memory_disk_passphrase_set" => {
+                crate::memory_disk::passphrase_set(&s(args, "passphrase"))?;
+                Ok(Value::Null)
+            }
+            "memory_disk_passphrase_forget" => {
+                crate::memory_disk::passphrase_forget()?;
+                Ok(Value::Null)
+            }
+            "memory_disk_sync" => to(crate::memory_disk::sync_here(db, &self.dir)),
+            "memory_disk_versions" => to(crate::memory_disk::versions_here(db, &self.dir)),
+            "memory_disk_restore" => to(crate::memory_disk::restore_here(
+                db,
+                &self.dir,
+                &s(args, "name"),
+            )),
+            // Agent setup (24z3 D6): the agents' own config files in this machine's home folder and its projects, a
+            // running session's model or mode, and the chat clean-up of this machine's chats.
+            "agent_config_list" => to(crate::agent_config::list(
+                &s(args, "provider"),
+                &config_home()?,
+                self.optional_root(args)?.as_deref(),
+            )),
+            "agent_config_read" => to(crate::agent_config::read(
+                &s(args, "provider"),
+                &s(args, "id"),
+                &config_home()?,
+                self.optional_root(args)?.as_deref(),
+            )),
+            "agent_config_write" => to(crate::agent_config::write(
+                &s(args, "provider"),
+                &s(args, "id"),
+                &config_home()?,
+                self.optional_root(args)?.as_deref(),
+                &s(args, "text"),
+                opt(args, "expectedHash").as_deref(),
+            )),
+            "agent_configure" => {
+                self.agents.configure(
+                    db,
+                    &s(args, "sessionId"),
+                    opt(args, "model").as_deref(),
+                    opt(args, "mode").as_deref(),
+                )?;
+                Ok(Value::Null)
+            }
+            "agent_clean_up" => {
+                let keep: Vec<String> =
+                    serde_json::from_value(args["keep"].clone()).unwrap_or_default();
+                to(agent::clean_up_chats(
+                    db,
+                    args["days"].as_i64().unwrap_or(0),
+                    &keep,
+                    crate::store::now(),
+                ))
+            }
             // OmniRoute (24z3 D5): the one on this master's machine, with this master's keys.
             "omniroute_connect" => {
                 crate::omniroute::connect(&endpoint_arg(args)?)?;
@@ -821,6 +901,9 @@ impl Master {
     /// list, and keeps Claude Code current when its settings ask for that (20 seconds after start, then once a day;
     /// never while an agent is working).
     pub fn start_own(self: &Arc<Self>) {
+        if self.app_data {
+            return;
+        }
         let settings = crate::settings::get_all(&self.db).unwrap_or_default();
         self.startup
             .start_all(&crate::startup::items_from_settings(&settings));
@@ -843,6 +926,18 @@ impl Master {
                 m.omniroute_look();
                 drop(m);
                 std::thread::sleep(crate::omniroute::WATCH_EVERY);
+            }
+        });
+        // The memory disk (24z3 D6): 90 seconds after start, then every 10 minutes, with this master's own disk and
+        // passphrase, shown or not.
+        let me = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(90));
+            loop {
+                let Some(m) = me.upgrade() else { return };
+                crate::memory_disk::sync_due(&m.db, &m.dir);
+                drop(m);
+                std::thread::sleep(crate::memory_disk::SYNC_EVERY);
             }
         });
     }
@@ -883,13 +978,36 @@ impl Master {
     }
 }
 
+/// The file the desktop app keeps in its own data folder (24z3 D6), so a master service opened on it knows it is This PC.
+const APP_MARK: &str = "qanuvi-app.mark";
+
+/// Called by the desktop app at start-up on its data folder.
+pub fn mark_app_data(dir: &Path) {
+    let file = dir.join(APP_MARK);
+    if !file.is_file() {
+        let _ = std::fs::write(
+            file,
+            "This folder is the Qanuvi desktop app's own data. A master service opened on it is This PC.\n",
+        );
+    }
+}
+
+fn on_app_data(dir: &Path) -> bool {
+    dir.join(APP_MARK).is_file()
+}
+
 /// Runs the background service until it is stopped.
 pub fn serve(dir: &Path) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
     master.start_own();
-    // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour.
+    // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour. On the app's
+    // own data the desktop core makes This PC's backups.
     let backup_dir = dir.to_path_buf();
+    let app_data = master.app_data;
     std::thread::spawn(move || {
+        if app_data {
+            return;
+        }
         std::thread::sleep(Duration::from_secs(120));
         loop {
             if let Err(e) =
@@ -1334,6 +1452,67 @@ mod tests {
             .unwrap_err();
             assert!(e.contains("QANUVI_KEY_OPENROUTER"), "{e}");
         }
+    }
+
+    #[test]
+    fn answers_memory_disk_and_agent_setup_on_its_own_machine() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        assert!(!m.app_data);
+        // Known commands (24z3 D6): any problem is the command's own, never "does not know the command".
+        let args = json!({"provider": "claude", "id": "nothing", "sessionId": "none", "days": 0, "keep": []});
+        for cmd in [
+            "memory_disk_device",
+            "memory_disk_status",
+            "memory_disk_passphrase_saved",
+            "memory_disk_passphrase_set",
+            "memory_disk_sync",
+            "memory_disk_versions",
+            "memory_disk_restore",
+            "agent_config_list",
+            "agent_config_read",
+            "agent_config_write",
+            "agent_configure",
+            "agent_clean_up",
+        ] {
+            if let Err(e) = call(&m, cmd, args.clone()) {
+                assert!(!e.contains("does not know the command"), "{cmd}: {e}");
+            }
+        }
+        // The master's own disk is the one its settings name: none yet, said by its sync and kept for the window.
+        let e = call(&m, "memory_disk_sync", json!({})).unwrap_err();
+        assert!(e.contains("Choose where"), "{e}");
+        let st = call(&m, "memory_disk_status", json!({})).unwrap();
+        assert_eq!(st["error"], json!(e));
+        assert_eq!(
+            call(&m, "memory_disk_versions", json!({})).unwrap(),
+            json!([])
+        );
+        // Its device id is its own, the same when asked again.
+        let a = call(&m, "memory_disk_device", json!({})).unwrap();
+        assert_eq!(a, call(&m, "memory_disk_device", json!({})).unwrap());
+        assert_eq!(
+            call(&m, "agent_clean_up", json!({"days": 0, "keep": []})).unwrap(),
+            json!(0)
+        );
+    }
+
+    #[test]
+    fn a_master_on_the_apps_own_data_is_this_pc() {
+        let data = tempfile::tempdir().unwrap();
+        assert!(!on_app_data(data.path()));
+        mark_app_data(data.path());
+        mark_app_data(data.path());
+        assert!(on_app_data(data.path()));
+        let m = Master::open(data.path()).unwrap().shared();
+        assert!(m.app_data);
+        // Its start-up list is the desktop core's to start: nothing starts here.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let item = json!({"id": "proxy", "name": "proxy", "command": "no-such-program-xyz", "waitFor": addr, "enabled": true});
+        call(&m, "settings_set", json!({"values": {"startup": [item]}})).unwrap();
+        m.start_own();
+        assert_eq!(call(&m, "startup_status", json!({})).unwrap(), json!([]));
     }
 
     #[test]

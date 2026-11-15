@@ -15,6 +15,11 @@ pub fn use_master_names() {
     MASTER.store(true, Ordering::Relaxed);
 }
 
+/// Whether this program is a master with names of its own (a master on This PC's own data is not).
+pub fn is_master() -> bool {
+    MASTER.load(Ordering::Relaxed)
+}
+
 fn entry(endpoint: &str) -> String {
     entry_for(MASTER.load(Ordering::Relaxed), endpoint)
 }
