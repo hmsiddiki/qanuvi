@@ -369,7 +369,20 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 05:40): 24z3 D7 BUILT (not driven live yet). A master answers memory_list,
+    RESUME HERE (newest, 2026-11-16 06:10): 24z3 D7 DRIVEN LIVE on the local test master, all pass (release test
+    build 05:44). This PC Memory: "1 entry on the disk from this computer" (c); Sync now. Master shown -> Memory page
+    loads (no "cannot be done" line); master Sync now -> "read This PC" (b). New entry "D7 master memory test" saved
+    into the master's DB only (This PC's DB unchanged), listed; Try it gives the master's slice; the master synced on
+    its own after the change ("2 entries"); Edit (title + " edited") saved on the master; Delete (Qanuvi's own dialog)
+    marks it deleted on the master and the page shows "No entries yet". Show This PC -> Memory lists This PC's own
+    entry only. Driving note: the trash icon and the dialog button are both named "Delete"; ui.ps1 invoke hits the
+    icon (closes the dialog), so click the dialog button by position. FINDING (older than D7, not fixed): an entry
+    scoped to a project is kept with that machine's project id; the disk carries it to other machines, where no
+    project has that id, so it never shows there ("D6 disk test fact" is scoped to This PC's projl: in the master's
+    DB but not on its page). Proposal for the owner: map the scope by the project's folder/name when merging, or show
+    entries of unknown projects under "every project" with a "from another machine" note. NEXT: VPS (server build
+    swap, owner yes), then Part B with (d).
+    RESUME HERE (before, 2026-11-16 05:40): 24z3 D7 BUILT (not driven live yet). A master answers memory_list,
     memory_save, memory_delete, memory_slice, memory_search from its own memory (master.rs, same arguments as the
     desktop; test answers_memory_entries_from_its_own_memory). (b) This PC's disk file is named "This PC"
     (memory_disk.rs writer/named_for; a master keeps its own name; the file still goes by the lasting id). (c) "1
