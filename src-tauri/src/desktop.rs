@@ -1193,10 +1193,26 @@ async fn setup_tools() -> Res<crate::local_servers::Tools> {
     blocking(|| Ok(crate::local_servers::tools())).await
 }
 
-/// Installs one of them at the user's click (Windows asks for permission itself).
+/// How one of them is installed here: the command the wizard shows before the user says yes (24z3 D2).
 #[tauri::command]
-async fn setup_install(tool: String) -> Res<()> {
-    blocking(move || crate::local_servers::install(&tool)).await
+fn setup_install_plan(tool: String) -> Res<crate::local_servers::InstallPlan> {
+    crate::local_servers::install_plan(&tool)
+}
+
+/// Runs the install in a terminal the wizard shows (typing, a password prompt included, goes through term_write).
+#[tauri::command]
+fn setup_install_start(
+    window: tauri::Window,
+    state: State<AppState>,
+    tool: String,
+    cols: u16,
+    rows: u16,
+    on_event: Channel<terminal::TermEvent>,
+) -> Res<String> {
+    let id =
+        crate::local_servers::install_start(&state.terminals, &tool, cols, rows, on_event.into())?;
+    state.terminals.set_owner(&id, window.label());
+    Ok(id)
 }
 
 /// Free memory and free graphics memory right now (GB), for the wizard's first page.
@@ -1686,7 +1702,7 @@ fn inbox_changed(app: &tauri::AppHandle, change: &str, item: Option<&inbox::Inbo
     );
 }
 
-// Desktop notifications (24u part 4, session B): the window sends the owner's settings; a click that started Qanuvi
+// Desktop notifications (24u part 4, session B): the window sends This PC's settings (24z3 D2: never a master's); a click that started Qanuvi
 // waits until the window asks for it.
 #[tauri::command]
 fn notify_settings(
@@ -1711,14 +1727,16 @@ fn notify_test(app: tauri::AppHandle) -> Res<()> {
 }
 
 // A new item in a connected master's Inbox (24z R2d part 3): every window that follows the master asks, it is shown once.
+// The window sends that master's Notifications settings with it (24z3 D2); an older window sends none: This PC's.
 #[tauri::command]
 fn notify_item(
     app: tauri::AppHandle,
     notifier: State<crate::desktop_notify::Notifier>,
     item: inbox::InboxItem,
+    settings: Option<crate::notify::NotifySettings>,
 ) {
     if notifier.first_time(&item.id) {
-        crate::desktop_notify::new_item(&app, &item);
+        crate::desktop_notify::new_item_by(&app, &item, settings);
     }
 }
 
@@ -2175,7 +2193,8 @@ pub fn run() {
             backups_remove,
             app_restart,
             setup_tools,
-            setup_install,
+            setup_install_plan,
+            setup_install_start,
             machine_room,
             omniroute_catalog,
             omniroute_add_key,

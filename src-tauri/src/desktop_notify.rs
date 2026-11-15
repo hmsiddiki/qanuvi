@@ -61,12 +61,18 @@ fn installed() -> bool {
     !crate::data_location::from_source()
 }
 
-/// A new Inbox item: told on the desktop when the owner's settings want it.
+/// A new Inbox item of This PC: told on the desktop when This PC's settings want it.
 pub fn new_item(app: &AppHandle, item: &InboxItem) {
+    new_item_by(app, item, None);
+}
+
+/// A new Inbox item: told when its machine's settings want it (24z3 D2: a master's item by that master's
+/// Notifications settings, which the window sends with it; This PC's otherwise).
+pub fn new_item_by(app: &AppHandle, item: &InboxItem, machine: Option<NotifySettings>) {
     let Some(n) = app.try_state::<Notifier>() else {
         return;
     };
-    let s = n.settings.lock().unwrap().clone();
+    let s = machine.unwrap_or_else(|| n.settings.lock().unwrap().clone());
     if !notify::wanted(&s, item) || notify::quiet_now(&s, notify::local_minute()) {
         return;
     }

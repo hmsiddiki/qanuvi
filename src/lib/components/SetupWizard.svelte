@@ -4,9 +4,14 @@
    * honestly what local models can do here, then sets up what the user ticks: a local model through Ollama (installed
    * if missing), OpenRouter (the user signs in and pastes the key; Qanuvi does the rest) and OmniRoute (installed,
    * started and connected; sign-ins open in the browser). Every install, page and sign-in waits for a click.
+   * It is the shown machine's (24z3 D2): an install is asked first with its exact command, then runs in a terminal
+   * on that machine, shown here (a password it asks for is typed there), and its end is said.
    */
   import { onMount } from "svelte";
-  import { routed as invoke } from "$lib/remote";
+  import { routed as invoke, shownMachine, shownPlace, shownPlaceTitle } from "$lib/remote";
+  import { api } from "$lib/api";
+  import { ask } from "$lib/stores/confirm.svelte";
+  import TerminalView from "./TerminalView.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { errorText } from "$lib/api";
   import { localVerdict, recommend } from "$lib/agents/guides";
@@ -32,11 +37,24 @@
   let step = $state<"pc" | "local" | "openrouter" | "omniroute" | "done">("pc");
   let busy = $state("");
   let error = $state("");
-  let command = $state("");
+  /** Where to get a tool by hand when there is no install command for it on the machine. */
+  let link = $state<{ tool: string; url: string } | null>(null);
+  /** The install running in the terminal below, and what it ended with. */
+  let installing = $state<{ tool: string; line: string; ended: boolean } | null>(null);
+  let outcome = $state("");
+  const NAMES: Record<string, string> = { ollama: "Ollama", node: "Node.js", omniroute: "OmniRoute" };
+
+  interface InstallPlan {
+    tool: string;
+    line: string;
+    admin: boolean;
+  }
   let orKey = $state("");
 
   const provider = (id: string) => settings.value.brain.providers.find((p) => p.id === id) as ModelProvider;
-  let verdict = $derived(guides.machine ? localVerdict(guides.machine) : null);
+  let place = $state(shownPlace());
+  let title = $state(shownPlaceTitle());
+  let verdict = $derived(guides.machine ? localVerdict(guides.machine, title) : null);
 
   onMount(async () => {
     await guides.loadMachine();
@@ -61,20 +79,59 @@
   async function run(label: string, f: () => Promise<unknown>) {
     busy = label;
     error = "";
-    command = "";
     try {
       await f();
     } catch (e) {
-      const text = errorText(e);
-      if (text.startsWith("command:")) command = text.slice("command:".length);
-      else error = text;
+      error = errorText(e);
     } finally {
       busy = "";
     }
   }
 
   async function install(tool: string) {
-    await run(`Installing ${tool}… (Windows may ask for permission)`, () => invoke("setup_install", { tool }));
+    error = "";
+    link = null;
+    outcome = "";
+    const name = NAMES[tool] ?? tool;
+    let plan: InstallPlan;
+    try {
+      plan = await invoke<InstallPlan>("setup_install_plan", { tool });
+    } catch (e) {
+      const text = errorText(e);
+      if (text.startsWith("link:")) link = { tool, url: text.slice("link:".length) };
+      else error = text;
+      return;
+    }
+    const where = shownPlace();
+    const lines = [`Install ${name} on ${where}? It runs:`, plan.line];
+    if (plan.admin) lines.push(`Windows asks for permission on ${where}'s own screen: someone there has to click Yes.`);
+    lines.push("You see it run here; if it asks for a password, type it in the terminal.");
+    if (!(await ask(lines.join("\n\n"), { title: `Install ${name}`, okLabel: "Install" }))) return;
+    installing = { tool, line: plan.line, ended: false };
+  }
+
+  /** The install ended: the tools are looked for again, and the wizard says whether it is there now. */
+  async function installEnded(code: number | null) {
+    const job = installing;
+    if (!job) return;
+    installing = { ...job, ended: true };
+    tools = await invoke<Tools>("setup_tools").catch(() => tools);
+    const name = NAMES[job.tool] ?? job.tool;
+    const there = !!tools?.[job.tool as keyof Tools];
+    outcome =
+      there || code === 0
+        ? `${name} is installed on ${place}.`
+        : `${name} was not installed${code !== null ? ` (exit code ${code})` : ""}. What it said is above.`;
+    if (code === 0 && !there)
+      outcome += ` Qanuvi does not find it yet: restart Qanuvi on ${place} so it sees the new program.`;
+  }
+
+  function closeInstall() {
+    installing = null;
+  }
+
+  async function lookAgain() {
+    link = null;
     tools = await invoke<Tools>("setup_tools").catch(() => tools);
   }
 
@@ -173,7 +230,7 @@
   </div>
 
   {#if step === "pc"}
-    <h4>1. This computer</h4>
+    <h4>1. {title}</h4>
     {#if guides.machine}
       <p>
         {guides.machine.ramGb} GB memory{guides.machine.gpu
@@ -185,7 +242,7 @@
       {#if verdict}<p class="verdict {verdict.level}">{verdict.text}</p>{/if}
       <p class="muted small">Set up:</p>
       <label class="check"
-        ><input type="checkbox" bind:checked={want.local} disabled={verdict?.level === "none"} /> A model on this computer
+        ><input type="checkbox" bind:checked={want.local} disabled={verdict?.level === "none"} /> A model on {place}
         (Ollama: free, works offline)</label
       >
       <label class="check"
@@ -198,13 +255,13 @@
       >
       <button type="button" class="btn primary" onclick={next}>Next</button>
     {:else}
-      <p class="muted">Looking at this computer…</p>
+      <p class="muted">Looking at {place}…</p>
     {/if}
   {:else if step === "local"}
-    <h4>2. A model on this computer</h4>
+    <h4>2. A model on {place}</h4>
     {#if tools && !tools.ollama}
       <p>Ollama runs the models. It is not installed yet.</p>
-      <button type="button" class="btn primary" disabled={!!busy} onclick={() => install("ollama")}
+      <button type="button" class="btn primary" disabled={!!busy || !!installing} onclick={() => install("ollama")}
         >Install Ollama</button
       >
     {:else}
@@ -251,12 +308,12 @@
     <h4>4. OmniRoute</h4>
     {#if tools && !tools.node}
       <p>OmniRoute needs Node.js.</p>
-      <button type="button" class="btn primary" disabled={!!busy} onclick={() => install("node")}
+      <button type="button" class="btn primary" disabled={!!busy || !!installing} onclick={() => install("node")}
         >Install Node.js</button
       >
     {:else if tools && !tools.omniroute}
       <p>OmniRoute is not installed yet (MIT licence, from npm).</p>
-      <button type="button" class="btn primary" disabled={!!busy} onclick={() => install("omniroute")}
+      <button type="button" class="btn primary" disabled={!!busy || !!installing} onclick={() => install("omniroute")}
         >Install OmniRoute</button
       >
     {:else if !brain.keys.omniroute}
@@ -282,13 +339,42 @@
     <h4>Done</h4>
     <p>
       Qanuvi agent is set for new sessions with {settings.value.brain.models.length} models: online ones first for changes,
-      a model on this computer for questions when there is one. The list is below; you can reorder it any time.
+      a model on {place} for questions when there is one. The list is below; you can reorder it any time.
     </p>
     <button type="button" class="btn primary" onclick={onclose}>Close</button>
   {/if}
 
   {#if busy}<p class="muted small">{busy}</p>{/if}
-  {#if command}<p class="small">Run this in a terminal: <code>{command}</code></p>{/if}
+  {#if installing}
+    <p class="small">On {place}: <code>{installing.line}</code></p>
+    <div class="term">
+      <TerminalView
+        projectId=""
+        shell=""
+        visible={true}
+        start={(cols, rows, onEvent) => api.term.installStart(installing?.tool ?? "", cols, rows, onEvent)}
+        endText="The install has ended."
+        onexit={installEnded}
+      />
+    </div>
+    {#if installing.ended}
+      <button type="button" class="link" onclick={closeInstall}>Close the terminal</button>
+    {:else}
+      <p class="muted small">Installing… type in the terminal if it asks for something.</p>
+    {/if}
+  {/if}
+  {#if outcome}<p class="small">{outcome}</p>{/if}
+  {#if link}
+    <p class="small">
+      There is no install command for {NAMES[link.tool] ?? link.tool} on {place}. Install it there from
+      {#if shownMachine() === null}
+        <button type="button" class="link" onclick={() => link && openUrl(link.url)}>{link.url}</button>,
+      {:else}
+        <code>{link.url}</code>,
+      {/if}
+      then <button type="button" class="link" onclick={lookAgain}>look again</button>.
+    </p>
+  {/if}
   {#if error}<p class="error small">{error}</p>{/if}
   {#if omni.error}<p class="error small">{omni.error}</p>{/if}
 </div>
@@ -402,6 +488,15 @@
     color: var(--qx-accent);
     font: inherit;
     cursor: pointer;
+  }
+
+  .term {
+    position: relative;
+    height: 200px;
+    margin: 6px 0;
+    border-radius: 6px;
+    background: #141416;
+    overflow: hidden;
   }
 
   code {

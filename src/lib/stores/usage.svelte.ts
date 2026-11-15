@@ -1,5 +1,8 @@
-/** Qanuvi's total memory and processor use (itself and every process it started), for the status bar (1f). */
-import { routed as invoke } from "$lib/remote";
+/**
+ * Qanuvi's total memory and processor use (itself and every process it started), for the status bar (1f). It is the
+ * shown machine's (24z3 D2): a switch clears it at once, and an answer from the machine before is dropped.
+ */
+import { routed as invoke, shownMachine, shownPlaceTitle } from "$lib/remote";
 
 export interface UsagePart {
   name: string;
@@ -22,16 +25,36 @@ export function bytes(n: number): string {
 
 class UsageStore {
   now = $state<Usage | null>(null);
+  /** Whose it is, for the tooltip: "This computer" or the master's name. */
+  place = $state("This computer");
   #timer: ReturnType<typeof setInterval> | null = null;
+  #asks = 0;
 
   start(): void {
     if (this.#timer) return;
-    const look = () =>
-      invoke<Usage | null>("qanuvi_usage")
-        .then((u) => (this.now = u))
-        .catch(() => {});
-    void look();
-    this.#timer = setInterval(look, 5000);
+    void this.look();
+    this.#timer = setInterval(() => void this.look(), 5000);
+  }
+
+  async look(): Promise<void> {
+    const ask = ++this.#asks;
+    const machine = shownMachine();
+    try {
+      const u = await invoke<Usage | null>("qanuvi_usage");
+      if (ask === this.#asks && machine === shownMachine()) {
+        this.now = u;
+        this.place = shownPlaceTitle();
+      }
+    } catch {
+      // A master that cannot tell (an older one) shows nothing, never another machine's numbers.
+      if (ask === this.#asks && machine === shownMachine()) this.now = null;
+    }
+  }
+
+  /** Another machine is shown (machines.ts). */
+  switched(): void {
+    this.now = null;
+    if (this.#timer) void this.look();
   }
 }
 

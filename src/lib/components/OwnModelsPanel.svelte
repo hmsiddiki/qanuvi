@@ -233,8 +233,8 @@
     <span>
       <strong>Use models on {here} (Ollama)</strong>
       <span class="muted small"
-        >Off: only free models online (OpenRouter, OmniRoute). Nothing is installed, downloaded or started on this
-        computer, and models already in the list from it are skipped.</span
+        >Off: only free models online (OpenRouter, OmniRoute). Nothing is installed, downloaded or started on {here},
+        and models already in the list from it are skipped.</span
       >
     </span>
   </label>
@@ -242,7 +242,7 @@
   {#each b.providers.filter((p) => b.local || p.kind !== "ollama") as p (p.id)}
     <div class="provider">
       <div class="row">
-        <strong>{p.name}</strong>
+        <strong>{p.name.replace("(this computer)", `(${here})`)}</strong>
         <input
           value={p.url}
           spellcheck="false"

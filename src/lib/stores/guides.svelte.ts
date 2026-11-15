@@ -3,7 +3,7 @@
  * agent brought up to date with the user's permission (kept here after the user accepts it).
  */
 import { Channel } from "@tauri-apps/api/core";
-import { routed as invoke } from "$lib/remote";
+import { routed as invoke, shownPlaceTitle } from "$lib/remote";
 import { errorText } from "$lib/api";
 import {
   BUILT_IN_GUIDES,
@@ -31,12 +31,15 @@ export interface Proposal {
 class GuidesStore {
   kept = $state<Guide[] | null>(null);
   machine = $state<MachineInfo | null>(null);
+  /** Whose `machine` is, at the start of a sentence: "This computer" or the master's name. */
+  place = $state("This computer");
   checking = $state<Record<string, string>>({});
   pulling = $state<Record<string, { status: string; done: number; total: number } | null>>({});
   pullError = $state<Record<string, string>>({});
   updating = $state(false);
   updateError = $state("");
   proposal = $state<Proposal | null>(null);
+  #asks = 0;
 
   constructor() {
     try {
@@ -56,9 +59,23 @@ class GuidesStore {
     return this.all.find((g) => g.provider === provider);
   }
 
+  /** The shown machine's memory and graphics card (read once per machine). */
   async loadMachine(): Promise<void> {
     if (this.machine) return;
-    this.machine = await invoke<MachineInfo>("machine_info").catch(() => null);
+    const ask = ++this.#asks;
+    const info = await invoke<MachineInfo>("machine_info").catch(() => null);
+    if (ask === this.#asks) {
+      this.place = shownPlaceTitle();
+      this.machine = info;
+    }
+  }
+
+  /** Another machine is shown (machines.ts): its facts are read again; a late answer from the one before is dropped. */
+  switched(): void {
+    const had = this.machine !== null;
+    this.#asks++;
+    this.machine = null;
+    if (had) void this.loadMachine();
   }
 
   get local() {

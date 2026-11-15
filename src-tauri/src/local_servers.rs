@@ -53,6 +53,12 @@ fn usual_places(program: &str) -> Vec<PathBuf> {
         if let Some(roaming) = env("APPDATA") {
             list.push(roaming.join("npm").join(format!("{program}.cmd")));
         }
+        // Node.js's installer (a new install is not on the PATH Qanuvi started with).
+        if let Some(files) = env("ProgramFiles") {
+            let node = files.join("nodejs");
+            list.push(node.join(format!("{program}.exe")));
+            list.push(node.join(format!("{program}.cmd")));
+        }
     } else {
         for dir in ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"] {
             list.push(PathBuf::from(dir).join(program));
@@ -331,61 +337,137 @@ pub fn tools() -> Tools {
     }
 }
 
-/// Installs a tool the setup wizard needs, at the user's click. Windows: winget (Windows asks for permission itself);
-/// OmniRoute: npm. Other systems get the official command to run themselves (Err starting with "command:").
-pub fn install(tool: &str) -> Result<(), String> {
-    let (program, args): (&str, Vec<&str>) = match (tool, cfg!(windows)) {
-        ("ollama", true) => ("winget", vec!["install", "--id", "Ollama.Ollama", "-e"]),
-        ("node", true) => ("winget", vec!["install", "--id", "OpenJS.NodeJS.LTS", "-e"]),
-        ("ollama", false) => {
-            return Err(if cfg!(target_os = "macos") {
-                "command:brew install ollama".into()
-            } else {
-                "command:curl -fsSL https://ollama.com/install.sh | sh".into()
-            });
-        }
-        ("node", false) => return Err("command:open https://nodejs.org".into()),
-        ("omniroute", _) => ("npm", vec!["install", "-g", "omniroute"]),
-        _ => return Err("Qanuvi does not install that.".into()),
+/// How a tool the setup wizard needs is installed on this machine (24z3 D2): the command the user reads before saying
+/// yes, then watches running in a terminal on this machine (a password prompt answered there). Windows uses winget,
+/// Ollama for the user only (no admin prompt); Node.js needs Windows' own permission on this machine's screen.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallPlan {
+    pub tool: String,
+    /// The command as the user reads it.
+    pub line: String,
+    /// Windows asks for permission on this machine's own screen (UAC): someone there clicks Yes.
+    pub admin: bool,
+    /// What runs (the program found on this machine and its arguments).
+    #[serde(skip)]
+    pub program: String,
+    #[serde(skip)]
+    pub args: Vec<String>,
+}
+
+/// Where to get a tool by hand when there is no command for it here (an error starting with "link:").
+fn link(tool: &str) -> String {
+    let url = match tool {
+        "ollama" => "https://ollama.com/download",
+        _ => "https://nodejs.org",
     };
+    format!("link:{url}")
+}
+
+fn found(program: &str) -> Option<String> {
+    find(program).map(|p| p.to_string_lossy().to_string())
+}
+
+/// The install of `tool` on this machine, or why there is none: "link:<url>" to get it by hand, or a sentence.
+pub fn install_plan(tool: &str) -> Result<InstallPlan, String> {
+    plan_for(tool, std::env::consts::OS, &found)
+}
+
+/// Starts the install in a terminal on this machine (the user said yes to the plan's line); the terminal's id.
+/// Its output and the exit code reach `channel`; typing goes in through the terminal's write.
+pub fn install_start(
+    terminals: &crate::terminal::Terminals,
+    tool: &str,
+    cols: u16,
+    rows: u16,
+    channel: crate::sink::Sink<crate::terminal::TermEvent>,
+) -> Result<String, String> {
+    let plan = install_plan(tool).map_err(|e| match e.strip_prefix("link:") {
+        Some(url) => format!("There is no install command for {tool} here; get it from {url}."),
+        None => e,
+    })?;
     // Room first: the installers themselves need some memory and the download needs disk.
     crate::machine::check(tool, 0.5)?;
-    let path = crate::terminal::find_on_path(program)
-        .ok_or_else(|| format!("{program} is not on this computer."))?;
-    let mut cmd = Command::new(path);
-    cmd.args(&args);
-    if program == "winget" {
-        // The user pressed Install after reading what it installs: winget's source and package terms are accepted.
-        cmd.args([
-            "--accept-source-agreements",
-            "--accept-package-agreements",
-            "--silent",
-        ]);
+    let cwd = crate::agent_config::home_dir().unwrap_or_else(std::env::temp_dir);
+    terminals.spawn_program(
+        "setup",
+        &cwd,
+        &plan.program,
+        &plan.args,
+        cols,
+        rows,
+        channel,
+    )
+}
+
+fn plan_for(
+    tool: &str,
+    os: &str,
+    found: &dyn Fn(&str) -> Option<String>,
+) -> Result<InstallPlan, String> {
+    let plan = |line: &str, program: String, args: Vec<String>, admin: bool| InstallPlan {
+        tool: tool.into(),
+        line: line.into(),
+        admin,
+        program,
+        args,
+    };
+    let words = |s: &str| s.split(' ').map(String::from).collect::<Vec<_>>();
+    if !matches!(tool, "ollama" | "node" | "omniroute") {
+        return Err("Qanuvi does not install that.".into());
     }
-    cmd.stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000);
+    if tool == "omniroute" {
+        let npm = found("npm").ok_or("OmniRoute needs Node.js first (npm was not found).")?;
+        let line = "npm install -g omniroute";
+        return Ok(if os == "windows" {
+            // npm is a .cmd file there: run through cmd.
+            let mut args = words("/d /c");
+            args.push(npm);
+            args.extend(words("install -g omniroute"));
+            plan(line, "cmd.exe".into(), args, false)
+        } else {
+            plan(line, npm, words("install -g omniroute"), false)
+        });
     }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("{program} could not start: {e}"))?;
-    if out.status.success() {
-        return Ok(());
+    if os == "windows" {
+        let winget = found("winget").ok_or_else(|| link(tool))?;
+        let (id, scope) = if tool == "ollama" {
+            ("Ollama.Ollama", " --scope user")
+        } else {
+            ("OpenJS.NodeJS.LTS", "")
+        };
+        // The user said yes after reading what it installs: winget's source and package terms are accepted;
+        // --silent keeps the installer's own window from waiting on this machine's screen.
+        let rest = format!(
+            "install --id {id} -e{scope} --accept-source-agreements --accept-package-agreements --silent"
+        );
+        return Ok(plan(
+            &format!("winget {rest}"),
+            winget,
+            words(&rest),
+            tool == "node",
+        ));
     }
-    let text =
-        String::from_utf8_lossy(&out.stderr).to_string() + &String::from_utf8_lossy(&out.stdout);
-    let line = text
-        .lines()
-        .map(str::trim)
-        .rfind(|l| !l.is_empty())
-        .unwrap_or("no reason given");
-    Err(format!(
-        "{tool} was not installed: {}",
-        line.chars().take(200).collect::<String>()
+    if tool == "node" {
+        return Err(link(tool));
+    }
+    if os == "macos" {
+        let brew = found("brew").ok_or_else(|| link(tool))?;
+        return Ok(plan(
+            "brew install ollama",
+            brew,
+            words("install ollama"),
+            false,
+        ));
+    }
+    // Linux: Ollama's own script (it asks for the sudo password in the terminal).
+    found("curl").ok_or_else(|| link(tool))?;
+    let line = "curl -fsSL https://ollama.com/install.sh | sh";
+    Ok(plan(
+        line,
+        "/bin/sh".into(),
+        vec!["-c".into(), line.into()],
+        false,
     ))
 }
 
@@ -488,5 +570,67 @@ mod tests {
         );
         assert_eq!(key("{\"error\":\"no\"}"), None);
         assert_eq!(key("no json at all"), None);
+    }
+    fn with(names: &'static [&'static str]) -> impl Fn(&str) -> Option<String> {
+        move |p: &str| names.contains(&p).then(|| format!("/found/{p}"))
+    }
+
+    #[test]
+    fn plans_an_install_for_each_system() {
+        // Windows: Ollama for the user only (no permission prompt), Node.js needs Windows' permission.
+        let w = with(&["winget", "npm"]);
+        let o = plan_for("ollama", "windows", &w).unwrap();
+        assert!(
+            o.line
+                .starts_with("winget install --id Ollama.Ollama -e --scope user"),
+            "{}",
+            o.line
+        );
+        assert!(!o.admin);
+        assert_eq!(o.program, "/found/winget");
+        assert_eq!(o.args[0], "install");
+        let n = plan_for("node", "windows", &w).unwrap();
+        assert!(n.admin && !n.line.contains("--scope"), "{}", n.line);
+        let r = plan_for("omniroute", "windows", &w).unwrap();
+        assert_eq!(r.line, "npm install -g omniroute");
+        assert_eq!(r.program, "cmd.exe");
+        assert_eq!(r.args[..3], ["/d", "/c", "/found/npm"]);
+        // No winget: where to get it.
+        assert_eq!(
+            plan_for("ollama", "windows", &with(&[])).unwrap_err(),
+            "link:https://ollama.com/download"
+        );
+        // Mac: Homebrew; Linux: Ollama's script through sh (sudo asks in the terminal).
+        let m = plan_for("ollama", "macos", &with(&["brew"])).unwrap();
+        assert_eq!(
+            (m.line.as_str(), m.program.as_str()),
+            ("brew install ollama", "/found/brew")
+        );
+        let l = plan_for("ollama", "linux", &with(&["curl"])).unwrap();
+        assert_eq!(l.program, "/bin/sh");
+        assert_eq!(
+            l.args,
+            ["-c", "curl -fsSL https://ollama.com/install.sh | sh"]
+        );
+        // Node.js on Mac and Linux: by hand.
+        assert_eq!(
+            plan_for("node", "linux", &with(&["curl"])).unwrap_err(),
+            "link:https://nodejs.org"
+        );
+        assert_eq!(
+            plan_for("node", "macos", &with(&["brew"])).unwrap_err(),
+            "link:https://nodejs.org"
+        );
+        let u = plan_for("omniroute", "linux", &with(&["npm"])).unwrap();
+        assert_eq!((u.program.as_str(), u.args.len()), ("/found/npm", 3));
+        assert!(
+            plan_for("omniroute", "linux", &with(&[]))
+                .unwrap_err()
+                .contains("Node.js first")
+        );
+        assert_eq!(
+            plan_for("rm", "linux", &with(&[])).unwrap_err(),
+            "Qanuvi does not install that."
+        );
     }
 }

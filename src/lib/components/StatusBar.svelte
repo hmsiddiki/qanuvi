@@ -209,7 +209,7 @@
   {#if usage.now}
     <span
       class="item static"
-      title={`Qanuvi in all (${usage.now.processes} processes):\n` +
+      title={`Qanuvi in all on ${usage.place} (${usage.now.processes} processes):\n` +
         usage.now.parts.map((p) => `${p.name}${p.count > 1 ? ` ×${p.count}` : ""}: ${bytes(p.memory)}`).join("\n")}
     >
       <span>{bytes(usage.now.memory)} · {usage.now.cpu.toFixed(0)}%</span>

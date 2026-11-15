@@ -429,6 +429,33 @@ impl Master {
                 self.terminals.kill(&s(args, "id"));
                 Ok(Value::Null)
             }
+            // This machine and its setup (24z3 D2): the guide, the setup wizard and the status bar while it is shown.
+            "machine_info" => to(Ok(crate::machine::detect())),
+            "machine_room" => to(Ok(
+                crate::machine::room().map(|r| (r.free_ram_gb, r.free_vram_gb))
+            )),
+            "setup_tools" => to(Ok(crate::local_servers::tools())),
+            "setup_install_plan" => to(crate::local_servers::install_plan(&s(args, "tool"))),
+            "setup_install_start" => {
+                let sink = stream(&s(args, "onEvent"));
+                let term = Sink::new(move |e: terminal::TermEvent| {
+                    sink.send(serde_json::to_value(e).unwrap_or(Value::Null))
+                        .is_ok()
+                });
+                let id = crate::local_servers::install_start(
+                    &self.terminals,
+                    &s(args, "tool"),
+                    n(args, "cols").max(10) as u16,
+                    n(args, "rows").max(4) as u16,
+                    term,
+                )?;
+                opened_terminals
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(id.clone());
+                Ok(json!(id))
+            }
+            "qanuvi_usage" => to(Ok(crate::usage::usage())),
             // Git.
             "git_status" => to(git::status(&self.root(args)?)),
             "git_diff" => to(git::diff(&self.root(args)?, &s(args, "path"))),
@@ -942,6 +969,26 @@ mod tests {
             let args = json!({"projectId": "not-a-project", "name": "DB_PASSWORD", "value": "x"});
             assert!(call(&m, cmd, args).is_err(), "{cmd}");
         }
+    }
+
+    #[test]
+    fn answers_the_machine_and_its_setup() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let info = call(&m, "machine_info", json!({})).unwrap();
+        assert!(info["ramGb"].as_f64().is_some(), "{info}");
+        call(&m, "machine_room", json!({})).unwrap();
+        assert!(call(&m, "setup_tools", json!({})).unwrap()["os"].is_string());
+        call(&m, "qanuvi_usage", json!({})).unwrap();
+        let e = call(&m, "setup_install_plan", json!({"tool": "rm"})).unwrap_err();
+        assert_eq!(e, "Qanuvi does not install that.");
+        let e = call(
+            &m,
+            "setup_install_start",
+            json!({"tool": "rm", "onEvent": "t1"}),
+        )
+        .unwrap_err();
+        assert!(!e.contains("does not know"), "{e}");
     }
 
     #[test]

@@ -111,7 +111,7 @@
               {#if provider.kind === "ollama"}
                 {#if guides.machine}
                   <p class="muted machine">
-                    This computer: {guides.machine.ramGb} GB memory{guides.machine.gpu
+                    {guides.place}: {guides.machine.ramGb} GB memory{guides.machine.gpu
                       ? `, ${guides.machine.gpu.name} (${guides.machine.gpu.vramGb} GB)`
                       : ", no separate graphics card"}.
                   </p>
@@ -149,12 +149,12 @@
                         {#if guides.pullError[s.model.name]}<span class="error">{guides.pullError[s.model.name]}</span
                           >{/if}
                       {:else}
-                        <span class="muted small">This computer has too little memory for a useful model.</span>
+                        <span class="muted small">{guides.place} has too little memory for a useful model.</span>
                       {/if}
                     </div>
                   {/each}
                 {:else}
-                  <span class="muted">Looking at this computer…</span>
+                  <span class="muted">Looking at the machine…</span>
                 {/if}
               {:else if candidates.length}
                 <ul class="picks">

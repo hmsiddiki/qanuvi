@@ -5,19 +5,24 @@
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import "@xterm/xterm/css/xterm.css";
-  import { api, errorText } from "$lib/api";
+  import { api, errorText, type TermEvent } from "$lib/api";
 
   interface Props {
     projectId: string;
     shell: string;
     visible: boolean;
-    onexit?: () => void;
+    /** The program ended; its exit code when known (a program run by `start`). */
+    onexit?: (code: number | null) => void;
     ontitle?: (title: string) => void;
     /** A folder of the project to start in. */
     dir?: string;
+    /** Starts something else than a shell (24z3 D2: a setup install); answers the terminal's id. */
+    start?: (cols: number, rows: number, onEvent: (e: TermEvent) => void) => Promise<string>;
+    /** Said when it ends (the shell's line otherwise). */
+    endText?: string;
   }
 
-  let { projectId, shell, visible, onexit, ontitle, dir }: Props = $props();
+  let { projectId, shell, visible, onexit, ontitle, dir, start, endText }: Props = $props();
 
   function menu(e: MouseEvent) {
     const t = term;
@@ -117,22 +122,19 @@
       return true;
     });
 
-    api.term
-      .spawn(
-        projectId,
-        shell,
-        term.cols,
-        term.rows,
-        (event) => {
-          if (event.kind === "data") term?.write(event.data);
-          else {
-            exited = true;
-            term?.write("\r\n\x1b[90m[The shell has ended. Close this tab or open a new terminal.]\x1b[0m\r\n");
-            onexit?.();
-          }
-        },
-        dir ?? null,
-      )
+    const onEvent = (event: TermEvent) => {
+      if (event.kind === "data") term?.write(event.data);
+      else if (!exited) {
+        exited = true;
+        const text = endText ?? "The shell has ended. Close this tab or open a new terminal.";
+        term?.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`);
+        onexit?.(event.code);
+      }
+    };
+    (start
+      ? start(term.cols, term.rows, onEvent)
+      : api.term.spawn(projectId, shell, term.cols, term.rows, onEvent, dir ?? null)
+    )
       .then((newId) => (id = newId))
       .catch((e) => term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`));
 

@@ -48,6 +48,12 @@ export function shownPlace(): string {
   return shown ? nameOf(shown) : "this computer";
 }
 
+/** The same at the start of a sentence: "This computer", or "VPS". */
+export function shownPlaceTitle(): string {
+  const p = shownPlace();
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 export function nameMachines(names: (master: string) => string): void {
   nameOf = names;
 }
@@ -72,6 +78,7 @@ const WINDOW_ONLY = new Set([
   "account_sign_in",
   "account_sign_out",
   "notify_item",
+  "notify_settings",
   "notify_take_start",
   "notify_test",
   "inspector_close",
@@ -149,7 +156,7 @@ export async function callMaster<T>(master: string, cmd: string, args: Record<st
 /** Notes the ids a master made, so later calls about them go to it. */
 export function remember(master: string, cmd: string, result: unknown): void {
   const idOf = (v: unknown) => (v && typeof v === "object" ? (v as { id?: unknown }).id : undefined);
-  if (cmd === "term_spawn" && typeof result === "string") own(result, master);
+  if ((cmd === "term_spawn" || cmd === "setup_install_start") && typeof result === "string") own(result, master);
   else if (Array.isArray(result) && (cmd === "agent_sessions" || cmd === "projects_list")) {
     for (const item of result) if (typeof idOf(item) === "string") own(idOf(item) as string, master);
   } else if (typeof idOf(result) === "string" && /^(agent_start|projects_(add|update|redetect))$/.test(cmd)) {

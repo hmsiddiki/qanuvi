@@ -406,6 +406,12 @@ export const api = {
       channel.onmessage = onEvent;
       return invoke<string>("term_spawn", { projectId, shell, cols, rows, dir, onEvent: channel });
     },
+    /** A setup install in a terminal on the shown machine (24z3 D2); typing and closing go through write and kill. */
+    installStart: (tool: string, cols: number, rows: number, onEvent: (e: TermEvent) => void) => {
+      const channel = new Channel<TermEvent>();
+      channel.onmessage = onEvent;
+      return invoke<string>("setup_install_start", { tool, cols, rows, onEvent: channel });
+    },
     write: (id: string, data: string) => invoke<void>("term_write", { id, data }),
     resize: (id: string, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
     kill: (id: string) => invoke<void>("term_kill", { id }),

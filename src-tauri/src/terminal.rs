@@ -6,7 +6,25 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+type SharedChild = Arc<Mutex<Box<dyn Child + Send + Sync>>>;
+
+/// A program's exit code, waiting up to `within` for it to end.
+fn exit_code(child: &SharedChild, within: Duration) -> Option<u32> {
+    let until = Instant::now() + within;
+    loop {
+        if let Ok(Some(status)) = child.lock().unwrap_or_else(|e| e.into_inner()).try_wait() {
+            return Some(status.exit_code());
+        }
+        if Instant::now() >= until {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Shell {
@@ -26,7 +44,7 @@ pub enum TermEvent {
 struct Term {
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
-    child: Box<dyn Child + Send + Sync>,
+    child: SharedChild,
     project_id: String,
     /// The window that opened it (desktop), so closing a second window ends only its own terminals.
     owner: Option<String>,
@@ -175,6 +193,41 @@ impl Terminals {
             .find(|s| s.id == shell_id)
             .or_else(|| all.first())
             .ok_or("No shell was found on this machine.")?;
+        let mut cmd = CommandBuilder::new(&shell.program);
+        cmd.args(&shell.args);
+        self.start(project_id, cwd, cmd, cols, rows, channel, false)
+    }
+
+    /// Runs one program in a terminal (24z3 D2: a setup install the user can watch and answer, a password prompt
+    /// included). When the program ends, its exit code is sent (`Exit { code }`), also where the terminal itself
+    /// stays open (Windows keeps the pseudo-console until it is closed).
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_program(
+        &self,
+        tag: &str,
+        cwd: &Path,
+        program: &str,
+        args: &[String],
+        cols: u16,
+        rows: u16,
+        channel: Sink<TermEvent>,
+    ) -> Result<String, String> {
+        let mut cmd = CommandBuilder::new(program);
+        cmd.args(args);
+        self.start(tag, cwd, cmd, cols, rows, channel, true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn start(
+        &self,
+        project_id: &str,
+        cwd: &Path,
+        mut cmd: CommandBuilder,
+        cols: u16,
+        rows: u16,
+        channel: Sink<TermEvent>,
+        watch: bool,
+    ) -> Result<String, String> {
         let pty = native_pty_system();
         let pair = pty
             .openpty(PtySize {
@@ -184,18 +237,20 @@ impl Terminals {
                 pixel_height: 0,
             })
             .map_err(|e| e.to_string())?;
-        let mut cmd = CommandBuilder::new(&shell.program);
-        cmd.args(&shell.args);
         cmd.cwd(cwd);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         cmd.env("TERM_PROGRAM", "Qanuvi");
         let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
         drop(pair.slave);
+        let child: SharedChild = Arc::new(Mutex::new(child));
         let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
         let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+        // The end is told once: by the reader when the output closes, or (a watched program) when it exits.
+        let told = Arc::new(AtomicBool::new(false));
 
         let id = uuid::Uuid::new_v4().to_string();
+        let (out, told_r, child_r) = (channel.clone(), told.clone(), child.clone());
         std::thread::Builder::new()
             .name(format!("term-{id}"))
             .spawn(move || {
@@ -207,15 +262,43 @@ impl Terminals {
                         Ok(n) => {
                             pending.extend_from_slice(&buf[..n]);
                             let data = take_utf8(&mut pending);
-                            if !data.is_empty() && channel.send(TermEvent::Data { data }).is_err() {
+                            if !data.is_empty() && out.send(TermEvent::Data { data }).is_err() {
                                 break;
                             }
                         }
                     }
                 }
-                let _ = channel.send(TermEvent::Exit { code: None });
+                let code = if watch {
+                    exit_code(&child_r, Duration::from_secs(2))
+                } else {
+                    None
+                };
+                if !told_r.swap(true, Ordering::SeqCst) {
+                    let _ = out.send(TermEvent::Exit { code });
+                }
             })
             .map_err(|e| e.to_string())?;
+        if watch {
+            let child_w = child.clone();
+            std::thread::Builder::new()
+                .name(format!("term-wait-{id}"))
+                .spawn(move || {
+                    let code = loop {
+                        match child_w.lock().unwrap_or_else(|e| e.into_inner()).try_wait() {
+                            Ok(Some(status)) => break Some(status.exit_code()),
+                            Ok(None) => {}
+                            Err(_) => break None,
+                        }
+                        std::thread::sleep(Duration::from_millis(250));
+                    };
+                    // The last output first: the reader may still have some.
+                    std::thread::sleep(Duration::from_millis(400));
+                    if !told.swap(true, Ordering::SeqCst) {
+                        let _ = channel.send(TermEvent::Exit { code });
+                    }
+                })
+                .map_err(|e| e.to_string())?;
+        }
 
         self.map.lock().unwrap_or_else(|e| e.into_inner()).insert(
             id.clone(),
@@ -258,9 +341,10 @@ impl Terminals {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .remove(id);
-        if let Some(mut term) = term {
-            let _ = term.child.kill();
-            let _ = term.child.wait();
+        if let Some(term) = term {
+            let mut child = term.child.lock().unwrap_or_else(|e| e.into_inner());
+            let _ = child.kill();
+            let _ = child.wait();
         }
     }
 
@@ -340,6 +424,51 @@ mod tests {
         let mut pending = vec![b'a', 0xff, b'b'];
         assert_eq!(take_utf8(&mut pending), "a\u{fffd}b");
         assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn a_program_run_in_a_terminal_tells_its_exit_code() {
+        let (program, args): (&str, Vec<String>) = if cfg!(windows) {
+            (
+                "cmd.exe",
+                vec!["/d".into(), "/c".into(), "echo hi & exit 3".into()],
+            )
+        } else {
+            ("/bin/sh", vec!["-c".into(), "echo hi; exit 3".into()])
+        };
+        let (tx, rx) = std::sync::mpsc::channel::<TermEvent>();
+        let tx = Mutex::new(tx);
+        let sink = Sink::new(move |e| tx.lock().unwrap().send(e).is_ok());
+        let terms = Terminals::default();
+        let dir = std::env::temp_dir();
+        let id = terms
+            .spawn_program("setup", &dir, program, &args, 80, 24, sink)
+            .unwrap();
+        let mut out = String::new();
+        let code = loop {
+            match rx
+                .recv_timeout(Duration::from_secs(8))
+                .unwrap_or_else(|_| panic!("no end told; output {out:?}"))
+            {
+                TermEvent::Data { data } => {
+                    // Windows' pseudo-console asks where the cursor is before it starts the program; the window's
+                    // terminal (xterm.js) answers that itself.
+                    if data.contains("\x1b[6n") {
+                        terms.write(&id, "\x1b[1;1R").unwrap();
+                    }
+                    out.push_str(&data)
+                }
+                TermEvent::Exit { code } => break code,
+            }
+        };
+        assert_eq!(code, Some(3));
+        assert!(out.contains("hi"), "{out:?}");
+        // Told once only.
+        assert!(!matches!(
+            rx.recv_timeout(Duration::from_millis(800)),
+            Ok(TermEvent::Exit { .. })
+        ));
+        terms.kill(&id);
     }
 
     #[test]

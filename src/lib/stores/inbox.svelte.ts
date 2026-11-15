@@ -9,6 +9,7 @@
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { callMaster } from "$lib/remote";
+import { forgetNotifications, learnNotifications, notifyFor } from "./notify.svelte";
 import { listen } from "@tauri-apps/api/event";
 import type { Place } from "./ui.svelte";
 import { keepAnswer, loadPlanState, savePlanState } from "$lib/plan/planstate";
@@ -153,11 +154,13 @@ class InboxStore {
   async followMaster(master: string): Promise<void> {
     if (this.#following.has(master)) return;
     this.#following.add(master);
+    await learnNotifications(master);
     const events = new Channel<Change>();
     events.onmessage = (c) => {
       const item = c.item ? { ...c.item, master } : null;
       if (c.change === "answer" && item) for (const fn of this.#answered) fn(item);
-      if (c.change === "add" && item && c.new !== false) void invoke("notify_item", { item: c.item }).catch(() => {});
+      if (c.change === "add" && item && c.new !== false)
+        void invoke("notify_item", { item: c.item, settings: notifyFor(master) }).catch(() => {});
       void callMaster<InboxItem[]>(master, "inbox_list", {})
         .then((list) => this.#setRemote(master, list))
         .catch(() => {});
@@ -173,6 +176,7 @@ class InboxStore {
   /** The connection to a master ended: its items leave the list (they stay on the master). */
   dropMaster(master: string): void {
     this.#following.delete(master);
+    forgetNotifications(master);
     if (!(master in this.#remote)) return;
     delete this.#remote[master];
     this.#merge();

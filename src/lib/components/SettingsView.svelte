@@ -3,6 +3,7 @@
    * Settings (15h): one page over the main area, with its parts as tabs on the left and a search box. The agent pane
    * and the work area stay as they were underneath (terminals keep running); × or Esc goes back to them.
    */
+  import { shownPlace } from "$lib/remote";
   import X from "@lucide/svelte/icons/x";
   import Bot from "@lucide/svelte/icons/bot";
   import Boxes from "@lucide/svelte/icons/boxes";
@@ -179,8 +180,8 @@
       {:else if tab === "models"}
         <h2>Models and providers</h2>
         <p class="intro">
-          The models Qanuvi core uses: free ones online and, if you want, on this computer. Their order, keys, setup
-          guides and OmniRoute.
+          The models Qanuvi core uses: free ones online and, if you want, on {(void settings.machine, shownPlace())}.
+          Their order, keys, setup guides and OmniRoute.
         </p>
         {#if settings.value.ai}<OwnModelsPanel />{:else}<p class="intro">AI features are off (Agents).</p>{/if}
       {:else if tab === "team"}

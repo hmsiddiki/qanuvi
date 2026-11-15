@@ -369,7 +369,28 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-15 18:10): 24z3 D1 DRIVEN LIVE, all pass (release test build 17:58, scratch
+    RESUME HERE (newest, 2026-11-15 19:30): 24z3 D2 BUILT (machine/setup + usage + notifications on the shown
+    machine). Owner agreed: the status bar shows only the shown machine; every install runs the SAME way on every
+    machine and system (This PC, desktop masters, servers): the wizard asks first with the exact command (and, when
+    Windows will show its permission box on that machine's own screen, says someone there clicks Yes; never a UAC
+    bypass), then runs it in a terminal on that machine shown inside the wizard (a sudo or Homebrew password is typed
+    there by the owner), then says installed / not installed (exit code) and looks for the tools again. Plans
+    (local_servers::install_plan): Windows winget, Ollama --scope user (no admin box), Node.js machine-wide (admin
+    box), OmniRoute npm through cmd; Mac brew install ollama; Linux Ollama's script through sh; Node.js on Mac/Linux
+    and no winget/brew/curl: "link:<url>" (a button on This PC, plain text on a master). terminal.rs: spawn_program
+    runs one program and tells its real exit code once (a watcher thread; Windows keeps the pseudo-console open
+    after the program ends). master.rs answers machine_info, machine_room, setup_tools, setup_install_plan,
+    setup_install_start (its terminal closes with the connection), qanuvi_usage. setup_install gone. Usage: cleared
+    at a switch, late answers dropped, older master shows nothing, tooltip names the machine. Notifications per
+    machine: notify_settings window-only and only ever This PC's; a master's settings are read when the Inbox
+    follows it (kept current while it is shown) and sent with each notify_item. guides.machine read again per
+    machine; D1 leftovers fixed (Models subtitle, Ollama's name and help line, guide and wizard say the machine's
+    name). Node.js's Program Files folder added to the usual places (a new install is not on Qanuvi's old PATH).
+    Green: 354 TS tests (3 new, setup.machine.test.ts), svelte-check, prettier, rustfmt, clippy desktop + server,
+    397 desktop / 383 server Rust tests (new: install plans per system, master answers, a program's exit code in a
+    real pseudo-terminal). NOT driven live. NEXT: drive D2 live (test build, scratch master: wizard on the master,
+    an install that fails harmlessly, status bar switch, a master's notification setting), then D3.
+    RESUME HERE (before, 2026-11-15 18:10): 24z3 D1 DRIVEN LIVE, all pass (release test build 17:58, scratch
     projects pc-proj and master-proj, the "This PC" test master, $0, no model run). This PC: OpenRouter key kept
     (the owner's real one, not touched). Master shown: OpenRouter "Save key" (no key: not This PC's); Find models on
     Ollama answered from the master, 2 models tagged with the master's name; a test key saved on the master went to

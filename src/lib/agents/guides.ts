@@ -534,17 +534,20 @@ export const FREE_PROVIDERS: FreeProvider[] = [
  * coder (about 15 GB and up, like qwen3-coder:30b) runs fast here; "questions" when only small models fit — they answer
  * questions and make small edits but are not good enough for real coding; "none" when nothing useful fits.
  */
-export function localVerdict(m: MachineInfo): { level: "none" | "questions" | "coding"; text: string } {
+export function localVerdict(
+  m: MachineInfo,
+  place = "This computer",
+): { level: "none" | "questions" | "coding"; text: string } {
   const { coder } = suggestLocal(m);
   if (!coder)
     return {
       level: "none",
-      text: "This computer has too little memory for a useful local model. Use the free online models: they are stronger anyway.",
+      text: `${place} has too little memory for a useful local model. Use the free online models: they are stronger anyway.`,
     };
   if (coder.model.sizeGb >= 15 && coder.fast)
     return {
       level: "coding",
-      text: `This computer can run ${coder.model.name}, a capable coder, fast on its graphics card. For the biggest jobs the online models (Claude through OmniRoute) are still stronger.`,
+      text: `${place} can run ${coder.model.name}, a capable coder, fast on its graphics card. For the biggest jobs the online models (Claude through OmniRoute) are still stronger.`,
     };
   return {
     level: "questions",
