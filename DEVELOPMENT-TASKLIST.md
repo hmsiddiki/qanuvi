@@ -382,8 +382,16 @@ runs on or off; with it off nothing is sent anywhere.
     (1) the server's Name field is shown exactly as typed everywhere (no capitalising; sentences reworded so a name
     never starts one; shownPlaceTitle only for "This computer"); (2) an empty Name becomes the machine's own name
     from hello (hostname, e.g. basevm378), not the SSH address; (3) the Name editable later on the server card;
-    (4) refused: a name another server has (case-insensitive) and "This PC". More ideas offered, owner to choose:
-    see the reply of 2026-11-16. Then D4.
+    (4) refused: a name another server has (case-insensitive) and "This PC". ALSO AGREED (2026-11-16): (5) a
+    colour per machine (picked automatically, changeable on its card; shown in the switcher and status bar; This PC
+    stays plain) so the shown machine is never mistaken; (6) every added machine gets a lasting unique id: the master
+    keeps a permanent id file in its data folder (master.json is only the running service's address/token), hello
+    answers it, the window stores it per server; adding a server whose id is already known says "This is the same
+    computer as <name>" and does not add it again; (7) the same name rules for relay pairings ("A computer"
+    fallback, "This device's name"); (8) names at most about 40 characters, trimmed, invisible characters refused;
+    (9) "Dismiss" on the "Restored the backup ..." note; (10) the SSH address (and computer name) on HOVER over a
+    machine in the switcher, NOT as text under the name (owner: keeps the switcher small). Build (1)-(10) as one
+    batch in a fresh conversation; parts touching the switcher land with Part B if it is not built yet. Then D4.
     RESUME HERE (before, 2026-11-15 23:00): 24z3 D3 DRIVEN LIVE, all pass (release test build 22:56, scratch
     projects pc-proj and master-proj, the "This PC" test master). This PC's Backups page unchanged (its test-build
     default folder, on, its 3 daily backups, Choose…). With the master shown: "Backups: This PC", on by default, the
