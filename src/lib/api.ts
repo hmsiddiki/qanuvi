@@ -98,6 +98,19 @@ export interface Shell {
 
 export type TermEvent = { kind: "data"; data: string } | { kind: "exit"; code: number | null };
 
+/**
+ * Unsaved editor text kept on its machine while the switcher shows another one (24z3 Part B2). An agent's own
+ * configuration file has an empty project, its tab key as the path and what reopens it in meta (JSON).
+ */
+export interface Draft {
+  projectId: string;
+  path: string;
+  text: string;
+  /** The file's fingerprint when the changes began: a file changed since shows a conflict on save. */
+  hash: string;
+  meta?: string;
+}
+
 /** What a language server sends (15i): whole protocol messages, lines of its log, its end. */
 export type LspEvent =
   { kind: "message"; text: string } | { kind: "log"; text: string } | { kind: "exit"; code: number | null };
@@ -420,6 +433,14 @@ export const api = {
     write: (id: string, data: string) => invoke<void>("term_write", { id, data }),
     resize: (id: string, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
     kill: (id: string) => invoke<void>("term_kill", { id }),
+    /** The switcher hides the terminal's machine (24z3 Part B2): the shell goes on there, its output is kept. */
+    detach: (id: string) => invoke<void>("term_detach", { id }),
+    /** Its machine is shown again: the kept output comes first (and its end, if it ended), then what follows. */
+    attach: (id: string, onEvent: (e: TermEvent) => void) => {
+      const channel = new Channel<TermEvent>();
+      channel.onmessage = onEvent;
+      return invoke<void>("term_attach", { id, onEvent: channel });
+    },
     /** Stops this window's terminals (before the interface reloads). */
     killWindow: () => invoke<void>("term_kill_window"),
   },

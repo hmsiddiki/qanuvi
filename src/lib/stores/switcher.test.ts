@@ -12,7 +12,7 @@ vi.stubGlobal("localStorage", {
 });
 const switched = () => ({ switched: vi.fn(async () => {}) });
 vi.mock("./brain.svelte", () => ({ brain: switched() }));
-vi.mock("./projects.svelte", () => ({ projects: { load: vi.fn(async () => {}) } }));
+vi.mock("./projects.svelte", () => ({ projects: { list: [], load: vi.fn(async () => {}) } }));
 vi.mock("./settings.svelte", () => ({ settings: { loadMachine: vi.fn(async () => {}) } }));
 vi.mock("./guides.svelte", () => ({ guides: switched() }));
 vi.mock("./usage.svelte", () => ({ usage: switched() }));
@@ -23,6 +23,10 @@ vi.mock("./omniroute.svelte", () => ({ omni: { switched: vi.fn(), look: vi.fn(as
 vi.mock("./memoryDisk.svelte", () => ({ memoryDisk: switched() }));
 vi.mock("./remoteAccess.svelte", () => ({ remoteAccess: switched() }));
 vi.mock("./memory.svelte", () => ({ memory: { touch: vi.fn() } }));
+vi.mock("./editor.svelte", () => ({ editor: { park: () => [], openConfig: vi.fn(), applyDraft: vi.fn() } }));
+vi.mock("./terminals.svelte", () => ({ terminals: { park: vi.fn(async () => {}) } }));
+vi.mock("./workspace.svelte", () => ({ workspace: { flush: vi.fn(), restored: new Set() } }));
+vi.mock("./drafts", () => ({ drafts: { keep: vi.fn(async () => {}), take: vi.fn(async () => []) } }));
 
 const { shownMachine } = await import("$lib/remote");
 const { pick, restoreShown, show } = await import("./machines");

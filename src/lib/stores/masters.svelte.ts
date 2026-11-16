@@ -12,6 +12,7 @@ import { inbox } from "./inbox.svelte";
 import { show } from "./machines";
 import { projects } from "./projects.svelte";
 import { runner } from "./runner.svelte";
+import { terminals } from "./terminals.svelte";
 import { settings, type MasterSettings } from "./settings.svelte";
 import { nameProblem, pickColor, uniqueName } from "$lib/machineNames";
 
@@ -77,6 +78,8 @@ class MastersStore {
     forgetMaster(id);
     // The machine on screen went away: This PC is shown again (forgetMaster already sends calls there).
     if (projects.machine === id || settings.machine === id) void show(null);
+    // Its terminals ended with the connection: their tabs go, and its projects open new ones when shown again.
+    terminals.forgetMachine(id);
     const { [id]: _gone, ...counts } = this.projectCount;
     this.projectCount = counts;
     inbox.dropMaster(id);

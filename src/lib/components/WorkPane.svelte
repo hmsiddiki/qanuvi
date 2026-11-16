@@ -288,8 +288,9 @@
         </div>
       </div>
       <div class="terminal-body">
-        {#each terminals.tabs as t (t.key)}
+        {#each terminals.mounted as t (t.key)}
           <TerminalView
+            tab={t}
             projectId={t.projectId}
             shell={t.shell}
             dir={t.dir}

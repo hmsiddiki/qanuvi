@@ -14,6 +14,7 @@ pub mod checks;
 pub mod claude_update;
 pub mod dap;
 pub mod data_location;
+pub mod drafts;
 pub mod files;
 pub mod git;
 pub mod inbox;

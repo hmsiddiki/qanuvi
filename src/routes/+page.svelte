@@ -42,6 +42,8 @@
   import { isProjectView, workspace, type SavedTab } from "$lib/stores/workspace.svelte";
   import { projectFromUrl, windows } from "$lib/stores/windows.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import { drafts } from "$lib/stores/drafts";
+  import { shownMachine } from "$lib/remote";
 
   let ready = $state(false);
 
@@ -144,11 +146,37 @@
         );
       if (w.view) ui.show(w.view);
       if (terminals.forProject(id).length === 0) for (const shell of w.terminals) terminals.open(id, shell);
+      await giveBackDrafts(id);
+      if (projects.currentId !== id) return;
       workspace.restored.add(id);
     }
     await sessions;
     if (projects.currentId === id && w.session && agent.sessions.some((s) => s.id === w.session))
       agent.select(w.session);
+  }
+
+  /**
+   * Unsaved text the project's machine kept while it was hidden (24z3 Part B2): back in its files, as typed, with
+   * no question. A project left before they are all back keeps the rest for next time.
+   */
+  async function giveBackDrafts(id: string) {
+    const machine = projects.machine;
+    const list = await drafts.take(machine, id);
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i];
+      if (projects.currentId !== id) {
+        await drafts.keep(machine, list.slice(i), shownMachine() === machine);
+        return;
+      }
+      const key = tabKey(id, d.path);
+      if (!editorStore.tabs.some((x) => x.key === key)) await editorStore.open(id, d.path, null, null, 0);
+      if (!editorStore.applyDraft(key, d.text, d.hash)) {
+        // The file cannot be opened any more (gone, or now too large): its text stays kept rather than lost.
+        await drafts.keep(machine, [d], shownMachine() === machine);
+        const tab = editorStore.tabs.find((x) => x.key === key);
+        if (tab?.error) await editorStore.close(key);
+      }
+    }
   }
 
   // A memory change is copied to the memory disk a little later.

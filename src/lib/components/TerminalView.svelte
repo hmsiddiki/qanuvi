@@ -6,6 +6,7 @@
   import { FitAddon } from "@xterm/addon-fit";
   import "@xterm/xterm/css/xterm.css";
   import { api, errorText, type TermEvent } from "$lib/api";
+  import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
 
   interface Props {
     projectId: string;
@@ -20,9 +21,14 @@
     start?: (cols: number, rows: number, onEvent: (e: TermEvent) => void) => Promise<string>;
     /** Said when it ends (the shell's line otherwise). */
     endText?: string;
+    /**
+     * Its terminal tab (24z3 Part B2): a terminal started before is attached again (its recent output first), and a
+     * screen that goes because its machine is hidden leaves the shell running.
+     */
+    tab?: TerminalTab;
   }
 
-  let { projectId, shell, visible, onexit, ontitle, dir, start, endText }: Props = $props();
+  let { projectId, shell, visible, onexit, ontitle, dir, start, endText, tab }: Props = $props();
 
   function menu(e: MouseEvent) {
     const t = term;
@@ -52,6 +58,9 @@
   let id: string | null = null;
   let observer: ResizeObserver | null = null;
   let exited = false;
+  /** Old output is being played back into a new screen (24z3 Part B2). */
+  let replaying = false;
+  let played = false;
 
   function resize() {
     if (!term || !fit || !host || host.offsetWidth === 0 || host.offsetHeight === 0) return;
@@ -100,6 +109,9 @@
     resize();
 
     term.onData((data) => {
+      // Answers the screen gives to old output played back (a cursor question the shell asked long ago) are not
+      // typed into the shell.
+      if (replaying) return;
       if (id && !exited) api.term.write(id, data).catch(() => {});
     });
     term.onTitleChange((title) => ontitle?.(title));
@@ -122,21 +134,48 @@
       return true;
     });
 
-    const onEvent = (event: TermEvent) => {
-      if (event.kind === "data") term?.write(event.data);
-      else if (!exited) {
-        exited = true;
-        const text = endText ?? "The shell has ended. Close this tab or open a new terminal.";
-        term?.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`);
-        onexit?.(event.code);
-      }
+    const ended = (code: number | null, text: string) => {
+      if (exited) return;
+      exited = true;
+      term?.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`);
+      onexit?.(code);
     };
-    (start
-      ? start(term.cols, term.rows, onEvent)
-      : api.term.spawn(projectId, shell, term.cols, term.rows, onEvent, dir ?? null)
-    )
-      .then((newId) => (id = newId))
-      .catch((e) => term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`));
+    const onEvent = (event: TermEvent) => {
+      if (event.kind === "data") {
+        if (replaying) {
+          played = true;
+          term?.write(event.data, () => (replaying = false));
+        } else term?.write(event.data);
+      } else ended(event.code, endText ?? "The shell has ended. Close this tab or open a new terminal.");
+    };
+    const again = tab?.termId;
+    if (again) {
+      // Back from a hidden machine: the same shell, with what it wrote meanwhile.
+      id = again;
+      replaying = true;
+      api.term
+        .attach(again, onEvent)
+        .then(() => {
+          if (tab) terminals.attached(tab.key);
+          // Nothing kept to play back: the screen answers the shell again.
+          if (!played) setTimeout(() => !played && (replaying = false), 500);
+          resize();
+        })
+        .catch(() => {
+          replaying = false;
+          if (tab) terminals.attached(tab.key);
+          ended(null, "This terminal ended while its machine was not shown. Close this tab or open a new terminal.");
+        });
+    } else
+      (start
+        ? start(term.cols, term.rows, onEvent)
+        : api.term.spawn(projectId, shell, term.cols, term.rows, onEvent, dir ?? null)
+      )
+        .then((newId) => {
+          id = newId;
+          if (tab) terminals.started(tab.key, newId);
+        })
+        .catch((e) => term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`));
 
     observer = new ResizeObserver(() => resize());
     observer.observe(host);
@@ -153,7 +192,12 @@
 
   onDestroy(() => {
     observer?.disconnect();
-    if (id) api.term.kill(id).catch(() => {});
+    // A hidden machine's terminal goes on there; a closed tab (or a window going) stops it.
+    if (id && !tab?.parked) {
+      api.term.kill(id).catch(() => {});
+      // A screen shown again later starts a new shell, as before.
+      if (tab) terminals.stopped(tab.key);
+    }
     term?.dispose();
   });
 </script>

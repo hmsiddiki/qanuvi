@@ -106,7 +106,7 @@ export function windowOnly(cmd: string): boolean {
 }
 
 /** Commands whose `id` argument is a project or a terminal. */
-const ID_KEYED = /^(projects_(remove|update|touch|redetect)|term_(write|resize|kill))$/;
+const ID_KEYED = /^(projects_(remove|update|touch|redetect)|term_(write|resize|kill|attach|detach))$/;
 
 /** The master that made the call's project, session or terminal, or null when none did. */
 export function routeOf(cmd: string, args?: Record<string, unknown>): string | null {
@@ -123,6 +123,11 @@ export function machineFor(cmd: string, args?: Record<string, unknown>): string 
 export async function routed<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const master = machineFor(cmd, args);
   return master ? callMaster<T>(master, cmd, args ?? {}) : invoke<T>(cmd, args);
+}
+
+/** A call to one machine whatever is shown (24z3 Part B2: a machine being hidden; null is This PC). */
+export function callOn<T>(machine: string | null, cmd: string, args: Record<string, unknown>): Promise<T> {
+  return machine ? callMaster<T>(machine, cmd, args) : invoke<T>(cmd, args);
 }
 
 /** A command the machine does not answer yet (24z3 Part A): said on screen, never done on This PC instead. */

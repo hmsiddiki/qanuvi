@@ -243,6 +243,25 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 12 {
+        // Unsaved editor text of a machine hidden by the switcher (24z3 Part B2): kept on the machine the file belongs
+        // to and given back when the window shows that machine again. One row per project and file; an agent's own
+        // configuration file is kept with an empty project and its tab key as the path, its details in meta.
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE drafts (
+                 project_id TEXT NOT NULL,
+                 path TEXT NOT NULL,
+                 text TEXT NOT NULL,
+                 hash TEXT NOT NULL,
+                 meta TEXT NOT NULL DEFAULT '',
+                 updated_at INTEGER NOT NULL,
+                 PRIMARY KEY (project_id, path)
+             );
+             PRAGMA user_version = 12;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -265,7 +284,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 11);
+        assert_eq!(version, 12);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

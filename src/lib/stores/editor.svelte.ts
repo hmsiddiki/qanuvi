@@ -1,6 +1,7 @@
-import type { EditorState } from "@codemirror/state";
+import { EditorState } from "@codemirror/state";
 import { ask } from "$lib/stores/confirm.svelte";
-import { api, errorText } from "$lib/api";
+import { api, errorText, type Draft } from "$lib/api";
+import { liveViews } from "$lib/editor/shared";
 import { languageFor } from "$lib/editor/languages";
 import { settings } from "./settings.svelte";
 import { lsp } from "./lsp.svelte";
@@ -206,6 +207,8 @@ class EditorStore {
       revealColumn: column,
       saveError: "",
     };
+    // A state kept from before its machine was hidden (24z3 Part B2) is not this file's any more.
+    this.states.delete(key);
     await this.#load(tab, key, group ?? this.#target());
   }
 
@@ -236,6 +239,7 @@ class EditorStore {
       label,
       global: projectId === null,
     };
+    this.states.delete(key);
     await this.#load(tab, key, this.#target());
   }
 
@@ -391,6 +395,52 @@ class EditorStore {
     if (groups[0] && first && groups[0].keys.includes(first)) groups[0].active = first;
     this.#setGroups(groups);
     if (this.groups[focused]) this.focused = focused;
+  }
+
+  /** The text a tab has now: its live editor's, else the one kept for it, else the saved text. */
+  textOf(key: string): string | null {
+    const tab = this.tabs.find((t) => t.key === key);
+    if (!tab) return null;
+    return (liveViews(key)[0]?.state ?? this.states.get(key))?.doc.toString() ?? tab.savedText;
+  }
+
+  /**
+   * The switcher hides this machine (24z3 Part B2): every open file leaves the window. Answers the unsaved ones as
+   * drafts to keep on the machine; nothing is asked. The editor groups start empty for the next machine.
+   */
+  park(): Draft[] {
+    const out: Draft[] = [];
+    for (const t of this.tabs) {
+      if (!t.dirty || t.binary || t.tooLarge || t.error) continue;
+      const text = this.textOf(t.key);
+      if (text === null || text === t.savedText) continue;
+      if (t.config) {
+        const meta = JSON.stringify({ ...t.config, label: t.label ?? "" });
+        out.push({ projectId: "", path: t.key, text, hash: t.hash, meta });
+      } else out.push({ projectId: t.projectId, path: t.path, text, hash: t.hash });
+    }
+    this.tabs = [];
+    this.states.clear();
+    this.#lastActive.clear();
+    this.groups = [{ keys: [], active: null }];
+    this.focused = 0;
+    return out;
+  }
+
+  /**
+   * Gives a reopened file its kept unsaved text (24z3 Part B2), as if typed (Undo goes back to the file's text).
+   * When the file changed on its machine since the changes began, saving says so instead of overwriting.
+   */
+  applyDraft(key: string, text: string, hash: string): boolean {
+    const tab = this.tabs.find((t) => t.key === key);
+    if (!tab || tab.binary || tab.tooLarge || tab.error) return false;
+    if (hash && hash !== tab.hash) tab.hash = hash;
+    if (text === tab.savedText) return true;
+    const view = liveViews(key)[0];
+    if (view) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    else this.states.set(key, EditorState.create({ doc: text }));
+    tab.dirty = true;
+    return true;
   }
 
   get anyDirty(): boolean {

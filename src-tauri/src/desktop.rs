@@ -95,6 +95,7 @@ fn projects_add(state: State<AppState>, path: String) -> Res<projects::Project> 
 #[tauri::command]
 fn projects_remove(state: State<AppState>, id: String) -> Res<()> {
     state.terminals.kill_project(&id);
+    let _ = crate::drafts::drop_project(&state.db, &id);
     state.languages.stop_project(&id);
     state.debuggers.stop_project(&id);
     state.agents.stop_project(&id);
@@ -497,6 +498,25 @@ fn term_write(state: State<AppState>, id: String, data: String) -> Res<()> {
 #[tauri::command]
 fn term_resize(state: State<AppState>, id: String, cols: u16, rows: u16) -> Res<()> {
     state.terminals.resize(&id, cols, rows)
+}
+
+/// The switcher hid this terminal's machine (24z3 Part B2): its output stops reaching the window; the shell goes on.
+#[tauri::command]
+fn term_detach(state: State<AppState>, id: String) {
+    state.terminals.detach(&id);
+}
+
+/// The window shows the terminal's machine again: its recent output first, then what comes.
+#[tauri::command]
+fn term_attach(
+    window: tauri::Window,
+    state: State<AppState>,
+    id: String,
+    on_event: Channel<terminal::TermEvent>,
+) -> Res<()> {
+    state.terminals.attach(&id, on_event.into())?;
+    state.terminals.set_owner(&id, window.label());
+    Ok(())
 }
 
 #[tauri::command]
@@ -1817,6 +1837,22 @@ fn plan_data_set(
     Ok(())
 }
 
+// Unsaved text of a machine the switcher hid (24z3 Part B2), kept here when the file is this computer's.
+#[tauri::command]
+fn drafts_put(state: State<AppState>, draft: crate::drafts::Draft) -> Res<()> {
+    crate::drafts::put(&state.db, &draft)
+}
+
+#[tauri::command]
+fn drafts_list(state: State<AppState>, project_id: String) -> Res<Vec<crate::drafts::Draft>> {
+    crate::drafts::list(&state.db, &project_id)
+}
+
+#[tauri::command]
+fn drafts_drop(state: State<AppState>, project_id: String, path: String) -> Res<()> {
+    crate::drafts::drop(&state.db, &project_id, &path)
+}
+
 #[tauri::command]
 fn plan_data_import(state: State<AppState>, entries: Vec<crate::plan_data::Entry>) -> Res<usize> {
     crate::plan_data::import(&state.db, &entries)
@@ -2228,6 +2264,8 @@ pub fn run() {
             term_spawn,
             term_write,
             term_kill_window,
+            term_attach,
+            term_detach,
             term_resize,
             term_kill,
             lsp_statuses,
@@ -2285,6 +2323,9 @@ pub fn run() {
             plan_data_list,
             plan_data_set,
             plan_data_import,
+            drafts_put,
+            drafts_list,
+            drafts_drop,
             plan_runs::plan_run_start,
             plan_runs::plan_run_finish,
             plan_runs::plan_run_state,

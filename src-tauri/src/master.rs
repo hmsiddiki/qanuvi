@@ -216,6 +216,7 @@ impl Master {
                 let id = s(args, "id");
                 self.terminals.kill_project(&id);
                 self.agents.stop_project(&id);
+                let _ = crate::drafts::drop_project(db, &id);
                 to(projects::remove(db, &id))
             }
             "projects_update" => {
@@ -392,6 +393,21 @@ impl Master {
                 crate::plan_data::set(db, &id, &s(args, "file"), kind, &args["value"])?;
                 Ok(Value::Null)
             }
+            // Unsaved text of this master's files while the window shows another machine (24z3 Part B2).
+            "drafts_put" => {
+                let draft: crate::drafts::Draft =
+                    serde_json::from_value(args["draft"].clone()).map_err(|e| e.to_string())?;
+                if !draft.project_id.is_empty() {
+                    projects::get(db, &draft.project_id)?;
+                }
+                crate::drafts::put(db, &draft)?;
+                Ok(Value::Null)
+            }
+            "drafts_list" => to(crate::drafts::list(db, &s(args, "projectId"))),
+            "drafts_drop" => {
+                crate::drafts::drop(db, &s(args, "projectId"), &s(args, "path"))?;
+                Ok(Value::Null)
+            }
             // Private details given during a plan's run, in this master's credential store (a server build has
             // none and says so).
             "plan_private" => to(Ok(crate::secrets::plan_private(
@@ -462,6 +478,20 @@ impl Master {
                 n(args, "cols") as u16,
                 n(args, "rows") as u16,
             )),
+            // The window's switcher hid this master (24z3 Part B2): output is kept, then given back on return.
+            "term_detach" => {
+                self.terminals.detach(&s(args, "id"));
+                Ok(Value::Null)
+            }
+            "term_attach" => {
+                let sink = stream(&s(args, "onEvent"));
+                let term = Sink::new(move |e: terminal::TermEvent| {
+                    sink.send(serde_json::to_value(e).unwrap_or(Value::Null))
+                        .is_ok()
+                });
+                self.terminals.attach(&s(args, "id"), term)?;
+                Ok(Value::Null)
+            }
             "term_kill" => {
                 self.terminals.kill(&s(args, "id"));
                 Ok(Value::Null)
@@ -1201,6 +1231,40 @@ mod tests {
     fn call(m: &Master, cmd: &str, args: Value) -> Result<Value, String> {
         let streams = |_: &str| Sink::new(|_: Value| true);
         m.dispatch(cmd, &args, &streams, &Mutex::new(HashSet::new()))
+    }
+
+    #[test]
+    fn keeps_unsaved_text_of_its_files_while_another_machine_is_shown() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+        let draft = json!({"projectId": id, "path": "a.js", "text": "let a = 2;", "hash": "h1"});
+        call(&m, "drafts_put", json!({"projectId": id, "draft": draft})).unwrap();
+        let list = call(&m, "drafts_list", json!({"projectId": id})).unwrap();
+        assert_eq!(list[0]["text"], "let a = 2;");
+        assert_eq!(list[0]["hash"], "h1");
+        // A project this master does not have is refused.
+        let other = json!({"projectId": "nope", "path": "a.js", "text": "x", "hash": ""});
+        assert!(
+            call(
+                &m,
+                "drafts_put",
+                json!({"projectId": "nope", "draft": other})
+            )
+            .is_err()
+        );
+        call(&m, "drafts_drop", json!({"projectId": id, "path": "a.js"})).unwrap();
+        assert_eq!(
+            call(&m, "drafts_list", json!({"projectId": id})).unwrap(),
+            json!([])
+        );
     }
 
     #[test]

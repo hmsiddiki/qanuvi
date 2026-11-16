@@ -41,7 +41,60 @@ pub enum TermEvent {
     Exit { code: Option<u32> },
 }
 
+/// The most recent output each terminal keeps for a window that comes back to it (about the last screens of text).
+const RECENT_MAX: usize = 256 * 1024;
+
+/// Where a terminal's output goes (24z3 Part B2). While the window shows the terminal's machine, to that window; while
+/// the switcher hides the machine, nowhere, but the most recent output is always kept, so the window that shows the
+/// machine again gets it back (the shell itself goes on all the while).
+#[derive(Default)]
+struct Outlet {
+    sink: Option<Sink<TermEvent>>,
+    recent: String,
+    /// The shell ended (with its exit code when known).
+    ended: Option<Option<u32>>,
+}
+
+impl Outlet {
+    fn data(&mut self, data: String) {
+        keep_recent(&mut self.recent, &data, RECENT_MAX);
+        if let Some(sink) = &self.sink
+            && sink.send(TermEvent::Data { data }).is_err()
+        {
+            // Nobody listens any more (the window went): the output is kept for the next one.
+            self.sink = None;
+        }
+    }
+
+    fn exit(&mut self, code: Option<u32>) {
+        self.ended = Some(code);
+        if let Some(sink) = &self.sink {
+            let _ = sink.send(TermEvent::Exit { code });
+        }
+    }
+}
+
+/// Adds output to what a terminal keeps, dropping the oldest beyond `max` bytes from the start of a line, so
+/// the text given back does not begin halfway through one.
+pub fn keep_recent(recent: &mut String, data: &str, max: usize) {
+    recent.push_str(data);
+    if recent.len() <= max {
+        return;
+    }
+    let mut cut = recent.len() - max;
+    while !recent.is_char_boundary(cut) {
+        cut += 1;
+    }
+    let line = recent[cut..]
+        .char_indices()
+        .take_while(|(i, _)| *i < 4096)
+        .find(|(_, c)| *c == '\n')
+        .map(|(i, _)| cut + i + 1);
+    recent.drain(..line.unwrap_or(cut));
+}
+
 struct Term {
+    outlet: Arc<Mutex<Outlet>>,
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
     child: SharedChild,
@@ -250,7 +303,11 @@ impl Terminals {
         let told = Arc::new(AtomicBool::new(false));
 
         let id = uuid::Uuid::new_v4().to_string();
-        let (out, told_r, child_r) = (channel.clone(), told.clone(), child.clone());
+        let outlet = Arc::new(Mutex::new(Outlet {
+            sink: Some(channel),
+            ..Outlet::default()
+        }));
+        let (out, told_r, child_r) = (outlet.clone(), told.clone(), child.clone());
         std::thread::Builder::new()
             .name(format!("term-{id}"))
             .spawn(move || {
@@ -262,8 +319,8 @@ impl Terminals {
                         Ok(n) => {
                             pending.extend_from_slice(&buf[..n]);
                             let data = take_utf8(&mut pending);
-                            if !data.is_empty() && out.send(TermEvent::Data { data }).is_err() {
-                                break;
+                            if !data.is_empty() {
+                                out.lock().unwrap_or_else(|e| e.into_inner()).data(data);
                             }
                         }
                     }
@@ -274,12 +331,12 @@ impl Terminals {
                     None
                 };
                 if !told_r.swap(true, Ordering::SeqCst) {
-                    let _ = out.send(TermEvent::Exit { code });
+                    out.lock().unwrap_or_else(|e| e.into_inner()).exit(code);
                 }
             })
             .map_err(|e| e.to_string())?;
         if watch {
-            let child_w = child.clone();
+            let (child_w, outlet_w) = (child.clone(), outlet.clone());
             std::thread::Builder::new()
                 .name(format!("term-wait-{id}"))
                 .spawn(move || {
@@ -294,7 +351,10 @@ impl Terminals {
                     // The last output first: the reader may still have some.
                     std::thread::sleep(Duration::from_millis(400));
                     if !told.swap(true, Ordering::SeqCst) {
-                        let _ = channel.send(TermEvent::Exit { code });
+                        outlet_w
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .exit(code);
                     }
                 })
                 .map_err(|e| e.to_string())?;
@@ -303,6 +363,7 @@ impl Terminals {
         self.map.lock().unwrap_or_else(|e| e.into_inner()).insert(
             id.clone(),
             Term {
+                outlet,
                 writer,
                 master: pair.master,
                 child,
@@ -333,6 +394,36 @@ impl Terminals {
                 pixel_height: 0,
             })
             .map_err(|e| e.to_string())
+    }
+
+    /// Stops sending a terminal's output to its window (24z3 Part B2: the switcher hid its machine); the shell goes
+    /// on and its recent output is kept.
+    pub fn detach(&self, id: &str) {
+        if let Some(t) = self.map.lock().unwrap_or_else(|e| e.into_inner()).get(id) {
+            t.outlet.lock().unwrap_or_else(|e| e.into_inner()).sink = None;
+        }
+    }
+
+    /// Sends a terminal's output to a window again: first what it kept (and its end, if it ended), then what comes.
+    pub fn attach(&self, id: &str, sink: Sink<TermEvent>) -> Result<(), String> {
+        let outlet = self
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .map(|t| t.outlet.clone())
+            .ok_or("That terminal has closed.")?;
+        let mut o = outlet.lock().unwrap_or_else(|e| e.into_inner());
+        if !o.recent.is_empty() {
+            let _ = sink.send(TermEvent::Data {
+                data: o.recent.clone(),
+            });
+        }
+        if let Some(code) = o.ended {
+            let _ = sink.send(TermEvent::Exit { code });
+        }
+        o.sink = Some(sink);
+        Ok(())
     }
 
     pub fn kill(&self, id: &str) {
@@ -469,6 +560,88 @@ mod tests {
             Ok(TermEvent::Exit { .. })
         ));
         terms.kill(&id);
+    }
+
+    #[test]
+    fn keeps_the_most_recent_output_from_a_line_start() {
+        let mut recent = String::new();
+        keep_recent(&mut recent, "first line\nsecond line\n", 1024);
+        assert_eq!(recent, "first line\nsecond line\n");
+        // Over the limit: the oldest goes, and what is kept starts after a line end.
+        keep_recent(&mut recent, "third\n", 16);
+        assert_eq!(recent, "third\n");
+        // A long run without line ends is cut at a character boundary.
+        let mut r = String::new();
+        keep_recent(&mut r, &"é".repeat(20), 9);
+        assert!(r.len() <= 9 && r.chars().all(|c| c == 'é'), "{r:?}");
+    }
+
+    #[test]
+    fn a_detached_terminal_keeps_its_output_and_end_for_the_next_window() {
+        let (program, args): (&str, Vec<String>) = if cfg!(windows) {
+            (
+                "cmd.exe",
+                vec![
+                    "/d".into(),
+                    "/c".into(),
+                    "ping -n 2 127.0.0.1 >nul & echo later & exit 4".into(),
+                ],
+            )
+        } else {
+            (
+                "/bin/sh",
+                vec!["-c".into(), "sleep 1; echo later; exit 4".into()],
+            )
+        };
+        let (tx, rx) = std::sync::mpsc::channel::<TermEvent>();
+        let tx = Mutex::new(tx);
+        let first = Sink::new(move |e| tx.lock().unwrap().send(e).is_ok());
+        let terms = Terminals::default();
+        let id = terms
+            .spawn_program(
+                "setup",
+                &std::env::temp_dir(),
+                program,
+                &args,
+                80,
+                24,
+                first,
+            )
+            .unwrap();
+        // The pseudo-console's cursor question (Windows) is answered while the first window listens.
+        if let Ok(TermEvent::Data { data }) = rx.recv_timeout(Duration::from_secs(5))
+            && data.contains("\x1b[6n")
+        {
+            terms.write(&id, "\x1b[1;1R").unwrap();
+        }
+        terms.detach(&id);
+        // The window is away: the program ends meanwhile, nothing reaches the first window.
+        std::thread::sleep(Duration::from_secs(4));
+        assert!(
+            rx.try_iter().all(|e| !matches!(e, TermEvent::Exit { .. })),
+            "the end reached a detached window"
+        );
+
+        let (tx2, rx2) = std::sync::mpsc::channel::<TermEvent>();
+        let tx2 = Mutex::new(tx2);
+        terms
+            .attach(&id, Sink::new(move |e| tx2.lock().unwrap().send(e).is_ok()))
+            .unwrap();
+        let back: Vec<TermEvent> = rx2.try_iter().collect();
+        let text: String = back
+            .iter()
+            .filter_map(|e| match e {
+                TermEvent::Data { data } => Some(data.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(text.contains("later"), "{text:?}");
+        assert!(
+            matches!(back.last(), Some(TermEvent::Exit { code: Some(4) })),
+            "{back:?}"
+        );
+        terms.kill(&id);
+        assert!(terms.attach(&id, Sink::new(|_| true)).is_err());
     }
 
     #[test]

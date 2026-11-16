@@ -369,7 +369,30 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 07:50): D8 finding FIXED (ff87cbd: empty Memory text names a project only when
+    RESUME HERE (newest, 2026-11-16 08:15): 24z3 PART B2 BUILT (not driven live yet). A machine leaving the screen is
+    wiped from the window (machines.ts park(), run at the start of show() and not waited for: every call names the
+    machine being hidden, remote.ts callOn): the workspaces are flushed and their projects leave workspace.restored,
+    editor.park() empties the editor groups and answers the unsaved files as drafts, kept ON THAT MACHINE (new table
+    drafts, migration 12, drafts.rs; drafts_put/list/drop on the desktop core and the master; dropped with a removed
+    project). A machine whose connection already ended (masters #dropped) gets its drafts held in the window
+    (stores/drafts.ts, in order through one queue) until it is shown again. Terminals: only the shown machine's have
+    a screen (terminals.mounted); a hidden machine's are parked: term_detach on its core, the shell goes on, the core
+    keeps its last 256 KB of output from a line start (terminal.rs Outlet); on return the screen calls term_attach and
+    gets that output (and its end, if it ended meanwhile); answers xterm gives to old output (cursor question) are not
+    typed into the shell. A closed terminal panel still stops its shells as before (the id is cleared, a new shell
+    starts when shown). A dropped master's terminal tabs go (its shells ended with the connection); its projects open
+    fresh ones from their workspace. On return the project's workspace is given back as at start-up, then its drafts
+    (applyDraft: typed in, so Undo gives the file's text; a file changed since keeps the draft's fingerprint, so Save
+    shows the conflict); agent configuration files with drafts reopen after the switch (project "" + meta). Chats
+    already came back from the machine on each switch (agent.loadProject), unchanged. Tests: Rust drafts (3), master
+    drafts command, terminal keep_recent + detached-then-attached (ends meanwhile); TS 405 (drafts, terminals,
+    machines.park new; switcher mocks); svelte-check 0/0, clippy, server build check. NOT DONE / to look at: running
+    agent turn streams of a hidden machine still reach the window (spec: only while shown); a draft whose file cannot
+    open again stays kept with no word on screen; window memory with several masters not measured (Part F). NEXT:
+    drive B2 live (release test build): unsaved file + terminal running on This PC, switch to the test master and
+    back (text and terminal output back, nothing asked), same on the master side, a draft while the master drops,
+    then the VPS (server build swap).
+    RESUME HERE (before, 2026-11-16 07:50): D8 finding FIXED (ff87cbd: empty Memory text names a project only when
     one is open; driven live on the VPS). 24z3 PART B SPLIT (owner: "go for part B"): B1 = the switcher, B2 = a
     hidden machine wiped from the window and rebuilt on return (editors, chats, terminals per machine; drafts kept on
     the machine), still to build. B1 BUILT a552399 AND DRIVEN LIVE, all pass: MachineSwitcher.svelte replaces the
