@@ -57,7 +57,8 @@ jobs:
       - name: Checks and tests
         # A test that hangs fails within minutes with its name, instead of holding the runner for an hour.
         timeout-minutes: 30
-        run: npm run verify
+        shell: bash
+        run: bash scripts/ci-verify.sh
 
       - name: Build the app
         run: npx tauri build
