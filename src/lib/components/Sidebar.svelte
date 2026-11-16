@@ -276,7 +276,8 @@
             </button>
           </div>
         {:else}
-          <p class="empty">No projects yet. Use + to add a folder.</p>
+          <!-- A machine that cannot be reached (24z3 Part E): its projects are not known, not missing. -->
+          <p class="empty">{held ? "Not connected." : "No projects yet. Use + to add a folder."}</p>
         {/each}
       </section>
 
@@ -365,7 +366,7 @@
           {#each groups.rest as s (s.id)}
             {@render chatRow(s)}
           {:else}
-            {#if !groups.saved.length}
+            {#if !groups.saved.length && !held}
               <p class="empty">
                 {chatFilter
                   ? "No chat title matches."

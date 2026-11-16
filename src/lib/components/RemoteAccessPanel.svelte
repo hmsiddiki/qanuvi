@@ -6,6 +6,7 @@
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
   import { placeTitle, shownPlace } from "$lib/remote";
+  import { switcher } from "$lib/stores/switcher.svelte";
 
   let relay = $state(settings.value.remoteAccess.relay);
   let name = $state(settings.value.remoteAccess.name);
@@ -41,90 +42,95 @@
 
 <section class="panel">
   <h3><MonitorSmartphone size={14} /> {placeTitle(place)}: remote access</h3>
-  <p class="muted">
-    Let your other devices reach the projects on {place} from anywhere, through a relay. Everything between them is encrypted
-    end to end; the relay only passes it on. Nothing is opened on {here ? "this computer's" : "its"} network.
-  </p>
-  <div class="row">
-    <input bind:value={relay} placeholder="Relay address, for example wss://relay.qanuvi.com" spellcheck="false" />
-    <input class="short" bind:value={name} placeholder={here ? "This computer's name" : "Its name on your devices"} />
-  </div>
-  <div class="row">
-    {#if on}
-      <button
-        type="button"
-        class="btn"
-        disabled={remoteAccess.busy}
-        onclick={() => remoteAccess.set(true, relay, name)}
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        class="btn"
-        disabled={remoteAccess.busy}
-        onclick={() => remoteAccess.set(false, relay, name)}
-      >
-        Turn off
-      </button>
-    {:else}
-      <button
-        type="button"
-        class="btn primary"
-        disabled={remoteAccess.busy || !relay.trim()}
-        onclick={() => remoteAccess.set(true, relay, name)}>Turn on</button
-      >
-    {/if}
-    {#if on && st}
-      <span class="state" class:ok={st.connected}
-        >{st.connected ? "Connected to the relay" : st.error || "Connecting…"}</span
-      >
-    {/if}
-  </div>
-  {#if remoteAccess.error}<p class="error">{remoteAccess.error}</p>{/if}
-
-  {#if on && st}
+  {#if switcher.held}
+    <!-- The shown machine cannot be reached (24z3 Part E): nothing here can be read or changed until it is back. -->
+    <p class="muted">Not connected. Its remote access shows here once it is back.</p>
+  {:else}
+    <p class="muted">
+      Let your other devices reach the projects on {place} from anywhere, through a relay. Everything between them is encrypted
+      end to end; the relay only passes it on. Nothing is opened on {here ? "this computer's" : "its"} network.
+    </p>
     <div class="row">
-      <button type="button" class="btn" disabled={!st.connected} onclick={() => remoteAccess.pairStart()}>
-        Pair a device
-      </button>
-      {#if st.code}
-        <span class="code">{st.code[0]}</span>
-        <span class="muted"
-          >type this on the other device (Servers → Pair through the relay); good for {Math.ceil(st.code[1] / 60)} min, one
-          try</span
+      <input bind:value={relay} placeholder="Relay address, for example wss://relay.qanuvi.com" spellcheck="false" />
+      <input class="short" bind:value={name} placeholder={here ? "This computer's name" : "Its name on your devices"} />
+    </div>
+    <div class="row">
+      {#if on}
+        <button
+          type="button"
+          class="btn"
+          disabled={remoteAccess.busy}
+          onclick={() => remoteAccess.set(true, relay, name)}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          class="btn"
+          disabled={remoteAccess.busy}
+          onclick={() => remoteAccess.set(false, relay, name)}
+        >
+          Turn off
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="btn primary"
+          disabled={remoteAccess.busy || !relay.trim()}
+          onclick={() => remoteAccess.set(true, relay, name)}>Turn on</button
+        >
+      {/if}
+      {#if on && st}
+        <span class="state" class:ok={st.connected}
+          >{st.connected ? "Connected to the relay" : st.error || "Connecting…"}</span
         >
       {/if}
     </div>
+    {#if remoteAccess.error}<p class="error">{remoteAccess.error}</p>{/if}
 
-    {#if st.sessions.length}
-      <div class="live">
-        <strong>In use now:</strong>
-        {#each st.sessions as s (s.session)}<span>{s.device} (since {ago(s.since)})</span>{/each}
-        <button type="button" class="btn stop" onclick={() => remoteAccess.stop()}>Stop all</button>
+    {#if on && st}
+      <div class="row">
+        <button type="button" class="btn" disabled={!st.connected} onclick={() => remoteAccess.pairStart()}>
+          Pair a device
+        </button>
+        {#if st.code}
+          <span class="code">{st.code[0]}</span>
+          <span class="muted"
+            >type this on the other device (Servers → Pair through the relay); good for {Math.ceil(st.code[1] / 60)} min,
+            one try</span
+          >
+        {/if}
       </div>
-    {/if}
 
-    <h4>Paired devices</h4>
-    {#each st.devices as [pairing, deviceName, added] (pairing)}
-      <div class="device">
-        <span>{deviceName}</span>
-        <span class="muted">paired {ago(added)}</span>
-        <button type="button" class="link" onclick={() => removeDevice(pairing, deviceName)}>Remove</button>
-      </div>
-    {:else}
-      <p class="muted">None yet.</p>
-    {/each}
+      {#if st.sessions.length}
+        <div class="live">
+          <strong>In use now:</strong>
+          {#each st.sessions as s (s.session)}<span>{s.device} (since {ago(s.since)})</span>{/each}
+          <button type="button" class="btn stop" onclick={() => remoteAccess.stop()}>Stop all</button>
+        </div>
+      {/if}
 
-    <button type="button" class="link" onclick={openLog}>{showLog ? "Hide" : "Show"} activity</button>
-    {#if showLog}
-      <ul class="log">
-        {#each remoteAccess.activity as a, i (i)}
-          <li><span class="muted">{new Date(a.at * 1000).toLocaleString()}</span> {a.device}: {a.what}</li>
-        {:else}
-          <li class="muted">Nothing yet.</li>
-        {/each}
-      </ul>
+      <h4>Paired devices</h4>
+      {#each st.devices as [pairing, deviceName, added] (pairing)}
+        <div class="device">
+          <span>{deviceName}</span>
+          <span class="muted">paired {ago(added)}</span>
+          <button type="button" class="link" onclick={() => removeDevice(pairing, deviceName)}>Remove</button>
+        </div>
+      {:else}
+        <p class="muted">None yet.</p>
+      {/each}
+
+      <button type="button" class="link" onclick={openLog}>{showLog ? "Hide" : "Show"} activity</button>
+      {#if showLog}
+        <ul class="log">
+          {#each remoteAccess.activity as a, i (i)}
+            <li><span class="muted">{new Date(a.at * 1000).toLocaleString()}</span> {a.device}: {a.what}</li>
+          {:else}
+            <li class="muted">Nothing yet.</li>
+          {/each}
+        </ul>
+      {/if}
     {/if}
   {/if}
 </section>

@@ -379,7 +379,17 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 16:15): 24z3 PART E DRIVEN LIVE, ALL PASS (owner yes to the three choices: 2 min
+    RESUME HERE (newest, CHECKPOINT 2026-11-16 16:30, for a fresh conversation): g1 + g2 FIXED (owner: "fix them and
+    make checkpoint"), not driven live (text only; the test window still holds an unsaved scratch line in projm's
+    README, so it was not rebuilt). g1: the sidebar under a held machine says "Not connected." where it said "No
+    projects yet. Use + to add a folder", and shows no empty-chats line. g2: the Servers page's remote access card of
+    a held machine shows only "Not connected. Its remote access shows here once it is back." (no boxes, no Turn on).
+    Checks: svelte-check 0/0, prettier, TS 417. 24z3 order step 2 (C2 + E) DONE. NEXT (fresh conversation): order
+    step 3 = B2 leftovers + f1 (Projects "+" on a shown server adds a folder on that machine, not "this PC") and f2
+    (shell picker lists the shown machine's shells, not Windows PowerShell on a Linux server); then step 4 working
+    icon + "Open in a new window", step 5 Part F, then R3-R5, full check, 0.1.23 (ask before publishing). Glance at
+    g1/g2 at the next release test build.
+    RESUME HERE (before, 2026-11-16 16:15): 24z3 PART E DRIVEN LIVE, ALL PASS (owner yes to the three choices: 2 min
     before the wipe, no automatic tries on "not connected", start-up stays on This PC). Release test build 15:55 (old
     local test master stopped with the owner's yes). Local test master shown, its serve process stopped: cover came,
     went by itself on the next try (a fresh master started). Master kept away (its exe renamed for the test, put back
