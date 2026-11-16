@@ -379,7 +379,15 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 02:30): 0.1.24 PUBLISHED from branch old-infrastructure (782a328, tag v0.1.24;
+    RESUME HERE (newest, CHECKPOINT 2026-11-17 02:40, fresh conversation): read docs/MIGRATION-VIEWER.md (M0, M1a,
+    M1b marked BUILT) and the entry below. Done this session: M0 parity test 3825c57, M1a master pipes a87eb34, M1b
+    language servers on a shown master 523d49c, 0.1.24 published from old-infrastructure (handover fix + live chat
+    token count), same fix on main 9be8f8e. Open: drive M1b through the app (local test master, then VPS with the
+    owner's yes for the new server build); M1b leftovers (need_gb for TypeScript/Svelte/Pyright, live install
+    output); finding k1 (a --stdio-started serve service keeps the caller's output pipe; stop scratch services after
+    live tests); then M1c preview through port_forward, M1d debugger. Live test helper: ignored Rust test
+    lsp::live_runs_a_server_on_a_real_master (env QANUVI_LIVE_MASTER/DATA/PROJECT, output to a file, not a pipe).
+    RESUME HERE (before, 2026-11-17 02:30): 0.1.24 PUBLISHED from branch old-infrastructure (782a328, tag v0.1.24;
     owner "publish anyway", release gate skipped). Fix (2271908, cherry-picked to main as 9be8f8e): the chat handover
     keeps off the session a plan run works in, also between its turns (the core's session id goes empty there; on
     0.1.23 the chat handover took Step 6 at 152k, its note went to a session nobody continued and the runner started
