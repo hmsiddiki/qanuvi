@@ -49,10 +49,15 @@ export class TerminalsStore {
     if (t) t.termId = termId;
   }
 
-  /** Its shell was stopped (the terminal panel was closed): a new screen starts a new one. */
-  stopped(key: string): void {
+  /**
+   * Its screen went while the tab stays (the terminal panel or work pane was closed): the shell goes on, its output
+   * kept, and the next screen attaches to it again.
+   */
+  parkOne(key: string): void {
     const t = this.tabs.find((x) => x.key === key);
-    if (t) t.termId = undefined;
+    if (!t) return;
+    t.parked = true;
+    if (t.termId && !t.ended) void callOn(t.machine, "term_detach", { id: t.termId }).catch(() => {});
   }
 
   /** Its screen is back and shows the terminal again. */
@@ -119,6 +124,8 @@ export class TerminalsStore {
   close(key: string): void {
     const tab = this.tabs.find((t) => t.key === key);
     this.tabs = this.tabs.filter((t) => t.key !== key);
+    // A parked one has no screen to stop it: stopped here (a shown one stops when its screen goes).
+    if (tab?.parked && tab.termId) void callOn(tab.machine, "term_kill", { id: tab.termId }).catch(() => {});
     if (tab && this.activeByProject[tab.projectId] === key) {
       const next = this.forProject(tab.projectId).at(-1);
       const map = { ...this.activeByProject };

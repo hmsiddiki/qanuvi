@@ -48,12 +48,19 @@ describe("terminals per machine", () => {
     expect(t.tabs).toEqual([]);
   });
 
-  it("a stopped shell starts again when its screen comes back", () => {
+  it("a screen closed with its tab kept parks the shell; closing a parked tab stops it", () => {
     const t = new TerminalsStore();
+    invoke.mockClear();
     switcher.shown = null;
     t.open("pc-project");
-    t.started(t.tabs[0].key, "term-x");
-    t.stopped(t.tabs[0].key);
-    expect(t.tabs[0].termId).toBeUndefined();
+    const key = t.tabs[0].key;
+    t.started(key, "term-x");
+    t.parkOne(key);
+    expect(t.tabs[0].parked).toBe(true);
+    expect(t.tabs[0].termId, "the next screen attaches to the same shell").toBe("term-x");
+    expect(invoke).toHaveBeenCalledWith("term_detach", { id: "term-x" });
+    t.close(key);
+    expect(invoke).toHaveBeenCalledWith("term_kill", { id: "term-x" });
+    expect(t.tabs).toEqual([]);
   });
 });

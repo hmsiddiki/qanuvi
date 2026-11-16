@@ -164,7 +164,7 @@
         .catch(() => {
           replaying = false;
           if (tab) terminals.attached(tab.key);
-          ended(null, "This terminal ended while its machine was not shown. Close this tab or open a new terminal.");
+          ended(null, "This terminal ended while it was not shown. Close this tab or open a new terminal.");
         });
     } else
       (start
@@ -192,11 +192,11 @@
 
   onDestroy(() => {
     observer?.disconnect();
-    // A hidden machine's terminal goes on there; a closed tab (or a window going) stops it.
+    // Only a closed tab (or the window going) stops the shell. A screen that goes while its tab stays (its machine
+    // hidden, the terminal panel or work pane closed) leaves it running, its output kept for the next screen.
     if (id && !tab?.parked) {
-      api.term.kill(id).catch(() => {});
-      // A screen shown again later starts a new shell, as before.
-      if (tab) terminals.stopped(tab.key);
+      if (tab && terminals.tabs.some((t) => t.key === tab.key)) terminals.parkOne(tab.key);
+      else api.term.kill(id).catch(() => {});
     }
     term?.dispose();
   });

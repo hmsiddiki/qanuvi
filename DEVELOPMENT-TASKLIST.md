@@ -379,8 +379,9 @@ runs on or off; with it off nothing is sent anywhere.
     a screen (terminals.mounted); a hidden machine's are parked: term_detach on its core, the shell goes on, the core
     keeps its last 256 KB of output from a line start (terminal.rs Outlet); on return the screen calls term_attach and
     gets that output (and its end, if it ended meanwhile); answers xterm gives to old output (cursor question) are not
-    typed into the shell. A closed terminal panel still stops its shells as before (the id is cleared, a new shell
-    starts when shown). A dropped master's terminal tabs go (its shells ended with the connection); its projects open
+    typed into the shell. OWNER AGREED (08:30) and BUILT: a closed terminal panel or work pane now parks its shells
+    the same way (terminals.parkOne; the next screen attaches again), only closing the tab stops a shell (a parked
+    tab closed is stopped by terminals.close). A dropped master's terminal tabs go (its shells ended with the connection); its projects open
     fresh ones from their workspace. On return the project's workspace is given back as at start-up, then its drafts
     (applyDraft: typed in, so Undo gives the file's text; a file changed since keeps the draft's fingerprint, so Save
     shows the conflict); agent configuration files with drafts reopen after the switch (project "" + meta). Chats
