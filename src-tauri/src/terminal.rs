@@ -608,8 +608,11 @@ mod tests {
                 first,
             )
             .unwrap();
-        // The pseudo-console's cursor question (Windows) is answered while the first window listens.
-        if let Ok(TermEvent::Data { data }) = rx.recv_timeout(Duration::from_secs(5))
+        // The pseudo-console's cursor question (Windows only) is answered while the first window listens. Elsewhere
+        // nothing is waited for: the first event there is the program's own output, and waiting for it let the end
+        // reach the first window before it went away (Linux CI).
+        if cfg!(windows)
+            && let Ok(TermEvent::Data { data }) = rx.recv_timeout(Duration::from_secs(5))
             && data.contains("\x1b[6n")
         {
             terms.write(&id, "\x1b[1;1R").unwrap();
