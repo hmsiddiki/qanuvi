@@ -2,6 +2,7 @@
 //! SSH, or to a paired computer through the relay, and passes the window's calls for that master's projects to it. "This PC" starts the master program next to the app,
 //! with its own data folder (for trying the feature without a server).
 
+use crate::sink::Sink;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -12,7 +13,6 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::Emitter;
-use tauri::ipc::Channel;
 
 type Reply = Result<Value, String>;
 
@@ -23,7 +23,7 @@ pub struct Connection {
     stdin: Mutex<Box<dyn Write + Send>>,
     closed: AtomicBool,
     pending: Mutex<HashMap<u64, mpsc::Sender<Reply>>>,
-    streams: Mutex<HashMap<String, Channel<Value>>>,
+    streams: Mutex<HashMap<String, Sink<Value>>>,
     next: AtomicU64,
     pub info: Mutex<Value>,
 }
@@ -31,6 +31,8 @@ pub struct Connection {
 #[derive(Default)]
 pub struct Remotes {
     map: Mutex<HashMap<String, Arc<Connection>>>,
+    /// Local ports that reach a master's localhost port (migration M1), by master and its port.
+    forwards: Mutex<HashMap<(String, u16), crate::pipes::Forward>>,
 }
 
 /// Checks an SSH target ("user@host", "host", "host:port" is not SSH syntax; use an SSH config alias for ports).
@@ -140,7 +142,7 @@ impl Connection {
     }
 
     /// Sends a command and waits for its answer (as long as it takes: a test run can be long).
-    pub fn call(&self, cmd: &str, mut args: Value, events: Option<Channel<Value>>) -> Reply {
+    pub fn call(&self, cmd: &str, mut args: Value, events: Option<Sink<Value>>) -> Reply {
         let id = self.next.fetch_add(1, Ordering::SeqCst) + 1;
         if let Some(ch) = events {
             let name = format!("s{id}");
@@ -163,6 +165,12 @@ impl Connection {
             .unwrap_or_else(|_| Err("The connection to the master has ended.".into()))
     }
 
+    /// Sends a command without waiting for its answer (the answer is dropped when it comes).
+    pub fn tell(&self, cmd: &str, args: Value) {
+        let id = self.next.fetch_add(1, Ordering::SeqCst) + 1;
+        let _ = self.send(&json!({"id": id, "cmd": cmd, "args": args}));
+    }
+
     fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
         if let Some(mut c) = self.child.lock().unwrap_or_else(|e| e.into_inner()).take() {
@@ -177,9 +185,12 @@ impl Connection {
             return;
         };
         if let Some(stream) = msg["stream"].as_str() {
-            let streams = self.streams.lock().unwrap_or_else(|e| e.into_inner());
-            if let Some(ch) = streams.get(stream) {
-                let _ = ch.send(msg["event"].clone());
+            let mut streams = self.streams.lock().unwrap_or_else(|e| e.into_inner());
+            // A stream nobody listens to any more is forgotten (a port link that closed, a window that went).
+            if let Some(sink) = streams.get(stream)
+                && sink.send(msg["event"].clone()).is_err()
+            {
+                streams.remove(stream);
             }
         } else if let Some(n) = msg["id"].as_u64() {
             let tx = self
@@ -391,6 +402,27 @@ impl Remotes {
         Ok(conn)
     }
 
+    /// A local port that reaches `port` on the master's localhost (the same one again when asked twice). It ends
+    /// when the master is disconnected.
+    pub fn forward(&self, id: &str, port: u16) -> Result<u16, String> {
+        let conn = self.get(id)?;
+        let mut all = self.forwards.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(f) = all.get(&(id.to_string(), port)) {
+            return Ok(f.local);
+        }
+        let f = crate::pipes::forward(conn, port)?;
+        let local = f.local;
+        all.insert((id.to_string(), port), f);
+        Ok(local)
+    }
+
+    pub fn unforward(&self, id: &str, port: u16) {
+        self.forwards
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&(id.to_string(), port));
+    }
+
     /// The masters connected now.
     pub fn connected(&self) -> Vec<String> {
         self.map
@@ -402,6 +434,10 @@ impl Remotes {
     }
 
     pub fn disconnect(&self, id: &str) {
+        self.forwards
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|(m, _), _| m != id);
         let conn = self
             .map
             .lock()
@@ -413,6 +449,10 @@ impl Remotes {
     }
 
     pub fn disconnect_all(&self) {
+        self.forwards
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
         let all: Vec<_> = self
             .map
             .lock()
@@ -422,6 +462,15 @@ impl Remotes {
         for (_, c) in all {
             c.close();
         }
+    }
+}
+
+impl crate::pipes::Link for Connection {
+    fn call(&self, cmd: &str, args: Value, events: Option<Sink<Value>>) -> Reply {
+        Connection::call(self, cmd, args, events)
+    }
+    fn tell(&self, cmd: &str, args: Value) {
+        Connection::tell(self, cmd, args)
     }
 }
 

@@ -379,7 +379,16 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): M0 BUILT. Parity test master.rs
+    RESUME HERE (newest, 2026-11-17): M1a BUILT (pipes.rs; master pipe_*/port_*, app port_forward/port_unforward,
+    seq-ordered writes, closed with the connection). Rust verify green (fmt, clippy -D warnings desktop + server
+    build, 435 tests). Live check against a real `qanuvi-master --stdio` on a scratch data folder: pipe echo with
+    out-of-order sends, exit event, HTTP through port_open, closed port refused, left-open pipe ended with the
+    connection, all pass. Not yet through the app window (nothing on screen uses the pipes until M1b/M1c).
+    FINDING k1 (in 0.1.23 already, not fixed, owner to decide): when `--stdio` starts the background `serve`
+    service, the service inherits the caller's stdout pipe on Windows (handle inheritance, though its stdio is
+    null), so the caller does not see the end of output when the stdio process exits. NEXT: M1b language servers on
+    a shown master (machine questions: which/free memory/install with live output; remove the lsp #root block).
+    RESUME HERE (before, 2026-11-17): M0 BUILT. Parity test master.rs
     answers_every_window_command_or_it_is_the_interfaces (app handler list vs master arms; 35 INTERFACE, 14 GAPS with
     phases; fails on a new unlisted command, a closed gap still listed, or a stale name; checked that it fails when a
     gap line is removed). NEXT: M1a master pipes (pipe_start/send/stop, port_forward), then M1b-M1d.

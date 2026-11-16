@@ -97,6 +97,17 @@ This PC is untouched in M1.
     connection.
   - `port_forward` opens a local port on the viewer's side that reaches the master's localhost port.
   - Both end with the connection.
+  - BUILT 2026-11-17 (M1a, `pipes.rs`):
+    - Master side: `pipe_start` (program, args, project folder or home) / `pipe_send` / `pipe_stop`, and
+      `port_open` (port on 127.0.0.1 or ::1) / `port_send` / `port_close`.
+    - Bytes go as base64, untouched. Events are `out`/`err`/`exit` for a program and `data`/`closed` for a port.
+    - Every send carries a `seq`, and the master writes in that order, because it answers each command on its own
+      thread.
+    - Pipes are closed with the connection, as terminals are.
+    - Viewer side: the `port_forward` / `port_unforward` app commands (interface list) listen on a free 127.0.0.1
+      port and carry each socket through `port_open`. Sends don't wait for an answer (`Connection::tell`).
+      Forwards end when the master disconnects.
+    - Remote streams now hold a `Sink`, and a stream nobody listens to any more is forgotten.
 - **Generic machine questions** for installs: whether a program or file exists there, free memory, and running an
   install command with live output. The master already does this for setup installs.
 - **Language servers on a shown master:**

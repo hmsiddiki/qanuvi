@@ -33,6 +33,7 @@ pub mod model_keys;
 pub mod notify;
 pub mod omniroute;
 pub mod paths;
+pub mod pipes;
 pub mod plan;
 pub mod plan_data;
 pub mod preview;

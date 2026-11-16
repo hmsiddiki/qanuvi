@@ -1563,7 +1563,7 @@ async fn remote_call(
     on_event: Channel<serde_json::Value>,
 ) -> Res<serde_json::Value> {
     let conn = state.remotes.get(&master)?;
-    blocking(move || conn.call(&cmd, args, streams.then_some(on_event))).await
+    blocking(move || conn.call(&cmd, args, streams.then(|| on_event.into()))).await
 }
 
 /// The masters this app is connected to (a new window joins them).
@@ -1575,6 +1575,18 @@ fn remote_list(state: State<AppState>) -> Vec<String> {
 #[tauri::command]
 fn remote_disconnect(state: State<AppState>, id: String) {
     state.remotes.disconnect(&id);
+}
+
+/// A free local port that reaches `port` on a connected master's localhost (migration M1: the preview of a shown
+/// master's dev server). It ends when that master is disconnected.
+#[tauri::command]
+fn port_forward(state: State<AppState>, master: String, port: u16) -> Res<u16> {
+    state.remotes.forward(&master, port)
+}
+
+#[tauri::command]
+fn port_unforward(state: State<AppState>, master: String, port: u16) {
+    state.remotes.unforward(&master, port);
 }
 
 #[tauri::command]
@@ -2187,6 +2199,8 @@ pub fn run() {
             remote_connect,
             remote_call,
             remote_disconnect,
+            port_forward,
+            port_unforward,
             remote_list,
             remote_pair,
             model_key_set,

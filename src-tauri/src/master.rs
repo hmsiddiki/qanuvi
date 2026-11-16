@@ -38,6 +38,8 @@ pub struct Master {
     app_data: bool,
     db: Db,
     terminals: Terminals,
+    /// Program pipes and port links lent to viewers (migration M1); each ends with its connection.
+    pipes: crate::pipes::Pipes,
     agents: Agents,
     indexes: index::Indexes,
     /// Start-up commands this master started (24z3 D4: its own list, from its own settings).
@@ -130,6 +132,7 @@ impl Master {
             app_data,
             db,
             terminals: Terminals::default(),
+            pipes: crate::pipes::Pipes::default(),
             agents: Agents::default(),
             indexes: index::Indexes::default(),
             startup: crate::startup::Startup::default(),
@@ -165,7 +168,7 @@ impl Master {
     }
 
     /// Runs one command. `stream` makes a sink for commands that stream events (terminals, agent sessions);
-    /// `opened_terminals` collects the terminals this connection opened, to close them when it ends.
+    /// `opened_terminals` collects the terminals and pipes this connection opened, to close them when it ends.
     pub fn dispatch(
         &self,
         cmd: &str,
@@ -496,6 +499,44 @@ impl Master {
             }
             "term_kill" => {
                 self.terminals.kill(&s(args, "id"));
+                Ok(Value::Null)
+            }
+            // The two pipes lent to a viewer (migration M1): run a program here with its input and output carried
+            // over the connection, or reach a port on this machine's localhost. Both end with the connection.
+            "pipe_start" => {
+                let root = self.optional_root(args)?;
+                let cwd = match root {
+                    Some(r) => files::folder_in(&r, opt(args, "dir").as_deref())?,
+                    None => config_home()?,
+                };
+                let id = self.pipes.start(
+                    &s(args, "program"),
+                    &list(args, "args"),
+                    &cwd,
+                    stream(&s(args, "onEvent")),
+                )?;
+                opened_terminals
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(id.clone());
+                Ok(json!(id))
+            }
+            "port_open" => {
+                let port = u16::try_from(n(args, "port")).map_err(|_| "That is not a port.")?;
+                let id = self.pipes.open_port(port, stream(&s(args, "onEvent")))?;
+                opened_terminals
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(id.clone());
+                Ok(json!(id))
+            }
+            "pipe_send" | "port_send" => {
+                self.pipes
+                    .send(&s(args, "id"), n(args, "seq"), &s(args, "data"))?;
+                Ok(Value::Null)
+            }
+            "pipe_stop" | "port_close" => {
+                self.pipes.stop(&s(args, "id"));
                 Ok(Value::Null)
             }
             // Backups and the data folder (24z3 D3): the master's own, on by default like the desktop app's (in
@@ -920,7 +961,11 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
         let _ = t.join();
     }
     for id in terminals.lock().unwrap_or_else(|e| e.into_inner()).iter() {
-        master.terminals.kill(id);
+        if crate::pipes::is_pipe(id) {
+            master.pipes.stop(id);
+        } else {
+            master.terminals.kill(id);
+        }
     }
 }
 
@@ -2042,6 +2087,130 @@ mod tests {
         assert!(call(&m, "inbox_add", json!({"item": {}})).is_err());
     }
 
+    // Migration M1a: the pipes a master lends to a viewer, through its own commands, as a viewer reaches them.
+    struct TestLink {
+        m: Arc<Master>,
+        opened: Arc<Mutex<HashSet<String>>>,
+    }
+
+    impl crate::pipes::Link for TestLink {
+        fn call(
+            &self,
+            cmd: &str,
+            args: Value,
+            events: Option<Sink<Value>>,
+        ) -> Result<Value, String> {
+            let ev = events.unwrap_or_else(|| Sink::new(|_| true));
+            let streams = move |_: &str| ev.clone();
+            self.m.dispatch(cmd, &args, &streams, &self.opened)
+        }
+        fn tell(&self, cmd: &str, args: Value) {
+            // Each command on its own thread, as a connection answers them, so writes may arrive out of order.
+            let (m, opened, cmd) = (self.m.clone(), self.opened.clone(), cmd.to_string());
+            std::thread::spawn(move || {
+                let streams = |_: &str| Sink::new(|_: Value| true);
+                let _ = m.dispatch(&cmd, &args, &streams, &opened);
+            });
+        }
+    }
+
+    #[test]
+    fn lends_a_program_pipe_and_a_port_and_ends_them_with_the_connection() {
+        use base64::{Engine, engine::general_purpose::STANDARD as B64};
+        use std::io::{Read, Write};
+        let data = tempfile::tempdir().unwrap();
+        let m = Arc::new(Master::open(data.path()).unwrap());
+        let opened: Arc<Mutex<HashSet<String>>> = Arc::default();
+        let link = Arc::new(TestLink {
+            m: m.clone(),
+            opened: opened.clone(),
+        });
+
+        // A port: an echo server on this machine, reached through a forward on a free local port.
+        let server = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = server.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for s in server.incoming().map_while(Result::ok) {
+                std::thread::spawn(move || {
+                    let mut r = s.try_clone().unwrap();
+                    let mut w = s;
+                    let _ = std::io::copy(&mut r, &mut w);
+                });
+            }
+        });
+        let fwd = crate::pipes::forward(link.clone(), port).unwrap();
+        assert_ne!(fwd.local, port);
+        let mut c = std::net::TcpStream::connect(("127.0.0.1", fwd.local)).unwrap();
+        c.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let sent: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+        let mut w = c.try_clone().unwrap();
+        let to_send = sent.clone();
+        std::thread::spawn(move || w.write_all(&to_send).unwrap());
+        let mut got = vec![0u8; sent.len()];
+        c.read_exact(&mut got).unwrap();
+        assert!(got == sent, "the bytes came back changed or out of order");
+        assert_eq!(opened.lock().unwrap().len(), 1);
+        drop(c);
+
+        // A program: a stand-in that echoes what comes in.
+        if let Some(node) = crate::local_servers::find("node") {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let sink = Sink::new(move |e: Value| tx.send(e).is_ok());
+            let streams = move |_: &str| sink.clone();
+            let id = m
+                .dispatch(
+                    "pipe_start",
+                    &json!({"program": node.to_string_lossy(), "args": ["-e", "process.stdin.pipe(process.stdout)"]}),
+                    &streams,
+                    &opened,
+                )
+                .unwrap();
+            let id = id.as_str().unwrap();
+            let none = |_: &str| Sink::new(|_: Value| true);
+            m.dispatch(
+                "pipe_send",
+                &json!({"id": id, "seq": 0, "data": B64.encode("Content-Length: 2\r\n\r\n{}")}),
+                &none,
+                &opened,
+            )
+            .unwrap();
+            let mut out = Vec::new();
+            while out.len() < 23 {
+                let e = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+                if e["kind"] == "out" {
+                    out.extend(B64.decode(e["data"].as_str().unwrap()).unwrap());
+                }
+            }
+            assert_eq!(out, b"Content-Length: 2\r\n\r\n{}");
+            // The connection ends: every pipe it opened ends with it.
+            for id in opened.lock().unwrap().drain() {
+                m.pipes.stop(&id);
+            }
+            let exit = loop {
+                let e = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+                if e["kind"] == "exit" {
+                    break e;
+                }
+            };
+            assert!(exit.get("code").is_some());
+        }
+        drop(fwd);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while m.pipes.running() > 0 && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(m.pipes.running(), 0);
+        let none = |_: &str| Sink::new(|_: Value| true);
+        assert!(
+            m.dispatch("pipe_start", &json!({"program": ""}), &none, &opened)
+                .is_err()
+        );
+        assert!(
+            m.dispatch("port_open", &json!({"port": 70000}), &none, &opened)
+                .is_err()
+        );
+    }
+
     // Migration M0 (docs/MIGRATION-VIEWER.md): every command the app answers is answered by the master too, or it
     // belongs to the interface. The known gaps are listed with the phase that closes them; each phase removes its
     // lines. M6 empties GAPS and from then on the app answers only INTERFACE.
@@ -2064,6 +2233,9 @@ mod tests {
         "data_location_remove_old",
         "data_test_build",
         "attachment_file",
+        // The viewer side of the master's port links (M1).
+        "port_forward",
+        "port_unforward",
         // Coding tools: the interface's, run on the shown machine through the master's pipes (M1, M5).
         "lsp_statuses",
         "lsp_install",
