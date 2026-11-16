@@ -1,4 +1,4 @@
-import { api, type Shell } from "$lib/api";
+import type { Shell } from "$lib/api";
 import { settings } from "./settings.svelte";
 import { switcher } from "./switcher.svelte";
 import { callOn } from "$lib/remote";
@@ -30,12 +30,16 @@ export class TerminalsStore {
   activeByProject = $state<Record<string, string>>({});
   shells = $state<Shell[]>([]);
 
+  /** The shown machine's shells (24z3 step 3, f2): read again on each switch; a late answer for another is dropped. */
   async loadShells(): Promise<void> {
+    const machine = switcher.shown;
+    let found: Shell[];
     try {
-      this.shells = await api.term.shells();
+      found = await callOn<Shell[]>(machine, "term_shells", {});
     } catch {
-      this.shells = [];
+      found = [];
     }
+    if (switcher.shown === machine) this.shells = found;
   }
 
   /** The tabs that have a screen now: the shown machine's. */

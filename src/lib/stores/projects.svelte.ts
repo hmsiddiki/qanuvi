@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Project, type ProjectSettings } from "$lib/api";
-import { shownMachine } from "$lib/remote";
+import { own, shownMachine } from "$lib/remote";
+import { folderPicker } from "./folderPicker.svelte";
 
 /** The project each machine opens with: This PC keeps the old key, a master its own. */
 export const currentKey = (machine: string | null) =>
@@ -73,12 +74,14 @@ class ProjectsStore {
     api.projects.touch(id).catch(() => {});
   }
 
-  /** Opens the system folder picker and adds the chosen folder. */
+  /** Picks a folder of the shown machine and adds it: the system picker on This PC, Qanuvi's own on a master. */
   async addWithPicker(): Promise<Project | null> {
-    // The picker shows this PC's folders: a server's folder is typed in on the Servers screen.
-    if (this.machine) {
-      this.error = "This picks a folder on this PC. Add a folder of the server on the Servers screen.";
-      return null;
+    const machine = this.machine;
+    if (machine) {
+      const path = await folderPicker.pick(machine);
+      // Shown machine changed meanwhile: the folder belongs to the one it was picked on, never added elsewhere.
+      if (!path || this.machine !== machine) return null;
+      return this.add(path);
     }
     const picked = await open({ directory: true, multiple: false, title: "Add a project folder" });
     if (typeof picked !== "string") return null;
@@ -90,7 +93,9 @@ class ProjectsStore {
     try {
       const added = await api.projects.add(path);
       const project = this.machine ? { ...added, master: this.machine } : added;
-      if (!this.machine) this.#localIds.add(project.id);
+      // Later calls about it go to its machine, whatever is shown then.
+      if (this.machine) own(project.id, this.machine);
+      else this.#localIds.add(project.id);
       if (!this.list.some((p) => p.id === project.id)) this.list = [project, ...this.list];
       this.select(project.id);
       return project;

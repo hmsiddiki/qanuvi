@@ -24,7 +24,9 @@ vi.mock("./memoryDisk.svelte", () => ({ memoryDisk: switched() }));
 vi.mock("./remoteAccess.svelte", () => ({ remoteAccess: switched() }));
 vi.mock("./memory.svelte", () => ({ memory: { touch: vi.fn() } }));
 vi.mock("./editor.svelte", () => ({ editor: { park: () => [], openConfig: vi.fn(), applyDraft: vi.fn() } }));
-vi.mock("./terminals.svelte", () => ({ terminals: { park: vi.fn(async () => {}) } }));
+vi.mock("./terminals.svelte", () => ({
+  terminals: { park: vi.fn(async () => {}), loadShells: vi.fn(async () => {}) },
+}));
 vi.mock("./workspace.svelte", () => ({ workspace: { flush: vi.fn(), restored: new Set() } }));
 vi.mock("./drafts", () => ({ drafts: { keep: vi.fn(async () => {}), take: vi.fn(async () => []) } }));
 

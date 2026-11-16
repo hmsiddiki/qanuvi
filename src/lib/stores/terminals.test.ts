@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // 24z3 Part B2: only the shown machine's terminals have a screen; a hidden machine's are parked (the shell goes on
 // there, told only while it can be reached) and their tabs go when the machine's connection ends.
-const invoke = vi.fn(async (..._args: unknown[]) => {});
+const invoke = vi.fn(async (..._args: unknown[]): Promise<unknown> => undefined);
 vi.mock("@tauri-apps/api/core", () => ({ Channel: class {}, invoke: (...a: unknown[]) => invoke(...a) }));
 vi.mock("./settings.svelte", () => ({ settings: { value: { defaultShell: "pwsh" } } }));
 
@@ -62,5 +62,47 @@ describe("terminals per machine", () => {
     t.close(key);
     expect(invoke).toHaveBeenCalledWith("term_kill", { id: "term-x" });
     expect(t.tabs).toEqual([]);
+  });
+});
+
+// 24z3 step 3, f2: the shell picker lists the shown machine's shells, never This PC's while a server is shown.
+describe("shells of the shown machine", () => {
+  const shellsOf = (machine: string | null) =>
+    machine
+      ? [{ id: "bash", label: "bash", program: "/bin/bash" }]
+      : [{ id: "pwsh", label: "PowerShell", program: "pwsh" }];
+  const answer = async (cmd: unknown, args: unknown) => {
+    const a = (args ?? {}) as { master?: string; cmd?: string };
+    if (cmd === "term_shells") return shellsOf(null);
+    if (cmd === "remote_call" && a.cmd === "term_shells") return shellsOf(a.master ?? null);
+    return undefined;
+  };
+
+  it("are read from the machine shown", async () => {
+    invoke.mockImplementation(answer);
+    const t = new TerminalsStore();
+    switcher.shown = "vps";
+    await t.loadShells();
+    expect(t.shells.map((s) => s.id)).toEqual(["bash"]);
+    switcher.shown = null;
+    await t.loadShells();
+    expect(t.shells.map((s) => s.id)).toEqual(["pwsh"]);
+    invoke.mockReset();
+  });
+
+  it("an answer that comes after another switch is dropped", async () => {
+    invoke.mockImplementation(answer);
+    const t = new TerminalsStore();
+    switcher.shown = null;
+    await t.loadShells();
+    switcher.shown = "vps";
+    const late = t.loadShells();
+    switcher.shown = null;
+    await late;
+    expect(
+      t.shells.map((s) => s.id),
+      "This PC's list stays",
+    ).toEqual(["pwsh"]);
+    invoke.mockReset();
   });
 });

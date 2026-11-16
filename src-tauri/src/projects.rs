@@ -152,6 +152,47 @@ pub fn canonical_dir(path: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(display_path(&canon)))
 }
 
+/// A folder of this machine and the folders in it: a server's own folder picker (24z3 step 3, f1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Folders {
+    pub path: String,
+    /// The folder above; none at the top of a drive or of `/`.
+    pub parent: Option<String>,
+    pub dirs: Vec<FolderEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FolderEntry {
+    pub name: String,
+    pub path: String,
+}
+
+/// The folders in one folder (an empty path is the home folder); files are left out. Sorted by name, case aside.
+pub fn list_folders(path: &str) -> Result<Folders, String> {
+    let dir = if path.trim().is_empty() {
+        let home = crate::agent_config::home_dir().ok_or("The home folder could not be found.")?;
+        canonical_dir(&home.to_string_lossy())?
+    } else {
+        canonical_dir(path)?
+    };
+    let mut dirs: Vec<FolderEntry> = std::fs::read_dir(&dir)
+        .map_err(|e| format!("{} cannot be read: {e}", display_path(&dir)))?
+        .flatten()
+        // A link to a folder counts (is_dir follows it); one that leads nowhere does not.
+        .filter(|e| e.path().is_dir())
+        .map(|e| FolderEntry {
+            name: e.file_name().to_string_lossy().to_string(),
+            path: display_path(&e.path()),
+        })
+        .collect();
+    dirs.sort_by_key(|d| d.name.to_lowercase());
+    Ok(Folders {
+        path: display_path(&dir),
+        parent: dir.parent().map(display_path),
+        dirs,
+    })
+}
+
 fn from_row(row: &Row) -> rusqlite::Result<Project> {
     let tags: String = row.get("tags")?;
     let settings: String = row.get("settings")?;
@@ -400,6 +441,30 @@ mod tests {
         let dir = folder(&["file.txt"]);
         assert!(add(&db, &dir.path().join("file.txt").to_string_lossy()).is_err());
         assert!(add(&db, "  ").is_err());
+    }
+
+    #[test]
+    fn list_folders_gives_only_folders_sorted_with_full_paths() {
+        let dir = folder(&["beta/", "Alpha/", "file.txt", "beta/inner/"]);
+        let found = list_folders(&dir.path().to_string_lossy()).unwrap();
+        let names: Vec<&str> = found.dirs.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, ["Alpha", "beta"]);
+        assert!(!found.path.starts_with(r"\\?\"));
+        assert_eq!(
+            Path::new(&found.dirs[1].path),
+            Path::new(&found.path).join("beta")
+        );
+        // The folder above is listed as the parent, and reading it again lists this one.
+        let up = list_folders(found.parent.as_deref().unwrap()).unwrap();
+        assert!(up.dirs.iter().any(|d| d.path == found.path));
+    }
+
+    #[test]
+    fn list_folders_starts_at_home_and_refuses_a_file_or_a_missing_folder() {
+        assert!(!list_folders("").unwrap().path.is_empty());
+        let dir = folder(&["file.txt"]);
+        assert!(list_folders(&dir.path().join("file.txt").to_string_lossy()).is_err());
+        assert!(list_folders("Z:/no/such/folder/anywhere").is_err());
     }
 
     #[test]

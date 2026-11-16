@@ -66,3 +66,14 @@ describe("drafts of a hidden machine", () => {
     expect(onMachine.size).toBe(0);
   });
 });
+
+describe("draft preview in the Inbox", () => {
+  it("gives short text whole and cuts long text at a line end, saying how much is left", async () => {
+    const { draftPreview } = await import("./drafts");
+    expect(draftPreview("a\nb")).toBe("a\nb");
+    const long = "line one\nline two\nline three";
+    const shown = draftPreview(long, 12);
+    expect(shown.startsWith("line one\n…")).toBe(true);
+    expect(shown).toContain(`${long.length - 8} more characters`);
+  });
+});

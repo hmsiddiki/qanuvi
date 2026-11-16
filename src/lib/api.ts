@@ -89,6 +89,13 @@ export interface SearchResult {
   truncated: boolean;
 }
 
+/** A folder of a machine and the folders in it (a server's own folder picker). */
+export interface Folders {
+  path: string;
+  parent: string | null;
+  dirs: { name: string; path: string }[];
+}
+
 export interface Shell {
   id: string;
   label: string;
@@ -362,6 +369,8 @@ export const api = {
       invoke<Project>("projects_update", { id, name, settings }),
     touch: (id: string) => invoke<void>("projects_touch", { id }),
     redetect: (id: string) => invoke<Project>("projects_redetect", { id }),
+    /** A master's folders, for picking a project folder there (an empty path is its home folder). */
+    folders: (path: string) => invoke<Folders>("dirs_list", { path }),
   },
   files: {
     listDir: (projectId: string, path: string) => invoke<Entry[]>("files_list_dir", { projectId, path }),

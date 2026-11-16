@@ -379,7 +379,24 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-16 16:30, for a fresh conversation): g1 + g2 FIXED (owner: "fix them and
+    RESUME HERE (newest, 2026-11-16 16:40): ORDER STEP 3 BUILT (not driven live). (f1) Projects "+" on a shown
+    server opens Qanuvi's own folder picker on that machine (FolderPicker.svelte, stores/folderPicker.svelte.ts): starts
+    at its home folder, path box (Enter goes there; a typed path is checked on the machine before "Add this folder"),
+    Up, its folders (click opens one); every read names the machine (callOn), a switch closes it, and a folder picked
+    on one machine is never added to another. Master answers dirs_list (projects::list_folders: folders only, sorted,
+    full paths, home for ""). A project added from the sidebar on a master is owned at once (remote own()). This PC
+    keeps the system picker. (f2) the shell list is read again from the shown machine on each switch (late answers
+    dropped). B2 leftovers: (a) a hidden machine's agent turn events never reach the window (agent.handler names the
+    machine shown when it was made; its chat is read back on return), and the chat's "working" state is cleared on a
+    switch; (b) a draft whose file cannot open again stays kept and now says so once in the Inbox (kind "drafts",
+    one key per file, why it did not open, the text to copy from, cut at 4000 characters). Checks: TS 423
+    (folderPicker 3, shells 2, draft preview 1), svelte-check 0/0, prettier, Rust projects 9 + master dirs_list,
+    clippy, server build check. Noticed meanwhile: the owner's installed 0.1.22 run sat on step 5 after it was done
+    (the old window runner read "rate limit ... reached" in the step's own answer as a usage limit; fixed in 9ea5fcd,
+    waits for 0.1.23); owner told Pause then Resume. NEXT: drive step 3 live (release test build: "+" on the local
+    test master and the VPS, shells on the VPS, a turn running on the master while This PC is shown, a draft whose
+    file was deleted while hidden), then step 4 (working icon + "Open in a new window"), step 5 Part F, R3-R5.
+    RESUME HERE (before, CHECKPOINT 2026-11-16 16:30, for a fresh conversation): g1 + g2 FIXED (owner: "fix them and
     make checkpoint"), not driven live (text only; the test window still holds an unsaved scratch line in projm's
     README, so it was not rebuilt). g1: the sidebar under a held machine says "Not connected." where it said "No
     projects yet. Use + to add a folder", and shows no empty-chats line. g2: the Servers page's remote access card of

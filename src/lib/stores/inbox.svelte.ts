@@ -56,7 +56,7 @@ export interface InboxItem {
   id: string;
   at: number;
   type: InboxType;
-  kind: "run" | "sign-in" | "knowledge" | "chats";
+  kind: "run" | "sign-in" | "knowledge" | "chats" | "drafts";
   title: string;
   text: string;
   read: boolean;

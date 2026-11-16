@@ -473,9 +473,15 @@ ${text}`
     else this.sessions = [session, ...this.sessions];
   }
 
-  /** Passes a session's events to the pane (used by sends here and by plan runs). */
-  handler(sessionId: () => string | null) {
+  /**
+   * Passes a session's events to the pane (used by sends here and by plan runs). Only while the machine the session
+   * runs on is shown (24z3 Part B2): a hidden machine's turn goes on there and its chat is read back on return, so
+   * its events never land in another machine's chat list or "working" state. The machine is the one shown when the
+   * handler is made, which is where its turn was started.
+   */
+  handler(sessionId: () => string | null, machine: string | null = shownMachine()) {
     return (event: AgentEvent) => {
+      if (shownMachine() !== machine) return;
       const id = sessionId();
       if (event.kind === "session") {
         this.#upsert(event.session);

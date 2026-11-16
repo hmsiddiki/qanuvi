@@ -87,3 +87,11 @@ export class DraftsStore {
 }
 
 export const drafts = new DraftsStore();
+
+/** The kept text as the Inbox shows it, to copy from: its start, cut at a line end past the limit. */
+export function draftPreview(text: string, limit = 4000): string {
+  if (text.length <= limit) return text;
+  const cut = text.lastIndexOf("\n", limit);
+  const rest = text.length - (cut > 0 ? cut : limit);
+  return `${text.slice(0, cut > 0 ? cut : limit)}\n… (${rest} more characters, kept with the rest)`;
+}

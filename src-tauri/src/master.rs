@@ -212,6 +212,8 @@ impl Master {
             // Projects (folders on this master).
             "projects_list" => to(projects::list(db)),
             "projects_add" => to(projects::add(db, &s(args, "path"))),
+            // The window's folder picker for this machine (there is no system picker for a server's folders).
+            "dirs_list" => to(projects::list_folders(&s(args, "path"))),
             "projects_remove" => {
                 let id = s(args, "id");
                 self.terminals.kill_project(&id);
@@ -1265,6 +1267,28 @@ mod tests {
             call(&m, "drafts_list", json!({"projectId": id})).unwrap(),
             json!([])
         );
+    }
+
+    // 24z3 step 3, f1: the window's "+" on a shown server picks a folder there through this master's folder list.
+    #[test]
+    fn lists_its_folders_for_the_windows_folder_picker() {
+        let data = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        std::fs::create_dir(folder.path().join("shop")).unwrap();
+        std::fs::write(folder.path().join("notes.txt"), "").unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let found = call(
+            &m,
+            "dirs_list",
+            json!({"path": folder.path().to_string_lossy()}),
+        )
+        .unwrap();
+        assert_eq!(found["dirs"].as_array().unwrap().len(), 1);
+        assert_eq!(found["dirs"][0]["name"], "shop");
+        let shop = found["dirs"][0]["path"].as_str().unwrap().to_string();
+        let p = call(&m, "projects_add", json!({"path": shop})).unwrap();
+        assert_eq!(p["name"], "shop");
+        assert!(call(&m, "dirs_list", json!({"path": ""})).unwrap()["path"].is_string());
     }
 
     #[test]

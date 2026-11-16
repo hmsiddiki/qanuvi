@@ -44,8 +44,9 @@
   import { isProjectView, workspace, type SavedTab } from "$lib/stores/workspace.svelte";
   import { projectFromUrl, windows } from "$lib/stores/windows.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-  import { drafts } from "$lib/stores/drafts";
-  import { shownMachine } from "$lib/remote";
+  import FolderPicker from "$lib/components/FolderPicker.svelte";
+  import { draftPreview, drafts } from "$lib/stores/drafts";
+  import { machineName, shownMachine } from "$lib/remote";
 
   let ready = $state(false);
 
@@ -173,10 +174,24 @@
       const key = tabKey(id, d.path);
       if (!editorStore.tabs.some((x) => x.key === key)) await editorStore.open(id, d.path, null, null, 0);
       if (!editorStore.applyDraft(key, d.text, d.hash)) {
-        // The file cannot be opened any more (gone, or now too large): its text stays kept rather than lost.
+        // The file cannot be opened any more (gone, or now too large): its text stays kept rather than lost, and the
+        // owner is told once (the same key replaces the note on each return) with the text to copy from.
         await drafts.keep(machine, [d], shownMachine() === machine);
         const tab = editorStore.tabs.find((x) => x.key === key);
+        const why = tab?.error
+          ? tab.error
+          : tab?.tooLarge
+            ? "It is now too large to open."
+            : tab?.binary
+              ? "It is no longer a text file."
+              : "It could not be opened.";
         if (tab?.error) await editorStore.close(key);
+        inbox.add({
+          kind: "drafts",
+          key: `draft:${machine ?? "this-pc"}:${id}:${d.path}`,
+          title: `Unsaved changes to ${d.path} on ${machine ? machineName(machine) : "This PC"} are kept`,
+          text: `${why} The unsaved text stays kept and comes back once the file opens again.\n\n${draftPreview(d.text)}`,
+        });
       }
     }
   }
@@ -354,6 +369,7 @@
 
 <ContextMenu />
 <ConfirmDialog />
+<FolderPicker />
 
 {#if ui.quickOpen && projects.current}
   <QuickOpen

@@ -19,7 +19,7 @@ pub struct InboxItem {
     /// "info", "answer" or "problem".
     #[serde(rename = "type")]
     pub kind_of: String,
-    /// What it is about: "run", "sign-in", "knowledge", "chats".
+    /// What it is about: "run", "sign-in", "knowledge", "chats", "drafts".
     pub kind: String,
     pub title: String,
     pub text: String,

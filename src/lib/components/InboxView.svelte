@@ -54,6 +54,7 @@
     "sign-in": "Sign-in",
     knowledge: "Knowledge",
     chats: "Chats",
+    drafts: "Unsaved text",
   };
 
   async function open(item: InboxItem) {

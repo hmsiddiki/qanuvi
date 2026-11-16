@@ -20,6 +20,7 @@ import { memoryDisk } from "./memoryDisk.svelte";
 import { remoteAccess } from "./remoteAccess.svelte";
 import { memory } from "./memory.svelte";
 import { switcher } from "./switcher.svelte";
+import { folderPicker } from "./folderPicker.svelte";
 
 /**
  * The machine leaving the screen is wiped from the window (24z3 Part B2): its open files go (unsaved text kept as
@@ -60,6 +61,12 @@ export async function show(machine: string | null): Promise<void> {
   switcher.held = null;
   showMachine(machine);
   switcher.shown = machine;
+  // A folder picker open on the machine before closes (it read that machine's folders).
+  folderPicker.switched(machine);
+  // The shell picker lists the new machine's shells (a Linux server has no Windows PowerShell).
+  void terminals.loadShells();
+  // The chat pane's "working" was the machine before's turn: the new machine's chat shows its own sessions' state.
+  if (from !== machine) agent.busy = false;
   // The status bar, the setup guide's machine facts, Start-up and Claude Code's version are the new machine's.
   usage.switched();
   guides.switched();

@@ -23,7 +23,7 @@ vi.mock("./memory.svelte", () => ({ memory: { touch: vi.fn() } }));
 const unsaved: Draft[] = [{ projectId: "p1", path: "a.js", text: "changed", hash: "h1" }];
 const editor = { park: vi.fn(() => unsaved), openConfig: vi.fn(async () => {}), applyDraft: vi.fn() };
 vi.mock("./editor.svelte", () => ({ editor }));
-const terminals = { park: vi.fn(async () => {}) };
+const terminals = { park: vi.fn(async () => {}), loadShells: vi.fn(async () => {}) };
 vi.mock("./terminals.svelte", () => ({ terminals }));
 const workspace = { flush: vi.fn(), restored: new Set<string>() };
 vi.mock("./workspace.svelte", () => ({ workspace }));
