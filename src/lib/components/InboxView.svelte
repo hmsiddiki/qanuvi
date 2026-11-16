@@ -44,7 +44,8 @@
     if (item.status === "closed") return "No longer asked.";
     const label = item.form?.choices.find((c) => c.id === item.answer?.choice)?.label ?? item.answer?.choice ?? "";
     const said = item.answer?.text?.trim();
-    const where = item.answeredBy && item.answeredBy !== "main" ? ` (in window ${item.answeredBy})` : "";
+    const where =
+      item.answeredBy && !["main", "desktop"].includes(item.answeredBy) ? ` (in window ${item.answeredBy})` : "";
     return `You answered: ${label}${said ? ` · "${said}"` : ""}${where}`;
   }
 
@@ -118,12 +119,13 @@
       <div class="item unread" class:offline={item.offline} data-id={item.id} class:focus={ui.inboxFocus === item.id}>
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
-          {#if several}{@const m = machineOf(item)}<span class="machine"
-              ><span class="dot" style:background={m.color}></span>{m.name}</span
-            >{/if}
           <strong class="title">{item.title}</strong>
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
+        {#if several}{@const m = machineOf(item)}
+          <div class="machine">
+            <span class="dot" style:background={m.color}></span>{m.name}
+          </div>{/if}
         {#if item.offline}
           {#if item.text}<p class="text">{item.text}</p>{/if}
           <p class="text gone">{machineOf(item).name} is not connected. Answer it once it is back.</p>
@@ -157,12 +159,13 @@
       >
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
-          {#if several}{@const m = machineOf(item)}<span class="machine"
-              ><span class="dot" style:background={m.color}></span>{m.name}</span
-            >{/if}
           <strong class="title">{item.title}</strong>
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
+        {#if several}{@const m = machineOf(item)}
+          <div class="machine">
+            <span class="dot" style:background={m.color}></span>{m.name}
+          </div>{/if}
         {#if item.text}<p class="text">{item.text}</p>{/if}
         {#if item.type === "answer"}<p class="text">{outcome(item)}</p>{/if}
         {#if item.offline}
@@ -255,12 +258,12 @@
   }
 
   .machine {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    margin: 2px 0 0 70px;
     font-size: 11px;
     color: var(--qx-text-secondary);
-    white-space: nowrap;
   }
 
   .dot {
@@ -286,6 +289,7 @@
 
   .when {
     margin-left: auto;
+    white-space: nowrap;
   }
 
   .text {

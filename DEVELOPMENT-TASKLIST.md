@@ -379,7 +379,23 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 15:15): 24z3 PART B2 DRIVEN LIVE, ALL PASS (order step 1 done). Release test
+    RESUME HERE (newest, 2026-11-16 16:00): step 2 started (owner: "go ahead" on the proposed order 1 C2, 2 E, 3 B2
+    leftovers + f1/f2, 4 working icon + "Open in a new window", 5 F). Check done first: the window already followed
+    every machine's Inbox, merged one list, badges in the switcher, answers to the owning machine; missing were the
+    items' machine names, a filter, Open switching machine (bug: it picked the project on the machine shown), dropped
+    machines' items vanishing, notifications without the machine. 24z3 PART C2 BUILT (1a5d1cd + layout fix) AND
+    DRIVEN LIVE, ALL PASS (release test build 15:58, local test master; test questions put in its DB while stopped):
+    each item names its machine on a small line under the title (colour dot; This PC grey), "All machines / This PC /
+    each master" filter (Clear all follows it), the master's question answered from the Inbox while basevm378 was
+    shown (master DB: answered, no switch), "Open the plan" on the master's item switched basevm378 -> test master
+    and opened projm's plan, master stopped -> its items stay greyed "... is not connected" (questions: "Answer it
+    once it is back"), nothing to press; reconnect -> the live list replaces them. Removing a master drops its items.
+    A master's desktop notification starts with its name ("basevm378: Needs your answer: ...", bundled lines too;
+    InboxItem.machine, never stored; Rust test) - not seen live (needs a live add on a master), tests only. An answer
+    from a master's Inbox no longer says "(in window desktop)". Tests: TS 407, Rust notify 5 + inbox 11, svelte-check
+    0/0, clippy, server build check. NEXT: step 2 part 2 = Part E (not connected screen + Reconnect; overlay
+    "connection lost, reconnecting" for a shown machine that drops, f3).
+    RESUME HERE (before, 2026-11-16 15:15): 24z3 PART B2 DRIVEN LIVE, ALL PASS (order step 1 done). Release test
     build 14:49 (old local test master stopped with the owner's yes so the build could replace its exe), server build
     cross-built 15:03 (zigbuild -j 2, 9.3 MB) and swapped into ~/.local/bin on the VPS. This PC (projl): README unsaved
     line + ping in a terminal -> local test master -> back: text back unsaved, same tab, the ping process kept running
