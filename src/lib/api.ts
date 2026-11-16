@@ -316,7 +316,12 @@ export interface PickedElement {
 export interface MemoryEntry {
   id: string;
   kind: "rule" | "style" | "fact" | "decision" | "solution" | "example";
-  /** "" for every project, else a project id. */
+  /**
+   * About me ("me") and Tools and models ("tools") are account memory and travel through the memory disk; This project
+   * ("project") stays on the machine that has the project (24z3 D8).
+   */
+  part: "me" | "project" | "tools";
+  /** The project id of a This project entry, else "". */
   scope: string;
   title: string;
   body: string;

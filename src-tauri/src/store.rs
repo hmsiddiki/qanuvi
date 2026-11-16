@@ -231,6 +231,18 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 11 {
+        // The memory's parts (24z3 D8): About me ("me") and Tools and models ("tools") are account memory and travel
+        // through the memory disk; This project ("project") never leaves the machine. Entries for every project become
+        // About me, the ones for a project This project.
+        conn.execute_batch(
+            "BEGIN;
+             ALTER TABLE memory ADD COLUMN part TEXT NOT NULL DEFAULT '';
+             UPDATE memory SET part = CASE WHEN scope = '' THEN 'me' ELSE 'project' END;
+             PRAGMA user_version = 11;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -253,7 +265,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 10);
+        assert_eq!(version, 11);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

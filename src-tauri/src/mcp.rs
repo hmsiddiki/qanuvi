@@ -97,12 +97,13 @@ fn memory_tools() -> Vec<Value> {
         }),
         json!({
             "name": "memory_suggest",
-            "description": "Suggest a lasting entry for the user's memory: a decision made, a fact learned, a solution worth reusing. The user approves it first. Keep it short and specific.",
+            "description": "Suggest a lasting entry for the user's memory: a decision made, a fact learned, a solution worth reusing. The user approves it first. Keep it short and specific. Part: \"project\" (this project only, the default), \"me\" (about the user, for every project) or \"tools\" (the user's tools and models).",
             "inputSchema": {"type": "object", "properties": {
                 "kind": {"type": "string", "enum": ["fact", "decision", "solution", "rule", "style", "example"]},
                 "title": {"type": "string"},
                 "body": {"type": "string"},
-                "all_projects": {"type": "boolean", "description": "For every project, not just this one."}
+                "part": {"type": "string", "enum": ["project", "me", "tools"]},
+                "all_projects": {"type": "boolean", "description": "Same as part \"me\" (kept for older callers)."}
             }, "required": ["kind", "title", "body"]}
         }),
     ]
@@ -261,12 +262,13 @@ impl Server {
                     .memory
                     .as_ref()
                     .ok_or("The memory is not available here.")?;
-                let scope = if args["all_projects"].as_bool().unwrap_or(false) {
-                    ""
-                } else {
-                    scope.as_str()
+                let part = match s("part").as_str() {
+                    p @ ("me" | "tools" | "project") => p.to_string(),
+                    _ if args["all_projects"].as_bool().unwrap_or(false) => "me".into(),
+                    _ if scope.is_empty() => "me".into(),
+                    _ => "project".into(),
                 };
-                crate::memory::suggest(db, &s("kind"), scope, &s("title"), &s("body"))?;
+                crate::memory::suggest(db, &s("kind"), &part, scope, &s("title"), &s("body"))?;
                 Ok("Suggested. The user approves or dismisses it in Qanuvi's Memory view; until then it is not used.".into())
             }
             _ => Err(format!("Unknown tool {name}.")),
@@ -549,6 +551,7 @@ mod tests {
             &crate::memory::Entry {
                 id: String::new(),
                 kind: "decision".into(),
+                part: String::new(),
                 scope: "p1".into(),
                 title: "Money in cents".into(),
                 body: "Totals are integer cents.".into(),
@@ -591,5 +594,29 @@ mod tests {
             "not used until approved"
         );
         assert_eq!(crate::memory::list(&db, Some("p1"), true).unwrap().len(), 2);
+        let (_, err) = call(
+            &mut server,
+            "memory_suggest",
+            json!({"kind": "fact", "part": "tools", "title": "Uses Ollama", "body": "On the GPU."}),
+        );
+        assert!(!err);
+        let all = crate::memory::list(&db, None, true).unwrap();
+        let tools = all.iter().find(|e| e.title == "Uses Ollama").unwrap();
+        assert_eq!(
+            (
+                tools.part.as_str(),
+                tools.scope.as_str(),
+                tools.status.as_str()
+            ),
+            ("tools", "", "suggested")
+        );
+        let first = all
+            .iter()
+            .find(|e| e.title.starts_with("Tests use"))
+            .unwrap();
+        assert_eq!(
+            (first.part.as_str(), first.scope.as_str()),
+            ("project", "p1")
+        );
     }
 }

@@ -4,6 +4,10 @@
 //!
 //! Entries keep an id, change times and a deleted mark rather than being erased, so copies made on two machines can be
 //! merged later (Milestone 18).
+//!
+//! Every entry belongs to one of three parts (24z3 D8): About me and Tools and models are the user's account memory
+//! and travel to their other machines; This project entries belong to one project and never leave the machine that has
+//! it. Only the user makes an entry active: whatever an agent or Qanuvi adds arrives as a suggestion.
 
 use crate::store::{Db, now};
 use rusqlite::{OptionalExtension, Row, params};
@@ -11,6 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 pub const KINDS: [&str; 6] = ["rule", "style", "fact", "decision", "solution", "example"];
+/// The parts of the memory: "me" (About me), "project" (This project), "tools" (Tools and models).
+pub const PARTS: [&str; 3] = ["me", "project", "tools"];
 const MAX_TITLE: usize = 200;
 const MAX_BODY: usize = 4000;
 /// How much of an entry's text goes into a slice.
@@ -21,7 +27,10 @@ pub struct Entry {
     #[serde(default)]
     pub id: String,
     pub kind: String,
-    /// "" for every project, else a project id.
+    /// "me", "project" or "tools"; "" (from before the parts, or a file of an older Qanuvi) is read from the scope.
+    #[serde(default)]
+    pub part: String,
+    /// The project id of a This project entry, else "".
     #[serde(default)]
     pub scope: String,
     pub title: String,
@@ -51,24 +60,44 @@ fn user() -> String {
     "user".into()
 }
 
-fn from_row(r: &Row) -> rusqlite::Result<Entry> {
+impl Entry {
+    /// The entry's part; one without a part (from before the parts) is About me when it was for every project, else
+    /// This project.
+    pub fn part(&self) -> &str {
+        match self.part.as_str() {
+            p @ ("me" | "project" | "tools") => p,
+            "" if self.scope.is_empty() => "me",
+            "" => "project",
+            other => other,
+        }
+    }
+
+    /// About me and Tools and models: the account memory, which travels to the user's other machines.
+    pub fn is_account(&self) -> bool {
+        matches!(self.part(), "me" | "tools")
+    }
+}
+
+/// Reads an entry from columns in the order of COLS.
+pub(crate) fn from_row(r: &Row) -> rusqlite::Result<Entry> {
     Ok(Entry {
         id: r.get(0)?,
         kind: r.get(1)?,
-        scope: r.get(2)?,
-        title: r.get(3)?,
-        body: r.get(4)?,
-        tags: r.get(5)?,
-        status: r.get(6)?,
-        source: r.get(7)?,
-        created_at: r.get(8)?,
-        updated_at: r.get(9)?,
-        uses: r.get(10)?,
+        part: r.get(2)?,
+        scope: r.get(3)?,
+        title: r.get(4)?,
+        body: r.get(5)?,
+        tags: r.get(6)?,
+        status: r.get(7)?,
+        source: r.get(8)?,
+        created_at: r.get(9)?,
+        updated_at: r.get(10)?,
+        uses: r.get(11)?,
     })
 }
 
-const COLS: &str =
-    "id, kind, scope, title, body, tags, status, source, created_at, updated_at, uses";
+pub(crate) const COLS: &str =
+    "id, kind, part, scope, title, body, tags, status, source, created_at, updated_at, uses";
 
 /// Entries that apply to a project (its own and the ones for every project), or all of them with `None`; suggested
 /// ones only with `suggested`.
@@ -97,6 +126,21 @@ pub fn get(db: &Db, id: &str) -> Result<Entry, String> {
         .ok_or_else(|| "That memory entry no longer exists.".into())
 }
 
+/// The entry as it is kept: a known part, and a project only for This project entries.
+fn normalized(e: &Entry) -> Result<Entry, String> {
+    let mut out = e.clone();
+    out.part = e.part().to_string();
+    if !PARTS.contains(&out.part.as_str()) {
+        return Err(format!("Unknown part of the memory: {}.", e.part));
+    }
+    if out.is_account() {
+        out.scope = String::new();
+    } else if out.scope.trim().is_empty() {
+        return Err("Choose the project this entry is for.".into());
+    }
+    Ok(out)
+}
+
 fn check(e: &Entry) -> Result<(), String> {
     if !KINDS.contains(&e.kind.as_str()) {
         return Err(format!("Unknown kind of entry: {}.", e.kind));
@@ -115,51 +159,67 @@ fn check(e: &Entry) -> Result<(), String> {
     Ok(())
 }
 
-/// Adds an entry (without an id) or changes one; answers it as stored.
-pub fn save(db: &Db, e: &Entry) -> Result<Entry, String> {
-    check(e)?;
-    let t = now();
-    let status = if e.status == "suggested" {
-        "suggested"
-    } else {
-        "active"
-    };
-    let source = if e.source == "agent" { "agent" } else { "user" };
-    if e.id.is_empty() {
-        let id = uuid::Uuid::new_v4().to_string();
-        db.conn()
-            .execute(
-                "INSERT INTO memory (id, kind, scope, title, body, tags, status, source, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
-                params![
-                    id,
-                    e.kind,
-                    e.scope,
-                    e.title.trim(),
-                    e.body.trim(),
-                    e.tags.trim(),
-                    status,
-                    source,
-                    t
-                ],
-            )
-            .map_err(|e| e.to_string())?;
-        return get(db, &id);
-    }
-    let n = db
-        .conn()
+fn insert(db: &Db, e: &Entry, status: &str, source: &str) -> Result<Entry, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    db.conn()
         .execute(
-            "UPDATE memory SET kind = ?2, scope = ?3, title = ?4, body = ?5, tags = ?6, status = ?7, updated_at = ?8
-             WHERE id = ?1 AND deleted = 0",
+            "INSERT INTO memory (id, kind, part, scope, title, body, tags, status, source, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
             params![
-                e.id,
+                id,
                 e.kind,
+                e.part,
                 e.scope,
                 e.title.trim(),
                 e.body.trim(),
                 e.tags.trim(),
                 status,
-                t
+                source,
+                now()
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    get(db, &id)
+}
+
+/// Adds an entry (without an id) or changes one; answers it as stored.
+///
+/// A new entry from an agent is always a suggestion: only the user makes an entry active (24z3 D8). An account entry
+/// moved to This project is kept under a new id and the old one gets a deleted mark, so the user's other machines drop
+/// their copy at the next sync (the new one never leaves this machine).
+pub fn save(db: &Db, e: &Entry) -> Result<Entry, String> {
+    check(e)?;
+    let e = &normalized(e)?;
+    let source = if e.source == "agent" { "agent" } else { "user" };
+    let status = if e.status == "suggested" || (e.id.is_empty() && source == "agent") {
+        "suggested"
+    } else {
+        "active"
+    };
+    if e.id.is_empty() {
+        return insert(db, e, status, source);
+    }
+    let before = get(db, &e.id)?;
+    if before.is_account() && !e.is_account() {
+        let moved = insert(db, e, status, &before.source)?;
+        delete(db, &e.id)?;
+        return Ok(moved);
+    }
+    let n = db
+        .conn()
+        .execute(
+            "UPDATE memory SET kind = ?2, part = ?3, scope = ?4, title = ?5, body = ?6, tags = ?7, status = ?8,
+             updated_at = ?9 WHERE id = ?1 AND deleted = 0",
+            params![
+                e.id,
+                e.kind,
+                e.part,
+                e.scope,
+                e.title.trim(),
+                e.body.trim(),
+                e.tags.trim(),
+                status,
+                now()
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -180,14 +240,26 @@ pub fn delete(db: &Db, id: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// An agent's suggestion: stored as "suggested" until the user approves it.
-pub fn suggest(db: &Db, kind: &str, scope: &str, title: &str, body: &str) -> Result<Entry, String> {
+/// An agent's suggestion: stored as "suggested" until the user approves it. `scope` is used only for This project.
+pub fn suggest(
+    db: &Db,
+    kind: &str,
+    part: &str,
+    scope: &str,
+    title: &str,
+    body: &str,
+) -> Result<Entry, String> {
     save(
         db,
         &Entry {
             id: String::new(),
             kind: kind.into(),
-            scope: scope.into(),
+            part: part.into(),
+            scope: if part == "project" {
+                scope.into()
+            } else {
+                String::new()
+            },
             title: title.into(),
             body: body.into(),
             tags: String::new(),
@@ -378,6 +450,7 @@ mod tests {
         Entry {
             id: String::new(),
             kind: kind.into(),
+            part: String::new(),
             scope: scope.into(),
             title: title.into(),
             body: body.into(),
@@ -432,6 +505,7 @@ mod tests {
         let s = suggest(
             &db,
             "decision",
+            "project",
             "p1",
             "Use integer cents",
             "Money is stored as cents.",
@@ -533,6 +607,81 @@ mod tests {
             uses, 1,
             "entries given to an agent are counted; a preview is not"
         );
+    }
+
+    #[test]
+    fn every_entry_has_a_part_and_only_this_project_keeps_a_project() {
+        let db = Db::open_in_memory().unwrap();
+        // Without a part: for every project = About me, for one project = This project.
+        assert_eq!(
+            save(&db, &entry("fact", "", "I like tea", ""))
+                .unwrap()
+                .part,
+            "me"
+        );
+        assert_eq!(
+            save(&db, &entry("fact", "p1", "Shop", "")).unwrap().part,
+            "project"
+        );
+        // Account parts never keep a project.
+        let mut tools = entry("fact", "p1", "Ollama on the GPU", "");
+        tools.part = "tools".into();
+        let t = save(&db, &tools).unwrap();
+        assert_eq!((t.part.as_str(), t.scope.as_str()), ("tools", ""));
+        // This project needs its project; an unknown part is refused.
+        let mut lost = entry("fact", "", "Which project?", "");
+        lost.part = "project".into();
+        assert!(save(&db, &lost).is_err());
+        let mut odd = entry("fact", "", "x", "");
+        odd.part = "brain".into();
+        assert!(save(&db, &odd).is_err());
+        // Listing a project gives its own and the account entries; another project's are left out.
+        save(&db, &entry("fact", "p2", "Other", "")).unwrap();
+        assert_eq!(list(&db, Some("p1"), false).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn a_new_entry_from_an_agent_is_always_a_suggestion() {
+        let db = Db::open_in_memory().unwrap();
+        let mut e = entry("rule", "", "Always use tabs", "");
+        e.source = "agent".into();
+        let saved = save(&db, &e).unwrap();
+        assert_eq!(
+            saved.status, "suggested",
+            "an agent cannot make an active entry"
+        );
+        // The user keeps it: then it is active.
+        let mut kept = saved.clone();
+        kept.status = "active".into();
+        assert_eq!(save(&db, &kept).unwrap().status, "active");
+        // Suggest without a project for This project is refused; with one it is kept.
+        assert!(suggest(&db, "fact", "project", "", "x", "").is_err());
+        let s = suggest(&db, "fact", "tools", "p1", "Uses Fable", "").unwrap();
+        assert_eq!(
+            (s.part.as_str(), s.scope.as_str(), s.status.as_str()),
+            ("tools", "", "suggested")
+        );
+    }
+
+    #[test]
+    fn an_account_entry_moved_to_a_project_leaves_a_deleted_mark() {
+        let db = Db::open_in_memory().unwrap();
+        let a = save(&db, &entry("fact", "", "Shop uses bKash", "")).unwrap();
+        let mut moved = a.clone();
+        moved.part = "project".into();
+        moved.scope = "p1".into();
+        let m = save(&db, &moved).unwrap();
+        assert_ne!(m.id, a.id, "kept under a new id");
+        assert_eq!((m.part.as_str(), m.scope.as_str()), ("project", "p1"));
+        assert!(
+            get(&db, &a.id).is_err(),
+            "the account copy is marked deleted"
+        );
+        // A project entry moved to About me keeps its id (it starts to travel).
+        let mut back = m.clone();
+        back.part = "me".into();
+        let b = save(&db, &back).unwrap();
+        assert_eq!((b.id.as_str(), b.scope.as_str()), (m.id.as_str(), ""));
     }
 
     #[test]

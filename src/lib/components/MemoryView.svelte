@@ -1,7 +1,9 @@
 <script lang="ts">
   /**
-   * The user's memory (Milestone 17): rules, style, facts, decisions, solutions and approved examples, for every project
-   * or for one. Agents get only the part that fits their request; this view shows, edits and tries that.
+   * The user's memory (Milestone 17): rules, style, facts, decisions, solutions and approved examples. Every entry is in
+   * one of three parts (24z3 D8): About me and Tools and models are account memory (they go to the user's other machines
+   * through the memory disk), This project stays on the machine that has the project. Agents get only what fits their
+   * request; this view shows, edits and tries that.
    */
   import Brain from "@lucide/svelte/icons/brain";
   import Plus from "@lucide/svelte/icons/plus";
@@ -27,8 +29,15 @@
     { id: "example", label: "Example", hint: "An approved example to follow" },
   ];
 
+  const PARTS: { id: MemoryEntry["part"]; label: string; hint: string }[] = [
+    { id: "me", label: "About me", hint: "You and how you work: for every project, on all your computers" },
+    { id: "project", label: "This project", hint: "Only this project: stays on the computer that has it" },
+    { id: "tools", label: "Tools and models", hint: "Your tools, models and set-up: on all your computers" },
+  ];
+
   let entries = $state<MemoryEntry[]>([]);
   let filter = $state<"" | MemoryEntry["kind"]>("");
+  let partFilter = $state<"" | MemoryEntry["part"]>("");
   let query = $state("");
   let error = $state("");
   let editing = $state<Partial<MemoryEntry> | null>(null);
@@ -40,11 +49,16 @@
   let shown = $derived(
     entries
       .filter((e) => e.status === "active")
+      .filter((e) => !partFilter || e.part === partFilter)
       .filter((e) => !filter || e.kind === filter)
       .filter((e) => {
         const q = query.trim().toLowerCase();
         return !q || `${e.title} ${e.body} ${e.tags}`.toLowerCase().includes(q);
       }),
+  );
+
+  let groups = $derived(
+    PARTS.map((p) => ({ ...p, entries: shown.filter((e) => e.part === p.id) })).filter((g) => g.entries.length),
   );
 
   async function load() {
@@ -69,13 +83,31 @@
   });
 
   function startNew() {
-    editing = { kind: "fact", scope: project?.id ?? "", title: "", body: "", tags: "" };
+    editing = {
+      part: project ? "project" : "me",
+      kind: "fact",
+      scope: project?.id ?? "",
+      title: "",
+      body: "",
+      tags: "",
+    };
   }
 
   async function save() {
     if (!editing) return;
     try {
-      await api.memory.save({ ...editing, kind: editing.kind ?? "fact", title: editing.title ?? "" });
+      const part = editing.part ?? "me";
+      if (part === "project" && !editing.scope) {
+        error = "Choose the project this entry is for.";
+        return;
+      }
+      await api.memory.save({
+        ...editing,
+        part,
+        scope: part === "project" ? editing.scope : "",
+        kind: editing.kind ?? "fact",
+        title: editing.title ?? "",
+      });
       editing = null;
       memory.touch();
     } catch (e) {
@@ -120,16 +152,25 @@
     }
   }
 
-  const scopeLabel = (e: Partial<MemoryEntry>) =>
-    !e.scope ? "every project" : (projects.list.find((p) => p.id === e.scope)?.name ?? "a project");
+  const projectName = (id: string | undefined) => projects.list.find((p) => p.id === id)?.name ?? "a project";
+  const partLabel = (e: Partial<MemoryEntry>) =>
+    e.part === "project"
+      ? `This project · ${projectName(e.scope)}`
+      : (PARTS.find((p) => p.id === e.part)?.label ?? "About me");
+  const entryNote = (e: MemoryEntry) =>
+    [e.part === "project" ? projectName(e.scope) : "", e.uses ? `given to agents ${e.uses}×` : ""]
+      .filter(Boolean)
+      .join(" · ");
   const kindLabel = (k: string) => KINDS.find((x) => x.id === k)?.label ?? k;
 </script>
 
 <div class="memory">
   <h2><Brain size={16} /> Memory</h2>
   <p class="lead">
-    What Qanuvi knows about you and your projects. Agents get only the rules and style plus the entries that match their
-    request (at most {settings.value.memoryBudget} characters), and can ask for more or suggest new entries for you to approve.
+    What Qanuvi knows about you, your tools and your projects. About me and Tools and models go with you to your other
+    computers (through the memory disk); This project stays on this computer. Agents get only the rules and style plus
+    the entries that match their request (at most {settings.value.memoryBudget} characters), and can ask for more or suggest
+    new entries for you to approve.
   </p>
 
   <div class="options">
@@ -166,7 +207,7 @@
         <div class="head">
           <span class="kind k-{e.kind}">{kindLabel(e.kind)}</span>
           <strong>{e.title}</strong>
-          <span class="muted">{scopeLabel(e)}</span>
+          <span class="muted">{partLabel(e)}</span>
           <span class="spacer"></span>
           <button type="button" class="btn primary" onclick={() => approve(e)}><Check size={13} /> Keep</button>
           <button type="button" class="btn" onclick={() => (editing = { ...e, status: "active" })}>
@@ -180,6 +221,10 @@
   {/if}
 
   <div class="bar">
+    <select bind:value={partFilter} aria-label="Part">
+      <option value="">All parts</option>
+      {#each PARTS as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
+    </select>
     <select bind:value={filter} aria-label="Kind">
       <option value="">All kinds</option>
       {#each KINDS as k (k.id)}<option value={k.id}>{k.label}</option>{/each}
@@ -196,13 +241,24 @@
         save();
       }}
     >
+      <div class="row parts" role="radiogroup" aria-label="Part">
+        {#each PARTS as p (p.id)}
+          <label class="part" class:on={editing.part === p.id}>
+            <input type="radio" name="part" value={p.id} bind:group={editing.part} />
+            {p.label}
+          </label>
+        {/each}
+        {#if editing.part === "project"}
+          <select bind:value={editing.scope} aria-label="Project">
+            {#if !editing.scope}<option value="">Choose a project…</option>{/if}
+            {#each projects.list as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+          </select>
+        {/if}
+      </div>
+      <p class="muted hint">{PARTS.find((p) => p.id === editing?.part)?.hint}</p>
       <div class="row">
         <select bind:value={editing.kind} aria-label="Kind">
           {#each KINDS as k (k.id)}<option value={k.id}>{k.label}</option>{/each}
-        </select>
-        <select bind:value={editing.scope} aria-label="For">
-          <option value="">Every project</option>
-          {#each projects.list as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
         </select>
         <span class="muted">{KINDS.find((k) => k.id === editing?.kind)?.hint}</span>
       </div>
@@ -217,23 +273,26 @@
     </form>
   {/if}
 
-  {#each shown as e (e.id)}
-    <div class="entry">
-      <div class="head">
-        <span class="kind k-{e.kind}">{kindLabel(e.kind)}</span>
-        <strong>{e.title}</strong>
-        <span class="muted">{scopeLabel(e)}{e.uses ? ` · given to agents ${e.uses}×` : ""}</span>
-        <span class="spacer"></span>
-        <IconButton label="Edit" onclick={() => (editing = { ...e })}><Pencil size={13} /></IconButton>
-        <IconButton label="Delete" onclick={() => remove(e)}><Trash size={13} /></IconButton>
+  {#each groups as g (g.id)}
+    <h3 class="group">{g.label} <span class="muted">({g.entries.length})</span></h3>
+    {#each g.entries as e (e.id)}
+      <div class="entry">
+        <div class="head">
+          <span class="kind k-{e.kind}">{kindLabel(e.kind)}</span>
+          <strong>{e.title}</strong>
+          <span class="muted">{entryNote(e)}</span>
+          <span class="spacer"></span>
+          <IconButton label="Edit" onclick={() => (editing = { ...e })}><Pencil size={13} /></IconButton>
+          <IconButton label="Delete" onclick={() => remove(e)}><Trash size={13} /></IconButton>
+        </div>
+        {#if e.body}<p class="body">{e.body}</p>{/if}
       </div>
-      {#if e.body}<p class="body">{e.body}</p>{/if}
-    </div>
+    {/each}
   {:else}
     <p class="muted">
       {entries.some((x) => x.status === "active")
         ? "Nothing matches."
-        : "No entries yet. Add rules you always want followed, facts about your projects, decisions and solutions."}
+        : "No entries yet. Add things about you and how you work, your tools and models, and facts, decisions and solutions for this project."}
     </p>
   {/each}
 
@@ -363,6 +422,39 @@
     padding: var(--qx-space-2) var(--qx-space-3);
     border: 1px solid var(--qx-accent);
     border-radius: var(--qx-radius-card);
+  }
+
+  .parts {
+    gap: 4px;
+  }
+
+  .part {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-button);
+    cursor: pointer;
+  }
+
+  .part.on {
+    border-color: var(--qx-accent);
+    color: var(--qx-accent);
+  }
+
+  .part input {
+    margin: 0;
+  }
+
+  .hint {
+    margin: 0;
+  }
+
+  h3.group {
+    margin-top: var(--qx-space-3);
+    color: var(--qx-text-secondary);
   }
 
   .entry {

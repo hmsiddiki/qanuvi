@@ -2,8 +2,9 @@
 //! be a Google Drive, Dropbox or OneDrive folder, a USB disk or a network share; or a folder on their own server over
 //! SSH), so their machines share it.
 //!
-//! Each machine writes only its own file there (`<device>.qxm`, its whole memory with deleted marks), so two machines
-//! never write the same file. Syncing reads every machine's file and keeps the newest version of each entry, deletions
+//! Each machine writes only its own file there (`<device>.qxm`, its account memory with deleted marks), so two machines
+//! never write the same file. Only account memory (About me, Tools and models) goes on the disk; This project entries
+//! never leave their machine, and any found in a file (from an older Qanuvi) are left out (24z3 D8). Syncing reads every machine's file and keeps the newest version of each entry, deletions
 //! included. The last versions of a machine's own file are kept (`<device>-<time>.qxv`) and can be restored.
 //!
 //! Files are encrypted with a key made from the user's passphrase (Argon2id) using XChaCha20-Poly1305; without the
@@ -122,36 +123,27 @@ fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric())
 }
 
-/// Every entry of the memory, deleted ones included (they tell other machines about deletions).
+/// The account memory (About me, Tools and models), deleted ones included (they tell other machines about deletions).
+/// This project entries are never in it.
 pub fn all(db: &Db) -> Result<Vec<Stored>, String> {
     let conn = db.conn();
     let mut st = conn
-        .prepare(
-            "SELECT id, kind, scope, title, body, tags, status, source, created_at, updated_at, uses, deleted
-             FROM memory ORDER BY created_at",
-        )
+        .prepare(&format!(
+            "SELECT {}, deleted FROM memory ORDER BY created_at",
+            crate::memory::COLS
+        ))
         .map_err(|e| e.to_string())?;
-    st.query_map([], |r| {
-        Ok(Stored {
-            entry: Entry {
-                id: r.get(0)?,
-                kind: r.get(1)?,
-                scope: r.get(2)?,
-                title: r.get(3)?,
-                body: r.get(4)?,
-                tags: r.get(5)?,
-                status: r.get(6)?,
-                source: r.get(7)?,
-                created_at: r.get(8)?,
-                updated_at: r.get(9)?,
-                uses: r.get(10)?,
-            },
-            deleted: r.get::<_, i64>(11)? != 0,
+    let rows = st
+        .query_map([], |r| {
+            Ok(Stored {
+                entry: crate::memory::from_row(r)?,
+                deleted: r.get::<_, i64>(12)? != 0,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows.into_iter().filter(|s| s.entry.is_account()).collect())
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize)]
@@ -162,15 +154,17 @@ pub struct Merged {
 }
 
 /// Takes in entries from another copy: an entry that is new here, or newer there, wins (deletions too). Use counts
-/// keep the larger number.
+/// keep the larger number. Only account memory is taken in: a This project entry belongs to the machine that has the
+/// project, so one in a file (written by an older Qanuvi) is left out.
 pub fn merge(db: &Db, entries: &[Stored]) -> Result<Merged, String> {
     let conn = db.conn();
     let mut m = Merged::default();
     for s in entries {
         let e = &s.entry;
-        if !valid_entry(e) {
+        if !valid_entry(e) || !e.is_account() {
             continue;
         }
+        let part = e.part();
         let local: Option<(i64, i64, i64)> = conn
             .query_row(
                 "SELECT updated_at, deleted, uses FROM memory WHERE id = ?1",
@@ -182,12 +176,12 @@ pub fn merge(db: &Db, entries: &[Stored]) -> Result<Merged, String> {
         match local {
             None => {
                 conn.execute(
-                    "INSERT INTO memory (id, kind, scope, title, body, tags, status, source, created_at, updated_at,
-                     deleted, uses) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                    "INSERT INTO memory (id, kind, part, scope, title, body, tags, status, source, created_at,
+                     updated_at, deleted, uses) VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     params![
                         e.id,
                         e.kind,
-                        e.scope,
+                        part,
                         e.title,
                         e.body,
                         e.tags,
@@ -206,12 +200,12 @@ pub fn merge(db: &Db, entries: &[Stored]) -> Result<Merged, String> {
             }
             Some((updated, was_deleted, uses)) if e.updated_at > updated => {
                 conn.execute(
-                    "UPDATE memory SET kind = ?2, scope = ?3, title = ?4, body = ?5, tags = ?6, status = ?7,
-                     source = ?8, updated_at = ?9, deleted = ?10, uses = ?11 WHERE id = ?1",
+                    "UPDATE memory SET kind = ?2, part = ?3, scope = '', title = ?4, body = ?5, tags = ?6,
+                     status = ?7, source = ?8, updated_at = ?9, deleted = ?10, uses = ?11 WHERE id = ?1",
                     params![
                         e.id,
                         e.kind,
-                        e.scope,
+                        part,
                         e.title,
                         e.body,
                         e.tags,
@@ -250,6 +244,7 @@ fn valid_entry(e: &Entry) -> bool {
         && e.title.chars().count() <= 200
         && e.body.chars().count() <= 4000
         && e.scope.len() <= 80
+        && crate::memory::PARTS.contains(&e.part())
         && matches!(e.status.as_str(), "active" | "suggested")
         && matches!(e.source.as_str(), "user" | "agent")
 }
@@ -530,7 +525,7 @@ pub fn sync(db: &Db, disk: &Disk, passphrase: &str, me: &Device) -> Result<Repor
     let entries = all(db)?;
     report.written = entries.iter().filter(|e| !e.deleted).count();
     let snapshot = Snapshot {
-        format: 1,
+        format: 2,
         device_id: me.id.clone(),
         device_name: me.name.clone(),
         written_at: report.at,
@@ -600,7 +595,7 @@ pub fn restore(db: &Db, disk: &Disk, passphrase: &str, name: &str) -> Result<usi
     let kept: std::collections::HashSet<&str> = snapshot
         .entries
         .iter()
-        .filter(|s| !s.deleted)
+        .filter(|s| !s.deleted && s.entry.is_account())
         .map(|s| s.entry.id.as_str())
         .collect();
     let mut restored: Vec<Stored> = snapshot.entries.clone();
@@ -831,6 +826,7 @@ mod tests {
         Entry {
             id: String::new(),
             kind: "fact".into(),
+            part: String::new(),
             scope: String::new(),
             title: title.into(),
             body: String::new(),
@@ -941,6 +937,113 @@ mod tests {
             std::fs::read(disk_dir.path().join("lap1.qxm")).unwrap(),
             before
         );
+    }
+
+    fn in_part(title: &str, part: &str, scope: &str) -> Entry {
+        let mut e = entry(title);
+        e.part = part.into();
+        e.scope = scope.into();
+        e
+    }
+
+    #[test]
+    fn only_account_memory_goes_on_the_disk_and_this_project_stays_home() {
+        let disk_dir = tempfile::tempdir().unwrap();
+        let disk = Disk::Folder {
+            path: disk_dir.path().to_string_lossy().to_string(),
+        };
+        let pc = Db::open_in_memory().unwrap();
+        let laptop = Db::open_in_memory().unwrap();
+        let pc_dev = Device {
+            id: "pc1".into(),
+            name: "PC".into(),
+        };
+        let laptop_dev = Device {
+            id: "lap1".into(),
+            name: "Laptop".into(),
+        };
+        let pass = "a long passphrase";
+        memory::save(&pc, &in_part("Answer in English", "me", "")).unwrap();
+        memory::save(&pc, &in_part("Ollama on the GPU", "tools", "")).unwrap();
+        let shop = memory::save(&pc, &in_part("Shop uses bKash", "project", "p1")).unwrap();
+        let r = sync(&pc, &disk, pass, &pc_dev).unwrap();
+        assert_eq!(r.written, 2, "the project entry is not on the disk");
+        let file = open(
+            pass,
+            &std::fs::read(disk_dir.path().join("pc1.qxm")).unwrap(),
+        )
+        .unwrap();
+        assert!(!String::from_utf8_lossy(&file).contains("bKash"));
+        sync(&laptop, &disk, pass, &laptop_dev).unwrap();
+        assert_eq!(
+            titles(&laptop),
+            vec!["Answer in English", "Ollama on the GPU"]
+        );
+        let tools = memory::list(&laptop, None, false)
+            .unwrap()
+            .into_iter()
+            .find(|e| e.title == "Ollama on the GPU")
+            .unwrap();
+        assert_eq!(tools.part, "tools", "the part travels with the entry");
+
+        // A file of an older Qanuvi (format 1, no parts, project entries in it): only the every-project ones come in.
+        let mut old_project = in_part("Old project fact", "", "p9");
+        old_project.id = "old1".into();
+        old_project.created_at = 1;
+        old_project.updated_at = 1;
+        let mut old_me = in_part("Old every-project fact", "", "");
+        old_me.id = "old2".into();
+        old_me.created_at = 1;
+        old_me.updated_at = 1;
+        let old = Snapshot {
+            format: 1,
+            device_id: "old".into(),
+            device_name: "Old".into(),
+            written_at: 1,
+            entries: vec![
+                Stored {
+                    entry: old_project,
+                    deleted: false,
+                },
+                Stored {
+                    entry: old_me,
+                    deleted: false,
+                },
+            ],
+        };
+        disk.write(
+            "old.qxm",
+            &seal(pass, &serde_json::to_vec(&old).unwrap()).unwrap(),
+        )
+        .unwrap();
+        sync(&laptop, &disk, pass, &laptop_dev).unwrap();
+        let got = memory::get(&laptop, "old2").unwrap();
+        assert_eq!((got.part.as_str(), got.scope.as_str()), ("me", ""));
+        assert!(
+            memory::get(&laptop, "old1").is_err(),
+            "another machine's project entry stays out"
+        );
+
+        // Moving an account entry into a project: the other machine drops its copy; the project copy stays here.
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        let english = memory::list(&pc, None, false)
+            .unwrap()
+            .into_iter()
+            .find(|e| e.title == "Answer in English")
+            .unwrap();
+        let mut moved = english.clone();
+        moved.part = "project".into();
+        moved.scope = "p1".into();
+        memory::save(&pc, &moved).unwrap();
+        sync(&pc, &disk, pass, &pc_dev).unwrap();
+        let r = sync(&laptop, &disk, pass, &laptop_dev).unwrap();
+        assert_eq!(r.merged.deleted, 1);
+        assert!(!titles(&laptop).contains(&"Answer in English".to_string()));
+
+        // Restoring a version never touches This project entries.
+        let v = versions(&disk, &pc_dev).unwrap();
+        restore(&pc, &disk, pass, &v.last().unwrap().name).unwrap();
+        assert!(memory::get(&pc, &shop.id).is_ok());
     }
 
     #[test]

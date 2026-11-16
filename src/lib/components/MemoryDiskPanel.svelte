@@ -96,8 +96,9 @@
 <section class="disk">
   <h3><HardDrive size={14} /> Memory disk</h3>
   <p class="muted">
-    An encrypted copy of your memory that your computers share. Each computer writes its own file; syncing takes in what
-    the others changed. Without the passphrase the files cannot be read.
+    An encrypted copy of your account memory (About me, Tools and models) that your computers share. This project
+    entries never go on the disk: they stay on the computer that has the project. Each computer writes its own file;
+    syncing takes in what the others changed. Without the passphrase the files cannot be read.
   </p>
 
   <div class="modes" role="radiogroup" aria-label="Where the memory is kept">
@@ -199,8 +200,8 @@
     {#if memoryDisk.last}
       {@const l = memoryDisk.last}
       <p class="muted">
-        Last synced {ago(l.at)}: {l.written} {l.written === 1 ? "entry" : "entries"} on the disk from {onMaster ? place : "this computer"}{l.devices
-          .length
+        Last synced {ago(l.at)}: {l.written}
+        {l.written === 1 ? "entry" : "entries"} on the disk from {onMaster ? place : "this computer"}{l.devices.length
           ? `; read ${l.devices.join(", ")}`
           : "; no other computer yet"}{l.merged.added || l.merged.changed || l.merged.deleted
           ? ` (${l.merged.added} new, ${l.merged.changed} changed, ${l.merged.deleted} deleted here)`
