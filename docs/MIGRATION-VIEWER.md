@@ -1,171 +1,182 @@
 # Migration plan: the app is a viewer of masters
 
-Status: DRAFT for the owner's review (2026-11-16). No code until the owner agrees.
+Status: SPLIT AGREED with the owner (2026-11-17); phases below follow it. No code until the owner says go.
 Going back: branch `old-infrastructure` / tag `v0.1.23-old-infrastructure` (see OLD-INFRASTRUCTURE.md there), data
 backup at `E:\Backups\qanuvi\old-infrastructure-0.1.23`.
 
-## The goal (owner decision 2026-11-16)
+## The goal (owner decisions 2026-11-16 and 2026-11-17)
 
-- The master is Qanuvi: projects, files, git, terminals, agents, plans, Inbox, memory, settings and its own server list.
-  It works fully with no display.
-- The app is only the visual container: editors, chat, voice, layout, windows. It shows one master at a time.
-- This PC runs its own master, and the app shows it by default. A VPS runs only a master.
-- A master can connect to other masters. The app shows them nested under that master in the switcher.
-- Nothing on screen is shared with This PC. Every machine shows the same screen with its own data.
+- A master is any machine running Qanuvi: a VPS, a laptop, another desktop, or This PC itself.
+- The master is Qanuvi. It owns projects, files, agents, plans, Inbox, memory, settings, its account and its own
+  server list. It is fully usable from a terminal with no display; in a terminal the agent does the work (paid or
+  free models, as designed today).
+- The app (the interface) is the visual container. It shows one master at a time, and the same screen for every
+  machine.
+- This PC runs its own master, and the interface shows it by default.
+- A master can connect to other masters. The interface shows them nested under that master in the switcher.
+- Nothing on screen is shared with This PC.
+
+## The split (agreed)
+
+| Side | What |
+|---|---|
+| **Master** | account, projects, files, git, terminals, agents, plans, Inbox, memory, settings, server list, backups, start-up list, usage, model keys, decider, web pages/images for attachments, knowledge sources; **two pipes** lent to a viewer: run a program and pipe its input and output, and forward a port |
+| **Interface** | editor, chat, voice, layout, windows, popup notifications, app updates, this screen's file picker and clipboard; **language servers, debugger, inspector/preview** |
+
+The terms used in that split:
+
+- **Coding tools are the interface's.**
+  - Language servers (Intelephense, TypeScript, Svelte, rust-analyzer, Pyright), debuggers (js-debug, PHP Debug)
+    and the preview belong to the interface.
+  - They run on the machine that has the files, because they need its files, packages and toolchain. The interface
+    starts them there through the master's pipes and speaks their protocols itself. The master knows nothing about
+    LSP or debugging.
+  - They are optional on each machine. They are installed on the shown machine only after the user's yes:
+    - npm servers go into that master's data folder;
+    - rust-analyzer goes through that machine's rustup;
+    - a server already on that machine's PATH is used.
+  - The master never needs them for its own work. A terminal-only master runs with or without them.
+- **Small machines.**
+  - Nothing starts by itself; a tool starts only when a file of its language is opened on screen.
+  - Tools end when the viewer leaves.
+  - Each server's memory need (`need_gb` in lsp.rs) is checked against the machine's free memory before starting.
+    If it does not fit, the screen says so and does not start it.
+  - A per-machine switch keeps coding tools off.
+- **The account belongs to the master.** Account memory follows the account, so every machine signs in for itself.
+  - **Terminal or VPS:** `qanuvi-master login` with the username and a Qlopy **application password**. The core
+    already has these (`qp_app_password_create`, password grant at `/api/qlopy/v1/auth/token`). The master keeps the
+    application password encrypted in its secret store and signs in again by itself when the 30-day session ends.
+    So it lasts until the user revokes that password on the site.
+  - **With the interface open:** today's browser sign-in, handed to the shown machine.
+  - **Site side:** qanuvi.com needs a "Machine passwords" page for normal users, as a plugin or theme page; today only
+    `admin/api.php` creates them and it needs `edit_posts`. "Application passwords" must be on in Settings > API.
+    There is NO Qlopy core change. Device code sign-in is dropped (not needed).
 
 ## Where we are (measured at 0.1.23)
 
 - **Two cores, two dispatchers.**
-  - The app's built-in core: `desktop.rs`, 212 Tauri commands, one typed wrapper each.
-  - The master: `master.rs`, `Master::dispatch`, 175 commands as string arms; `plan_run_*` and `inbox_*` sit in their
-    own files.
-  - Both call the same core modules but duplicate the wiring (Inbox, plan runs, background loops, shutdown).
-  - No test checks that they offer the same commands.
-- **The gap is 49 commands only the app answers.**
-  - Inbox and plan runs are already on the master, apart from `inbox_import`.
-  - Window-only by nature (16): `notify_*` (4), `account_*` (4), `app_info`, `app_restart`, `startup_path`,
-    `term_kill_window`, `lsp_stop_window`, `dap_stop_window`, `inbox_import`, `plan_data_import`.
-  - Connecting to other machines (6): `remote_*`. These are window-only today; in the target they belong to every core.
-  - App install (4): `data_location_*` (3) and `data_test_build`. A master's folder is fixed by `--data`.
-  - Core, could move as is (10): `inspector_*` (5), `browser_agent_shot`, `core_decide`, `knowledge_fetch`,
+  - The app's built-in core: `desktop.rs`, 212 commands.
+  - The master: `master.rs` `Master::dispatch`, 175 commands.
+  - They duplicate the wiring for the Inbox, plan runs, background loops and shutdown, and no test compares them.
+- **49 commands only the app answers. Under the split:**
+  - Stay in the interface: `notify_*`, `app_info`, `app_restart`, `startup_path`, `*_kill_window`/`*_stop_window`,
+    `inbox_import`, `plan_data_import`, `data_location_*`, `data_test_build`, `attachment_file`.
+  - Interface, running through the pipes: `lsp_*`, `dap_*`, `inspector_*`, `browser_agent_shot`.
+  - Move to the master: `account_*`, `remote_*` (each core connects onward), `core_decide`, `knowledge_fetch`,
     `attachment_page`, `attachment_image`.
-  - Core with an event stream (11): `lsp_*` (5) and `dap_*` (6), apart from the `*_stop_window` ones. They need the
-    `onEvent` stream wiring that `term_spawn` already uses, and cleanup when the connection ends.
-  - Split (1): `attachment_file` reads a file picked on this screen. It stays in the window, which sends the bytes.
-- **The window routes calls.**
-  - `src/lib/remote.ts` sends each call to This PC (Tauri invoke) or to a master (`remote_call`).
-  - The choice is based on `WINDOW_ONLY`, then the owner of the id, then the shown machine.
-  - Several stores call Tauri directly and skip the router.
-- **The server list belongs to the window.**
-  - It lives in `settings.masters` in localStorage, and `settings.rs` refuses to store it in a database.
-  - Pairing keys are in This PC's keyring.
-  - A master cannot connect onward, and no master forwards calls.
-- **This PC is not a master.**
-  - A `qanuvi-master` runs on the app's own `qanuvi.db` only for remote access (`target: "self"`).
-  - That master runs in a reduced mode (`mark_app_data`): no start-up list, watches, sync or backups.
-
-## The target
-
-```
-App window ──(one protocol)──> This PC's master ──> its own DB, terminals, agents, plans
-                     │                          └──> masters it connects to ──> their masters (nested)
-                     └──> any other master the app was given directly
-```
-
-- **One command set, one dispatcher (the master's).** The app's Rust side keeps only window things: notifications,
-  account sign-in, app info/restart/update, the data folder of the install, window-to-window events, and the client
-  side of connections.
-- **Every call goes over the same protocol, This PC included.**
-  - The router becomes: the owner of the id, else the shown machine.
-  - `WINDOW_ONLY` shrinks to the true window list.
-- **The machine owns its server list and keys.** The switcher shows This PC's list. A master that has its own list
-  shows a nested dropdown.
-- **Calls to a nested machine are forwarded.** The call carries a path (`["vps1", "vps2"]`). Each master passes the
-  call to the next one and passes stream events back.
+- **A shown master gets no coding tools today.**
+  - Language servers are silently off for master projects (`lsp.svelte.ts` `#root`).
+  - `dap_*` fails with "cannot do this yet".
+  - The inspector always browses This PC's localhost.
+  - The owner postponed this on 2026-11-15; this plan brings it in M1.
+- **The window routes calls** (`src/lib/remote.ts`).
+- **The server list lives in window localStorage.** No master connects onward.
+- **This PC has no master of its own,** apart from the reduced remote-access one (`mark_app_data`).
 
 ## Phases
 
-Each phase ends with verify green, a live check on scratch projects, and the owner's review. A release comes only
-with the owner's yes.
+Each phase ends with verify green, a live check on scratch projects, and the owner's review. Releases only with the
+owner's yes.
 
-### M0. Guard rails (small)
+### M0. Guard rails
 
-- A parity test lists every desktop command and fails if the master does not answer it.
-- The 16 window-only names are written in one shared list that the test allows.
-- Today the test would fail with 33 gaps. Each phase below removes some, until none are left.
+- A parity test: every command the app answers is either answered by the master or is on the interface list.
+- It starts with the known gaps listed, and each phase removes some.
 
-### M1. Close the core gap on the master
+### M1. Coding tools on a shown master (ships on its own)
 
-- **Move as is:** `inspector_*`, `browser_agent_shot`, `core_decide` (keys via `model_keys::get`), `knowledge_fetch`,
-  `attachment_page`, `attachment_image` (the master's own stored images).
-- **LSP and DAP on the master:**
-  - Events go out through connection streams.
-  - Servers end when their connection ends, the same as terminals do today.
-  - A language server runs on the machine that has the files. This also ends the "LSP refuses master projects" gap.
-- **Connections (`remote_*`) on the master:**
-  - Add `Remotes` to the master.
-  - `remote_connect` / `remote_call` / `remote_disconnect` / `remote_list`, with events passed through.
-- **Data-folder moving** stays an app-install feature. A master reports `fixed: true` as today.
+This PC is untouched in M1.
 
-### M2. Each machine owns its server list
+- **Master pipes:**
+  - `pipe_start` / `pipe_send` / `pipe_stop` run a program on that machine with stdio streamed over the
+    connection.
+  - `port_forward` opens a local port on the viewer's side that reaches the master's localhost port.
+  - Both end with the connection.
+- **Generic machine questions** for installs: whether a program or file exists there, free memory, and running an
+  install command with live output. The master already does this for setup installs.
+- **Language servers on a shown master:**
+  - Remove the `#root` block.
+  - Status, install and start happen on the shown machine through the pipes, after the user's yes.
+  - The memory check uses that machine's free memory.
+  - A per-machine "coding tools off" switch.
+  - The screen says why when a tool is missing or does not fit.
+- **Preview/inspector on a shown master:** goes through `port_forward`.
+- **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
+  goes through a forwarded port on the master.
+- **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and
+  set `need_gb`.
 
-- Servers are a table in each core's DB, replacing `settings.masters` in localStorage.
-- Pairing keys are kept in that machine's secret store.
-- One-time import on first start: the app's localStorage list goes into This PC's core.
-- Name, colour and lasting id rules (24z3) move with it unchanged.
+### M2. The account on the master
 
-### M3. This PC runs its own master
+- `account_*` moves to the master: the refresh token and the application password go into that machine's secret
+  store.
+- `qanuvi-master login` (application password).
+- The interface's browser sign-in is handed to the shown machine.
+- The Account page shows the shown machine's account.
+- **Site side (owner's site, separate from this repo):** a "Machine passwords" page on qanuvi.com, and application
+  passwords switched on.
 
-- At launch, the app starts This PC's master, or attaches to one already running. It uses the existing
-  `serve` + `--stdio` bridge on the app's own data folder.
-- **No data move:** the master opens the same `qanuvi.db`.
-- The app's built-in core stops opening it for core work.
-- The reduced `mark_app_data` mode goes away: This PC's master runs the start-up list, watches, sync and backups
-  itself. They are removed from `desktop.rs`.
-- Remote access becomes "This PC's master accepts relay sessions". It needs no second process.
-- The installer already ships `qanuvi-master.exe` next to the app. Check this in the release build.
+### M3. Each machine owns its server list, and masters connect onward
 
-### M4. The window becomes a viewer
+- Servers become a table in each core's DB. Pairing keys go in that machine's secret store.
+- On first start, the interface's localStorage list is imported once into This PC.
+- `remote_*` on the master.
+- A call to a nested machine carries a path (`["vps1", "vps2"]`). Each master forwards the call and passes stream
+  events back.
+- Loops are refused: a machine never forwards to a path that already holds its own lasting id.
+- The switcher shows the nested dropdown, made visually clear.
 
-- `remote.ts`: every call goes over the protocol to its machine. This PC is a machine id like any other.
-- The direct Tauri calls in stores (`inbox`, `planData`, `settings`, `masters`, `remoteAccess`, ...) move to the
-  router.
-- **Events:** desktop `app.emit` events (`qanuvi-inbox`, `qanuvi-plan-data`, `qanuvi-run*`) are replaced by the
-  master streams already used for other machines (`inbox_watch`, `plan_run_watch`). `notify_item` stays in the
-  window, fed by those streams.
-- **Switcher:**
-  - Machines come from the shown core's server list.
-  - A master that has its own list shows a nested dropdown, made visually clear.
-  - Calls use a machine path.
-- **Window state stays in the window:** shown machine, layout, tabs, panel, split, machine windows.
+### M4. This PC runs its own master
 
-### M5. Delete the second core
+- At launch, the app starts or attaches to This PC's master on the app's own data folder.
+- There is no data move: the master opens the same `qanuvi.db`.
+- The reduced `mark_app_data` mode ends: This PC's master runs its own start-up list, watches, sync and backups.
+- Remote access becomes This PC's master accepting relay sessions.
+- Measure the extra local hop: typing, file reads and the terminal must still feel instant.
 
-- From `desktop.rs`, remove every core command wrapper, plus `desktop_runs.rs`, the Inbox copy, background loops and
-  shutdown copies.
-- What is left: the window commands and the connection client.
-- The parity test now checks that the app answers only the window list.
+### M5. The window becomes a viewer
 
-### M6. A master in a terminal
+- Every call goes over the protocol to its machine. This PC is just a machine id.
+- The direct Tauri calls in stores move to the router.
+- Desktop `app.emit` events are replaced by the master streams (`inbox_watch`, `plan_run_watch`).
+- This PC's coding tools use the same pipes as every other machine.
+- Window state (shown machine, layout, tabs, panel, machine windows) stays in the window.
 
-The owner said a master can be driven fully from a terminal. Minimal commands:
+### M6. Delete the second core
 
-- `qanuvi-master status`
-- `projects`
-- `inbox`
-- `plan run <file>`
-- `servers add/list`
+- From `desktop.rs`, remove the core wrappers, plus `desktop_runs.rs`, the Inbox copy, the loops and the shutdown
+  copies.
+- The parity test then checks that the app answers only the interface list.
 
-These are thin clients over the same protocol to the local service. The full scope is the owner's choice, see the
-decisions below.
+### M7. A master in a terminal
 
-### M7. Release
+- `qanuvi-master status`, `login`, `projects`, `inbox`, `plan run <file>`, `servers add/list`.
+- These are thin clients to the local service over the same protocol.
+- A full terminal screen goes later (IDEAS-UPCOMING).
 
-- Full verify, plus a long everyday check on scratch projects: This PC, the local test master, the VPS and one nested
-  master.
-- Check old installs: the server list import and existing data.
+### M8. Masters update themselves (owner's yes pending)
+
+- Each master checks the update channel and asks first through its Inbox (or `qanuvi-master update` in a
+  terminal).
+- This PC's master updates together with the app.
+
+### M9. Release
+
+- Full verify, plus a long everyday check on scratch projects: This PC, the local test master, the VPS, a nested
+  master, and coding tools on a shown master.
+- Old installs: the server list import and existing data.
 - Publish only with the owner's yes.
 
-## Decisions for the owner
+## Still to decide
 
-1. **This PC's master after the app closes:** recommend it keeps running while work is in progress (plans, agents)
-   and stops when idle, with a "Stop This PC's master" item. This overlaps R4 (tray).
-2. **M6 scope:** recommend the minimal commands above in this plan. A full terminal UI goes later
-   (IDEAS-UPCOMING).
-3. **Nested depth:** recommend no limit in the protocol, with loops refused (a machine never forwards to a path that
-   already contains its own lasting id).
-4. **Account sign-in** (Qlopy OAuth) stays per device in the window. A master uses relay pairing keys, not the
-   account.
-5. **Order:** recommend M0 → M1 → M2 → M3 → M4 → M5, then M6, then M7. M1 and M2 can be released on their own, since
-   they only add to the master. M3–M5 change the app's base and go out together.
+1. M8: should masters update themselves, asking first through their Inbox?
+2. This PC's master after the app closes: keep running while work is in progress (plans, agents) and stop when idle?
+   (Overlaps R4, tray.)
+3. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
 
 ## Risks
 
-- **M3 and M4 change everything at once for This PC.** Live checks must cover every page on This PC, not only on
-  masters.
-- **Two processes on one DB** during M3: until M5, the app core must not write core tables. Mitigate with a
-  read-only open in the app.
-- **Speed:** every This PC call gains a local socket hop. Measure in M3, since editor typing, file reads and the
-  terminal must still feel instant.
-- **Event loss on reconnect:** streams need a resend or reload on reconnect. Inbox and plan runs already reload; LSP
-  and DAP restart.
+- **M4 and M5 change This PC's base.** Live checks must cover every page on This PC.
+- **Two processes on one DB** between M4 and M6: the app core must not write core tables.
+- **Speed** of the local hop for This PC (measure in M4).
+- **Streams on reconnect:** the Inbox and plan runs reload; language servers and debuggers restart.

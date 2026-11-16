@@ -379,7 +379,12 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 22:30): MIGRATION PLAN DRAFTED in docs/MIGRATION-VIEWER.md (measured: gap is 49
+    RESUME HERE (newest, 2026-11-17): SPLIT AGREED, plan rewritten in docs/MIGRATION-VIEWER.md (M0-M9). Master =
+    any machine; coding tools (language servers, debugger, preview) are the interface's, run on the shown machine through
+    two master pipes (run-and-pipe, port forward), optional per machine; account on the master (terminal: Qlopy
+    application password, site needs a Machine passwords page, no core change). Open: M8 self-update, This PC master
+    after app close, release grouping. Waiting for the owner's go on M0/M1.
+    RESUME HERE (before, 2026-11-16 22:30): MIGRATION PLAN DRAFTED in docs/MIGRATION-VIEWER.md (measured: gap is 49
     desktop-only commands, not 57; Inbox and plan runs already on the master; phases M0-M7; five owner decisions).
     Waiting for the owner's review and answers; no code until agreed.
     RESUME HERE (before, 2026-11-16 21:55): 0.1.23 PUBLISHED (owner: "publish anyway"; release rule skipped with
