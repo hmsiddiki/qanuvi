@@ -379,7 +379,18 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-16 17:30, fresh conversation): h1-h3 FIXED (owner: "fix them"), not
+    RESUME HERE (newest, 2026-11-16 17:45): h1-h3 DRIVEN LIVE, ALL PASS on This PC + local test master; VPS still
+    runs the 16:58 server build. Release test build 17:29, server build cross-built 17:32 (zigbuild -j 2, 9.4 MB, zig
+    lives in E:\DevTools\zig\zig-windows-x86_64-0.13.0, put that folder on PATH), not yet swapped onto the VPS.
+    Stale leftovers of earlier conversations stopped first (old local test master tree, old conversation process).
+    (h1) local test master: unsaved line in step3-proj notes.md, switched to This PC, file moved aside, back: Inbox
+    "Unsaved changes to notes.md on DESKTOP-R8G3PAK (test) are kept" tagged DESKTOP-R8G3PAK (test) and kept by that
+    machine filter (no This PC items shown). VPS on its older build: the same note lands tagged This PC (fallback,
+    never lost), as designed. (h2) VPS picker: opening an empty folder keeps the dialog size; Up and the path box stay
+    at the same place, Up goes back, Cancel closes. (h3) last session's six numbered paragraphs now read 4, 5, 6 ... in
+    one list. NEXT: swap the 17:32 server build onto the VPS (owner yes) and drive h1 there (note tagged basevm378),
+    then step 4 (working icon + "Open in a new window"), step 5 Part F, R3-R5.
+    RESUME HERE (before, CHECKPOINT 2026-11-16 17:30, fresh conversation): h1-h3 FIXED (owner: "fix them"), not
     driven live. (h1) the window puts a note about a master's own work into that master's Inbox: inbox.add(item,
     master) calls the master's new inbox_add (master_inbox.rs: add_new + watchers "add"); an older master without it
     gets the note on This PC instead, never lost. The draft note in +page.svelte passes its machine. (h2) the folder
