@@ -159,11 +159,26 @@ This PC is untouched in M1.
 - These are thin clients to the local service over the same protocol.
 - A full terminal screen goes later (IDEAS-UPCOMING).
 
-### M8. Masters update themselves (owner's yes pending)
+### M8. Masters update themselves (agreed 2026-11-17)
 
-- Each master checks the update channel and asks first through its Inbox (or `qanuvi-master update` in a
-  terminal).
-- This PC's master updates together with the app.
+The rule: the master does everything the app does today, updates included.
+
+- **Checks:** each master looks for a newer version on the same signed update channel, as the app does today
+  (hourly, with a signature check; a wrong signature is refused). It reads the channel through the same
+  `latest.json`, which then lists master builds too (Windows, Linux x86_64 server build, macOS) next to the app
+  installer. `publish-update.mjs` builds and signs those as well.
+- **In a terminal:**
+  - `qanuvi-master status` and the start of every terminal command print "Update available: 0.x.y" when there is
+    one.
+  - `qanuvi-master update` downloads, checks the signature, swaps the program and restarts the service. The
+    service keeps the old copy (.prev) to go back to.
+- **In the interface, for the shown master,** the same as for This PC today:
+  - a slim "Update to x" button in the status bar with progress, then "Restart to update";
+  - "Download updates by themselves" as a setting of that machine.
+- **Running work:** the master uses its existing `master_busy`. While agents or plan runs are working, the restart
+  waits and says so: on screen, in the terminal, and as an Inbox note. It never cuts a run off.
+- **This PC:** after M4 its master ships inside the app installer and updates together with the app (one button).
+- **Publishing:** an update still goes out only with the owner's yes.
 
 ### M9. Release
 
@@ -174,10 +189,9 @@ This PC is untouched in M1.
 
 ## Still to decide
 
-1. M8: should masters update themselves, asking first through their Inbox?
-2. This PC's master after the app closes: keep running while work is in progress (plans, agents) and stop when idle?
+1. This PC's master after the app closes: keep running while work is in progress (plans, agents) and stop when idle?
    (Overlaps R4, tray.)
-3. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
+2. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
 
 ## Risks
 
