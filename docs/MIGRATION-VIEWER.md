@@ -131,7 +131,7 @@ This PC is untouched in M1.
     - A connection that ends drops its streams, so its servers report that they stopped.
   - Not yet: live install output (the install still answers at its end, as on This PC); `need_gb` for TypeScript,
     Svelte and Pyright is not measured yet. Driven live through the app window on the local test master
-    2026-11-17; on the VPS (no Node.js there) the screen says why each server cannot run.
+    2026-11-17 and on the VPS (after Node.js was put there; before, the screen said why each server could not run).
 - **Preview/inspector on a shown master:** goes through `port_forward`. With a master shown, `localhost` in the
   preview always means the master's localhost, never This PC's:
   - The tunnel uses any free port on This PC, so it never clashes with This PC's own dev servers.

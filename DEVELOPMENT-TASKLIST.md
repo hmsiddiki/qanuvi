@@ -379,7 +379,13 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 03:30): m1 + m2 FIXED f945170 and DRIVEN LIVE on the local test master (release
+    RESUME HERE (newest, 2026-11-17 03:45): M1b DRIVEN LIVE ON THE VPS, ALL PASS. Node.js put on basevm378 with the
+    owner's yes (Debian packages: nodejs 18.20.4, npm 9.2.0; apt, no outside script). Reopened index.php: the bar
+    now offered Install -> Intelephense went to /root/.local/share/qanuvi/language-servers/php, run by the VPS's
+    `qanuvi-master serve` -> undefined_call() flagged, Problems 1, hover on greet over ssh shows its signature. This
+    PC shown: the VPS server ended (none left); basevm378 again: started, no new offer. NEXT: M1b leftovers (need_gb
+    for TypeScript/Svelte/Pyright, live install output), k1 (owner), then M1c preview through port_forward, M1d.
+    RESUME HERE (before, 2026-11-17 03:30): m1 + m2 FIXED f945170 and DRIVEN LIVE on the local test master (release
     test build 03:05): tools off -> editor status line "Coding tools off on DESKTOP-R8G3PAK (test)", clicking it opens
     Settings, Languages; tools on again -> server back on the already open index.php at once (Problems 1), no reopen.
     vitest 439, svelte-check 0/0. VPS (owner yes): server build cross-built 03:11 (zigbuild -j 2, 9.4 MB), swapped into
