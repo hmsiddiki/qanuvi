@@ -379,7 +379,15 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 18:10): ORDER STEP 4 BUILT (b9d6211, 173fc7f) and driven live on This PC + local
+    RESUME HERE (newest, CHECKPOINT 2026-11-16 18:25, fresh conversation): owner AGREED both findings below, as
+    proposed: (i1) a closing window (or the app) keeps its unsaved files as drafts on their machine (B2 park path, in
+    onCloseRequested before the window goes) and the Inbox says so; (i2) agent processes start in a job object so the
+    --mcp-browser helper ends with its agent. Not built yet. ORDER NOW: build i1 + i2 and drive them live (scratch
+    projects only), drive Inbox Open into another window, then step 5 Part F, R3-R5, full check, 0.1.23 (owner's yes to
+    publish). GitHub ubuntu failure still open (see below): needs the failing test names, or the owner's yes to run the
+    cross-built Linux test binaries on the VPS. VPS server build lacks agents_working (rebuild + swap needs a yes).
+    Release test build 18:05 has the closing-order fix (1f6b883).
+    RESUME HERE (before, 2026-11-16 18:10): ORDER STEP 4 BUILT (b9d6211, 173fc7f) and driven live on This PC + local
     test master. (a) Working icon: agents_working (desktop core + master, agent::working_count = sessions running or
     waiting, chats and plan steps alike); stores/working.svelte.ts reads every connected machine every 6 s (and when the
     list opens); an older master answers nothing, so no icon for it. Live: a 40-line turn on the local test master
