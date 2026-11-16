@@ -379,7 +379,11 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 05:00): M1c DRIVEN LIVE on the local test master (release test build from
+    UPDATE 2026-11-17 05:25 (owner: "fix and go on"): p1 + p2 FIXED and DRIVEN LIVE. p1: previewTunnel.ts
+    machineText puts the bar's address back into text for the agent ("Send this page" and the inspector pick now
+    name http://localhost:5179/ while the page loads through the tunnel); 2 new tests. p2: the machine name in the
+    bar ends in an ellipsis; the full name stays in its hover text. NEXT: M1d debugger.
+    RESUME HERE (before, 2026-11-17 05:00): M1c DRIVEN LIVE on the local test master (release test build from
     b3423ff; the window binary rebuilt, the master binary left as it was because the running test master holds it
     and M1c has no Rust change). Scratch dev server E:\qc-scratch\m1c-drive\server.js on 127.0.0.1:5179 prints the
     Host header it gets. PASS: master shown -> m1b-drive Preview -> localhost:5179 loads through a tunnel the

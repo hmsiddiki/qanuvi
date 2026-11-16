@@ -22,7 +22,7 @@
   import { workspace } from "$lib/stores/workspace.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
   import { normalizeUrl } from "$lib/url";
-  import { loopbackPort, throughTunnel } from "$lib/previewTunnel";
+  import { loopbackPort, machineText, throughTunnel } from "$lib/previewTunnel";
   import IconButton from "./IconButton.svelte";
 
   interface Props {
@@ -129,7 +129,7 @@
     busy = "Reading the page…";
     error = "";
     try {
-      agent.attach(await api.browser.pageText(loaded));
+      agent.attach(machineText(await api.browser.pageText(loaded), loaded, current));
     } catch (e) {
       error = errorText(e);
     } finally {
@@ -165,7 +165,7 @@
     busy = "Finding the element…";
     try {
       const el = await api.browser.pick(x, y);
-      agent.attach(el.note);
+      agent.attach(machineText(el.note, loaded, current));
       shot = null;
     } catch (e) {
       error = errorText(e);
@@ -262,7 +262,9 @@
         class="machine"
         title={`localhost here is ${machineInfo.name}'s own localhost, reached through a tunnel on this computer.`}
       >
-        <span class="dot" style:background={machineInfo.color || "var(--qx-text-muted)"}></span>{machineInfo.name}
+        <span class="dot" style:background={machineInfo.color || "var(--qx-text-muted)"}></span><span class="name"
+          >{machineInfo.name}</span
+        >
       </span>
     {/if}
     <input bind:value={address} placeholder="http://localhost/…" spellcheck="false" aria-label="Address" />
@@ -411,12 +413,17 @@
     align-items: center;
     gap: 5px;
     margin-left: var(--qx-space-2);
+    flex-shrink: 0;
     max-width: 140px;
-    overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis;
     color: var(--qx-text-secondary);
     font-size: var(--qx-text-small);
+  }
+
+  .machine .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .dot {

@@ -31,3 +31,22 @@ export function throughTunnel(raw: string, local: number): string {
   url.port = String(local);
   return url.toString();
 }
+
+/**
+ * Text handed to the agent (page text, a picked element) names the tunnel's address; the agent works on the master,
+ * where that port means nothing. Put the master's own address back (`tunnelled` is what loaded, `shown` the bar's).
+ */
+export function machineText(text: string, tunnelled: string, shown: string): string {
+  if (!tunnelled || tunnelled === shown) return text;
+  let from: string;
+  let to: string;
+  try {
+    from = new URL(tunnelled).origin;
+    to = new URL(shown).origin;
+  } catch {
+    return text;
+  }
+  if (from === to) return text;
+  const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(`${escaped}(?!\\d)`, "g"), to);
+}
