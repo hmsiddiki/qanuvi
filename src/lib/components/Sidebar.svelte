@@ -3,6 +3,7 @@
   import * as files from "$lib/fileActions";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import ProjectPanel from "./ProjectPanel.svelte";
+  import MachineSwitcher from "./MachineSwitcher.svelte";
   import { panel, type PanelView } from "$lib/stores/panel.svelte";
   import LayoutGrid from "@lucide/svelte/icons/layout-grid";
   import Files from "@lucide/svelte/icons/files";
@@ -25,7 +26,6 @@
   import { masters } from "$lib/stores/masters.svelte";
   import Bell from "@lucide/svelte/icons/bell";
   import Plus from "@lucide/svelte/icons/plus";
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import X from "@lucide/svelte/icons/x";
@@ -131,13 +131,7 @@
 {/if}
 
 <nav class="sidebar" class:collapsed aria-label="Main">
-  <button type="button" class="workspace" title="Workspace">
-    <span class="avatar" aria-hidden="true">Q</span>
-    {#if !collapsed}
-      <span class="workspace-name">My workspace</span>
-      <ChevronDown size={14} />
-    {/if}
-  </button>
+  <MachineSwitcher {collapsed} onmanage={() => navigate("servers")} />
 
   <div class="modes" class:vertical={collapsed} role="tablist" aria-label="Sidebar">
     {#each MODES as m (m.id)}
@@ -424,51 +418,6 @@
 
   button {
     font: inherit;
-  }
-
-  .workspace {
-    display: flex;
-    align-items: center;
-    gap: var(--qx-space-2);
-    width: 100%;
-    margin-bottom: var(--qx-space-3);
-    padding: 6px var(--qx-space-2);
-    border: 0;
-    border-radius: var(--qx-radius-button);
-    background: transparent;
-    color: var(--qx-text);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .collapsed .workspace {
-    width: auto;
-    padding: 6px;
-  }
-
-  .workspace:hover {
-    background: var(--qx-bg-raised);
-  }
-
-  .avatar {
-    width: 22px;
-    height: 22px;
-    flex: none;
-    display: grid;
-    place-items: center;
-    border-radius: 6px;
-    background: var(--qx-text);
-    color: var(--qx-bg-window);
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .workspace-name {
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .items {

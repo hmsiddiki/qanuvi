@@ -2,9 +2,8 @@
   /**
    * Servers (Milestone 16): Qanuvi without a window on a Linux server or VPS, reached over SSH. Add a server,
    * connect, and add its folders as projects; they then work like this PC's projects. The sidebar lists one machine
-   * at a time (24z3 Part A2); until the switcher (Part B), "Show" here puts a server on screen.
+   * at a time (24z3 Part A2); the switcher at the top of the sidebar (Part B) picks it.
    */
-  import Eye from "@lucide/svelte/icons/eye";
   import Server from "@lucide/svelte/icons/server";
   import Plug from "@lucide/svelte/icons/plug";
   import Unplug from "@lucide/svelte/icons/unplug";
@@ -14,8 +13,6 @@
   import { ask } from "$lib/stores/confirm.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
   import { COLORS, NAME_MAX, nameProblem } from "$lib/machineNames";
-  import { show } from "$lib/stores/machines";
-  import { projects } from "$lib/stores/projects.svelte";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
   import IconButton from "./IconButton.svelte";
   import RemoteAccessPanel from "./RemoteAccessPanel.svelte";
@@ -119,21 +116,10 @@
 <div class="servers">
   <h2><Server size={16} /> Servers</h2>
   <p class="lead">
-    Qanuvi without a window on a Linux server or VPS. Shown in the sidebar, its projects work like this PC's: files,
-    git, search, terminals and agents run on the server, and agent sessions keep going when this PC is off.
+    Qanuvi without a window on a Linux server or VPS. Picked in the switcher at the top of the sidebar, its projects
+    work like this PC's: files, git, search, terminals and agents run on the server, and agent sessions keep going when
+    this PC is off.
   </p>
-
-  {#if projects.machine}
-    <p class="row">
-      <span class="muted"
-        >The sidebar shows {(() => {
-          const m = masters.list.find((x) => x.id === projects.machine);
-          return m ? displayName(m) : "a server";
-        })()}.</span
-      >
-      <button type="button" class="btn" onclick={() => show(null)}><Eye size={14} /> Show This PC</button>
-    </p>
-  {/if}
 
   <DataFolderPanel />
   <RemoteAccessPanel />
@@ -147,9 +133,6 @@
         <strong>{displayName(m)}</strong>
         {#if reachedBy(m)}<span class="muted">{reachedBy(m)}</span>{/if}
         <span class="spacer"></span>
-        {#if st.state === "on" && projects.machine !== m.id}
-          <IconButton label="Show in the sidebar" onclick={() => show(m.id)}><Eye size={14} /></IconButton>
-        {/if}
         {#if st.state === "on"}
           <IconButton label="Disconnect" onclick={() => masters.disconnect(m.id)}><Unplug size={14} /></IconButton>
         {:else}

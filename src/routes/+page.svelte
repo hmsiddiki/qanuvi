@@ -24,6 +24,7 @@
   import ProjectSettings from "$lib/components/ProjectSettings.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { masters } from "$lib/stores/masters.svelte";
+  import { restoreShown } from "$lib/stores/machines";
   import { memory } from "$lib/stores/memory.svelte";
   import { memoryDisk } from "$lib/stores/memoryDisk.svelte";
   import { account } from "$lib/stores/account.svelte";
@@ -58,9 +59,14 @@
     windows.init(() => projects.currentId);
     projects.persist = !projects.startWith;
     terminals.remote = (id) => !!projects.list.find((p) => p.id === id)?.master;
-    // Servers marked to connect at start-up connect once This PC's projects are listed (the sidebar keeps showing
-    // This PC; a project window for a server's project shows that server).
-    projects.load().then(() => masters.autoConnect());
+    // Servers marked to connect at start-up connect once This PC's projects are listed (a project window for a
+    // server's project shows that server). The main window then shows the machine picked last, when it is connected.
+    projects
+      .load()
+      .then(() => masters.autoConnect())
+      .then(() => {
+        if (!projects.startWith) void restoreShown((id) => masters.statusOf(id).state === "on");
+      });
     // The memory disk syncs at start-up (in the main window only: one sync per machine is enough).
     if (!projects.startWith) memoryDisk.init();
     account.init();
