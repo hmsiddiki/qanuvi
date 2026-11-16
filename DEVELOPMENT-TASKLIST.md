@@ -379,7 +379,22 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 16:30): 24z3 PART E BUILT (not driven live yet; f3 answered). A shown master
+    RESUME HERE (newest, 2026-11-16 16:15): 24z3 PART E DRIVEN LIVE, ALL PASS (owner yes to the three choices: 2 min
+    before the wipe, no automatic tries on "not connected", start-up stays on This PC). Release test build 15:55 (old
+    local test master stopped with the owner's yes). Local test master shown, its serve process stopped: cover came,
+    went by itself on the next try (a fresh master started). Master kept away (its exe renamed for the test, put back
+    after): countdown and "Last try: The master program was not found..." on the cover, projects and chats dimmed
+    (pixel check 711 -> 354) and out of the accessibility tree, a key typed did not reach the editor; after 2 min the
+    opaque "is not connected" screen; Show This PC -> This PC's own screen; picking the master in the switcher while
+    away -> its "not connected" screen (nothing of This PC); Reconnect while away -> error stays; Servers... opens
+    uncovered; Reconnect once back -> whole screen back. Unsaved README line on the master -> lost -> wiped -> back:
+    typed back unsaved. VPS basevm378: the window's ssh ended -> cover -> back by itself in about 2 s. Test note: a
+    test line ("typed while lost") went into projm's README while still connected (unsaved, scratch only). FINDINGS,
+    proposed, not built: (g1) under the "not connected" screen the empty sidebar says "No projects yet. Use + to add
+    a folder" (dimmed, inert) - say nothing, or "Not connected"; (g2) Servers page while a held machine is shown: its
+    "remote access" card still offers Turn on (fails) - show it as not connected. NEXT: g1/g2 if the owner agrees,
+    then order step 3 (B2 leftovers + f1/f2).
+    RESUME HERE (before, 2026-11-16 16:30): 24z3 PART E BUILT (not driven live yet; f3 answered). A shown master
     whose connection ends by itself stays shown: its screen stays as it was, read-only (agent and work panes inert,
     its projects and chats in the sidebar dimmed and inert; the Inbox and the switcher stay usable) under a see-through
     cover "<name>: connection lost, reconnecting…" with the countdown, the last try's error, Try now, Show This PC and
