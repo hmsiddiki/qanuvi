@@ -163,6 +163,11 @@ This PC is untouched in M1.
 
 The rule: the master does everything the app does today, updates included.
 
+- **Today (0.1.23):** the app screen is This PC's core, so it does the updating itself.
+- **After the migration:** updating is the master's job only. The screen does no updating of its own. It is a
+  viewing container with settings: it shows a master's update state, offers the button, and switches that master's
+  update settings, as it switches other settings today.
+
 - **Checks:** each master looks for a newer version on the same signed update channel, as the app does today
   (hourly, with a signature check; a wrong signature is refused). It reads the channel through the same
   `latest.json`, which then lists master builds too (Windows, Linux x86_64 server build, macOS) next to the app
@@ -172,12 +177,18 @@ The rule: the master does everything the app does today, updates included.
     one.
   - `qanuvi-master update` downloads, checks the signature, swaps the program and restarts the service. The
     service keeps the old copy (.prev) to go back to.
-- **In the interface, for the shown master,** the same as for This PC today:
+  - In a terminal the master only tells; it does not update by itself unless its auto-update setting is on.
+- **In the interface, for the shown master,** the same look as for This PC today:
   - a slim "Update to x" button in the status bar with progress, then "Restart to update";
-  - "Download updates by themselves" as a setting of that machine.
+  - the master does the work, and the screen only asks it and shows its progress.
+- **Auto-update** ("Download updates by themselves") is a setting stored on each master:
+  - It is switched from the screen, as today.
+  - It is off by default for a master set up from a terminal.
+  - When on, the master updates by itself, still waiting for running work.
 - **Running work:** the master uses its existing `master_busy`. While agents or plan runs are working, the restart
   waits and says so: on screen, in the terminal, and as an Inbox note. It never cuts a run off.
-- **This PC:** after M4 its master ships inside the app installer and updates together with the app (one button).
+- **This PC:** after M4, This PC's master updates the whole install, both the master and the screen app, with one
+  installer and one button. The screen app has no updater of its own any more.
 - **Publishing:** an update still goes out only with the owner's yes.
 
 ### M9. Release
