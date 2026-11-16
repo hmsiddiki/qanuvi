@@ -1,6 +1,6 @@
 # Migration plan: the app is a viewer of masters
 
-Status: SPLIT AGREED with the owner (2026-11-17); phases below follow it. No code until the owner says go.
+Status: AGREED by the owner (2026-11-17), all decisions settled. Next: M0, then M1, in a fresh session.
 Going back: branch `old-infrastructure` / tag `v0.1.23-old-infrastructure` (see OLD-INFRASTRUCTURE.md there), data
 backup at `E:\Backups\qanuvi\old-infrastructure-0.1.23`.
 
@@ -222,10 +222,7 @@ Every open item of the old plan is kept and lands here:
 
 - **This PC's master after the screen closes:** it keeps running with its tray icon visible, until the user quits
   from the icon (this is R4 in the new design).
-
-## Still to decide
-
-1. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
+- **Releases:** M1 alone, then M2+M3, then M4-M6 together, then M7-M9. Each only with the owner's yes.
 
 ## Risks
 

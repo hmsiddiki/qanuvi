@@ -379,7 +379,17 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): SPLIT AGREED, plan rewritten in docs/MIGRATION-VIEWER.md (M0-M9). Master =
+    RESUME HERE (newest, CHECKPOINT 2026-11-17, fresh conversation): MIGRATION PLAN AGREED IN FULL by the owner
+    (docs/MIGRATION-VIEWER.md, read it first). Owner rule: nothing in Qanuvi's plan or way of working changes, only
+    the layer design (screen = container, work in the master); the screen looks the same after. Settled: coding tools
+    are the interface's and run on the shown machine through two master pipes; account on the master (Qlopy
+    application password in a terminal; qanuvi.com needs a Machine passwords page, no core change); masters update
+    themselves (the screen only shows and switches settings); This PC's master keeps running after the screen closes,
+    with its tray icon (R4); every old open item mapped to a phase; releases M1 alone, M2+M3, M4-M6, M7-M9 (owner's
+    yes each). Size: about 1.5-2x the 24z3 work. NEXT: M0 parity test, then M1a master pipes (pipe_start/send/stop,
+    port_forward), M1b language servers, M1c preview, M1d debugger on a shown master. Check free RAM before builds.
+    Old infrastructure backup: branch old-infrastructure, tag v0.1.23-old-infrastructure, E:\Backups\qanuvi.
+    RESUME HERE (before, 2026-11-17): SPLIT AGREED, plan rewritten in docs/MIGRATION-VIEWER.md (M0-M9). Master =
     any machine; coding tools (language servers, debugger, preview) are the interface's, run on the shown machine through
     two master pipes (run-and-pipe, port forward), optional per machine; account on the master (terminal: Qlopy
     application password, site needs a Machine passwords page, no core change). Open: M8 self-update, This PC master
