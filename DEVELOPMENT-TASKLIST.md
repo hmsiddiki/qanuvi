@@ -379,7 +379,8 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): M1c BUILT, NOT YET DRIVEN LIVE. The preview of a master's project loads
+    RESUME HERE (newest, CHECKPOINT 2026-11-17, fresh conversation): M1c BUILT, NOT YET DRIVEN LIVE. Check free
+    RAM before the release test build (5.2 GB free at the checkpoint; stray node/MCP processes were cleared). The preview of a master's project loads
     that master's localhost through port_forward on a free local port (src/lib/previewTunnel.ts plus 4 tests,
     PreviewTab.svelte, api.browser.forward). The address bar keeps the master's address and shows the machine's
     dot and name. The frame, inspector, page text and "Open in the browser" use the tunnelled address. Public
