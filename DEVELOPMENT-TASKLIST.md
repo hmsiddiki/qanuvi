@@ -369,7 +369,23 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 07:20): 24z3 D8 BUILT (3438ed5, owner go) AND DRIVEN LIVE on This PC, the local
+    RESUME HERE (newest, 2026-11-16 07:50): D8 finding FIXED (ff87cbd: empty Memory text names a project only when
+    one is open; driven live on the VPS). 24z3 PART B SPLIT (owner: "go for part B"): B1 = the switcher, B2 = a
+    hidden machine wiped from the window and rebuilt on return (editors, chats, terminals per machine; drafts kept on
+    the machine), still to build. B1 BUILT a552399 AND DRIVEN LIVE, all pass: MachineSwitcher.svelte replaces the
+    "My workspace" placeholder at the top of the sidebar: This PC (always) + each paired master with its colour,
+    connection dot (green/amber/red/grey), unread Inbox count per machine and a badge on the closed switcher for the
+    others, address on hover only (SSH / relay / test master); a master not connected is connected first, an error
+    shows in the menu; "Servers..." opens the Servers page. switcher.svelte.ts keeps the shown machine reactive and
+    the pick (qanuvi.shownMachine, main window only); machines.ts pick()/restoreShown(): at start the main window
+    shows the machine picked last when it connected, a dropped connection shows This PC but keeps the choice.
+    Servers page stopgap "Show This PC" line and eye buttons removed; "This PC" as a name was already refused
+    (machineNames RESERVED). 394 TS tests (switcher.test.ts new), svelte-check 0/0, prettier. Driven (release test
+    build 07:40): menu lists all three with dots and tick; picking the test master switched the whole screen; window
+    closed and started again -> back on DESKTOP-R8G3PAK (test); VPS disconnected on its card (grey dot), picked in
+    the switcher -> connected and shown; This PC picked again. Not driven: collapsed sidebar look, the unread badges
+    (no unread items in the test data), Part C/E items. NEXT: B2 in a fresh conversation.
+    RESUME HERE (before, 2026-11-16 07:20): 24z3 D8 BUILT (3438ed5, owner go) AND DRIVEN LIVE on This PC, the local
     test master and the VPS, all pass. Built: memory column part (migration 11: scope '' -> me, else project);
     Entry::part()/is_account(); This project needs a project, account parts drop it; the disk writes, reads and
     restores account memory only (format 2; project entries in older files are left out); an account entry moved
