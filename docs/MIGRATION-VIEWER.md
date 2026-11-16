@@ -100,7 +100,12 @@ This PC is untouched in M1.
   - The memory check uses that machine's free memory.
   - A per-machine "coding tools off" switch.
   - The screen says why when a tool is missing or does not fit.
-- **Preview/inspector on a shown master:** goes through `port_forward`.
+- **Preview/inspector on a shown master:** goes through `port_forward`. With a master shown, `localhost` in the
+  preview always means the master's localhost, never This PC's:
+  - The tunnel uses any free port on This PC, so it never clashes with This PC's own dev servers.
+  - The address bar keeps showing `localhost:<port>`, with the machine's name and colour.
+  - Public addresses load directly, without a tunnel.
+  - Switching back to This PC makes `localhost` mean This PC again.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
 - **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and
