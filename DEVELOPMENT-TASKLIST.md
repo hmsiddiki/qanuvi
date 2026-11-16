@@ -379,7 +379,17 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 08:15): 24z3 PART B2 BUILT (not driven live yet). A machine leaving the screen is
+    RESUME HERE (newest, checkpoint 2026-11-16 09:30): OWNER CHOSE THE AGREED ORDER, no quick 0.1.23. Since 0.1.22
+    (2b4dd63) 78 commits: the Rust runner (TS runner deleted), 24z3 A1-A3, D1-D8, B1 (all driven live), B2 + its
+    terminal-panel follow-up and the false usage-limit fix 9ea5fcd (tests only, not driven live). Order now:
+    (1) drive B2 live (list in the 08:15 note below; also close and reopen the terminal panel: same shell, its
+    output back); (2) 24z3 leftovers: Part C2 (one Inbox screen for all machines), Part E (not connected screen with
+    Reconnect), the B2 NOT DONE items (hidden machine's agent streams, a draft whose file cannot open), Part F (drive
+    live side by side, window memory with several masters); first check what of C/C2/E already works and tell the
+    owner; (3) R3 queue, R4 tray mode, R5 drive live; (4) full check, publish 0.1.23 (owner's yes first). Until then
+    the installed 0.1.22 can still read a step's own "rate limit ... reached" text as a usage limit: the owner
+    presses Pause then Resume.
+    RESUME HERE (before, 2026-11-16 08:15): 24z3 PART B2 BUILT (not driven live yet). A machine leaving the screen is
     wiped from the window (machines.ts park(), run at the start of show() and not waited for: every call names the
     machine being hidden, remote.ts callOn): the workspaces are flushed and their projects leave workspace.restored,
     editor.park() empties the editor groups and answers the unsaved files as drafts, kept ON THAT MACHINE (new table
