@@ -82,6 +82,11 @@ owner's yes.
 
 - A parity test: every command the app answers is either answered by the master or is on the interface list.
 - It starts with the known gaps listed, and each phase removes some.
+- BUILT 2026-11-17: `master.rs` test `answers_every_window_command_or_it_is_the_interfaces`. It reads the app's
+  `generate_handler!` list and the master's match arms (`dispatch`, `inbox`, `plan_run`). `INTERFACE` lists 35
+  commands that stay with the screen; `GAPS` lists 14, each with its phase (account_* M2, remote_* M3; core_decide,
+  knowledge_fetch, attachment_page, attachment_image by M6). It also fails when a listed gap is already answered or a
+  listed command no longer exists, so the lists cannot go stale.
 
 ### M1. Coding tools on a shown master (ships on its own)
 

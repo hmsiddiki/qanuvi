@@ -379,7 +379,11 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17, fresh conversation): MIGRATION PLAN AGREED IN FULL by the owner
+    RESUME HERE (newest, 2026-11-17): M0 BUILT. Parity test master.rs
+    answers_every_window_command_or_it_is_the_interfaces (app handler list vs master arms; 35 INTERFACE, 14 GAPS with
+    phases; fails on a new unlisted command, a closed gap still listed, or a stale name; checked that it fails when a
+    gap line is removed). NEXT: M1a master pipes (pipe_start/send/stop, port_forward), then M1b-M1d.
+    RESUME HERE (before, CHECKPOINT 2026-11-17, fresh conversation): MIGRATION PLAN AGREED IN FULL by the owner
     (docs/MIGRATION-VIEWER.md, read it first). Owner rule: nothing in Qanuvi's plan or way of working changes, only
     the layer design (screen = container, work in the master); the screen looks the same after. Settled: coding tools
     are the interface's and run on the shown machine through two master pipes; account on the master (Qlopy

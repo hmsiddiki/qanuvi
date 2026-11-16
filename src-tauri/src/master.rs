@@ -2041,4 +2041,183 @@ mod tests {
         );
         assert!(call(&m, "inbox_add", json!({"item": {}})).is_err());
     }
+
+    // Migration M0 (docs/MIGRATION-VIEWER.md): every command the app answers is answered by the master too, or it
+    // belongs to the interface. The known gaps are listed with the phase that closes them; each phase removes its
+    // lines. M6 empties GAPS and from then on the app answers only INTERFACE.
+
+    /// Commands that stay with the interface (the visual container).
+    const INTERFACE: &[&str] = &[
+        // Popup notifications, the app itself, this screen's files and data folder.
+        "notify_settings",
+        "notify_take_start",
+        "notify_test",
+        "notify_item",
+        "app_info",
+        "app_restart",
+        "startup_path",
+        "term_kill_window",
+        "inbox_import",
+        "plan_data_import",
+        "data_location_move",
+        "data_location_cancel",
+        "data_location_remove_old",
+        "data_test_build",
+        "attachment_file",
+        // Coding tools: the interface's, run on the shown machine through the master's pipes (M1, M5).
+        "lsp_statuses",
+        "lsp_install",
+        "lsp_start",
+        "lsp_send",
+        "lsp_stop",
+        "lsp_stop_window",
+        "dap_statuses",
+        "dap_php",
+        "dap_install",
+        "dap_start",
+        "dap_connect",
+        "dap_send",
+        "dap_stop",
+        "dap_stop_window",
+        "inspector_show",
+        "inspector_scroll",
+        "inspector_pick",
+        "inspector_page_text",
+        "inspector_close",
+        "browser_agent_shot",
+    ];
+
+    /// Commands only the app answers today that move to the master, with the phase that moves them.
+    const GAPS: &[(&str, &str)] = &[
+        ("account_sign_in", "M2"),
+        ("account_cancel", "M2"),
+        ("account_me", "M2"),
+        ("account_sign_out", "M2"),
+        ("remote_connect", "M3"),
+        ("remote_call", "M3"),
+        ("remote_disconnect", "M3"),
+        ("remote_list", "M3"),
+        ("remote_pair", "M3"),
+        ("remote_unpair", "M3"),
+        ("core_decide", "M6"),
+        ("knowledge_fetch", "M6"),
+        ("attachment_page", "M6"),
+        ("attachment_image", "M6"),
+    ];
+
+    /// The command names of the app's `generate_handler!` list.
+    fn window_commands() -> Vec<String> {
+        let src = include_str!("desktop.rs");
+        let list = &src[src.find("generate_handler![").expect("the handler list")..];
+        let list = &list[list.find('[').unwrap() + 1..list.find(']').unwrap()];
+        list.lines()
+            .map(|l| l.split("//").next().unwrap_or(""))
+            .flat_map(|l| l.split(','))
+            .map(|c| c.trim().rsplit("::").next().unwrap_or("").to_string())
+            .filter(|c| !c.is_empty())
+            .collect()
+    }
+
+    /// The commands one master match answers: the string patterns of its top-level arms, from `start` to its
+    /// "does not know the command" fallback. Top level = the first arm's indent, so nested matches never count.
+    fn arms(src: &str, start: &str, into: &mut HashSet<String>) {
+        let from = src
+            .find(start)
+            .unwrap_or_else(|| panic!("{start} not found"));
+        let to = from + src[from..].find("does not know the command").unwrap();
+        let mut indent = None;
+        for line in src[from..to].lines() {
+            let t = line.trim_start();
+            let pattern = t.strip_prefix("| ").unwrap_or(t);
+            if !pattern.starts_with('"') {
+                continue;
+            }
+            let ind = line.len() - t.len();
+            if *indent.get_or_insert(ind) != ind {
+                continue;
+            }
+            let pattern = pattern.split("=>").next().unwrap_or("");
+            for name in pattern.split('|') {
+                let name = name.trim().trim_matches('"');
+                if !name.is_empty()
+                    && name
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                {
+                    into.insert(name.to_string());
+                }
+            }
+        }
+    }
+
+    fn master_commands() -> HashSet<String> {
+        let mut all = HashSet::new();
+        arms(include_str!("master.rs"), "pub fn dispatch(", &mut all);
+        arms(include_str!("master_inbox.rs"), "fn inbox(", &mut all);
+        arms(include_str!("master_runs.rs"), "fn plan_run(", &mut all);
+        all
+    }
+
+    #[test]
+    fn answers_every_window_command_or_it_is_the_interfaces() {
+        let window = window_commands();
+        let master = master_commands();
+        assert!(
+            window.len() > 150,
+            "the handler list was not read ({})",
+            window.len()
+        );
+        assert!(
+            master.contains("hello")
+                && master.contains("inbox_list")
+                && master.contains("plan_run_start")
+        );
+        let gaps: HashSet<&str> = GAPS.iter().map(|g| g.0).collect();
+        let interface: HashSet<&str> = INTERFACE.iter().copied().collect();
+        assert_eq!(gaps.len(), GAPS.len(), "a gap is listed twice");
+        assert_eq!(
+            interface.len(),
+            INTERFACE.len(),
+            "an interface command is listed twice"
+        );
+
+        let missing: Vec<&String> = window
+            .iter()
+            .filter(|c| {
+                !master.contains(*c)
+                    && !interface.contains(c.as_str())
+                    && !gaps.contains(c.as_str())
+            })
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "the app answers these but the master does not: {missing:?}. Answer them in the master, or add them to \
+             INTERFACE (the screen's own) or GAPS (with the phase that moves them)."
+        );
+        let closed: Vec<&(&str, &str)> = GAPS.iter().filter(|g| master.contains(g.0)).collect();
+        assert!(
+            closed.is_empty(),
+            "the master answers these now, remove them from GAPS: {closed:?}"
+        );
+        let both: Vec<&&str> = INTERFACE.iter().filter(|c| master.contains(**c)).collect();
+        assert!(
+            both.is_empty(),
+            "the master answers these, so they are not the interface's alone: {both:?}"
+        );
+        let stale: Vec<&str> = INTERFACE
+            .iter()
+            .copied()
+            .chain(GAPS.iter().map(|g| g.0))
+            .filter(|c| !window.iter().any(|w| w == c))
+            .collect();
+        assert!(
+            stale.is_empty(),
+            "the app no longer has these, remove them from the lists: {stale:?}"
+        );
+        let overlap: Vec<&&str> = INTERFACE.iter().filter(|c| gaps.contains(**c)).collect();
+        assert!(
+            overlap.is_empty(),
+            "listed as both interface and gap: {overlap:?}"
+        );
+    }
 }
