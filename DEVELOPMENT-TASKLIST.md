@@ -379,7 +379,10 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 21:55): 0.1.23 PUBLISHED (owner: "publish anyway"; release rule skipped with
+    RESUME HERE (newest, 2026-11-16 22:30): MIGRATION PLAN DRAFTED in docs/MIGRATION-VIEWER.md (measured: gap is 49
+    desktop-only commands, not 57; Inbox and plan runs already on the master; phases M0-M7; five owner decisions).
+    Waiting for the owner's review and answers; no code until agreed.
+    RESUME HERE (before, 2026-11-16 21:55): 0.1.23 PUBLISHED (owner: "publish anyway"; release rule skipped with
     QANUVI_RELEASE_ANYWAY=1 because Claude Code 2.1.325 was out and 2.1.318 is here). Check before it was short:
     release build starts on This PC, 2/2 machines, a new terminal runs a command; chat, plan step, machine switch
     and Inbox Open into another window NOT checked. Finding j1 (small): a restored terminal tab whose shell ended
