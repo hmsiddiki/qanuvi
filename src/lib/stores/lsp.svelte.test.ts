@@ -97,4 +97,23 @@ describe("language servers per machine", () => {
     expect(await lsp.clientFor({ key: "t1", projectId: "there", path: "cart.php" })).toBeNull();
     expect(started.length).toBe(1);
   });
+
+  it("says why a file gets no server: the machine's tools or that language's server are off", () => {
+    expect(lsp.offFor("cart.php")).toBeNull();
+    expect(lsp.offFor("notes.md"), "no server for that language at all").toBeNull();
+    lsp.setEnabled("php", false);
+    expect(lsp.offFor("cart.php")).toBe("server");
+    lsp.setToolsOff(true);
+    expect(lsp.offFor("cart.php")).toBe("tools");
+  });
+
+  it("tells open editors when tools or a server are switched on again, never when off", () => {
+    const at = lsp.switchedOn;
+    lsp.setToolsOff(true);
+    lsp.setEnabled("php", false);
+    expect(lsp.switchedOn).toBe(at);
+    lsp.setToolsOff(false);
+    lsp.setEnabled("php", true);
+    expect(lsp.switchedOn).toBe(at + 2);
+  });
 });

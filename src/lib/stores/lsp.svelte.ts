@@ -65,6 +65,8 @@ class LspStore {
   /** Server state per project and language, for the status bar. */
   state = $state<Record<string, "starting" | "ready" | "stopped" | "failed">>({});
   lastError = $state("");
+  /** Bumps when coding tools or one server are switched on again: open editors attach their file once more (m2). */
+  switchedOn = $state(0);
   references = $state<{ title: string; places: Place[] } | null>(null);
   bottom = $state<BottomView>("terminal");
   /** Applies a WorkspaceEdit in a project (set by lsp/actions.ts, which knows the editor). */
@@ -119,10 +121,20 @@ class LspStore {
     return !l.toolsOff && !l.off.includes(server);
   }
 
+  /** Why the shown machine runs no server for a file although it has one: its tools, or that server, are off (m1). */
+  offFor(path: string): "tools" | "server" | null {
+    const server = serverFor(path);
+    if (!server) return null;
+    const l = settings.value.languages;
+    if (l.toolsOff) return "tools";
+    return l.off.includes(server) ? "server" : null;
+  }
+
   /** The shown machine's switch for all its coding tools (a small machine keeps them off). */
   setToolsOff(off: boolean): void {
     settings.set("languages", { ...settings.value.languages, toolsOff: off });
     if (off) this.stopMachine(switcher.shown);
+    else this.switchedOn++;
   }
 
   setEnabled(server: ServerId, on: boolean): void {
@@ -130,6 +142,7 @@ class LspStore {
     const off = on ? l.off.filter((x) => x !== server) : [...new Set([...l.off, server])];
     settings.set("languages", { ...l, off });
     if (!on) this.stopServer(server);
+    else this.switchedOn++;
   }
 
   /** The project's folder and the machine it is on (its servers run there, migration M1). */

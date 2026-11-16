@@ -470,6 +470,16 @@
     if (view && shownKey === tab.key) loadBase(tab);
   });
 
+  // Coding tools or a server switched on again (Settings, Languages): the shown file gets its server now, not at the
+  // next file open (m2).
+  let switchedOn = lsp.switchedOn;
+  $effect(() => {
+    const n = lsp.switchedOn;
+    if (n === switchedOn) return;
+    switchedOn = n;
+    untrack(reattach);
+  });
+
   /** Opens the shown file in its language server (started if needed), then shows its problems. */
   function reattach() {
     const d = currentDoc();

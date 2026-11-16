@@ -13,6 +13,9 @@
   import { tabDrag } from "$lib/stores/tabDrag.svelte";
   import { platform } from "$lib/platform.svelte";
   import { LANGUAGE_LABELS } from "$lib/editor/languages";
+  import { lsp } from "$lib/stores/lsp.svelte";
+  import { ui } from "$lib/stores/ui.svelte";
+  import { shownPlace } from "$lib/remote";
   import type { Project } from "$lib/api";
 
   interface Props {
@@ -30,6 +33,8 @@
     active && (active.global || active.projectId === project.id || !settings.value.tabsFollowProject) ? active : null,
   );
   let cursor = $state({ line: 1, column: 1 });
+  /** No errors or hover for this file, and why (m1): the machine's coding tools, or its language's server, are off. */
+  let off = $derived(own ? lsp.offFor(own.path) : null);
   let editorView: CodeEditor | undefined = $state();
 
   async function overwrite() {
@@ -86,6 +91,15 @@
             <span class="path">{own.path}</span>
             {#if own.dirty}<span class="unsaved">Unsaved · Ctrl+S</span>{/if}
             <span class="spacer"></span>
+            {#if off}
+              <button
+                type="button"
+                class="tools-off"
+                title="No errors, hover or completion from a language server for this file. Click to change it (Settings, Languages)."
+                onclick={() => ui.openSettings("languages")}
+                >{off === "tools" ? `Coding tools off on ${shownPlace()}` : "Language server off"}</button
+              >
+            {/if}
             <span>Ln {cursor.line}, Col {cursor.column}</span>
             <span>{own.language ? LANGUAGE_LABELS[own.language] : "Plain text"}</span>
           </div>
@@ -171,6 +185,20 @@
 
   .status .spacer {
     flex: 1;
+  }
+
+  .tools-off {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .tools-off:hover {
+    color: var(--qx-text);
+    text-decoration: underline;
   }
 
   .unsaved {
