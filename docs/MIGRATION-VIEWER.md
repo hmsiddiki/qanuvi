@@ -198,11 +198,34 @@ The rule: the master does everything the app does today, updates included.
 - Old installs: the server list import and existing data.
 - Publish only with the owner's yes.
 
+## Nothing in Qanuvi's plan changes (owner, 2026-11-17)
+
+Everything built and planned for Qanuvi stays as it is. Only the layer design changes: the screen becomes a
+container, and the work moves into a master. After the migration the screen looks the same, a complete screen for
+whichever machine is shown, This PC or any master.
+
+Every open item of the old plan is kept and lands here:
+
+| Old item | Where it lands |
+|---|---|
+| R3 queue (migration 10) | On the master, as already decided: each machine's queue in its own DB, scheduler in its core |
+| R4 tray mode | This PC's master's tray icon (M4): visible whenever it runs (never hidden), opens the screen, "Quit Qanuvi" stops the master. Closing the screen only closes the container; runs, the queue and agents go on. No separate "tray mode" is needed |
+| R5 drive live | In M9's long check: a scratch plan, close the screen, reopen, progress intact; then the VPS |
+| R6 leftover processes | On the master: every child it starts in a kill-on-close job / process group, with a start-up check for leftovers. The owner rule stays: never end what the master still handles |
+| i1 unsaved files on window close | M5: a closing viewer keeps unsaved text as drafts on the shown machine, and the Inbox says so |
+| i2 browser helper left after close | With R6: agent processes and `--mcp-browser` in the master's job |
+| 24z3 Part F (window memory with several masters connected) | M9: measure with several masters shown in turn and nested ones |
+| j1 blank restored terminal | M5: a terminal whose shell ended says so |
+| Everything else in DEVELOPMENT-TASKLIST.md | Unchanged, built on the master after the migration |
+
+## Decided
+
+- **This PC's master after the screen closes:** it keeps running with its tray icon visible, until the user quits
+  from the icon (this is R4 in the new design).
+
 ## Still to decide
 
-1. This PC's master after the app closes: keep running while work is in progress (plans, agents) and stop when idle?
-   (Overlaps R4, tray.)
-2. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
+1. Releases: M1 alone, then M2+M3, then M4-M6 together, then M7-M9?
 
 ## Risks
 

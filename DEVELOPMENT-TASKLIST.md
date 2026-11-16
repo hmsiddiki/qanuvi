@@ -410,7 +410,7 @@ runs on or off; with it off nothing is sent anywhere.
     short everyday check of the release build on scratch projects (open project, chat, plan step, terminal, switch
     machine, Inbox Open into another window), then scripts/publish-update.mjs 0.1.23 ONLY with the owner's yes;
     GitHub CI does not block a local release. (2) write the migration plan (app = viewer of masters) before any
-    code. DROPPED for now (owner): i1, i2, step 5 Part F (the migration replaces them). Since 18:25: Linux CI FIXED
+    code. NOT DROPPED (owner 2026-11-17: nothing in the plan changes, only the layer design): i1, i2, step 5 Part F, R3-R6, j1 each land in a phase, see docs/MIGRATION-VIEWER.md "Nothing in Qanuvi's plan changes". Since 18:25: Linux CI FIXED
     (275e4f6, terminal test waited for the Windows-only cursor question; green on GitHub), CI posts failing tests
     as public annotations (393e284, dd87db8; read them with the checks API, 60 unsigned requests an hour); one
     Windows "Checks and tests" failure on GitHub at 275e4f6 not explained (full verify passes here); VPS runs the
