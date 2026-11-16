@@ -292,7 +292,9 @@
     <p class="muted">
       {entries.some((x) => x.status === "active")
         ? "Nothing matches."
-        : "No entries yet. Add things about you and how you work, your tools and models, and facts, decisions and solutions for this project."}
+        : project
+          ? "No entries yet. Add things about you and how you work, your tools and models, and facts, decisions and solutions for this project."
+          : "No entries yet. Add things about you and how you work, and your tools and models. Open a project to add entries for it."}
     </p>
   {/each}
 
