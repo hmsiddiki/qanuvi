@@ -4,7 +4,6 @@
    * click is the user's yes), on or off per language, how long an unused server keeps running; then the debuggers
    * and the PHP / Xdebug check (15i part 3).
    */
-  import { onMount } from "svelte";
   import { shownPlace } from "$lib/remote";
   import { switcher } from "$lib/stores/switcher.svelte";
   import { lsp } from "$lib/stores/lsp.svelte";
@@ -18,13 +17,12 @@
   let xdebugDraft = $state(settings.value.languages.xdebugFile);
 
   // The shown machine's servers (migration M1: a shown master's run there), read again when it changes.
+  // Its debuggers and PHP too (migration M1d).
   $effect(() => {
-    void lsp.loadStatuses(true, switcher.shown);
-  });
-
-  onMount(() => {
-    dap.loadStatuses();
-    dap.checkPhp();
+    const shown = switcher.shown;
+    void lsp.loadStatuses(true, shown);
+    void dap.loadStatuses(shown);
+    void dap.checkPhp(shown);
   });
 
   function saveXdebug() {

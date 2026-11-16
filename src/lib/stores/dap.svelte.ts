@@ -26,6 +26,7 @@ import {
 import { editor } from "./editor.svelte";
 import { projects } from "./projects.svelte";
 import { settings } from "./settings.svelte";
+import { switcher } from "./switcher.svelte";
 
 export interface Frame {
   id: number;
@@ -96,14 +97,18 @@ const INITIALIZE = {
   locale: "en",
 };
 
+/** Statuses and PHP are kept per machine (This PC is ""; migration M1d: a shown master's debuggers run there). */
+const machineKey = (machine: string | null) => machine ?? "";
+
 class DapStore {
-  statuses = $state<DapStatus[]>([]);
-  /** A debugger the chosen configuration needs, not installed yet. */
+  #statuses = $state<Record<string, DapStatus[]>>({});
+  /** A debugger the chosen configuration needs, not installed yet (for the machine in #offerMachine). */
   offer = $state<DapStatus | null>(null);
+  #offerMachine: string | null = null;
   installing = $state(false);
   installError = $state("");
-  /** PHP and its Xdebug, as last checked. */
-  php = $state<PhpInfo | null>(null);
+  /** PHP and its Xdebug on each machine, as last checked. */
+  #php = $state<Record<string, PhpInfo | null>>({});
 
   /** launch.json's configurations for the current project (or Qanuvi's defaults), and why it could not be read. */
   configs = $state<LaunchConfig[]>([]);
@@ -116,6 +121,8 @@ class DapStore {
     name: string;
     adapter: string;
     status: "starting" | "running" | "stopped" | "ending";
+    /** The machine it runs on (null: This PC). */
+    machine: string | null;
   } | null>(null);
   lastError = $state("");
   threads = $state<{ id: number; name: string }[]>([]);
@@ -155,22 +162,44 @@ class DapStore {
     return this.session !== null;
   }
 
-  async loadStatuses(): Promise<void> {
-    this.statuses = await api.dap.statuses().catch(() => this.statuses);
+  /** The shown machine's debuggers (the Languages settings and the Run and debug sidebar). */
+  get statuses(): DapStatus[] {
+    return this.#statuses[machineKey(switcher.shown)] ?? [];
   }
 
-  /** Checks PHP and the Xdebug a debug run gets (php.ini's own, or the file chosen in Settings). */
-  async checkPhp(): Promise<PhpInfo> {
+  /** PHP on the shown machine, as last checked. */
+  get php(): PhpInfo | null {
+    return this.#php[machineKey(switcher.shown)] ?? null;
+  }
+
+  statusesOn(machine: string | null): DapStatus[] {
+    return this.#statuses[machineKey(machine)] ?? [];
+  }
+
+  async loadStatuses(machine: string | null = switcher.shown): Promise<void> {
+    const k = machineKey(machine);
+    const list = await api.dap.statuses(machine).catch(() => this.#statuses[k] ?? []);
+    this.#statuses = { ...this.#statuses, [k]: list };
+  }
+
+  /**
+   * Checks PHP and the Xdebug a debug run gets on a machine (php.ini's own, or the file chosen in Settings; Settings
+   * are the shown machine's, which is the machine debugged).
+   */
+  async checkPhp(machine: string | null = switcher.shown): Promise<PhpInfo> {
+    const k = machineKey(machine);
     const file = settings.value.languages.xdebugFile;
-    const oldNote = this.php?.note;
+    const oldNote = this.#php[k]?.note;
+    let info: PhpInfo;
     try {
-      this.php = { ...(await api.dap.php(file)), xdebugFile: file };
+      info = { ...(await api.dap.php(file, machine)), xdebugFile: file };
     } catch (e) {
-      this.php = { php: "", version: "", build: "", xdebug: "", via: "", note: errorText(e), xdebugFile: file };
+      info = { php: "", version: "", build: "", xdebug: "", via: "", note: errorText(e), xdebugFile: file };
     }
+    this.#php = { ...this.#php, [k]: info };
     // The sidebar's "no Xdebug" message goes once Settings fixed it.
-    if (oldNote && this.lastError === oldNote && this.php.note !== oldNote) this.lastError = this.php.note;
-    return this.php;
+    if (oldNote && this.lastError === oldNote && info.note !== oldNote) this.lastError = info.note;
+    return info;
   }
 
   // Configurations -----------------------------------------------------------------------------------------------
@@ -233,12 +262,14 @@ class DapStore {
 
   // Installing ---------------------------------------------------------------------------------------------------
 
+  /** Installs a debugger on the machine it was offered for (else the shown one). */
   async install(id: string): Promise<boolean> {
+    const machine = this.offer?.id === id ? this.#offerMachine : switcher.shown;
     this.installing = true;
     this.installError = "";
     try {
-      await api.dap.install(id);
-      await this.loadStatuses();
+      await api.dap.install(id, machine);
+      await this.loadStatuses(machine);
       this.offer = null;
       return true;
     } catch (e) {
@@ -274,15 +305,18 @@ class DapStore {
     }
     const adapter = adapterFor(config.type)!;
     if (this.session) await this.stop();
-    if (!this.statuses.length) await this.loadStatuses();
-    const st = this.statuses.find((s) => s.id === adapter);
+    const project = projects.list.find((p) => p.id === projectId);
+    if (!project) return;
+    // The debugger runs on the project's machine (migration M1d).
+    const machine = project.master ?? null;
+    if (!this.statusesOn(machine).length) await this.loadStatuses(machine);
+    const st = this.statusesOn(machine).find((s) => s.id === adapter);
     if (!st?.installed) {
       this.offer = st ?? null;
+      this.#offerMachine = machine;
       this.lastError = st ? `${st.label} is not installed yet.` : `Qanuvi has no debugger called ${adapter}.`;
       return;
     }
-    const project = projects.list.find((p) => p.id === projectId);
-    if (!project) return;
     const shown = editor.active && editor.active.projectId === projectId ? editor.active : null;
     const { config: filled, unknown } = substitute(config, {
       root: project.path,
@@ -302,7 +336,7 @@ class DapStore {
     }
     // A PHP run needs PHP with Xdebug; listening only waits for a PHP that has its own.
     const runsPhp = adapter === "php" && !!(config.program || config.runtimeArgs);
-    const php = adapter === "php" ? await this.checkPhp() : null;
+    const php = adapter === "php" ? await this.checkPhp(machine) : null;
     if (runsPhp && php && !config.runtimeExecutable && (!php.php || !php.xdebug)) {
       this.lastError = php.note || "PHP with Xdebug was not found.";
       return;
@@ -312,7 +346,7 @@ class DapStore {
     this.#resetView();
     this.console = [];
     this.#renamed = new Set();
-    this.session = { projectId, name: config.name, adapter, status: "starting" };
+    this.session = { projectId, name: config.name, adapter, status: "starting", machine };
     this.#info(`Starting "${config.name}"…`);
     if (php && runsPhp) {
       this.#info(
@@ -325,7 +359,7 @@ class DapStore {
       );
     }
     try {
-      this.#key = await api.dap.start(projectId, adapter, (e) => this.#onAdapter(e));
+      this.#key = await api.dap.start(projectId, adapter, machine, (e) => this.#onAdapter(e));
     } catch (e) {
       this.lastError = errorText(e);
       this.#info(this.lastError);
@@ -650,6 +684,12 @@ class DapStore {
     const config = this.configs.find((c) => c.name === s.name);
     await this.stop();
     if (config) await this.start(s.projectId, config);
+  }
+
+  /** A machine left the screen: its debug session ends (the debugger ran there). */
+  stopMachine(machine: string | null): void {
+    if (this.session && this.session.machine === machine) void this.stop();
+    if (this.offer && this.#offerMachine === machine) this.offer = null;
   }
 
   /** Ends the session: the debuggee too (disconnect with terminateDebuggee), then the debugger itself. */

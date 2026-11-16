@@ -474,14 +474,16 @@ export const api = {
     stopWindow: () => invoke<void>("lsp_stop_window"),
   },
   dap: {
-    statuses: () => invoke<DapStatus[]>("dap_statuses"),
-    install: (id: string) => invoke<DapStatus>("dap_install", { id }),
-    /** PHP on this computer and its Xdebug (with the Xdebug file chosen in Settings, "" for none). */
-    php: (xdebugFile: string) => invoke<PhpInfo>("dap_php", { xdebugFile }),
-    start: (projectId: string, id: string, onEvent: (e: DapEvent) => void) => {
+    // Debuggers are the interface's (migration M1d): the app runs them on This PC or, with `master`, on that master
+    // through its pipes; these calls never go to a master themselves.
+    statuses: (master: string | null) => invoke<DapStatus[]>("dap_statuses", { master }),
+    install: (id: string, master: string | null) => invoke<DapStatus>("dap_install", { id, master }),
+    /** PHP on that machine and its Xdebug (with the Xdebug file chosen in its Settings, "" for none). */
+    php: (xdebugFile: string, master: string | null) => invoke<PhpInfo>("dap_php", { xdebugFile, master }),
+    start: (projectId: string, id: string, master: string | null, onEvent: (e: DapEvent) => void) => {
       const channel = new Channel<DapEvent>();
       channel.onmessage = onEvent;
-      return invoke<string>("dap_start", { projectId, id, onEvent: channel });
+      return invoke<string>("dap_start", { projectId, id, master, onEvent: channel });
     },
     /** One more connection to a server adapter (a child session). */
     connect: (key: string) => invoke<number>("dap_connect", { key }),

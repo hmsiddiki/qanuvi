@@ -35,7 +35,9 @@
     void project.id;
     void editor.tabs.find((t) => t.projectId === project.id && t.path === ".vscode/launch.json")?.savedText;
     dap.loadConfigs(project.id);
-    if (!dap.statuses.length) dap.loadStatuses();
+    // The project's machine's debuggers (migration M1d: a master's run there).
+    const machine = project.master ?? null;
+    if (!dap.statusesOn(machine).length) dap.loadStatuses(machine);
   });
 
   let mine = $derived(dap.session?.projectId === project.id ? dap.session : null);

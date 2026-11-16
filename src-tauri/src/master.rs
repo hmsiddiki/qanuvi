@@ -555,6 +555,17 @@ impl Master {
                 crate::pipes::host::write_new(&s(args, "path"), &s(args, "text"))?;
                 Ok(Value::Null)
             }
+            "host_read" => Ok(json!(crate::pipes::host::read_small(&s(args, "path"))?)),
+            "host_fetch" => {
+                crate::pipes::host::fetch(
+                    &s(args, "url"),
+                    &s(args, "archive"),
+                    &s(args, "into"),
+                    &s(args, "expect"),
+                    &s(args, "version"),
+                )?;
+                Ok(Value::Null)
+            }
             "pipe_send" | "port_send" => {
                 self.pipes
                     .send(&s(args, "id"), n(args, "seq"), &s(args, "data"))?;
@@ -2327,6 +2338,15 @@ mod tests {
         .unwrap();
         let file = crate::paths::data_dir().join(&rel);
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "{}");
+        // A small file reads back; a missing one is null (M1d: a debugger's version note).
+        assert_eq!(
+            call(&m, "host_read", json!({"path": rel})).unwrap(),
+            json!("{}")
+        );
+        assert_eq!(
+            call(&m, "host_read", json!({"path": format!("{rel}.none")})).unwrap(),
+            Value::Null
+        );
         let _ =
             std::fs::remove_dir_all(crate::paths::data_dir().join(rel.split('/').next().unwrap()));
         for bad in ["../x.txt", "", "/etc/x", "a/../../x"] {
@@ -2334,7 +2354,29 @@ mod tests {
                 call(&m, "host_write_new", json!({"path": bad, "text": ""})).is_err(),
                 "{bad}"
             );
+            assert!(
+                call(&m, "host_read", json!({"path": bad})).is_err(),
+                "{bad}"
+            );
+            assert!(
+                call(
+                    &m,
+                    "host_fetch",
+                    json!({"url": "https://github.com/x.zip", "archive": "zip", "into": bad, "expect": "a.js"})
+                )
+                .is_err(),
+                "{bad}"
+            );
         }
+        // Only https downloads.
+        assert!(
+            call(
+                &m,
+                "host_fetch",
+                json!({"url": "http://example.com/x.zip", "archive": "zip", "into": "debug-adapters/t", "expect": "a.js"})
+            )
+            .is_err()
+        );
     }
 
     // Migration M0 (docs/MIGRATION-VIEWER.md): every command the app answers is answered by the master too, or it

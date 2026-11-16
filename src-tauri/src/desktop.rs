@@ -614,21 +614,47 @@ fn lsp_stop_window(window: tauri::Window, state: State<AppState>) {
 // Debug adapters (15i part 3) -----------------------------------------------------------------------------
 
 #[tauri::command]
-async fn dap_statuses() -> Res<Vec<crate::dap::Status>> {
-    blocking(|| Ok(crate::dap::statuses())).await
+async fn dap_statuses(
+    state: State<'_, AppState>,
+    master: Option<String>,
+) -> Res<Vec<crate::dap::Status>> {
+    let link = lsp_host(&state, &master)?;
+    blocking(move || match link {
+        Some(l) => Ok(crate::dap::statuses(&crate::lsp::On::new(l)?)),
+        None => Ok(crate::dap::statuses(&crate::lsp::Here)),
+    })
+    .await
 }
 
-/// PHP on this computer and its Xdebug (with the Xdebug file chosen in Settings).
+/// PHP on that machine and its Xdebug (with the Xdebug file chosen in that machine's Settings).
 #[tauri::command]
-async fn dap_php(xdebug_file: String) -> Res<crate::dap::PhpInfo> {
-    blocking(move || Ok(crate::dap::php_info(&xdebug_file))).await
+async fn dap_php(
+    state: State<'_, AppState>,
+    xdebug_file: String,
+    master: Option<String>,
+) -> Res<crate::dap::PhpInfo> {
+    let link = lsp_host(&state, &master)?;
+    blocking(move || match link {
+        Some(l) => Ok(crate::dap::php_info(&crate::lsp::On::new(l)?, &xdebug_file)),
+        None => Ok(crate::dap::php_info(&crate::lsp::Here, &xdebug_file)),
+    })
+    .await
 }
 
-/// Installs an adapter; the window asked the user first.
+/// Installs an adapter on that machine; the window asked the user first.
 #[tauri::command]
-async fn dap_install(id: String) -> Res<crate::dap::Status> {
+async fn dap_install(
+    state: State<'_, AppState>,
+    id: String,
+    master: Option<String>,
+) -> Res<crate::dap::Status> {
     let spec = crate::dap::spec(&id)?;
-    blocking(move || crate::dap::install(spec)).await
+    let link = lsp_host(&state, &master)?;
+    blocking(move || match link {
+        Some(l) => crate::dap::install(&crate::lsp::On::new(l)?, spec),
+        None => crate::dap::install(&crate::lsp::Here, spec),
+    })
+    .await
 }
 
 #[tauri::command]
@@ -637,11 +663,19 @@ async fn dap_start(
     state: State<'_, AppState>,
     project_id: String,
     id: String,
+    master: Option<String>,
     on_event: Channel<crate::dap::DapEvent>,
 ) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
     let adapters = state.debuggers.clone();
     let owner = window.label().to_string();
+    // On a shown master, `project_id` is the master's own id for the project.
+    if let Some(link) = lsp_host(&state, &master)? {
+        return blocking(move || {
+            adapters.start_on(link, &project_id, &owner, &id, on_event.into())
+        })
+        .await;
+    }
+    let root = project_root(&state, &project_id)?;
     blocking(move || adapters.start(&project_id, &owner, &root, &id, on_event.into())).await
 }
 

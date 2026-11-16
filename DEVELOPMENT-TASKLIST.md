@@ -379,6 +379,11 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
+    RESUME HERE (newest, 2026-11-17 05:45): M1d BUILT, NOT YET DRIVEN LIVE (details in docs/MIGRATION-VIEWER.md,
+    debugger bullet). Checks green: clippy clean, 440 Rust lib tests, 446 front-end tests, svelte-check 0 errors,
+    prettier. Driving it live needs the local test master to run the new master build (host_fetch, host_read) and
+    the adapters on that master (download from GitHub, or a copy of This PC's test-data adapters). NEXT: drive M1d
+    on the local test master (js-debug on a Node file, PHP Debug), then the VPS.
     UPDATE 2026-11-17 05:25 (owner: "fix and go on"): p1 + p2 FIXED and DRIVEN LIVE. p1: previewTunnel.ts
     machineText puts the bar's address back into text for the agent ("Send this page" and the inspector pick now
     name http://localhost:5179/ while the page loads through the tunnel); 2 new tests. p2: the machine name in the

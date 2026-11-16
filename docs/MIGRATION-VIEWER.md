@@ -156,9 +156,22 @@ This PC is untouched in M1.
       browser to its own absolute `localhost:<port>` address leaves the tunnel.
   - Driven live 2026-11-17 on the local test master: tunnel, address bar, relative links, This PC direct, tunnel
     reused after switching back, inspector and page text all pass. Findings p1 (the text attached for the agent
-    names the tunnel's address, not the master's) and p2 (machine name cut off in the bar) await the owner.
+    names the tunnel's address, not the master's) and p2 (machine name cut off in the bar) were fixed and driven
+    live the same day.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
+  - BUILT 2026-11-17 (M1d, not yet driven live):
+    - `dap.rs` runs on the lsp `Host`: status, install and the PHP / Xdebug check ask the project's machine.
+    - Install: the release is looked up from This PC; the machine downloads and unpacks it into its own data
+      folder through two new generic master commands, `host_fetch` (an https archive, tar.gz or zip, swapped in
+      only when whole) and `host_read` (a small file below the data folder, for the version note).
+    - `Adapters::start_on` runs the adapter through `pipe_start`. PHP Debug (stdio) speaks over the pipe. js-debug
+      is started with port 0 on the master, says which port it took, and is reached through `pipes::forward`; child
+      sessions open more connections through the same tunnel.
+    - Xdebug needs no forward after all: the adapter runs on the master, so PHP there calls it back on the master's
+      own localhost.
+    - The window: `dap_*` are window-only in remote.ts and take `master`; statuses and the PHP check are kept per
+      machine; a session runs on its project's machine; a machine leaving the screen ends its session.
 - **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and
   set `need_gb`. DONE 2026-11-17 (see M1b leftovers above).
 

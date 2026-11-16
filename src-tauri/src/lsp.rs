@@ -123,6 +123,17 @@ pub trait Host {
     /// Writes a new file below the data folder (a file already there is kept).
     fn write_new(&self, relative: &str, text: &str) -> Result<(), String>;
     fn room(&self) -> Option<crate::machine::Room>;
+    /// A small text file below the data folder; None when there is none.
+    fn read_small(&self, relative: &str) -> Option<String>;
+    /// Downloads an archive ("tar.gz" or "zip") into a folder below the data folder (see `pipes::host::fetch`).
+    fn fetch(
+        &self,
+        url: &str,
+        archive: &str,
+        into: &str,
+        expect: &str,
+        version: &str,
+    ) -> Result<(), String>;
 }
 
 /// This PC.
@@ -185,6 +196,19 @@ impl Host for Here {
     }
     fn room(&self) -> Option<crate::machine::Room> {
         crate::machine::room()
+    }
+    fn read_small(&self, relative: &str) -> Option<String> {
+        crate::pipes::host::read_small(relative).ok().flatten()
+    }
+    fn fetch(
+        &self,
+        url: &str,
+        archive: &str,
+        into: &str,
+        expect: &str,
+        version: &str,
+    ) -> Result<(), String> {
+        crate::pipes::host::fetch(url, archive, into, expect, version)
     }
 }
 
@@ -270,6 +294,36 @@ impl Host for On {
             free_ram_gb: v[0].as_f64()?,
             free_vram_gb: v[1].as_f64().unwrap_or(0.0),
         })
+    }
+    fn read_small(&self, relative: &str) -> Option<String> {
+        let v = self
+            .link
+            .call("host_read", json!({"path": relative}), None)
+            .ok()?;
+        v.as_str().map(String::from)
+    }
+    fn fetch(
+        &self,
+        url: &str,
+        archive: &str,
+        into: &str,
+        expect: &str,
+        version: &str,
+    ) -> Result<(), String> {
+        self.link
+            .call(
+                "host_fetch",
+                json!({"url": url, "archive": archive, "into": into, "expect": expect, "version": version}),
+                None,
+            )
+            .map(|_| ())
+            .map_err(|e| {
+                if e.contains("does not know") {
+                    "That machine runs an older Qanuvi; update it to install debuggers there.".to_string()
+                } else {
+                    e
+                }
+            })
     }
 }
 
@@ -550,10 +604,20 @@ pub fn frame(text: &str) -> Vec<u8> {
 }
 
 /// The bytes of a program pipe's output, read as one stream.
-struct Received {
+pub(crate) struct Received {
     rx: mpsc::Receiver<Vec<u8>>,
     buf: Vec<u8>,
     at: usize,
+}
+
+impl Received {
+    pub(crate) fn new(rx: mpsc::Receiver<Vec<u8>>) -> Self {
+        Self {
+            rx,
+            buf: Vec::new(),
+            at: 0,
+        }
+    }
 }
 
 impl Read for Received {

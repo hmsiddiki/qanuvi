@@ -504,13 +504,127 @@ pub mod host {
         }))
     }
 
-    /// Writes a new file below the data folder (with its folders); a file already there is left as it is.
-    pub fn write_new(relative: &str, text: &str) -> Result<(), String> {
+    /// A path below the data folder; anything leaving it (or empty) is refused.
+    fn inside_data(relative: &str) -> Result<std::path::PathBuf, String> {
         let rel = Path::new(relative);
         if relative.is_empty() || !rel.components().all(|c| matches!(c, Component::Normal(_))) {
-            return Err("Only a file inside the data folder can be written.".into());
+            return Err("Only a file inside the data folder can be used.".into());
         }
-        let path = crate::paths::data_dir().join(rel);
+        Ok(crate::paths::data_dir().join(rel))
+    }
+
+    /// A small text file below the data folder (a version note), or None when there is none.
+    pub fn read_small(relative: &str) -> Result<Option<String>, String> {
+        let path = inside_data(relative)?;
+        match std::fs::metadata(&path) {
+            Ok(m) if m.is_file() && m.len() <= 64 * 1024 => std::fs::read_to_string(&path)
+                .map(Some)
+                .map_err(|e| e.to_string()),
+            Ok(_) => Err(format!("{relative} is not a small file.")),
+            Err(_) => Ok(None),
+        }
+    }
+
+    /// Downloads an archive ("tar.gz" or "zip") from an https address and unpacks it into a folder below the data
+    /// folder. The new copy replaces the old one only once it is whole and holds `expect`; `version` is written next
+    /// to it as version.txt. A failed download leaves the old copy as it was.
+    pub fn fetch(
+        url: &str,
+        archive: &str,
+        into: &str,
+        expect: &str,
+        version: &str,
+    ) -> Result<(), String> {
+        if !url.starts_with("https://") {
+            return Err("Only https addresses are downloaded.".into());
+        }
+        let dir = inside_data(into)?;
+        // `expect` is a file inside the unpacked folder.
+        inside_data(expect)?;
+        let fresh = dir.with_extension("new");
+        let _ = std::fs::remove_dir_all(&fresh);
+        std::fs::create_dir_all(&fresh)
+            .map_err(|e| format!("Could not make {}: {e}", fresh.display()))?;
+        let file = fresh.join(if archive == "zip" {
+            "download.zip"
+        } else {
+            "download.tar.gz"
+        });
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .http_status_as_error(false)
+                .timeout_global(Some(Duration::from_secs(180)))
+                .build(),
+        );
+        let mut res = agent
+            .get(url)
+            .header("User-Agent", "Qanuvi")
+            .call()
+            .map_err(|e| format!("{url} could not be downloaded: {e}"))?;
+        if res.status().as_u16() >= 400 {
+            return Err(format!("{url} answered {}.", res.status().as_u16()));
+        }
+        {
+            let mut out = std::fs::File::create(&file).map_err(|e| e.to_string())?;
+            let mut body = res
+                .body_mut()
+                .with_config()
+                .limit(200 * 1024 * 1024)
+                .reader();
+            std::io::copy(&mut body, &mut out)
+                .map_err(|e| format!("{url} could not be downloaded: {e}"))?;
+        }
+        place(&file, archive, &dir, expect, version)
+    }
+
+    /// Unpacks a downloaded archive (inside `<dir>.new`) and swaps it in for `dir`.
+    pub(crate) fn place(
+        file: &Path,
+        archive: &str,
+        dir: &Path,
+        expect: &str,
+        version: &str,
+    ) -> Result<(), String> {
+        let fresh = file.parent().ok_or("The download has no folder.")?;
+        unpack(archive, file, fresh).map_err(|e| format!("Unpacking failed: {e}"))?;
+        let _ = std::fs::remove_file(file);
+        if !fresh.join(expect).is_file() {
+            return Err(format!(
+                "The download does not hold {expect}; nothing was changed."
+            ));
+        }
+        std::fs::write(fresh.join("version.txt"), version).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_dir_all(dir);
+        std::fs::rename(fresh, dir)
+            .map_err(|e| format!("Could not move the download into place: {e}"))
+    }
+
+    fn unpack(archive: &str, file: &Path, into: &Path) -> Result<(), String> {
+        if archive == "zip" {
+            // Not the system tar: Linux's tar cannot read zip files. Names leaving the folder are refused.
+            let f = std::fs::File::open(file).map_err(|e| e.to_string())?;
+            let mut zip = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+            return zip.extract(into).map_err(|e| e.to_string());
+        }
+        // The tar that comes with Windows 10+, macOS and Linux.
+        let mut cmd = Command::new("tar");
+        cmd.arg("-xzf")
+            .arg(file)
+            .arg("-C")
+            .arg(into)
+            .stdin(Stdio::null());
+        super::hide(&mut cmd);
+        let out = cmd.output().map_err(|e| e.to_string())?;
+        if out.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+        }
+    }
+
+    /// Writes a new file below the data folder (with its folders); a file already there is left as it is.
+    pub fn write_new(relative: &str, text: &str) -> Result<(), String> {
+        let path = inside_data(relative)?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Could not make {}: {e}", parent.display()))?;

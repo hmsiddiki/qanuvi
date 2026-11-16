@@ -22,6 +22,7 @@ import { memory } from "./memory.svelte";
 import { switcher } from "./switcher.svelte";
 import { folderPicker } from "./folderPicker.svelte";
 import { lsp } from "./lsp.svelte";
+import { dap } from "./dap.svelte";
 
 /**
  * The machine leaving the screen is wiped from the window (24z3 Part B2): its open files go (unsaved text kept as
@@ -37,6 +38,7 @@ export async function park(machine: string | null): Promise<void> {
   const unsaved = editor.park();
   // Coding tools end when the viewer leaves the machine (migration M1); they start again on its next file.
   lsp.stopMachine(machine);
+  dap.stopMachine(machine);
   await Promise.all([drafts.keep(machine, unsaved, reachable), terminals.park(machine, reachable)]);
 }
 
