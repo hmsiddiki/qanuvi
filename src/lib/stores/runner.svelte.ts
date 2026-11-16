@@ -27,6 +27,7 @@ import { defaultPlannerModel, planner } from "./planner.svelte";
 import type { FinishLevel } from "$lib/plan/finishing";
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
+import { runSessionInfo, type PlanSessionInfo } from "$lib/agent/handover";
 
 /** Where the next run goes on in an existing session (a paused step, or a chat the owner said to go on in). */
 interface Resume {
@@ -97,6 +98,20 @@ class RunnerStore {
 
   #running = $state(false);
   #sessionId = $state<string | null>(null);
+  /**
+   * The session the run last worked in: the core's own id goes empty between a step's turns (checks, a fix round),
+   * and the chat handover must keep off that session the whole time (the runner hands it over at the run's limit).
+   */
+  #workingIn: string | null = null;
+
+  constructor() {
+    agent.planSessionInfo = (id) => this.#sessionInfo(id);
+  }
+
+  /** Whether the run works in a session now, and the run's handover limit when it is one of its step sessions. */
+  #sessionInfo(id: string): PlanSessionInfo {
+    return runSessionInfo(id, this.run, this.#running || this.finishing, this.#sessionId, this.#workingIn);
+  }
   /** The project whose run is shown. */
   #project: string | null = null;
   /** Notices of the shown run already put into the chat. */
@@ -225,6 +240,7 @@ class RunnerStore {
     if (sid !== this.#sessionId) {
       this.#sessionId = sid;
       agent.planSessionId = sid;
+      if (sid) this.#workingIn = sid;
       if (sid) {
         this.switchingTo = null;
         void this.#follow(v.projectId, sid);

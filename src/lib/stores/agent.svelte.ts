@@ -18,6 +18,9 @@ import { contextSize } from "$lib/plan/guidance";
 import {
   chainOf,
   chatHandoverDue,
+  planInfoOf,
+  TurnUsage,
+  type PlanSessionInfo,
   chatHandoverRequest,
   chatResumePrompt,
   chatsOnly,
@@ -107,16 +110,29 @@ class AgentStore {
    */
   #fromHandover = false;
   #handoverTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The running turn's usage so far, for the stats line (null: none counted). */
+  turnUsage = $state<{ sessionId: string; inn: number; cache: number; out: number } | null>(null);
+  #turn = new TurnUsage();
+
+  #clearTurn(): void {
+    this.#turn.clear();
+    this.turnUsage = null;
+  }
 
   /** Whether to offer or start a handover now (after a model call's size is known, or a turn's end). */
   #checkHandover(): void {
     const s = this.selected;
     if (!s || this.handover || this.planSessionId === s.id || !this.#projectId) return;
+    // The runner hands over its own working session (at the run's limit); a step's chat otherwise follows the run's
+    // limit, every other chat the default one.
+    const plan = planInfoOf(s, this.sessions, this.planSessionInfo);
+    if (plan.busy) return;
     if (this.#fromHandover && this.context > 0) {
       this.#fromHandover = false;
       this.#notNow.set(s.id, this.context);
     }
-    const setting = settings.value.chatHandover;
+    const base = settings.value.chatHandover;
+    const setting = plan.limit === null ? base : { ...base, limit: plan.limit };
     if (!chatHandoverDue(this.context, setting, !!s.handover_off, this.#notNow.get(s.id) ?? 0)) {
       this.offer = false;
       return;
@@ -124,6 +140,12 @@ class AgentStore {
     if (setting.when === "auto") void this.handOver();
     else this.offer = true;
   }
+
+  /**
+   * The plan runner's view of a session (set by the runner store): `busy` while the run works in it, `limit` (the run's
+   * handover limit) when it is one of the run's step sessions.
+   */
+  planSessionInfo: (sessionId: string) => PlanSessionInfo = () => ({ busy: false, limit: null });
 
   /** "Not now": the bar goes until the context has grown a good deal more. */
   notNow(): void {
@@ -484,7 +506,17 @@ ${text}`
       if (shownMachine() !== machine) return;
       const id = sessionId();
       if (event.kind === "session") {
+        const before = this.sessions.find((s) => s.id === event.session.id);
         this.#upsert(event.session);
+        // The turn's totals are in: the live count of its model calls gives way to them.
+        if (
+          this.turnUsage?.sessionId === event.session.id &&
+          before &&
+          (before.input_tokens !== event.session.input_tokens ||
+            before.output_tokens !== event.session.output_tokens ||
+            before.cache_read_tokens !== event.session.cache_read_tokens)
+        )
+          this.#clearTurn();
         // A plan step shows the model and mode the plan gave it.
         if (event.session.id === this.planSessionId && event.session.id === this.selectedId) {
           this.model = event.session.model;
@@ -508,6 +540,9 @@ ${text}`
       if (event.kind === "line") {
         if (event.line.includes('"qanuvi_interrupted"')) this.interrupting = false;
         this.items = reduce(this.items, event.line, ++this.#seq, Math.floor(Date.now() / 1000));
+        // The stats line counts this turn's model calls as they come (the session's totals come at the turn's end).
+        if (this.turnUsage && this.turnUsage.sessionId !== id) this.#clearTurn();
+        if (id && this.#turn.take(event.line)) this.turnUsage = { sessionId: id, ...this.#turn.sums() };
         // Each model call's size is in its answer (no extra reads): past the limit, the chat offers a handover.
         if (event.line.includes('"usage"') && event.line.includes('"assistant"')) {
           const size = contextSize([event.line]);
