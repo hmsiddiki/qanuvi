@@ -379,7 +379,30 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 17:45): h1-h3 DRIVEN LIVE, ALL PASS on This PC + local test master; VPS still
+    RESUME HERE (newest, 2026-11-16 18:10): ORDER STEP 4 BUILT (b9d6211, 173fc7f) and driven live on This PC + local
+    test master. (a) Working icon: agents_working (desktop core + master, agent::working_count = sessions running or
+    waiting, chats and plan steps alike); stores/working.svelte.ts reads every connected machine every 6 s (and when the
+    list opens); an older master answers nothing, so no icon for it. Live: a 40-line turn on the local test master
+    showed the spinner on its row and on the closed switcher of the other window; gone after the turn. (b) "Open in a
+    new window" in a machine's right-click menu (machine-* windows, ?machine=<id|pc>, capability added): the window
+    opened on DESKTOP-R8G3PAK (test) with its projects and kept draft; the other window's row shows a window icon;
+    picking that machine there brought its window forward and left the picking window as it was; Inbox Open of an item
+    of a machine another window shows brings that window forward at the item (emitTo qanuvi-inbox-open, not driven
+    yet). (c) Reopen: the main window keeps the machine windows open when it closes (qanuvi.machineWindows); the last
+    window ends the app (as built in 15c: closing the main window alone leaves the others running); next start
+    brought the machine window back on its machine. FIX in 173fc7f (not yet seen live): the list was wider than the
+    sidebar with the new icons, so dots and ticks were cut off; now as wide as the sidebar (collapsed: 220px).
+    FINDINGS (proposed, not fixed): (i1) closing a window or the app drops unsaved text with no question and no draft
+    (true before step 4 too; only closing a tab asks): proposal, a closing window keeps its unsaved files as drafts on
+    their machine (the B2 park path, done in onCloseRequested before the window goes) and the Inbox says so. (i2) an
+    agent turn's --mcp-browser helper (qanuvi-master/qanuvi --mcp-browser) stays running after its agent process
+    ends when the app closes (Windows does not end children with their parent): proposal, start agent processes in a
+    job object that ends with them. NEXT: see the 173fc7f list live, the closing-order check (machine window closed
+    first: no reopen), Inbox Open into another window, then owner picks i1/i2; then step 5 Part F, R3-R5.
+    GitHub Build: ubuntu job fails in "Rust tests one at a time" since 9f6b97f (last green da34ae9); logs need a
+    signed-in view, test name unknown; Linux server test binaries cross-built (zigbuild --tests) ready to run on the
+    VPS if the owner agrees.
+    RESUME HERE (before, 2026-11-16 17:45): h1-h3 DRIVEN LIVE, ALL PASS on This PC + local test master; VPS still
     runs the 16:58 server build. Release test build 17:29, server build cross-built 17:32 (zigbuild -j 2, 9.4 MB, zig
     lives in E:\DevTools\zig\zig-windows-x86_64-0.13.0, put that folder on PATH), not yet swapped onto the VPS.
     Stale leftovers of earlier conversations stopped first (old local test master tree, old conversation process).
