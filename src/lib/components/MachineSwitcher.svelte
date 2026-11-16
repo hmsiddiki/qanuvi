@@ -156,7 +156,7 @@
   </button>
 
   {#if open}
-    <div class="menu" role="listbox" aria-label="Machines">
+    <div class="menu" class:narrow={collapsed} role="listbox" aria-label="Machines">
       <button
         type="button"
         class="machine"
@@ -324,14 +324,20 @@
     position: absolute;
     z-index: 30;
     top: calc(100% + 4px);
+    /* As wide as the sidebar: a long name shortens instead of pushing its dot, icons and tick out of sight. */
     left: 0;
-    min-width: 220px;
-    max-width: 300px;
+    right: 0;
     padding: 4px;
     border: 1px solid var(--qx-border);
     border-radius: var(--qx-radius-card);
     background: var(--qx-bg-panel);
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  /* A collapsed sidebar is only an icon wide: the list keeps a readable width there. */
+  .menu.narrow {
+    right: auto;
+    min-width: 220px;
   }
 
   .machine,
