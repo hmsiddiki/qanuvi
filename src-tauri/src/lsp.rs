@@ -32,7 +32,10 @@ pub struct Spec {
     /// The program's name on PATH (a server the user installed, or a non-npm one).
     pub program: &'static str,
     pub args: &'static [&'static str],
-    /// About how much memory it takes on a mid-size project, checked before it starts.
+    /// About how much memory it takes on a mid-size project, checked before it starts. Measured 2026-11-17 as the
+    /// peak working set of the server's whole process tree, 12 files open, 90 s: TypeScript 0.69 GB (168 TS/JS
+    /// files with their types), Svelte 0.61 GB (63 Svelte files and their TypeScript), Pyright 0.31 GB (58 Python
+    /// files, 25k lines); Intelephense and rust-analyzer measured before.
     pub need_gb: f64,
 }
 
@@ -55,7 +58,7 @@ pub const SPECS: &[Spec] = &[
         entry: "typescript-language-server/lib/cli.mjs",
         program: "typescript-language-server",
         args: &["--stdio"],
-        need_gb: 0.5,
+        need_gb: 0.7,
     },
     Spec {
         id: "svelte",
@@ -65,7 +68,7 @@ pub const SPECS: &[Spec] = &[
         entry: "svelte-language-server/bin/server.js",
         program: "svelteserver",
         args: &["--stdio"],
-        need_gb: 0.5,
+        need_gb: 0.7,
     },
     Spec {
         id: "rust",
@@ -407,6 +410,9 @@ pub fn install(
             "--no-audit",
             "--no-fund",
             "--omit=dev",
+            // Without a terminal npm says nothing until it ends; this gives a line per package fetched, so the
+            // window shows the install moving (its error lines still come last).
+            "--loglevel=http",
             "--prefix",
         ]
         .map(String::from)

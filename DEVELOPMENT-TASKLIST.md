@@ -379,7 +379,19 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): k1 FIXED (owner's yes; no tray icon in it, the icon stays in M4). On Windows
+    RESUME HERE (newest, 2026-11-17): M1b LEFTOVERS DONE. Live install output 55a3f48 (host_run streams output
+    lines to a listening caller; window shows the newest four under Installing) plus npm --loglevel=http (without
+    a terminal npm printed nothing until its end, so the first drive showed no lines for TypeScript). DRIVEN LIVE
+    (release test builds, owner's yes for the three npm downloads): Svelte installed on the local test master from
+    Settings, Languages (npm fetch lines streamed through the master, cleared at the end, "Installed by Qanuvi");
+    Pyright on This PC from the editor offer on gyp_main.py (lines shown, offer gone, server started, Problems 1);
+    TypeScript on This PC from Settings (before the loglevel fix). need_gb measured with a stdio driver (peak
+    working set of the server's process tree, 12 files open, 90 s): TypeScript 0.69 GB on a copy of Qanuvi's
+    front end (168 TS/JS files, its node_modules) -> 0.7; Svelte 0.61 GB on its 63 .svelte files -> 0.7;
+    Pyright 0.31 GB on node-gyp's gyp (58 .py, 25k lines) -> 0.4 kept. Scratch: E:\qc-scratch\needgb-web,
+    needgb-py. The local test master service was stopped and now runs the new build. NEXT: M1c preview through
+    port_forward, then M1d debugger.
+    RESUME HERE (before, 2026-11-17): k1 FIXED (owner's yes; no tray icon in it, the icon stays in M4). On Windows
     master.rs start_service now clears HANDLE_FLAG_INHERIT on this process's own stdin/stdout/stderr before the
     spawn, so the serve service no longer holds the --stdio caller's pipes. New integration test
     tests/master_stdio.rs runs the real qanuvi-master --stdio, closes its input and needs the caller's output to

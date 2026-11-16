@@ -129,9 +129,15 @@ This PC is untouched in M1.
     - `languages.toolsOff` is a per-machine switch ("Keep coding tools off on …").
     - A machine leaving the screen ends its servers (`park` → `lsp.stopMachine`).
     - A connection that ends drops its streams, so its servers report that they stopped.
-  - Not yet: live install output (the install still answers at its end, as on This PC); `need_gb` for TypeScript,
-    Svelte and Pyright is not measured yet. Driven live through the app window on the local test master
-    2026-11-17 and on the VPS (after Node.js was put there; before, the screen said why each server could not run).
+  - Driven live through the app window on the local test master 2026-11-17 and on the VPS (after Node.js was put
+    there; before, the screen said why each server could not run).
+  - Leftovers DONE 2026-11-17:
+    - Live install output: `host_run` sends each output line as it comes when the caller listens (`onEvent`), on
+      This PC and on a master; npm runs with `--loglevel=http` (without a terminal it says nothing until it ends).
+      The window shows the newest four lines under "Installing…" (editor offer and Settings, Languages). Driven
+      live: Svelte on the local test master, TypeScript and Pyright on This PC.
+    - `need_gb` measured (peak of the server's process tree, 12 files open, 90 s): TypeScript 0.69 GB → 0.7,
+      Svelte 0.61 GB → 0.7, Pyright 0.31 GB on 58 files → 0.4 kept.
 - **Preview/inspector on a shown master:** goes through `port_forward`. With a master shown, `localhost` in the
   preview always means the master's localhost, never This PC's:
   - The tunnel uses any free port on This PC, so it never clashes with This PC's own dev servers.
@@ -141,7 +147,7 @@ This PC is untouched in M1.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
 - **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and
-  set `need_gb`.
+  set `need_gb`. DONE 2026-11-17 (see M1b leftovers above).
 
 ### M2. The account on the master
 
