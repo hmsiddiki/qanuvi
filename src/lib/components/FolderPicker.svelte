@@ -106,7 +106,9 @@
     flex-direction: column;
     gap: 10px;
     width: min(560px, calc(100% - 32px));
-    max-height: min(600px, calc(100% - 48px));
+    /* A fixed height (not one that follows the folder count), so Up and the path box stay where they were after a
+       folder opens or an error line shows; the list takes what is left. */
+    height: min(600px, calc(100% - 48px));
     padding: 18px 20px 16px;
     border: 1px solid var(--qx-border);
     border-radius: var(--qx-radius-panel);

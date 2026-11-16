@@ -43,6 +43,16 @@ impl Master {
                 to(inbox::list(db))
             }
             "inbox_list" => to(inbox::list(db)),
+            "inbox_add" => {
+                // A note the window writes about this machine's own work (unsaved text kept here whose file no
+                // longer opens), so the Inbox lists it under this machine, as if the master had written it.
+                let item: inbox::NewItem = serde_json::from_value(args["item"].clone())
+                    .map_err(|e| format!("Not an Inbox item: {e}"))?;
+                let (added, new) = inbox::add_new(db, &item)?;
+                self.inbox_watchers
+                    .send(&json!({"change": "add", "item": added, "new": new}));
+                to(Ok(added))
+            }
             "inbox_answer" => {
                 // Who answered: the desktop says which of its windows (or later "phone").
                 let by = opt(args, "by")

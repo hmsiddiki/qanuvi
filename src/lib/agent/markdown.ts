@@ -54,7 +54,7 @@ export function renderMarkdown(text: string): string {
     }
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
-    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
     const quote = line.match(/^&gt;\s?(.*)$/);
     if (heading) {
       flushPara();
@@ -70,17 +70,24 @@ export function renderMarkdown(text: string): string {
       const kind = bullet ? "ul" : "ol";
       if (list !== kind) {
         closeList();
-        out.push(`<${kind}>`);
+        // A numbered list keeps its first number ("3." starts at 3), as the agent wrote it.
+        const start = numbered ? Number(numbered[1]) : 1;
+        out.push(start !== 1 ? `<ol start="${start}">` : `<${kind}>`);
         list = kind;
       }
-      out.push(`<li>${inline((bullet ?? numbered)![1])}</li>`);
+      out.push(`<li>${inline(bullet ? bullet[1] : numbered![2])}</li>`);
     } else if (quote) {
       flushPara();
       closeList();
       out.push(`<blockquote>${inline(quote[1])}</blockquote>`);
     } else if (!line.trim()) {
       flushPara();
-      closeList();
+      // Items with blank lines between them ("1." ... "2." written as paragraphs) stay one list, numbered on.
+      let next = i + 1;
+      while (next < lines.length && !lines[next].trim()) next++;
+      const after = lines[next] ?? "";
+      const goesOn = list === "ol" ? /^\s*\d+[.)]\s+/.test(after) : list === "ul" && /^\s*[-*+]\s+/.test(after);
+      if (!goesOn) closeList();
     } else {
       closeList();
       para.push(line);

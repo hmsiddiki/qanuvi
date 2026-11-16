@@ -379,7 +379,19 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 17:15): ORDER STEP 3 DRIVEN LIVE, ALL PASS. Release test build 16:55, server
+    RESUME HERE (newest, CHECKPOINT 2026-11-16 17:30, fresh conversation): h1-h3 FIXED (owner: "fix them"), not
+    driven live. (h1) the window puts a note about a master's own work into that master's Inbox: inbox.add(item,
+    master) calls the master's new inbox_add (master_inbox.rs: add_new + watchers "add"); an older master without it
+    gets the note on This PC instead, never lost. The draft note in +page.svelte passes its machine. (h2) the folder
+    picker dialog has a fixed height (min(600px, 100% - 48px)), the list takes the rest, so Up and the path box no
+    longer move. (h3) agent markdown: numbered or bullet items with blank lines between them stay one list (numbered
+    on), a list keeps its own first number (<ol start="2">). Checks: TS 425 (inbox +1, markdown +1), svelte-check
+    0/0, prettier, Rust master tests 18 (inbox_add), clippy, server build check. NEXT: rebuild the release test build
+    and server build, drive h1-h3 live (draft note tagged with the master and in its filter, on the local test master
+    and the VPS; picker height; a numbered-paragraph answer), then step 4 (working icon + "Open in a new window"),
+    step 5 Part F, R3-R5. The 17:00 test window and local test master were still running at this checkpoint (stop
+    them before rebuilding, the exe is locked while they run).
+    RESUME HERE (before, 2026-11-16 17:15): ORDER STEP 3 DRIVEN LIVE, ALL PASS. Release test build 16:55, server
     build cross-built 16:58 (zigbuild -j 2, 9.3 MB) and swapped into ~/.local/bin on the VPS (owner yes). (f1) local
     test master: "+" opens "Add a project folder on DESKTOP-R8G3PAK (test)" at its home folder, folders only; a typed
     path + Enter goes there; a typed missing path is refused on "Add this folder" ("... cannot be found."); the real

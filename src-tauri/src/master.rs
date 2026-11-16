@@ -2021,5 +2021,21 @@ mod tests {
         );
         assert_eq!(call(&m, "inbox_list", json!({})).unwrap(), json!([]));
         assert_eq!(heard.lock().unwrap().last().unwrap()["change"], "remove");
+        // A note the window writes about the master's own work lands in the master's Inbox; the same key replaces it.
+        let note = json!({"item": {"kind": "drafts", "title": "Unsaved changes kept", "text": "a", "key": "draft:x"}});
+        let first = call(&m, "inbox_add", note.clone()).unwrap();
+        assert_eq!(first["kind"], "drafts");
+        assert_eq!(heard.lock().unwrap().last().unwrap()["new"], true);
+        call(&m, "inbox_add", note).unwrap();
+        assert_eq!(heard.lock().unwrap().last().unwrap()["change"], "add");
+        assert_eq!(
+            call(&m, "inbox_list", json!({}))
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(call(&m, "inbox_add", json!({"item": {}})).is_err());
     }
 }

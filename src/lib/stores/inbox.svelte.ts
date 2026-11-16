@@ -222,9 +222,16 @@ class InboxStore {
     return () => this.#answered.delete(fn);
   }
 
-  /** Adds an item; one with the same key is replaced (and stays read when nothing in it changed). */
-  add(item: NewInboxItem): void {
-    void invoke<InboxItem>("inbox_add", { item: { type: "info", ...item } }).catch(() => {});
+  /**
+   * Adds an item; one with the same key is replaced (and stays read when nothing in it changed). An item about a
+   * master's own work goes into that master's Inbox, so it is listed (and filtered) under that machine; an older
+   * master without the command gets it here instead, so it is never lost.
+   */
+  add(item: NewInboxItem, master: string | null = null): void {
+    const args = { item: { type: "info", ...item } };
+    const here = () => void invoke<InboxItem>("inbox_add", args).catch(() => {});
+    if (!master) return here();
+    void callMaster<InboxItem>(master, "inbox_add", args).catch(here);
   }
 
   /**

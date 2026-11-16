@@ -186,12 +186,15 @@
               ? "It is no longer a text file."
               : "It could not be opened.";
         if (tab?.error) await editorStore.close(key);
-        inbox.add({
-          kind: "drafts",
-          key: `draft:${machine ?? "this-pc"}:${id}:${d.path}`,
-          title: `Unsaved changes to ${d.path} on ${machine ? machineName(machine) : "This PC"} are kept`,
-          text: `${why} The unsaved text stays kept and comes back once the file opens again.\n\n${draftPreview(d.text)}`,
-        });
+        inbox.add(
+          {
+            kind: "drafts",
+            key: `draft:${machine ?? "this-pc"}:${id}:${d.path}`,
+            title: `Unsaved changes to ${d.path} on ${machine ? machineName(machine) : "This PC"} are kept`,
+            text: `${why} The unsaved text stays kept and comes back once the file opens again.\n\n${draftPreview(d.text)}`,
+          },
+          machine,
+        );
       }
     }
   }

@@ -55,6 +55,29 @@ beforeEach(() => {
 });
 
 describe("a master's Inbox", () => {
+  it("takes a note about the master's own work there, or here when the master has no such command", async () => {
+    const note = { kind: "drafts" as const, title: "Unsaved changes kept", text: "a", key: "draft:vps:p:a.md" };
+    inbox.add(note, "vps");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.map((c) => [c.where, c.cmd])).toEqual([["vps", "inbox_add"]]);
+    expect(calls[0].args).toEqual({ item: { type: "info", ...note } });
+
+    calls.length = 0;
+    vi.mocked(invoke).mockImplementation((async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === "remote_call") throw new Error("This master does not know the command inbox_add.");
+      calls.push({ where: "here", cmd, args: args ?? {} });
+      return true;
+    }) as never);
+    inbox.add(note, "old");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.map((c) => [c.where, c.cmd])).toEqual([["here", "inbox_add"]]);
+
+    calls.length = 0;
+    inbox.add(note);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.map((c) => [c.where, c.cmd])).toEqual([["here", "inbox_add"]]);
+  });
+
   it("shows its items with this computer's, newest first, marked with the master", async () => {
     await inbox.refresh();
     await inbox.followMaster("vps");

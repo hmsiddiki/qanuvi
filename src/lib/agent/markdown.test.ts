@@ -23,6 +23,15 @@ describe("agent answer markdown", () => {
     );
   });
 
+  it("keeps numbered paragraphs one list, numbered on, and a list's own first number", () => {
+    expect(renderMarkdown("1. one\n\n2. two\n\n\n3. three")).toBe("<ol><li>one</li><li>two</li><li>three</li></ol>");
+    expect(renderMarkdown("- a\n\n- b")).toBe("<ul><li>a</li><li>b</li></ul>");
+    expect(renderMarkdown("1. a\n\nAfter.\n\n2. b")).toBe(
+      '<ol><li>a</li></ol><p>After.</p><ol start="2"><li>b</li></ol>',
+    );
+    expect(renderMarkdown("1. a\n\n- b")).toBe("<ol><li>a</li></ol><ul><li>b</li></ul>");
+  });
+
   it("keeps lines of a paragraph and leaves snake_case and 2*3*4 alone", () => {
     expect(renderMarkdown("one\ntwo")).toBe("<p>one<br>two</p>");
     expect(renderMarkdown("grant_minutes and 2*3*4")).toBe("<p>grant_minutes and 2*3*4</p>");
