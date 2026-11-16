@@ -392,6 +392,17 @@ runs on or off; with it off nothing is sent anywhere.
     switch on This PC: the server starts on the next file open or machine switch). Open: VPS drive (needs the
     owner's yes for the new server build there), M1b leftovers (need_gb TypeScript/Svelte/Pyright, live install
     output), k1, then M1c preview through port_forward, M1d debugger.
+    n1 (OWNER, 2026-11-17, fix FIRST AFTER THE MIGRATION, on the master): a blocked plan step's "Needs your answer"
+    card only said "blocked: it needs you" (seen on step 20 of TINYCODE-FINAL-PLAN in qpfixbase: the reason, an nginx
+    rule to add to the server's nginx.conf, was only in the chat). The owner must be able to answer from a phone
+    without reading the chat. (a) The question states the whole matter on its own: what failed, why only the owner
+    can act, the exact change wanted (the rule, with a copy button), and what each answer does. (b) The answer box is
+    a real answer, not "what to do differently": the agent reads it and acts on it. "Insert the block in nginx.conf
+    yourself" means it does that (asking for anything it is missing, such as the file's place); "I don't understand"
+    brings back a new, more detailed question; an answer that does not settle the need brings a follow-up question
+    instead of a blind retry. The question goes on until the need is met, the owner skips the step, or ends the run.
+    Try again / Skip / End stay as quick answers. Asks in words, never a restart by itself
+    (feedback: chat asks, not buttons).
     RESUME HERE (before, CHECKPOINT 2026-11-17 02:40, fresh conversation): read docs/MIGRATION-VIEWER.md (M0, M1a,
     M1b marked BUILT) and the entry below. Done this session: M0 parity test 3825c57, M1a master pipes a87eb34, M1b
     language servers on a shown master 523d49c, 0.1.24 published from old-infrastructure (handover fix + live chat

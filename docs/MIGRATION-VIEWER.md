@@ -248,6 +248,7 @@ Every open item of the old plan is kept and lands here:
 | i2 browser helper left after close | With R6: agent processes and `--mcp-browser` in the master's job |
 | 24z3 Part F (window memory with several masters connected) | M9: measure with several masters shown in turn and nested ones |
 | j1 blank restored terminal | M5: a terminal whose shell ended says so |
+| n1 a blocked step's question says too little (owner, 2026-11-17) | First item after M9, on the master. See n1 in DEVELOPMENT-TASKLIST.md |
 | Everything else in DEVELOPMENT-TASKLIST.md | Unchanged, built on the master after the migration |
 
 ## Decided
