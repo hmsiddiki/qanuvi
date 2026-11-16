@@ -130,7 +130,8 @@ This PC is untouched in M1.
     - A machine leaving the screen ends its servers (`park` → `lsp.stopMachine`).
     - A connection that ends drops its streams, so its servers report that they stopped.
   - Not yet: live install output (the install still answers at its end, as on This PC); `need_gb` for TypeScript,
-    Svelte and Pyright is not measured yet; a drive through the app window.
+    Svelte and Pyright is not measured yet. Driven live through the app window on the local test master
+    2026-11-17 (VPS not yet).
 - **Preview/inspector on a shown master:** goes through `port_forward`. With a master shown, `localhost` in the
   preview always means the master's localhost, never This PC's:
   - The tunnel uses any free port on This PC, so it never clashes with This PC's own dev servers.

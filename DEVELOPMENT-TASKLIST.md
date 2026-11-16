@@ -379,7 +379,20 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17 02:40, fresh conversation): read docs/MIGRATION-VIEWER.md (M0, M1a,
+    RESUME HERE (newest, 2026-11-17): M1b DRIVEN LIVE on the local test master, all pass (release test build from
+    main 3ca3e89; scratch project E:\qc-scratch\m1b-drive with index.php). Master shown -> "+" added the folder on
+    that machine -> index.php opened -> install offer for Intelephense "on that machine" -> Install: npm download
+    went into the master's data folder (local-master\language-servers\php), server started by `qanuvi-master
+    serve`, not by the app -> undefined_call() flagged, Problems 1, hover on greet shows its signature. Switch to
+    This PC: the master's server ended (0 processes); back: started again, no new offer. Languages page on the
+    master lists that machine's statuses ("rust-analyzer Found on DESKTOP-R8G3PAK (test)"), its own Format on save;
+    "Keep coding tools off on DESKTOP-R8G3PAK (test)" stopped its server at once, This PC's switch stayed off.
+    Findings for the owner (not changed): m1 with coding tools off nothing on the editor says why (only the
+    Settings page); m2 turning tools on again does not re-attach an already open file (same as the per-server
+    switch on This PC: the server starts on the next file open or machine switch). Open: VPS drive (needs the
+    owner's yes for the new server build there), M1b leftovers (need_gb TypeScript/Svelte/Pyright, live install
+    output), k1, then M1c preview through port_forward, M1d debugger.
+    RESUME HERE (before, CHECKPOINT 2026-11-17 02:40, fresh conversation): read docs/MIGRATION-VIEWER.md (M0, M1a,
     M1b marked BUILT) and the entry below. Done this session: M0 parity test 3825c57, M1a master pipes a87eb34, M1b
     language servers on a shown master 523d49c, 0.1.24 published from old-infrastructure (handover fix + live chat
     token count), same fix on main 9be8f8e. Open: drive M1b through the app (local test master, then VPS with the
