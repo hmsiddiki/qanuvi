@@ -391,6 +391,112 @@ fn carry(link: Arc<dyn Link>, socket: TcpStream, remote: u16) {
     }
 }
 
+/// Generic questions about the master's machine, for a viewer's coding tools (migration M1): the viewer knows the
+/// tools; the master only answers where programs and files are, and runs a command to its end.
+pub mod host {
+    use serde_json::{Value, json};
+    use std::io::Read;
+    use std::path::{Component, Path};
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    /// The data folder, the OS and its path separator.
+    pub fn info() -> Value {
+        json!({
+            "dataDir": crate::paths::data_dir().to_string_lossy(),
+            "os": std::env::consts::OS,
+            "sep": std::path::MAIN_SEPARATOR.to_string(),
+        })
+    }
+
+    pub fn find(program: &str) -> Option<String> {
+        crate::local_servers::find(program).map(|p| p.to_string_lossy().into_owned())
+    }
+
+    /// The end of a long text (what a failed install said last).
+    fn tail(bytes: &[u8]) -> String {
+        let t = String::from_utf8_lossy(bytes);
+        let lines: Vec<&str> = t.lines().collect();
+        lines[lines.len().saturating_sub(40)..].join("\n")
+    }
+
+    /// Runs a program to its end (at most `timeout`), answering its exit code and the end of its output.
+    pub fn run(
+        program: &str,
+        args: &[String],
+        cwd: Option<&Path>,
+        timeout: Duration,
+    ) -> Result<Value, String> {
+        if program.trim().is_empty() {
+            return Err("Which program?".into());
+        }
+        let mut cmd = Command::new(program);
+        cmd.args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(d) = cwd {
+            cmd.current_dir(d);
+        }
+        super::hide(&mut cmd);
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("Could not start {program} on this machine: {e}"))?;
+        let mut out = child.stdout.take();
+        let mut err = child.stderr.take();
+        let o = std::thread::spawn(move || {
+            let mut b = Vec::new();
+            if let Some(o) = out.as_mut() {
+                let _ = o.read_to_end(&mut b);
+            }
+            b
+        });
+        let e = std::thread::spawn(move || {
+            let mut b = Vec::new();
+            if let Some(e) = err.as_mut() {
+                let _ = e.read_to_end(&mut b);
+            }
+            b
+        });
+        let start = Instant::now();
+        let status = loop {
+            if let Some(s) = child.try_wait().map_err(|e| e.to_string())? {
+                break Some(s);
+            }
+            if start.elapsed() > timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let (out, err) = (o.join().unwrap_or_default(), e.join().unwrap_or_default());
+        Ok(json!({
+            "code": status.and_then(|s| s.code()),
+            "timedOut": status.is_none(),
+            "out": tail(&out),
+            "err": tail(&err),
+        }))
+    }
+
+    /// Writes a new file below the data folder (with its folders); a file already there is left as it is.
+    pub fn write_new(relative: &str, text: &str) -> Result<(), String> {
+        let rel = Path::new(relative);
+        if relative.is_empty() || !rel.components().all(|c| matches!(c, Component::Normal(_))) {
+            return Err("Only a file inside the data folder can be written.".into());
+        }
+        let path = crate::paths::data_dir().join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Could not make {}: {e}", parent.display()))?;
+        }
+        if !path.exists() {
+            std::fs::write(&path, text).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

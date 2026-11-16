@@ -526,16 +526,44 @@ fn term_kill(state: State<AppState>, id: String) {
 
 // Language servers (15i) ------------------------------------------------------------------------------------
 
+/// The machine a language server call is about: This PC, or a connected master (migration M1).
+fn lsp_host(
+    state: &AppState,
+    master: &Option<String>,
+) -> Res<Option<std::sync::Arc<dyn crate::pipes::Link>>> {
+    match master.as_deref().filter(|m| !m.is_empty()) {
+        Some(m) => Ok(Some(state.remotes.get(m)?)),
+        None => Ok(None),
+    }
+}
+
 #[tauri::command]
-async fn lsp_statuses() -> Res<Vec<crate::lsp::Status>> {
-    blocking(|| Ok(crate::lsp::statuses())).await
+async fn lsp_statuses(
+    state: State<'_, AppState>,
+    master: Option<String>,
+) -> Res<Vec<crate::lsp::Status>> {
+    let link = lsp_host(&state, &master)?;
+    blocking(move || match link {
+        Some(l) => Ok(crate::lsp::statuses(&crate::lsp::On::new(l)?)),
+        None => Ok(crate::lsp::statuses(&crate::lsp::Here)),
+    })
+    .await
 }
 
 /// Installs a server; the window asked the user first.
 #[tauri::command]
-async fn lsp_install(id: String) -> Res<crate::lsp::Status> {
+async fn lsp_install(
+    state: State<'_, AppState>,
+    id: String,
+    master: Option<String>,
+) -> Res<crate::lsp::Status> {
     let spec = crate::lsp::spec(&id)?;
-    blocking(move || crate::lsp::install(spec)).await
+    let link = lsp_host(&state, &master)?;
+    blocking(move || match link {
+        Some(l) => crate::lsp::install(&crate::lsp::On::new(l)?, spec),
+        None => crate::lsp::install(&crate::lsp::Here, spec),
+    })
+    .await
 }
 
 #[tauri::command]
@@ -544,11 +572,17 @@ async fn lsp_start(
     state: State<'_, AppState>,
     project_id: String,
     id: String,
+    master: Option<String>,
     on_event: Channel<crate::lsp::LspEvent>,
 ) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
     let servers = state.languages.clone();
     let owner = window.label().to_string();
+    // On a shown master, `project_id` is that master's own id for the project.
+    if let Some(link) = lsp_host(&state, &master)? {
+        return blocking(move || servers.start_on(link, &project_id, &owner, &id, on_event.into()))
+            .await;
+    }
+    let root = project_root(&state, &project_id)?;
     blocking(move || servers.start(&project_id, &owner, &root, &id, on_event.into())).await
 }
 

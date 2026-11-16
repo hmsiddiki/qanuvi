@@ -379,7 +379,14 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): M1a BUILT (pipes.rs; master pipe_*/port_*, app port_forward/port_unforward,
+    RESUME HERE (newest, 2026-11-17): M1b BUILT (language servers on a shown master; see MIGRATION-VIEWER.md M1b).
+    Verify green (prettier, svelte-check, 432 vitest, fmt, clippy -D warnings both builds, 437 Rust tests). Live
+    check: ignored test lsp::live_runs_a_server_on_a_real_master against a real `qanuvi-master --stdio` (env
+    QANUVI_LIVE_MASTER/DATA/PROJECT): 30 messages in order (one 100 KB), error output, stop on connection end, pass.
+    Its service must be stopped after (k1 holds an output pipe). NOT driven through the app window yet. Open in
+    M1b: measure need_gb (TypeScript, Svelte, Pyright), live install output. NEXT: drive M1b in the app (local test
+    master + VPS, owner's yes for the VPS build), then M1c preview through port_forward.
+    RESUME HERE (before, 2026-11-17): M1a BUILT (pipes.rs; master pipe_*/port_*, app port_forward/port_unforward,
     seq-ordered writes, closed with the connection). Rust verify green (fmt, clippy -D warnings desktop + server
     build, 435 tests). Live check against a real `qanuvi-master --stdio` on a scratch data folder: pipe echo with
     out-of-order sends, exit event, HTTP through port_open, closed port refused, left-open pipe ended with the

@@ -454,12 +454,14 @@ export const api = {
     killWindow: () => invoke<void>("term_kill_window"),
   },
   lsp: {
-    statuses: () => invoke<LspStatus[]>("lsp_statuses"),
-    install: (id: string) => invoke<LspStatus>("lsp_install", { id }),
-    start: (projectId: string, id: string, onEvent: (e: LspEvent) => void) => {
+    // Language servers are the interface's (migration M1): the app runs them on This PC or, with `master`, on that
+    // master through its pipes; these calls never go to a master themselves.
+    statuses: (master: string | null) => invoke<LspStatus[]>("lsp_statuses", { master }),
+    install: (id: string, master: string | null) => invoke<LspStatus>("lsp_install", { id, master }),
+    start: (projectId: string, id: string, master: string | null, onEvent: (e: LspEvent) => void) => {
       const channel = new Channel<LspEvent>();
       channel.onmessage = onEvent;
-      return invoke<string>("lsp_start", { projectId, id, onEvent: channel });
+      return invoke<string>("lsp_start", { projectId, id, master, onEvent: channel });
     },
     send: (key: string, text: string) => invoke<void>("lsp_send", { key, text }),
     stop: (key: string) => invoke<void>("lsp_stop", { key }),

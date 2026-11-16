@@ -5,6 +5,8 @@
    * and the PHP / Xdebug check (15i part 3).
    */
   import { onMount } from "svelte";
+  import { shownPlace } from "$lib/remote";
+  import { switcher } from "$lib/stores/switcher.svelte";
   import { lsp } from "$lib/stores/lsp.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import type { ServerId } from "$lib/lsp/protocol";
@@ -15,8 +17,12 @@
 
   let xdebugDraft = $state(settings.value.languages.xdebugFile);
 
+  // The shown machine's servers (migration M1: a shown master's run there), read again when it changes.
+  $effect(() => {
+    void lsp.loadStatuses(true, switcher.shown);
+  });
+
   onMount(() => {
-    lsp.loadStatuses(true);
     dap.loadStatuses();
     dap.checkPhp();
   });
@@ -36,7 +42,7 @@
   };
 
   const where = (found: string) =>
-    found === "qanuvi" ? "Installed by Qanuvi" : found === "path" ? "Found on this computer" : "Not installed";
+    found === "qanuvi" ? "Installed by Qanuvi" : found === "path" ? `Found on ${shownPlace()}` : "Not installed";
 
   function forget(server: string) {
     settings.set("languages", { ...l, never: l.never.filter((x) => x !== server) });
@@ -49,6 +55,16 @@
   Nothing comes with Qanuvi: a server is installed only when you click Install. One starts when the first file of its
   language opens, runs at low priority, and stops when its project closes or after a while unused.
 </p>
+
+<label class="save first">
+  <input type="checkbox" checked={l.toolsOff} onchange={(e) => lsp.setToolsOff(e.currentTarget.checked)} />
+  <span
+    ><strong>Keep coding tools off on {shownPlace()}</strong>
+    <span class="muted"
+      >No language server starts there, whatever is installed (for a small machine). Each machine has its own switch.</span
+    ></span
+  >
+</label>
 
 <div class="rows">
   {#each lsp.statuses as s (s.id)}
@@ -229,6 +245,11 @@
     align-items: flex-start;
     gap: 8px;
     margin: 14px 20px 0;
+  }
+
+  .save.first {
+    max-width: 640px;
+    margin: 0 20px 14px;
   }
 
   .save .muted {

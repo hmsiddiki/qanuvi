@@ -116,6 +116,21 @@ This PC is untouched in M1.
   - The memory check uses that machine's free memory.
   - A per-machine "coding tools off" switch.
   - The screen says why when a tool is missing or does not fit.
+- BUILT 2026-11-17 (M1b), language servers:
+  - The master answers generic `host_*` questions (`host_info`, `host_find`, `host_exists`, `host_run`, and
+    `host_write_new`, limited to its data folder); free memory comes from `machine_room`.
+  - `lsp.rs` has a `Host` trait: `Here` is This PC; `On` is a master through its connection. Status, install and
+    the memory check run against the file's machine.
+  - `Servers::start_on` runs the server through `pipe_start`, and the framing stays in the app.
+  - The app's `lsp_statuses` / `lsp_install` / `lsp_start` take `master`, and `lsp_*` are window-only in remote.ts.
+  - The screen side:
+    - Statuses are kept per machine and the `#root` block is gone.
+    - The install offer is tied to the file's machine.
+    - `languages.toolsOff` is a per-machine switch ("Keep coding tools off on …").
+    - A machine leaving the screen ends its servers (`park` → `lsp.stopMachine`).
+    - A connection that ends drops its streams, so its servers report that they stopped.
+  - Not yet: live install output (the install still answers at its end, as on This PC); `need_gb` for TypeScript,
+    Svelte and Pyright is not measured yet; a drive through the app window.
 - **Preview/inspector on a shown master:** goes through `port_forward`. With a master shown, `localhost` in the
   preview always means the master's localhost, never This PC's:
   - The tunnel uses any free port on This PC, so it never clashes with This PC's own dev servers.

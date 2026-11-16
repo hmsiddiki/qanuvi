@@ -49,13 +49,15 @@ export class LspClient {
     readonly server: ServerId,
     readonly root: string,
     onExit: (why: string) => void,
+    /** The master the project is on (null: This PC); its server runs there. */
+    readonly machine: string | null = null,
   ) {
     this.#onExit = onExit;
     this.ready = this.#start();
   }
 
   async #start(): Promise<void> {
-    this.key = await api.lsp.start(this.projectId, this.server, (e) => this.#event(e));
+    this.key = await api.lsp.start(this.projectId, this.server, this.machine, (e) => this.#event(e));
     const rootUri = fileUri(this.root);
     const name = this.root.replace(/\\/g, "/").split("/").pop() ?? "project";
     const result = (await this.request(

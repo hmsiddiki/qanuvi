@@ -530,6 +530,26 @@ impl Master {
                     .insert(id.clone());
                 Ok(json!(id))
             }
+            // Generic questions about this machine, for a viewer's coding tools (M1); no tool is known here.
+            "host_info" => Ok(crate::pipes::host::info()),
+            "host_find" => Ok(json!(crate::pipes::host::find(&s(args, "program")))),
+            "host_exists" => Ok(json!(Path::new(&s(args, "path")).exists())),
+            "host_run" => {
+                let cwd = opt(args, "cwd")
+                    .filter(|c| !c.is_empty())
+                    .map(PathBuf::from);
+                let timeout = Duration::from_secs(n(args, "timeoutSecs").clamp(5, 1800));
+                crate::pipes::host::run(
+                    &s(args, "program"),
+                    &list(args, "args"),
+                    cwd.as_deref(),
+                    timeout,
+                )
+            }
+            "host_write_new" => {
+                crate::pipes::host::write_new(&s(args, "path"), &s(args, "text"))?;
+                Ok(Value::Null)
+            }
             "pipe_send" | "port_send" => {
                 self.pipes
                     .send(&s(args, "id"), n(args, "seq"), &s(args, "data"))?;
@@ -2209,6 +2229,56 @@ mod tests {
             m.dispatch("port_open", &json!({"port": 70000}), &none, &opened)
                 .is_err()
         );
+    }
+
+    // Migration M1b: generic questions a viewer's coding tools ask about this machine.
+    #[test]
+    fn answers_generic_questions_about_its_machine() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let info = call(&m, "host_info", json!({})).unwrap();
+        assert!(info["dataDir"].is_string() && info["sep"].is_string());
+        assert_eq!(
+            call(&m, "host_find", json!({"program": "no-such-program-qz"})).unwrap(),
+            Value::Null
+        );
+        assert_eq!(
+            call(
+                &m,
+                "host_exists",
+                json!({"path": data.path().to_string_lossy()})
+            )
+            .unwrap(),
+            json!(true)
+        );
+        if let Some(node) = crate::local_servers::find("node") {
+            let r = call(
+                &m,
+                "host_run",
+                json!({"program": node.to_string_lossy(), "args": ["-e", "console.error('nope'); process.exit(3)"]}),
+            )
+            .unwrap();
+            assert_eq!(r["code"], 3);
+            assert_eq!(r["err"], "nope");
+        }
+        let rel = format!("host-test-{}/a/package.json", uuid::Uuid::new_v4());
+        call(&m, "host_write_new", json!({"path": rel, "text": "{}"})).unwrap();
+        call(
+            &m,
+            "host_write_new",
+            json!({"path": rel, "text": "changed"}),
+        )
+        .unwrap();
+        let file = crate::paths::data_dir().join(&rel);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{}");
+        let _ =
+            std::fs::remove_dir_all(crate::paths::data_dir().join(rel.split('/').next().unwrap()));
+        for bad in ["../x.txt", "", "/etc/x", "a/../../x"] {
+            assert!(
+                call(&m, "host_write_new", json!({"path": bad, "text": ""})).is_err(),
+                "{bad}"
+            );
+        }
     }
 
     // Migration M0 (docs/MIGRATION-VIEWER.md): every command the app answers is answered by the master too, or it

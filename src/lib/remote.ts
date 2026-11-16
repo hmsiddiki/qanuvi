@@ -106,8 +106,16 @@ const WINDOW_ONLY = new Set([
   "inbox_import",
   "plan_data_import",
   "term_kill_window",
+  // Coding tools are the interface's (migration M1); a master's are reached through the app's lsp_* with `master`.
+  "lsp_statuses",
+  "lsp_install",
+  "lsp_start",
+  "lsp_send",
+  "lsp_stop",
   "lsp_stop_window",
   "dap_stop_window",
+  "port_forward",
+  "port_unforward",
 ]);
 
 export function windowOnly(cmd: string): boolean {

@@ -173,6 +173,10 @@ impl Connection {
 
     fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
+        self.streams
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
         if let Some(mut c) = self.child.lock().unwrap_or_else(|e| e.into_inner()).take() {
             let _ = c.kill();
             let _ = c.wait();
@@ -209,6 +213,11 @@ impl Connection {
     }
 
     fn ended(&self, app: &tauri::AppHandle, id: &str) {
+        // What it streamed ends too (a language server there is told it stopped).
+        self.streams
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
         self.pending
             .lock()
             .unwrap_or_else(|e| e.into_inner())

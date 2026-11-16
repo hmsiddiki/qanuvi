@@ -16,6 +16,7 @@ import {
 } from "$lib/lsp/protocol";
 import { projects } from "./projects.svelte";
 import { settings } from "./settings.svelte";
+import { switcher } from "./switcher.svelte";
 
 export interface Problem {
   projectId: string;
@@ -47,15 +48,18 @@ export interface Doc {
 export type BottomView = "terminal" | "problems" | "references" | "debug";
 
 const clientKey = (projectId: string, server: ServerId) => `${projectId}::${server}`;
+/** Statuses are kept per machine (This PC is ""). */
+const machineKey = (machine: string | null) => machine ?? "";
 
 class LspStore {
-  statuses = $state<LspStatus[]>([]);
+  /** What each machine has installed (migration M1: a shown master's servers run there). */
+  #statuses = $state<Record<string, LspStatus[]>>({});
   /** Problems by file (project id and path). */
   problems = $state<Record<string, Problem[]>>({});
   /** Bumps when any file's problems change (the editor redraws its underlines). */
   problemsChanged = $state(0);
   /** A server to offer for the shown file: install it, not now, never. */
-  offer = $state<{ server: ServerId; status: LspStatus } | null>(null);
+  offer = $state<{ server: ServerId; status: LspStatus; machine: string | null } | null>(null);
   installing = $state<string | null>(null);
   installError = $state("");
   /** Server state per project and language, for the status bar. */
@@ -72,8 +76,10 @@ class LspStore {
   #docs = new Map<string, { client: string; uri: string }>();
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
   #notNow = new Set<string>();
-  #statusLoad: Promise<void> | null = null;
-  #statusAt = 0;
+  #statusLoad = new Map<string, Promise<void>>();
+  #statusAt = new Map<string, number>();
+  /** The machine of each running client. */
+  #machineOf = new Map<string, string | null>();
   #idle: ReturnType<typeof setInterval> | undefined;
 
   constructor() {
@@ -81,23 +87,42 @@ class LspStore {
     if (typeof window !== "undefined") api.lsp.stopWindow().catch(() => {});
   }
 
-  loadStatuses(force = false): Promise<void> {
-    if (!this.#statusLoad || force) {
-      this.#statusAt = Date.now();
-      this.#statusLoad = api.lsp
-        .statuses()
-        .then((s) => void (this.statuses = s))
-        .catch(() => void (this.statuses = []));
-    }
-    return this.#statusLoad;
+  /** The shown machine's servers (the Languages settings). */
+  get statuses(): LspStatus[] {
+    return this.#statuses[machineKey(switcher.shown)] ?? [];
   }
 
-  status(server: ServerId): LspStatus | undefined {
-    return this.statuses.find((s) => s.id === server);
+  loadStatuses(force = false, machine: string | null = switcher.shown): Promise<void> {
+    const k = machineKey(machine);
+    let load = this.#statusLoad.get(k);
+    if (!load || force) {
+      this.#statusAt.set(k, Date.now());
+      load = api.lsp
+        .statuses(machine)
+        .then((s) => void (this.#statuses = { ...this.#statuses, [k]: s }))
+        .catch(() => {
+          this.#statuses = { ...this.#statuses, [k]: [] };
+          // Asked again next time (the machine may answer later, or be updated).
+          this.#statusLoad.delete(k);
+        });
+      this.#statusLoad.set(k, load);
+    }
+    return load;
+  }
+
+  status(server: ServerId, machine: string | null = switcher.shown): LspStatus | undefined {
+    return (this.#statuses[machineKey(machine)] ?? []).find((s) => s.id === server);
   }
 
   enabled(server: ServerId): boolean {
-    return !settings.value.languages.off.includes(server);
+    const l = settings.value.languages;
+    return !l.toolsOff && !l.off.includes(server);
+  }
+
+  /** The shown machine's switch for all its coding tools (a small machine keeps them off). */
+  setToolsOff(off: boolean): void {
+    settings.set("languages", { ...settings.value.languages, toolsOff: off });
+    if (off) this.stopMachine(switcher.shown);
   }
 
   setEnabled(server: ServerId, on: boolean): void {
@@ -107,42 +132,51 @@ class LspStore {
     if (!on) this.stopServer(server);
   }
 
-  #root(projectId: string): string | null {
+  /** The project's folder and the machine it is on (its servers run there, migration M1). */
+  #place(projectId: string): { root: string; machine: string | null } | null {
     const p = projects.list.find((x) => x.id === projectId);
-    // Projects on a server (Milestone 16) get no language servers from this computer.
-    return p && !p.master ? p.path : null;
+    return p ? { root: p.path, machine: p.master ?? null } : null;
   }
 
   /** The client for a file, started if needed; null when there is none (no server, off, not installed). */
   async clientFor(doc: Doc): Promise<{ client: LspClient; uri: string } | null> {
     const server = serverFor(doc.path);
-    const root = this.#root(doc.projectId);
-    if (!server || !root || !this.enabled(server)) return null;
+    const place = this.#place(doc.projectId);
+    if (!server || !place || !this.enabled(server)) return null;
+    const { root, machine } = place;
     const key = clientKey(doc.projectId, server);
     let client = this.#clients.get(key);
     if (!client) {
-      await this.loadStatuses();
-      let st = this.status(server);
+      await this.loadStatuses(false, machine);
+      let st = this.status(server, machine);
       // Installed meanwhile from outside this window (another window, npm or rustup in a terminal): look again,
       // at most every 30 s, since the check starts programs (rust-analyzer --version).
-      if (!st?.found && Date.now() - this.#statusAt > 30_000) {
-        await this.loadStatuses(true);
-        st = this.status(server);
+      if (!st?.found && Date.now() - (this.#statusAt.get(machineKey(machine)) ?? 0) > 30_000) {
+        await this.loadStatuses(true, machine);
+        st = this.status(server, machine);
       }
       if (!st?.found) {
         const l = settings.value.languages;
-        if (st && !l.never.includes(server) && !this.#notNow.has(server)) this.offer = { server, status: st };
+        if (st && !l.never.includes(server) && !this.#notNow.has(server)) this.offer = { server, status: st, machine };
         return null;
       }
-      client = new LspClient(doc.projectId, server, root, (why) => {
-        if (this.#clients.get(key) !== client) return;
-        this.#clients.delete(key);
-        this.#forget(key);
-        this.#clearProblems(doc.projectId, server);
-        this.state = { ...this.state, [key]: "stopped" };
-        if (why) this.lastError = `${st.label} stopped: ${why}`;
-      });
+      client = new LspClient(
+        doc.projectId,
+        server,
+        root,
+        (why) => {
+          if (this.#clients.get(key) !== client) return;
+          this.#clients.delete(key);
+          this.#machineOf.delete(key);
+          this.#forget(key);
+          this.#clearProblems(doc.projectId, server);
+          this.state = { ...this.state, [key]: "stopped" };
+          if (why) this.lastError = `${st.label} stopped: ${why}`;
+        },
+        machine,
+      );
       this.#clients.set(key, client);
+      this.#machineOf.set(key, machine);
       this.state = { ...this.state, [key]: "starting" };
       const c = client;
       c.applyEdit = (edit) => this.editApplier(doc.projectId, edit);
@@ -296,12 +330,16 @@ class LspStore {
   }
 
   /** Installs a server (the user clicked Install, which is their yes). */
-  async install(server: ServerId): Promise<boolean> {
+  async install(
+    server: ServerId,
+    machine: string | null = this.offer?.server === server ? this.offer.machine : switcher.shown,
+  ): Promise<boolean> {
     this.installing = server;
     this.installError = "";
     try {
-      const st = await api.lsp.install(server);
-      this.statuses = this.statuses.map((s) => (s.id === st.id ? st : s));
+      const st = await api.lsp.install(server, machine);
+      const k = machineKey(machine);
+      this.#statuses = { ...this.#statuses, [k]: (this.#statuses[k] ?? []).map((s) => (s.id === st.id ? st : s)) };
       if (this.offer?.server === server) this.offer = null;
       return true;
     } catch (e) {
@@ -318,6 +356,7 @@ class LspStore {
     const c = this.#clients.get(key);
     if (!c) return;
     this.#clients.delete(key);
+    this.#machineOf.delete(key);
     this.#forget(key);
     this.#clearProblems(c.projectId, c.server);
     const s = { ...this.state };
@@ -332,6 +371,12 @@ class LspStore {
 
   stopProject(projectId: string): void {
     for (const [key, c] of this.#clients) if (c.projectId === projectId) this.#stop(key);
+  }
+
+  /** A machine stopped being shown, or its tools were switched off: its servers end (they start again on its next file). */
+  stopMachine(machine: string | null): void {
+    for (const key of [...this.#clients.keys()]) if ((this.#machineOf.get(key) ?? null) === machine) this.#stop(key);
+    if (this.offer?.machine === machine) this.offer = null;
   }
 
   /** Servers with no open file for a while stop (they start again on the next file). */
