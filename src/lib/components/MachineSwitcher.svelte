@@ -19,7 +19,6 @@
   let { collapsed = false, onmanage }: { collapsed?: boolean; onmanage: () => void } = $props();
 
   let open = $state(false);
-  let problem = $state("");
 
   let shownMaster = $derived(masters.list.find((m) => m.id === switcher.shown) ?? null);
   let shownName = $derived(shownMaster ? displayName(shownMaster) : "This PC");
@@ -43,6 +42,7 @@
 
   const stateText = (m: MasterSettings) => {
     const s = masters.statusOf(m.id);
+    if (switcher.held?.id === m.id && switcher.held.mode === "lost" && s.state !== "on") return "reconnecting…";
     return s.state === "on"
       ? "connected"
       : s.state === "connecting"
@@ -53,9 +53,10 @@
   };
 
   async function choose(id: string | null) {
-    problem = "";
     if (id === switcher.shown) {
       open = false;
+      // The machine shown cannot be reached (24z3 Part E): picking it again tries it now.
+      if (switcher.held) void masters.retryNow();
       return;
     }
     if (id) {
@@ -65,7 +66,10 @@
         // Not connected: connect first; the screen stays on the machine shown until it answers.
         await masters.connect(m);
         if (masters.statusOf(id).state !== "on") {
-          problem = `${displayName(m)}: ${masters.statusOf(id).error ?? "not connected"}`;
+          // No answer: its own "not connected" screen with Reconnect (Part E), never the screen before taken for it.
+          open = false;
+          if (projects.persist) switcher.remember(id);
+          await masters.showUnreachable(id);
           return;
         }
       }
@@ -94,7 +98,6 @@
     aria-expanded={open}
     aria-label="Machine: {shownName}"
     onclick={() => {
-      problem = "";
       open = !open;
     }}
   >
@@ -147,7 +150,6 @@
           >
         </button>
       {/each}
-      {#if problem}<p class="problem">{problem}</p>{/if}
       <button
         type="button"
         class="manage"
@@ -320,12 +322,6 @@
     display: grid;
     place-items: center;
     color: var(--qx-accent);
-  }
-
-  .problem {
-    margin: 4px 8px;
-    color: var(--qx-status-failed);
-    font-size: var(--qx-text-small);
   }
 
   .manage {

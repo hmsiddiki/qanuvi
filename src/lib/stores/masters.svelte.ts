@@ -9,12 +9,23 @@ import { errorText, type Project } from "$lib/api";
 import { callMaster, disown, forgetMaster, nameMachines, own, shownMachine } from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
-import { show } from "./machines";
+import { show, showOffline } from "./machines";
+import { switcher } from "./switcher.svelte";
 import { projects } from "./projects.svelte";
 import { runner } from "./runner.svelte";
 import { terminals } from "./terminals.svelte";
 import { settings, type MasterSettings } from "./settings.svelte";
 import { nameProblem, pickColor, uniqueName } from "$lib/machineNames";
+
+/** Waits between tries to reach a lost machine (seconds); the last one repeats. */
+export const RETRY_WAITS = [2, 4, 8, 15, 30];
+/** How long a lost machine's screen stays on, read-only, before it is wiped to "not connected" (ms). */
+export const LOST_FOR = 2 * 60_000;
+
+/** The wait before try number `tries` + 1 (ms). */
+export function retryWait(tries: number): number {
+  return RETRY_WAITS[Math.min(tries, RETRY_WAITS.length - 1)] * 1000;
+}
 
 export interface MasterInfo {
   name: string;
@@ -49,6 +60,7 @@ class MastersStore {
   /** How many projects each connected master has (the Servers screen), whichever machine is shown. */
   projectCount = $state<Record<string, number>>({});
   #listening = false;
+  #retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   get list(): MasterSettings[] {
     return settings.value.masters;
@@ -70,14 +82,19 @@ class MastersStore {
       const id = e.payload.id;
       if (this.statusOf(id).state !== "on") return;
       invoke("remote_disconnect", { id }).catch(() => {});
-      this.#dropped(id, "The connection ended. Work on the server goes on; connect again to see it.");
+      const said = "The connection ended. Work on the server goes on; connect again to see it.";
+      // The machine on screen: it stays, read-only, while it reconnects (24z3 Part E).
+      if (shownMachine() === id && !switcher.held) this.#lose(id, said);
+      else this.#dropped(id, said);
     });
   }
 
   #dropped(id: string, error?: string) {
-    forgetMaster(id);
+    // A machine held on screen (lost or not connected, Part E) stays shown; its calls fail, never run on This PC.
+    const held = switcher.held?.id === id;
+    forgetMaster(id, held);
     // The machine on screen went away: This PC is shown again (forgetMaster already sends calls there).
-    if (projects.machine === id || settings.machine === id) void show(null);
+    if (!held && (switcher.shown === id || projects.machine === id || settings.machine === id)) void show(null);
     // Its terminals ended with the connection: their tabs go, and its projects open new ones when shown again.
     terminals.forgetMachine(id);
     const { [id]: _gone, ...counts } = this.projectCount;
@@ -85,6 +102,76 @@ class MastersStore {
     inbox.dropMaster(id);
     runner.dropMaster(id);
     this.#set(id, error ? { state: "error", error } : { state: "off" });
+  }
+
+  /**
+   * The shown machine's connection ended by itself (Part E): its screen stays, read-only under an overlay, and it is
+   * tried again with growing waits. Back: the overlay goes. Not back within LOST_FOR: the screen is wiped to
+   * "not connected" with Reconnect.
+   */
+  #lose(id: string, error: string): void {
+    switcher.held = { id, mode: "lost", error: "", tries: 0, nextAt: 0, since: Date.now() };
+    // Nothing typed goes into a screen that cannot save it.
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    this.#dropped(id, error);
+    this.#planRetry();
+  }
+
+  #planRetry(): void {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
+    const h = switcher.held;
+    if (!h || h.mode !== "lost") return;
+    const wait = retryWait(h.tries);
+    switcher.held = { ...h, nextAt: Date.now() + wait };
+    this.#retryTimer = setTimeout(() => void this.retryNow(), wait);
+  }
+
+  /**
+   * Tries the held machine again now ("Try now" on the overlay, Reconnect on the "not connected" screen). Answers
+   * whether it is back; back, its screen is read again from it.
+   */
+  async retryNow(): Promise<boolean> {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
+    const h = switcher.held;
+    if (!h) return false;
+    const m = this.list.find((x) => x.id === h.id);
+    if (!m) {
+      switcher.held = null;
+      await show(null);
+      return false;
+    }
+    switcher.held = { ...h, nextAt: 0 };
+    await this.connect(m);
+    // Another machine picked meanwhile, or removed: nothing more to do here.
+    const now = switcher.held as typeof h | null;
+    if (!now || now.id !== h.id) return this.statusOf(h.id).state === "on";
+    if (this.statusOf(h.id).state === "on") {
+      // Calls go to it again; its whole screen is read again (a wiped one gets its drafts back with its projects).
+      await show(h.id);
+      return true;
+    }
+    const error = this.statusOf(h.id).error ?? "No answer.";
+    const next = { ...now, error, tries: now.tries + 1 };
+    if (next.mode === "lost" && Date.now() - next.since >= LOST_FOR) {
+      switcher.held = next;
+      await showOffline(h.id, error);
+    } else {
+      switcher.held = next;
+      this.#planRetry();
+    }
+    return false;
+  }
+
+  /**
+   * Shows a machine that did not answer when picked (Part E): "not connected" with Reconnect, never the screen of the
+   * machine before taken for it.
+   */
+  async showUnreachable(id: string): Promise<void> {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
+    await showOffline(id, this.statusOf(id).error ?? "Not connected.");
   }
 
   /** The other machines' names, as shown (for the name rules). */
@@ -182,6 +269,13 @@ class MastersStore {
       "masters",
       this.list.filter((x) => x.id !== m.id),
     );
+  }
+
+  /** Stops trying a held machine; the next screen shown replaces its cover. */
+  #letGo(): void {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = null;
+    switcher.held = null;
   }
 
   /** Adds a server and connects to it. Answers an error text ("" when it was added). */
@@ -285,6 +379,8 @@ class MastersStore {
 
   async disconnect(id: string): Promise<void> {
     await invoke("remote_disconnect", { id }).catch(() => {});
+    // Disconnected on purpose (or removed): a held screen of it goes, This PC is shown.
+    if (switcher.held?.id === id) this.#letGo();
     this.#dropped(id);
   }
 

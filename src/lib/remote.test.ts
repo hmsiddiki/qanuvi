@@ -86,6 +86,14 @@ describe("the machine on screen (24z3 A1)", () => {
     expect(machineFor("projects_list")).toBeNull();
   });
 
+  it("keeps a lost machine shown while it reconnects, its calls never on This PC (24z3 Part E)", () => {
+    showMachine("vps");
+    forgetMaster("vps", true);
+    expect(shownMachine()).toBe("vps");
+    expect(machineFor("projects_list")).toBe("vps");
+    showMachine(null);
+  });
+
   it("sends a shown machine's calls over its connection", async () => {
     invoke.mockReset().mockResolvedValue([]);
     showMachine("vps");

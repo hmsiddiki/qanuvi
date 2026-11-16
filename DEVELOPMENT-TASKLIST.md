@@ -379,7 +379,25 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 16:00): step 2 started (owner: "go ahead" on the proposed order 1 C2, 2 E, 3 B2
+    RESUME HERE (newest, 2026-11-16 16:30): 24z3 PART E BUILT (not driven live yet; f3 answered). A shown master
+    whose connection ends by itself stays shown: its screen stays as it was, read-only (agent and work panes inert,
+    its projects and chats in the sidebar dimmed and inert; the Inbox and the switcher stay usable) under a see-through
+    cover "<name>: connection lost, reconnecting…" with the countdown, the last try's error, Try now, Show This PC and
+    Servers… (the Servers page is never covered). Its calls keep going to it and fail (forgetMaster keepShown), never
+    to This PC. Tries: 2, 4, 8, 15, then every 30 s (RETRY_WAITS); back -> the whole screen is read again (show), the
+    unsaved text never left the editor. Not back within 2 min (LOST_FOR) -> wiped to the opaque "<name> is not
+    connected" screen (drafts held in the window as in B2, empty sidebar), Reconnect only by hand from then on.
+    Picking a master that does not answer opens that same "not connected" screen (the machine before is hidden as when
+    switching; the old error line in the switcher menu is gone); picking the shown held machine again tries it now.
+    Disconnect or Remove on purpose still shows This PC; the D3 restart flow is unchanged. Switcher row says
+    "reconnecting…" while lost. Files: switcher.svelte.ts (held), masters.svelte.ts (#lose, retryNow,
+    showUnreachable), machines.ts (showOffline, park sees held), MachineHeld.svelte, +page.svelte, Sidebar.svelte,
+    MachineSwitcher.svelte. Tests: TS 417 (masters.lost 6 new, park 3, remote 1), svelte-check 0/0; no Rust change.
+    Owner choices to confirm: 2 min before the wipe, no automatic tries on the "not connected" screen, start-up still
+    stays on This PC when the remembered machine does not answer. NEXT: drive Part E live (release test build; local
+    test master stopped while shown, then started again; then one past 2 min; then pick it while stopped; VPS too),
+    then step 3 (B2 leftovers + f1/f2).
+    RESUME HERE (before, 2026-11-16 16:00): step 2 started (owner: "go ahead" on the proposed order 1 C2, 2 E, 3 B2
     leftovers + f1/f2, 4 working icon + "Open in a new window", 5 F). Check done first: the window already followed
     every machine's Inbox, merged one list, badges in the switcher, answers to the owning machine; missing were the
     items' machine names, a filter, Open switching machine (bug: it picked the project on the machine shown), dropped

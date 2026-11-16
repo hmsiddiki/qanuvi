@@ -24,6 +24,7 @@
   import { windows } from "$lib/stores/windows.svelte";
   import { workspace } from "$lib/stores/workspace.svelte";
   import { masters } from "$lib/stores/masters.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
   import Bell from "@lucide/svelte/icons/bell";
   import Plus from "@lucide/svelte/icons/plus";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
@@ -76,6 +77,9 @@
   let chatFilter = $state("");
   let groups = $derived(chatGroups(agent.chats, chatFilter));
   let showFilter = $derived(agent.chats.length > 6 || chatFilter !== "");
+
+  // The shown machine cannot be reached (24z3 Part E): its projects and chats are read-only, the Inbox stays.
+  let held = $derived(switcher.held !== null);
 
   function navigate(id: string) {
     ui.section = id;
@@ -158,7 +162,7 @@
   </div>
 
   {#if panel.view !== "workspace" && !collapsed}
-    <div class="project-panel">
+    <div class="project-panel" class:held inert={held}>
       {#if projects.current}
         <ProjectPanel project={projects.current} views={false} />
       {:else}
@@ -193,7 +197,7 @@
     </ul>
 
     {#if !collapsed}
-      <section class="group projects-group">
+      <section class="group projects-group" class:held inert={held}>
         <header>
           <span>Projects</span>
           <button
@@ -277,7 +281,7 @@
       </section>
 
       {#if settings.value.ai}
-        <section class="group sessions">
+        <section class="group sessions" class:held inert={held}>
           <header>
             <span>Sessions</span>
             {#if projects.current}
@@ -403,6 +407,10 @@
 </nav>
 
 <style>
+  .held {
+    opacity: 0.45;
+  }
+
   .sidebar {
     height: 100%;
     display: flex;

@@ -30,10 +30,12 @@ vi.mock("./workspace.svelte", () => ({ workspace }));
 const drafts = { keep: vi.fn(async () => {}), take: vi.fn(async (): Promise<Draft[]> => []) };
 vi.mock("./drafts", () => ({ drafts }));
 
-const { showMachine } = await import("$lib/remote");
-const { show } = await import("./machines");
+const { showMachine, shownMachine } = await import("$lib/remote");
+const { show, showOffline } = await import("./machines");
+const { switcher } = await import("./switcher.svelte");
 
 beforeEach(async () => {
+  switcher.held = null;
   await show(null);
   vi.clearAllMocks();
   workspace.restored = new Set(["p1", "p2", "other"]);
@@ -80,5 +82,39 @@ describe("hiding a machine", () => {
     expect(drafts.take).toHaveBeenCalledWith("vps", "");
     expect(editor.openConfig).toHaveBeenCalledWith("claude-code", "settings", "Settings", null);
     expect(editor.applyDraft).toHaveBeenCalledWith("config::claude-code::settings::", "{ }", "h2");
+  });
+});
+
+// 24z3 Part E: a master that cannot be reached is shown as "not connected", never as a stale copy.
+describe("a machine that cannot be reached", () => {
+  it("holds a lost machine's drafts in the window when another is shown, and the cover goes", async () => {
+    await show("vps");
+    vi.clearAllMocks();
+    switcher.held = { id: "vps", mode: "lost", error: "", tries: 1, nextAt: 0, since: 1 };
+    await show(null);
+    expect(drafts.keep).toHaveBeenCalledWith("vps", unsaved, false);
+    expect(terminals.park).toHaveBeenCalledWith("vps", false);
+    expect(switcher.held).toBeNull();
+  });
+
+  it("picked while unreachable: the machine before is hidden, nothing of the new one is loaded", async () => {
+    await showOffline("vps", "Connection refused.");
+    expect(drafts.keep).toHaveBeenCalledWith(null, unsaved, true);
+    expect(switcher.shown).toBe("vps");
+    expect(shownMachine(), "its calls go to it and fail, never to This PC").toBe("vps");
+    expect(switcher.held).toMatchObject({ id: "vps", mode: "offline", error: "Connection refused.", tries: 0 });
+    expect(projects.list).toEqual([]);
+    expect(projects.load).not.toHaveBeenCalled();
+    projects.list = [{ id: "p1" }, { id: "p2" }];
+  });
+
+  it("lost for too long: its own screen is wiped, the drafts held in the window, the tries kept", async () => {
+    await show("vps");
+    vi.clearAllMocks();
+    switcher.held = { id: "vps", mode: "lost", error: "No answer.", tries: 5, nextAt: 0, since: 42 };
+    await showOffline("vps", "No answer.");
+    expect(drafts.keep).toHaveBeenCalledWith("vps", unsaved, false);
+    expect(switcher.held).toMatchObject({ mode: "offline", tries: 5, since: 42 });
+    projects.list = [{ id: "p1" }, { id: "p2" }];
   });
 });

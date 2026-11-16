@@ -24,11 +24,11 @@ import { switcher } from "./switcher.svelte";
 /**
  * The machine leaving the screen is wiped from the window (24z3 Part B2): its open files go (unsaved text kept as
  * drafts on that machine), its terminals keep running there with their screens gone, and its projects' workspaces
- * are given back from scratch on return. A machine whose connection already ended has its drafts held in the window
- * instead.
+ * are given back from scratch on return. A machine whose connection already ended (or one held as lost, Part E) has
+ * its drafts held in the window instead.
  */
 export async function park(machine: string | null): Promise<void> {
-  const reachable = shownMachine() === machine;
+  const reachable = shownMachine() === machine && switcher.held?.id !== machine;
   // The workspaces as they are now are written, and stop following the editor while it empties.
   workspace.flush();
   for (const p of projects.list) workspace.restored.delete(p.id);
@@ -56,6 +56,8 @@ export async function show(machine: string | null): Promise<void> {
   const from = switcher.shown;
   // Its calls name the machine being hidden, so the new one shows without waiting for them.
   if (from !== machine) void park(from);
+  // Another machine shown (or the held one back): no "not connected" screen any more.
+  switcher.held = null;
   showMachine(machine);
   switcher.shown = machine;
   // The status bar, the setup guide's machine facts, Start-up and Claude Code's version are the new machine's.
@@ -80,6 +82,32 @@ export async function show(machine: string | null): Promise<void> {
   memory.touch();
   // Unsaved agent configuration files kept on it (24z3 Part B2); project files come back with their workspace.
   if (from !== machine) void reopenConfigDrafts(machine);
+}
+
+/**
+ * A master that cannot be reached is put on screen as "not connected" (24z3 Part E): the machine before is hidden as
+ * when switching, and nothing of the new one shows (never a stale copy) until Reconnect brings it. A machine shown
+ * already (lost for too long) has its screen wiped the same way, its unsaved text held in the window.
+ */
+export async function showOffline(machine: string, error: string): Promise<void> {
+  const from = switcher.shown;
+  const held = switcher.held;
+  // Wiping it: the drafts of a lost machine stay in the window (park sees it held).
+  if (from === machine && !held) switcher.held = { id: machine, mode: "lost", error, tries: 0, nextAt: 0, since: 0 };
+  void park(from);
+  showMachine(machine);
+  switcher.shown = machine;
+  switcher.held = {
+    id: machine,
+    mode: "offline",
+    error,
+    tries: held?.id === machine ? held.tries : 0,
+    nextAt: 0,
+    since: held?.id === machine ? held.since : Date.now(),
+  };
+  // Its projects are not known here: an empty sidebar under the cover, and a fresh project change on return.
+  projects.list = [];
+  projects.currentId = null;
 }
 
 /**

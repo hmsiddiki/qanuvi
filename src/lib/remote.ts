@@ -29,9 +29,13 @@ export function disown(id: string): void {
   owners.delete(id);
 }
 
-export function forgetMaster(master: string): void {
+/**
+ * A master's connection ended. Its ids are forgotten; when it was shown, This PC is shown again unless `keepShown`
+ * (24z3 Part E: a lost machine stays on screen while it reconnects, and its calls fail rather than run on This PC).
+ */
+export function forgetMaster(master: string, keepShown = false): void {
   for (const [id, m] of owners) if (m === master) owners.delete(id);
-  if (shown === master) shown = null;
+  if (shown === master && !keepShown) shown = null;
 }
 
 /** Shows a machine: later calls without an id go to it (null: This PC). */

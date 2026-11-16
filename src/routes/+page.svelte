@@ -13,6 +13,8 @@
   import Sidebar from "$lib/components/Sidebar.svelte";
   import AgentPane from "$lib/components/AgentPane.svelte";
   import WorkPane from "$lib/components/WorkPane.svelte";
+  import MachineHeld from "$lib/components/MachineHeld.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
   import Splitter from "$lib/components/Splitter.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { sidebarScreenWidth } from "$lib/layout/layout";
@@ -292,6 +294,8 @@
   let showWork = $derived(s.workVisible || !showAgent);
   let workOnly = $derived(!showAgent && showWork);
   let agentOnly = $derived(showAgent && !showWork);
+  // The shown machine cannot be reached (24z3 Part E): its panes take no input under the cover.
+  let held = $derived(switcher.held !== null);
 </script>
 
 <svelte:window onkeydown={keydown} />
@@ -318,7 +322,12 @@
       <div class="panes" class:no-sidebar={!s.sidebarVisible} class:agent-right={s.agentSide === "right"}>
         {#if ui.settings}<SettingsView />{/if}
         {#if showAgent}
-          <div class="agent" class:fill={agentOnly} style:width={agentOnly ? undefined : `${s.agentWidth}px`}>
+          <div
+            class="agent"
+            inert={held}
+            class:fill={agentOnly}
+            style:width={agentOnly ? undefined : `${s.agentWidth}px`}
+          >
             <AgentPane />
           </div>
         {/if}
@@ -332,10 +341,11 @@
           />
         {/if}
         {#if showWork}
-          <div class="work" class:fill={workOnly || showAgent}>
+          <div class="work" inert={held} class:fill={workOnly || showAgent}>
             <WorkPane />
           </div>
         {/if}
+        <MachineHeld />
       </div>
     </div>
     <StatusBar />
