@@ -379,7 +379,23 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, checkpoint 2026-11-16 09:30): OWNER CHOSE THE AGREED ORDER, no quick 0.1.23. Since 0.1.22
+    RESUME HERE (newest, 2026-11-16 15:15): 24z3 PART B2 DRIVEN LIVE, ALL PASS (order step 1 done). Release test
+    build 14:49 (old local test master stopped with the owner's yes so the build could replace its exe), server build
+    cross-built 15:03 (zigbuild -j 2, 9.3 MB) and swapped into ~/.local/bin on the VPS. This PC (projl): README unsaved
+    line + ping in a terminal -> local test master -> back: text back unsaved, same tab, the ping process kept running
+    while hidden, typing after return works (echo printed), nothing asked. Master (master-proj): same, both ways.
+    Terminal panel closed and reopened: same shell, its output, takes input. Master dropped while shown (both its
+    processes stopped) with a second unsaved line: window fell back to This PC; picking the master in the switcher
+    reconnected it and typed both lines back (Undo gives the saved file, Redo the draft); its terminal tab gone (shell
+    ended with the connection, as specified). VPS basevm378 (new scratch project /root/b2-scratch, left in place):
+    draft + ping -> This PC 20 s -> back: draft back, ping went on (icmp_seq 6 -> 48), Ctrl+C and echo work. Test
+    note: SendKeys Ctrl+C does not reach a Windows console shell (also in a never-switched tab), so stop Windows test
+    processes directly. FINDINGS for step 2: (f1) on a shown server, Projects "+" says "This picks a folder on this
+    PC" and points to the Servers screen; per-machine screens should add a folder on the shown machine; (f2) the shell
+    picker shows "Windows PowerShell" while a Linux server is shown (should list that machine's shells); (f3) a shown
+    master that drops jumps to This PC (Part E's "not connected" screen with Reconnect is the planned answer). NEXT:
+    order step 2 (check first what of C/C2/E already works and tell the owner, then C2, E, B2 not-done items, F).
+    RESUME HERE (before, checkpoint 2026-11-16 09:30): OWNER CHOSE THE AGREED ORDER, no quick 0.1.23. Since 0.1.22
     (2b4dd63) 78 commits: the Rust runner (TS runner deleted), 24z3 A1-A3, D1-D8, B1 (all driven live), B2 + its
     terminal-panel follow-up and the false usage-limit fix 9ea5fcd (tests only, not driven live). Order now:
     (1) drive B2 live (list in the 08:15 note below; also close and reopen the terminal panel: same shell, its
