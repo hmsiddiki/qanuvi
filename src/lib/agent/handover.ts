@@ -184,3 +184,99 @@ export function keepNote(store: Pick<Storage, "setItem">, id: string, lines: num
 export function forgetNote(store: Pick<Storage, "removeItem">, id: string): void {
   store.removeItem(noteKey(id));
 }
+
+/** What the plan runner knows of a session: `busy` while its run works in it, `limit` for a run's step session. */
+export interface PlanSessionInfo {
+  busy: boolean;
+  limit: number | null;
+}
+
+/** A step hands over past this many tokens when its run sets no limit (as the core's plan/guidance.rs). */
+export const STEP_HANDOVER_DEFAULT = 200_000;
+
+/**
+ * The runner's side: the session the run works in now (`current`, which the core empties between a step's turns, or
+ * `workingIn`, the last one it worked in) is busy while the run is; every session of the run's steps, or of its
+ * finishing pass, follows the run's handover limit.
+ */
+export function runSessionInfo(
+  id: string,
+  run: {
+    options: { handoverLimit?: number };
+    steps: { attempts: { sessionId: string }[] }[];
+    finish?: { sessionId?: string | null };
+  } | null,
+  busyRun: boolean,
+  current: string | null,
+  workingIn: string | null,
+): PlanSessionInfo {
+  const busy = busyRun && (id === current || id === workingIn);
+  const ofRun =
+    (!!id && (id === current || id === workingIn)) ||
+    !!run?.steps.some((st) => st.attempts.some((a) => a.sessionId === id)) ||
+    (!!id && run?.finish?.sessionId === id);
+  if (!ofRun) return { busy: false, limit: null };
+  return { busy, limit: run?.options.handoverLimit ?? STEP_HANDOVER_DEFAULT };
+}
+
+/**
+ * The chat handover's side: a session, or the one it continues from (a step's chat goes on after a handover), as the
+ * runner knows it. A step's chat follows the run's limit; any other chat gets `limit: null` (the default limit).
+ */
+export function planInfoOf<T extends { id: string; continues_from?: string | null }>(
+  s: T,
+  sessions: T[],
+  info: (id: string) => PlanSessionInfo,
+): PlanSessionInfo {
+  const first = info(s.id);
+  if (first.limit !== null) return first;
+  let cur: T | undefined = s;
+  for (let i = 0; i < 20 && cur?.continues_from; i++) {
+    const from: string = cur.continues_from;
+    const found = info(from);
+    if (found.limit !== null) return { busy: false, limit: found.limit };
+    cur = sessions.find((x) => x.id === from);
+  }
+  return first;
+}
+
+/** What one turn has used so far, by model call (each call's latest usage; the agent repeats it per content block). */
+export class TurnUsage {
+  #calls = new Map<string, { inn: number; cache: number; out: number }>();
+
+  /** Takes an agent line; true when it carried usage (the sums changed). */
+  take(line: string): boolean {
+    if (!line.includes('"usage"') || !line.includes('"assistant"')) return false;
+    let m: { type?: string; message?: { id?: string; usage?: Record<string, number> } };
+    try {
+      m = JSON.parse(line);
+    } catch {
+      return false;
+    }
+    const u = m?.type === "assistant" ? m.message?.usage : undefined;
+    if (!u) return false;
+    const id = m.message?.id || `call-${this.#calls.size}`;
+    this.#calls.set(id, {
+      inn: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
+      cache: u.cache_read_input_tokens ?? 0,
+      out: u.output_tokens ?? 0,
+    });
+    return true;
+  }
+
+  sums(): { inn: number; cache: number; out: number } {
+    let inn = 0,
+      cache = 0,
+      out = 0;
+    for (const c of this.#calls.values()) {
+      inn += c.inn;
+      cache += c.cache;
+      out += c.out;
+    }
+    return { inn, cache, out };
+  }
+
+  clear(): void {
+    this.#calls.clear();
+  }
+}

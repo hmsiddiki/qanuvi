@@ -905,11 +905,17 @@
     </div>
   {/if}
   {#if session}
-    <div class="usage" title="Tokens sent (including cache writes), tokens read from cache, tokens received, and cost">
-      in {formatTokens(session.input_tokens)} · cache {formatTokens(session.cache_read_tokens)} · out {formatTokens(
-        session.output_tokens,
-      )}
-      · {formatCost(session.cost_usd)} · {(session.duration_ms / 1000).toFixed(0)} s{working ? ` · ${working}` : ""}
+    {@const live = agent.turnUsage?.sessionId === session.id ? agent.turnUsage : null}
+    <div
+      class="usage"
+      title={`Tokens sent (including cache writes), tokens read from cache, tokens received, and cost${live ? ". The running turn is counted as it goes; its cost comes when it ends" : ""}`}
+    >
+      in {formatTokens(session.input_tokens + (live?.inn ?? 0))} · cache {formatTokens(
+        session.cache_read_tokens + (live?.cache ?? 0),
+      )} · out {formatTokens(session.output_tokens + (live?.out ?? 0))}
+      · {formatCost(session.cost_usd)}{live ? " +…" : ""} · {(session.duration_ms / 1000).toFixed(0)} s{working
+        ? ` · ${working}`
+        : ""}
     </div>
   {/if}
 

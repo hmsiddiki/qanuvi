@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   REOPEN_FRESH_FROM,
+  TurnUsage,
+  STEP_HANDOVER_DEFAULT,
+  planInfoOf,
+  runSessionInfo,
   forgetNote,
   keepNote,
   keptNote,
@@ -180,5 +184,83 @@ describe("reopening a starred chat (24s part 3)", () => {
     expect(keptNote(store, "s1", 10)).toBeNull();
     forgetNote(store, "s1");
     expect(m.size).toBe(0);
+  });
+});
+
+// 0.1.24: the chat handover took a plan step the runner was working in (the core's session id is empty between a
+// step's turns), so the note went to a session nobody continued and the runner started the step again from scratch.
+describe("which handover a session gets", () => {
+  const run = {
+    options: { handoverLimit: 180_000 },
+    steps: [{ attempts: [{ sessionId: "step6" }] }, { attempts: [] as { sessionId: string }[] }],
+  };
+
+  it("leaves the session the runner works in to the runner, between turns too", () => {
+    expect(runSessionInfo("step7", run, true, "step7", "step7")).toEqual({ busy: true, limit: 180_000 });
+    // Between turns the core's id is empty: the last one it worked in still counts.
+    expect(runSessionInfo("step7", run, true, null, "step7")).toEqual({ busy: true, limit: 180_000 });
+  });
+
+  it("gives a step's chat the run's limit once the runner is not working in it", () => {
+    expect(runSessionInfo("step6", run, true, "step7", "step7")).toEqual({ busy: false, limit: 180_000 });
+    expect(runSessionInfo("step7", run, false, null, "step7")).toEqual({ busy: false, limit: 180_000 });
+    expect(runSessionInfo("step6", { ...run, options: {} }, false, null, null).limit).toBe(STEP_HANDOVER_DEFAULT);
+    expect(runSessionInfo("step6", { ...run, options: { handoverLimit: 0 } }, false, null, null).limit).toBe(0);
+  });
+
+  it("gives every other chat the default limit", () => {
+    expect(runSessionInfo("chat", run, true, "step7", "step7")).toEqual({ busy: false, limit: null });
+    expect(runSessionInfo("chat", null, false, null, null)).toEqual({ busy: false, limit: null });
+  });
+
+  it("keeps a step's chat on the run's limit after it was handed over", () => {
+    const sessions = [
+      { id: "step6", continues_from: null },
+      { id: "chat-a", continues_from: "step6" },
+      { id: "chat-b", continues_from: "chat-a" },
+      { id: "plain", continues_from: null },
+    ];
+    const info = (id: string) => runSessionInfo(id, run, true, "step7", "step7");
+    expect(planInfoOf(sessions[2], sessions, info)).toEqual({ busy: false, limit: 180_000 });
+    expect(planInfoOf(sessions[3], sessions, info)).toEqual({ busy: false, limit: null });
+    // A running step whose session took over from another is still the runner's.
+    const working = (id: string) => runSessionInfo(id, run, true, "chat-a", "chat-a");
+    expect(planInfoOf(sessions[1], sessions, working).busy).toBe(true);
+  });
+});
+
+// 0.1.24: a plan step or a chat taking messages while it works is one long turn; its totals only come at the turn's
+// end, so the stats line counts the turn's model calls as they come.
+describe("a turn's usage while it runs", () => {
+  const call = (id: string, u: Record<string, number>) =>
+    JSON.stringify({ type: "assistant", message: { id, usage: u, content: [] } });
+
+  it("counts each model call once, with its latest usage", () => {
+    const t = new TurnUsage();
+    expect(
+      t.take(
+        call("m1", {
+          input_tokens: 10,
+          cache_creation_input_tokens: 90,
+          cache_read_input_tokens: 500,
+          output_tokens: 1,
+        }),
+      ),
+    ).toBe(true);
+    // The same call again (another content block): replaced, not added.
+    t.take(
+      call("m1", {
+        input_tokens: 10,
+        cache_creation_input_tokens: 90,
+        cache_read_input_tokens: 500,
+        output_tokens: 40,
+      }),
+    );
+    t.take(call("m2", { input_tokens: 5, cache_read_input_tokens: 600, output_tokens: 7 }));
+    expect(t.sums()).toEqual({ inn: 105, cache: 1100, out: 47 });
+    expect(t.take('{"type":"user","message":{"content":"usage"}}')).toBe(false);
+    expect(t.take("not json usage assistant")).toBe(false);
+    t.clear();
+    expect(t.sums()).toEqual({ inn: 0, cache: 0, out: 0 });
   });
 });
