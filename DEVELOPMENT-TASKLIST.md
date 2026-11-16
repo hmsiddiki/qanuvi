@@ -379,7 +379,17 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): M1b DRIVEN LIVE on the local test master, all pass (release test build from
+    RESUME HERE (newest, 2026-11-17 03:30): m1 + m2 FIXED f945170 and DRIVEN LIVE on the local test master (release
+    test build 03:05): tools off -> editor status line "Coding tools off on DESKTOP-R8G3PAK (test)", clicking it opens
+    Settings, Languages; tools on again -> server back on the already open index.php at once (Problems 1), no reopen.
+    vitest 439, svelte-check 0/0. VPS (owner yes): server build cross-built 03:11 (zigbuild -j 2, 9.4 MB), swapped into
+    ~/.local/bin (old kept as qanuvi-master.prev, old serve ended with pkill -x). basevm378 shown -> project
+    ~/qanuvi-test/m1b-vps added -> index.php: no Install button, the bar says "This server runs on Node.js; install
+    Node.js from nodejs.org on that machine first"; its Languages page lists only the VPS's statuses, each missing
+    one with its reason (rust-analyzer: rustup). PASS. Not done: a running server on the VPS (it has no Node.js;
+    installing it there waits for the owner's yes). Test helper note: in Git Bash put MSYS_NO_PATHCONV=1 before
+    typing a Linux path through ui.ps1 (else /root/... becomes C:/Program Files/Git/root/...).
+    RESUME HERE (before, 2026-11-17): M1b DRIVEN LIVE on the local test master, all pass (release test build from
     main 3ca3e89; scratch project E:\qc-scratch\m1b-drive with index.php). Master shown -> "+" added the folder on
     that machine -> index.php opened -> install offer for Intelephense "on that machine" -> Install: npm download
     went into the master's data folder (local-master\language-servers\php), server started by `qanuvi-master
