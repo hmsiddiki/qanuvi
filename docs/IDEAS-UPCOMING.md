@@ -34,3 +34,29 @@ user's yes, licence and source shown.
   sent twice when Claude Code has the Superpowers plugin.
 - The brain measures runs with and without an extension and turns what works into its own methods: the extension is
   the benchmark to beat (owner's aim: Qanuvi's brain self-sufficient and better than Superpowers).
+
+## Brain and memory (owner, 2026-11-16)
+
+The picture: the brain belongs to the Qanuvi app itself, the same for every user; memory belongs to the user (account
+memory: About me, Tools and models; machine memory: This project). The brain reads a user's memory to work for that
+user; the memory never becomes part of the brain. Nothing learned, noticed or researched is a rule: it arrives in the
+user's memory as a suggestion until the user sets it. The first step (the three memory parts, and the memory disk
+sharing account memory only) is batch D8 in the tasklist; the ideas below come after the core.
+
+- A. Learning suggestions from the user's behaviour (memory side): coding style that satisfies them, solutions they
+  like, how they act on certain problems, how they debug, what they pick when planning, what they say to plan runners
+  mid-run, what they ask about often, what they ask suggestions for. Suggested only after something repeats, with the
+  examples it came from; when unclear Qanuvi asks "about you, or about this project?"; each entry shows when it was
+  last seen, newer behaviour wins, and a contradiction with an older entry is shown to the user.
+- B. Research as a brain ability: the brain researches what the user asks about often and similar things, so later
+  answers are more detailed. What it finds for the user goes into the user's memory as suggestions with sources,
+  then the normal path (approve, then share or use). A research budget the user sets; an always-on master (for
+  example a VPS) fits well; research questions never carry the user's private details to the web.
+- C. Voice commands and talking back to the user, as app abilities of the brain.
+- D. How the brain gains knowledge: two ways only, a new Qanuvi update (exists: release channels) or the central
+  qanuvi.com system (not designed yet: what it sends down, such as decision rules, model notes and research skills,
+  and how it is signed). By default nothing from a user's memory goes up; if it ever does, each user chooses it.
+- E. NEEDS REVIEW TOGETHER, NOT DECIDED: the brain instructs the model doing a step from the user's memory, shaped for
+  that model (short and explicit for a small local model, more for a paid one). Open: what "adapt" means (shaping
+  instructions now, adapters later), which brain decides when there are several machines (each core, or the paid
+  decider on top), and how to tell it worked (fewer corrections, fewer blocked steps).

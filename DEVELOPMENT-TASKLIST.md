@@ -369,7 +369,26 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 06:10): 24z3 D7 DRIVEN LIVE on the local test master, all pass (release test
+    RESUME HERE (newest, 2026-11-16 06:40): OWNER AGREED the Qanuvi ecosystem picture and batch D8 (below), before
+    Part B. NEXT: build D8 only when the owner says go; then Part B with (d). The later ideas (learning suggestions,
+    research, voice, how the brain gains knowledge, the brain instructing models from memory) are in
+    docs/IDEAS-UPCOMING.md "Brain and memory".
+    THE PICTURE (owner, 2026-11-16): the BRAIN belongs to the Qanuvi app itself, the same for every user (how to
+    decide, research, app abilities such as voice); it gets better only through Qanuvi updates or the central
+    qanuvi.com system. MEMORY belongs to the user: account memory (About me, Tools and models) follows the user's
+    account to every machine; machine memory (This project) stays on the machine that has the project. The brain
+    reads a user's memory to work for that user; the memory never becomes part of the brain. Nothing learned,
+    noticed or researched is ever a rule: it arrives as a suggestion until the owner sets it.
+    D8 (agreed, not built): memory parts and what the disk shares. (1) Every entry has one of three parts: About me,
+    This project, Tools and models (the main choice when saving; today's kinds stay as a second choice). (2) About
+    me and Tools and models are account memory: they travel through the memory disk for now (account sync through
+    qanuvi.com may replace or join it later). This project entries never leave their machine: the disk writes and
+    reads only account memory (replaces the D7 finding's proposals: project entries are not shared at all).
+    (3) Today's "every project" entries become About me; project-scoped ones stay This project. (4) Only the owner
+    makes an entry active: anything from an agent or from Qanuvi arrives as a suggestion. Drive live on This PC, the
+    local test master and the VPS; the old "D6 disk test fact" left on the master's DB from the disk is cleaned up
+    (it is This PC's project entry).
+    RESUME HERE (before, 2026-11-16 06:10): 24z3 D7 DRIVEN LIVE on the local test master, all pass (release test
     build 05:44). This PC Memory: "1 entry on the disk from this computer" (c); Sync now. Master shown -> Memory page
     loads (no "cannot be done" line); master Sync now -> "read This PC" (b). New entry "D7 master memory test" saved
     into the master's DB only (This PC's DB unchanged), listed; Try it gives the master's slice; the master synced on
