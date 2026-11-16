@@ -379,7 +379,7 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 03:45): M1b DRIVEN LIVE ON THE VPS, ALL PASS. Node.js put on basevm378 with the
+    RESUME HERE (newest, CHECKPOINT 2026-11-17 03:50, fresh conversation): M1b DRIVEN LIVE ON THE VPS, ALL PASS. Node.js put on basevm378 with the
     owner's yes (Debian packages: nodejs 18.20.4, npm 9.2.0; apt, no outside script). Reopened index.php: the bar
     now offered Install -> Intelephense went to /root/.local/share/qanuvi/language-servers/php, run by the VPS's
     `qanuvi-master serve` -> undefined_call() flagged, Problems 1, hover on greet over ssh shows its signature. This
