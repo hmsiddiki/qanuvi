@@ -385,6 +385,11 @@ runs on or off; with it off nothing is sent anywhere.
     and Inbox Open into another window NOT checked. Finding j1 (small): a restored terminal tab whose shell ended
     with its master (leftover test master stopped to free the locked qanuvi-master.exe) stays blank with no note
     that the shell has ended. NEXT: (2) below, write the migration plan (app = viewer of masters) before any code.
+    OLD INFRASTRUCTURE BACKUP (owner, 2026-11-16 22:05): branch old-infrastructure + tag v0.1.23-old-infrastructure
+    (pushed; the branch's OLD-INFRASTRUCTURE.md says how to go on without the migration: i1, i2, Part F, R3-R6, j1);
+    data at E:\Backups\qanuvi\old-infrastructure-0.1.23 (installed app's qanuvi.db snapshot, integrity ok,
+    attachments, snapshots, backups.json, the 0.1.23 installer + .sig). To go back: switch to that branch, tell the
+    agent "skip the migration plan and go on".
     RESUME HERE (before, CHECKPOINT 2026-11-16 21:40, fresh conversation): OWNER DECISION, NEW DIRECTION. The
     master is Qanuvi itself (projects, files, agents, plans, Inbox, memory, settings, its own server list), fully
     usable from a terminal with no display; the app is only the visual container (editors, chat, voice, layout,
