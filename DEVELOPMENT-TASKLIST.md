@@ -379,7 +379,21 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17, fresh conversation): M1c BUILT, NOT YET DRIVEN LIVE. Check free
+    RESUME HERE (newest, 2026-11-17 05:00): M1c DRIVEN LIVE on the local test master (release test build from
+    b3423ff; the window binary rebuilt, the master binary left as it was because the running test master holds it
+    and M1c has no Rust change). Scratch dev server E:\qc-scratch\m1c-drive\server.js on 127.0.0.1:5179 prints the
+    Host header it gets. PASS: master shown -> m1b-drive Preview -> localhost:5179 loads through a tunnel the
+    window opened on 127.0.0.1:33211 (page saw Host localhost:33211); the bar keeps http://localhost:5179/ with the
+    machine's dot and name; a relative link stays in the tunnel; This PC's project with the same address loads
+    directly (Host localhost:5179, no machine badge); back to the master reuses the same tunnel; the inspector
+    opens the tunnelled page and picks an element; "Send this page" reads it. "Open in the browser" not pressed
+    (would open the owner's browser). FINDINGS, await owner: p1 the text attached for the agent by "Send this
+    page" and the inspector names the tunnel address (http://localhost:33211/), not the master's
+    (http://localhost:5179/); the agent works on the master, where 33211 means nothing. Proposed fix: name the
+    address from the bar (the master's), front end only. p2 the machine name in the bar is cut off
+    ("DESKTOP-R8G3PAK (tes"); proposed: shorter label or the full name in the tooltip only. NEXT: owner's choice on
+    p1/p2, then M1d debugger.
+    RESUME HERE (before, CHECKPOINT 2026-11-17, fresh conversation): M1c BUILT, NOT YET DRIVEN LIVE. Check free
     RAM before the release test build (5.2 GB free at the checkpoint; stray node/MCP processes were cleared). The preview of a master's project loads
     that master's localhost through port_forward on a free local port (src/lib/previewTunnel.ts plus 4 tests,
     PreviewTab.svelte, api.browser.forward). The address bar keeps the master's address and shows the machine's

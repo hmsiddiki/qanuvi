@@ -154,6 +154,9 @@ This PC is untouched in M1.
       back asks for a new tunnel (the old ones end with `remote_disconnect`).
     - Known limits: names such as `site.test` are looked up on This PC, not the master. A page that sends the
       browser to its own absolute `localhost:<port>` address leaves the tunnel.
+  - Driven live 2026-11-17 on the local test master: tunnel, address bar, relative links, This PC direct, tunnel
+    reused after switching back, inspector and page text all pass. Findings p1 (the text attached for the agent
+    names the tunnel's address, not the master's) and p2 (machine name cut off in the bar) await the owner.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
 - **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and
