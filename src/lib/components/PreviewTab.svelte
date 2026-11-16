@@ -20,7 +20,9 @@
   import { agent } from "$lib/stores/agent.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { workspace } from "$lib/stores/workspace.svelte";
+  import { displayName, masters } from "$lib/stores/masters.svelte";
   import { normalizeUrl } from "$lib/url";
+  import { loopbackPort, throughTunnel } from "$lib/previewTunnel";
   import IconButton from "./IconButton.svelte";
 
   interface Props {
@@ -46,6 +48,48 @@
   let expanded = $state<"" | "window" | "screen">("");
 
   let current = $derived(history[position] ?? "");
+
+  // Migration M1c: a master's project previews that master's localhost, through a tunnel on a free local port.
+  // History and the address bar keep the machine's own address; only what loads uses the tunnel.
+  let machine = $derived(project.master ?? null);
+  let machineInfo = $derived.by(() => {
+    if (!machine) return null;
+    const m = masters.list.find((x) => x.id === machine);
+    return { name: m ? displayName(m) : machine, color: m?.color || "" };
+  });
+  /** What the page frame, the inspector and "Open in the browser" load. */
+  let loaded = $state("");
+  let tunnelError = $state("");
+
+  $effect(() => {
+    const url = current;
+    const m = machine;
+    // A connection that comes back drops its old tunnels, so a new one is asked for.
+    const state = m ? masters.status[m]?.state : undefined;
+    const port = m && url ? loopbackPort(url) : null;
+    tunnelError = "";
+    if (!m || port === null) {
+      loaded = url;
+      return;
+    }
+    loaded = "";
+    if (state !== "on") {
+      tunnelError = `Not connected to ${machineInfo?.name ?? m}, so its localhost cannot be shown.`;
+      return;
+    }
+    let stale = false;
+    api.browser
+      .forward(m, port)
+      .then((local) => {
+        if (!stale) loaded = throughTunnel(url, local);
+      })
+      .catch((e) => {
+        if (!stale) tunnelError = errorText(e);
+      });
+    return () => {
+      stale = true;
+    };
+  });
 
   // Milestone 15: follow the page the agent's test browser is on, and hand the agent a page or an element.
   let follow = $state(false);
@@ -81,11 +125,11 @@
   });
 
   async function sendPage() {
-    if (!current) return;
+    if (!loaded) return;
     busy = "Reading the page…";
     error = "";
     try {
-      agent.attach(await api.browser.pageText(current));
+      agent.attach(await api.browser.pageText(loaded));
     } catch (e) {
       error = errorText(e);
     } finally {
@@ -99,12 +143,12 @@
   }
 
   async function inspect() {
-    if (!current) return;
+    if (!loaded) return;
     busy = "Opening the page in the test browser…";
     error = "";
     try {
       const [w, h] = viewSize();
-      shot = await api.browser.show(current, w, h);
+      shot = await api.browser.show(loaded, w, h);
     } catch (e) {
       error = errorText(e);
     } finally {
@@ -213,6 +257,14 @@
       <ChevronRight size={15} />
     </IconButton>
     <IconButton label="Reload" disabled={!current} onclick={() => reloadKey++}><RotateCw size={14} /></IconButton>
+    {#if machineInfo}
+      <span
+        class="machine"
+        title={`localhost here is ${machineInfo.name}'s own localhost, reached through a tunnel on this computer.`}
+      >
+        <span class="dot" style:background={machineInfo.color || "var(--qx-text-muted)"}></span>{machineInfo.name}
+      </span>
+    {/if}
     <input bind:value={address} placeholder="http://localhost/…" spellcheck="false" aria-label="Address" />
     {#each Object.entries(DEVICES) as [id, d] (id)}
       <IconButton label={d.label} active={device === id} onclick={() => (device = id as Device)}>
@@ -229,19 +281,19 @@
       >
         <Eye size={14} />
       </IconButton>
-      <IconButton label="Send this page to the agent (as text)" disabled={!current || !!busy} onclick={sendPage}>
+      <IconButton label="Send this page to the agent (as text)" disabled={!loaded || !!busy} onclick={sendPage}>
         <FileInput size={14} />
       </IconButton>
       <IconButton
         label="Point at an element to send it to the agent"
         active={!!shot}
-        disabled={!current || !!busy}
+        disabled={!loaded || !!busy}
         onclick={() => (shot ? (shot = null) : inspect())}
       >
         <MousePointerClick size={14} />
       </IconButton>
     {/if}
-    <IconButton label="Open in the browser" disabled={!current} onclick={() => openUrl(current)}>
+    <IconButton label="Open in the browser" disabled={!loaded} onclick={() => openUrl(loaded)}>
       <ExternalLink size={14} />
     </IconButton>
     {#if expanded}
@@ -273,15 +325,21 @@
         onwheel={wheel}
       />
     {:else}
-      {#if current}
-        {#key `${current}#${reloadKey}`}
+      {#if loaded}
+        {#key `${loaded}#${reloadKey}`}
           <iframe
             title="Preview"
-            src={current}
+            src={loaded}
             style:width={DEVICES[device].width ? `${DEVICES[device].width}px` : "100%"}
             class:framed={DEVICES[device].width > 0}
           ></iframe>
         {/key}
+      {:else if current}
+        <div class="empty">
+          {#if tunnelError}<p class="error">{tunnelError}</p>{:else}<p>
+              Reaching localhost on {machineInfo?.name}…
+            </p>{/if}
+        </div>
       {:else}
         <div class="empty">
           <p>Type the address of the project's site above, or set it in the project's settings.</p>
@@ -346,6 +404,26 @@
     font-size: var(--qx-text-small);
     outline: none;
     user-select: text;
+  }
+
+  .machine {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: var(--qx-space-2);
+    max-width: 140px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--qx-text-secondary);
+    font-size: var(--qx-text-small);
+  }
+
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
   }
 
   input:focus {

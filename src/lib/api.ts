@@ -615,6 +615,8 @@ export const api = {
     pick: (x: number, y: number) => invoke<PickedElement>("inspector_pick", { x, y }),
     pageText: (url: string) => invoke<string>("inspector_page_text", { url }),
     close: () => invoke<void>("inspector_close"),
+    /** A free port on this computer that reaches `port` on a master's localhost (migration M1c: the preview). */
+    forward: (master: string, port: number) => invoke<number>("port_forward", { master, port }),
   },
   memory: {
     /** Entries for a project (and every project), or all with null; suggested ones too with `suggested`. */

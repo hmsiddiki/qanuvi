@@ -144,6 +144,16 @@ This PC is untouched in M1.
   - The address bar keeps showing `localhost:<port>`, with the machine's name and colour.
   - Public addresses load directly, without a tunnel.
   - Switching back to This PC makes `localhost` mean This PC again.
+  - BUILT 2026-11-17 (M1c, not yet driven live):
+    - `src/lib/previewTunnel.ts` decides which addresses are loopback (`localhost`, `*.localhost`, `127.x`, `[::1]`;
+      80/443 when no port is typed) and swaps in the tunnel's port, keeping site names (`shop.localhost`).
+    - `PreviewTab` follows the project's own machine (`project.master`), not only the shown one.
+    - History, the address bar and the saved page keep the master's address. The frame, the inspector, "Send this
+      page" and "Open in the browser" load the tunnelled one.
+    - The bar shows the machine's dot and name. A machine that is not connected says so. A connection that comes
+      back asks for a new tunnel (the old ones end with `remote_disconnect`).
+    - Known limits: names such as `site.test` are looked up on This PC, not the master. A page that sends the
+      browser to its own absolute `localhost:<port>` address leaves the tunnel.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
 - **Measure** the TypeScript, Svelte and Pyright memory needs (only Intelephense and rust-analyzer are measured) and

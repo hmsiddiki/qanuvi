@@ -379,7 +379,14 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17, fresh conversation): M1b LEFTOVERS DONE. Read docs/MIGRATION-VIEWER.md M1 (preview/inspector and debugger bullets) first; k1 also fixed (a6a425b). Live install output 55a3f48 (host_run streams output
+    RESUME HERE (newest, 2026-11-17): M1c BUILT, NOT YET DRIVEN LIVE. The preview of a master's project loads
+    that master's localhost through port_forward on a free local port (src/lib/previewTunnel.ts plus 4 tests,
+    PreviewTab.svelte, api.browser.forward). The address bar keeps the master's address and shows the machine's
+    dot and name. The frame, inspector, page text and "Open in the browser" use the tunnelled address. Public
+    addresses and This PC's projects load directly. No Rust change. Checks green: svelte-check 0 errors, 444
+    front-end tests, prettier. NEXT: drive M1c live (a dev server on the local test master, its project's
+    preview, switch back to This PC), then M1d debugger. Details are in docs/MIGRATION-VIEWER.md (M1 preview bullet).
+    RESUME HERE (before, CHECKPOINT 2026-11-17, fresh conversation): M1b LEFTOVERS DONE. Read docs/MIGRATION-VIEWER.md M1 (preview/inspector and debugger bullets) first; k1 also fixed (a6a425b). Live install output 55a3f48 (host_run streams output
     lines to a listening caller; window shows the newest four under Installing) plus npm --loglevel=http (without
     a terminal npm printed nothing until its end, so the first drive showed no lines for TypeScript). DRIVEN LIVE
     (release test builds, owner's yes for the three npm downloads): Svelte installed on the local test master from
