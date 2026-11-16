@@ -25,8 +25,9 @@
   import StatusBar from "$lib/components/StatusBar.svelte";
   import ProjectSettings from "$lib/components/ProjectSettings.svelte";
   import { projects } from "$lib/stores/projects.svelte";
-  import { masters } from "$lib/stores/masters.svelte";
-  import { restoreShown } from "$lib/stores/machines";
+  import { displayName, masters } from "$lib/stores/masters.svelte";
+  import { pick, restoreShown } from "$lib/stores/machines";
+  import { working } from "$lib/stores/working.svelte";
   import { memory } from "$lib/stores/memory.svelte";
   import { memoryDisk } from "$lib/stores/memoryDisk.svelte";
   import { account } from "$lib/stores/account.svelte";
@@ -42,7 +43,7 @@
   import { untrack } from "svelte";
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
   import { isProjectView, workspace, type SavedTab } from "$lib/stores/workspace.svelte";
-  import { projectFromUrl, windows } from "$lib/stores/windows.svelte";
+  import { machineFromUrl, projectFromUrl, windows } from "$lib/stores/windows.svelte";
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import FolderPicker from "$lib/components/FolderPicker.svelte";
   import { draftPreview, drafts } from "$lib/stores/drafts";
@@ -59,27 +60,44 @@
     planData.start().catch(() => {});
     ready = true;
     platform.load();
-    // A project window opens with its own project and leaves the main window's choice alone.
+    // A project window opens with its own project and leaves the main window's choice alone; so does a machine window
+    // (24z3 step 4), which opens on its own machine.
     projects.startWith = projectFromUrl(location.search);
-    windows.init(() => projects.currentId);
-    projects.persist = !projects.startWith;
+    const machineStart = machineFromUrl(location.search);
+    const extra = !!projects.startWith || machineStart !== undefined;
+    windows.init(
+      () => projects.currentId,
+      () => switcher.shown,
+    );
+    projects.persist = !extra;
     terminals.remote = (id) => !!projects.list.find((p) => p.id === id)?.master;
     // Servers marked to connect at start-up connect once This PC's projects are listed (a project window for a
     // server's project shows that server). The main window then shows the machine picked last, when it is connected.
     projects
       .load()
       .then(() => masters.autoConnect())
-      .then(() => {
-        if (!projects.startWith) void restoreShown((id) => masters.statusOf(id).state === "on");
+      .then(async () => {
+        if (machineStart !== undefined) return openOn(machineStart);
+        if (extra) return;
+        await restoreShown((id) => masters.statusOf(id).state === "on");
+        // The machine windows open when the app last closed come back, each on its machine.
+        for (const m of windows.takeMachineWindows()) {
+          const known = m === "" || masters.list.some((x) => x.id === m);
+          if (known && m !== (switcher.shown ?? "")) {
+            const master = masters.list.find((x) => x.id === m);
+            void windows.openMachine(m || null, master ? displayName(master) : "This PC").catch(() => {});
+          }
+        }
       });
+    working.start();
     // The memory disk syncs at start-up (in the main window only: one sync per machine is enough).
-    if (!projects.startWith) memoryDisk.init();
+    if (!extra) memoryDisk.init();
     account.init();
-    if (!projects.startWith) remoteAccess.init();
+    if (!extra) remoteAccess.init();
     terminals.loadShells();
     agent.loadInfo();
     // Chat clean-up (24t), once per start in the main window; said once, nothing when none went.
-    if (!projects.startWith)
+    if (!extra)
       agent
         .cleanUpChats(settings.value.chatCleanupDays)
         .then((n) => {
@@ -106,6 +124,25 @@
     };
     window.addEventListener("beforeunload", flush);
     return () => window.removeEventListener("beforeunload", flush);
+  });
+
+  /**
+   * A machine window (24z3 step 4) opens on its machine: a master not connected yet is connected first (the app's
+   * connection, shared by its windows); one that does not answer shows its own "not connected" screen (Part E).
+   */
+  async function openOn(machine: string | null) {
+    if (!machine) return;
+    const m = masters.list.find((x) => x.id === machine);
+    if (!m) return;
+    if (masters.statusOf(machine).state !== "on") await masters.connect(m);
+    if (masters.statusOf(machine).state === "on") await pick(machine, false);
+    else await masters.showUnreachable(machine);
+  }
+
+  // The other windows know which machine this one shows (picking it there brings this window forward).
+  $effect(() => {
+    const shown = switcher.shown;
+    untrack(() => windows.announceMachine(shown));
   });
 
   // A different project: its tabs, sessions and terminals.

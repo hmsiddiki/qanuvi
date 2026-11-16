@@ -3,7 +3,11 @@
    * The machine switcher (24z3 Part B), at the top of the sidebar: This PC and every paired master, with its colour,
    * its connection and its Inbox questions not read yet. Picking one shows that machine: the whole screen becomes its
    * own. This PC is always in the list. A master's SSH address shows on hover only, so the list stays small.
+   * Step 4: a working icon per machine (how many agents work there, on hover), and a machine's right-click menu opens
+   * it in a window of its own; picking a machine another window shows brings that window forward.
    */
+  import AppWindow from "@lucide/svelte/icons/app-window";
+  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Check from "@lucide/svelte/icons/check";
   import Monitor from "@lucide/svelte/icons/monitor";
@@ -15,10 +19,33 @@
   import { switcher } from "$lib/stores/switcher.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import type { MasterSettings } from "$lib/stores/settings.svelte";
+  import { working, workingText } from "$lib/stores/working.svelte";
+  import { windows } from "$lib/stores/windows.svelte";
 
   let { collapsed = false, onmanage }: { collapsed?: boolean; onmanage: () => void } = $props();
 
   let open = $state(false);
+  /** The right-click menu of a machine ("" is This PC), with where it opened. */
+  let menuFor = $state<{ id: string; x: number; y: number } | null>(null);
+
+  /** Agents working on the machines not shown (the closed switcher's icon). */
+  let workingElsewhere = $derived(
+    Object.entries(working.counts)
+      .filter(([m]) => m !== (switcher.shown ?? ""))
+      .reduce((a, [, c]) => a + c, 0),
+  );
+
+  const nameOf = (id: string) => {
+    if (!id) return "This PC";
+    const m = masters.list.find((x) => x.id === id);
+    return m ? displayName(m) : id;
+  };
+
+  async function openWindow(id: string) {
+    menuFor = null;
+    open = false;
+    await windows.openMachine(id || null, nameOf(id)).catch(() => {});
+  }
 
   let shownMaster = $derived(masters.list.find((m) => m.id === switcher.shown) ?? null);
   let shownName = $derived(shownMaster ? displayName(shownMaster) : "This PC");
@@ -53,6 +80,13 @@
   };
 
   async function choose(id: string | null) {
+    // Another window shows it already: that window comes forward, this one stays as it is.
+    const other = id === switcher.shown ? null : windows.windowOfMachine(id);
+    if (other) {
+      open = false;
+      await windows.focus(other).catch(() => {});
+      return;
+    }
     if (id === switcher.shown) {
       open = false;
       // The machine shown cannot be reached (24z3 Part E): picking it again tries it now.
@@ -81,10 +115,14 @@
 
 <svelte:window
   onpointerdown={(e) => {
-    if (open && !(e.target as HTMLElement).closest(".switcher")) open = false;
+    const t = e.target as HTMLElement;
+    if (menuFor && !t.closest(".context")) menuFor = null;
+    if (open && !t.closest(".switcher")) open = false;
   }}
   onkeydown={(e) => {
-    if (open && e.key === "Escape") open = false;
+    if (e.key !== "Escape") return;
+    if (menuFor) menuFor = null;
+    else if (open) open = false;
   }}
 />
 
@@ -99,6 +137,7 @@
     aria-label="Machine: {shownName}"
     onclick={() => {
       open = !open;
+      if (open) void working.refresh();
     }}
   >
     <span class="avatar" style:background={shownMaster?.color || undefined} aria-hidden="true">
@@ -106,6 +145,9 @@
     </span>
     {#if !collapsed}
       <span class="name">{shownName}</span>
+      {#if workingElsewhere > 0}<span class="working" title="{workingText(workingElsewhere)} on other machines"
+          ><LoaderCircle size={13} /></span
+        >{/if}
       {#if elsewhere > 0}<span class="pill" title="{elsewhere} not read on other machines">{elsewhere}</span>{/if}
       <ChevronDown size={14} />
     {:else if elsewhere > 0}
@@ -120,11 +162,23 @@
         class="machine"
         role="option"
         aria-selected={switcher.shown === null}
-        title="This PC"
+        title={["This PC", workingText(working.of(null)), windows.windowOfMachine(null) ? "open in another window" : ""]
+          .filter(Boolean)
+          .join(" · ")}
         onclick={() => choose(null)}
+        oncontextmenu={(e) => {
+          e.preventDefault();
+          menuFor = { id: "", x: e.clientX, y: e.clientY };
+        }}
       >
         <span class="swatch pc"><Monitor size={12} /></span>
         <span class="label">This PC</span>
+        {#if windows.windowOfMachine(null)}<span class="elsewhere" aria-label="Open in another window"
+            ><AppWindow size={12} /></span
+          >{/if}
+        {#if working.of(null)}<span class="working" aria-label={workingText(working.of(null))}
+            ><LoaderCircle size={13} /></span
+          >{/if}
         {#if unread[""]}<span class="pill" title="{unread['']} not read">{unread[""]}</span>{/if}
         <span class="tick"
           >{#if switcher.shown === null}<Check size={13} />{/if}</span
@@ -137,12 +191,29 @@
           class="machine"
           role="option"
           aria-selected={switcher.shown === m.id}
-          title="{displayName(m)}: {reach(m)} · {stateText(m)}"
+          title={[
+            `${displayName(m)}: ${reach(m)}`,
+            stateText(m),
+            workingText(working.of(m.id)),
+            windows.windowOfMachine(m.id) ? "open in another window" : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
           disabled={st.state === "connecting"}
           onclick={() => choose(m.id)}
+          oncontextmenu={(e) => {
+            e.preventDefault();
+            menuFor = { id: m.id, x: e.clientX, y: e.clientY };
+          }}
         >
           <span class="swatch" style:background={m.color || undefined}><Server size={12} /></span>
           <span class="label">{displayName(m)}</span>
+          {#if windows.windowOfMachine(m.id)}<span class="elsewhere" aria-label="Open in another window"
+              ><AppWindow size={12} /></span
+            >{/if}
+          {#if working.of(m.id)}<span class="working" aria-label={workingText(working.of(m.id))}
+              ><LoaderCircle size={13} /></span
+            >{/if}
           <span class="state {st.state}" aria-label={stateText(m)}></span>
           {#if unread[m.id]}<span class="pill" title="{unread[m.id]} not read">{unread[m.id]}</span>{/if}
           <span class="tick"
@@ -158,6 +229,20 @@
           onmanage();
         }}><Settings2 size={13} /> Servers…</button
       >
+    </div>
+  {/if}
+
+  {#if menuFor}
+    {@const id = menuFor.id}
+    <div class="context" role="menu" style:left="{menuFor.x}px" style:top="{menuFor.y}px">
+      {#if id === (switcher.shown ?? "")}
+        <span class="note">Shown in this window</span>
+      {:else}
+        <button type="button" role="menuitem" onclick={() => openWindow(id)}>
+          <AppWindow size={13} />
+          {windows.windowOfMachine(id || null) ? "Go to its window" : "Open in a new window"}
+        </button>
+      {/if}
     </div>
   {/if}
 </div>
@@ -322,6 +407,71 @@
     display: grid;
     place-items: center;
     color: var(--qx-accent);
+  }
+
+  .working {
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--qx-accent);
+  }
+
+  .working :global(svg) {
+    animation: qx-working-spin 1.2s linear infinite;
+  }
+
+  @keyframes qx-working-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .working :global(svg) {
+      animation: none;
+    }
+  }
+
+  .elsewhere {
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--qx-text-secondary);
+  }
+
+  .context {
+    position: fixed;
+    z-index: 40;
+    min-width: 190px;
+    padding: 4px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+    background: var(--qx-bg-panel);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .context button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: var(--qx-radius-button);
+    background: transparent;
+    color: var(--qx-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .context button:hover {
+    background: var(--qx-bg-raised);
+  }
+
+  .context .note {
+    display: block;
+    padding: 5px 8px;
+    color: var(--qx-text-secondary);
   }
 
   .manage {

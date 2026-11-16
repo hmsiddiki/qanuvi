@@ -16,6 +16,7 @@
   import { masters, displayName } from "$lib/stores/masters.svelte";
   import { switcher } from "$lib/stores/switcher.svelte";
   import { pick } from "$lib/stores/machines";
+  import { windows } from "$lib/stores/windows.svelte";
 
   /** Which machines' items show: "all", "" (This PC) or a master's id. */
   let only = $state("all");
@@ -62,8 +63,11 @@
     inbox.markRead(item.id);
     ui.inboxOpen = false;
     if (!item.open) return;
-    // Its step or plan is on the machine that has the item: that machine is shown first.
+    // Its step or plan is on the machine that has the item: that machine is shown first. A window of its own
+    // (24z3 step 4) comes forward instead, at the item, and this window stays as it is.
     const machine = item.master ?? null;
+    const other = machine !== switcher.shown ? windows.windowOfMachine(machine) : null;
+    if (other) return windows.openInboxIn(other, item.id);
     if (machine !== switcher.shown) await pick(machine, projects.persist);
     if (item.open.projectId && projects.current?.id !== item.open.projectId) projects.select(item.open.projectId);
     if (!layout.state.workVisible) layout.toggleWork();

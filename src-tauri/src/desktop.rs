@@ -776,6 +776,12 @@ fn agent_info() -> agent::AgentInfo {
     agent::info()
 }
 
+/// How many agents work on this PC now (the machine switcher's working icon, 24z3 step 4).
+#[tauri::command]
+fn agents_working(state: State<AppState>) -> i64 {
+    agent::working_count(&state.db)
+}
+
 #[tauri::command]
 fn agent_sessions(state: State<AppState>, project_id: String) -> Res<Vec<agent::Session>> {
     agent::list_sessions(&state.db, &project_id)
@@ -2300,6 +2306,7 @@ pub fn run() {
             git_show,
             git_blame,
             agent_info,
+            agents_working,
             agent_sessions,
             agent_session_events,
             agent_session_times,

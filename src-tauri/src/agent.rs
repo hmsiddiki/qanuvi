@@ -384,13 +384,19 @@ pub fn list_sessions(db: &Db, project_id: &str) -> Result<Vec<Session>, String> 
 
 /// Whether any agent on this machine is working now (a Claude Code update waits for that).
 pub fn any_working(db: &Db) -> bool {
+    working_count(db) > 0
+}
+
+/// How many agent sessions on this machine are working now, chats and plan steps alike (a turn under way, or one
+/// waiting for an answer). The machine switcher's working icon (24z3 step 4) shows it per machine.
+pub fn working_count(db: &Db) -> i64 {
     db.conn()
         .query_row(
             "SELECT COUNT(*) FROM sessions WHERE status IN ('running', 'waiting')",
             [],
             |r| r.get::<_, i64>(0),
         )
-        .is_ok_and(|n| n > 0)
+        .unwrap_or(0)
 }
 
 /// An agent session that changed a file (the project panel's Timeline, 15h).
@@ -1673,6 +1679,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(list_sessions(&db, &project.id).unwrap().len(), 1);
+        // The switcher counts it as working until its turn ends.
+        assert_eq!(working_count(&db), 1);
         assert_eq!(session_events(&db, "s1").unwrap(), vec!["{}"]);
         rename(&db, "s1", "  Better title ").unwrap();
         assert_eq!(get(&db, "s1").unwrap().title, "Better title");

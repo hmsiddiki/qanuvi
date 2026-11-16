@@ -548,6 +548,8 @@ impl Master {
                 "agents": self.agents.open_count(),
                 "runs": self.runs.active().len(),
             })),
+            // How many agents work here now (the window's machine switcher shows it, 24z3 step 4).
+            "agents_working" => Ok(json!(crate::agent::working_count(&self.db))),
             "master_restart" => {
                 self.restart(&self.dir)?;
                 Ok(Value::Null)
@@ -1518,6 +1520,7 @@ mod tests {
             (busy["agents"].as_u64(), busy["runs"].as_u64()),
             (Some(0), Some(0))
         );
+        assert_eq!(call(&m, "agents_working", json!({})).unwrap(), 0);
         call(&m, "backups_set", json!({"folder": "", "off": false})).unwrap();
     }
 
