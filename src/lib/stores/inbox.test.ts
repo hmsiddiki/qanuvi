@@ -64,8 +64,43 @@ describe("a master's Inbox", () => {
       ["vps-2", "vps"],
     ]);
     expect(inbox.questions.map((i) => i.id)).toEqual(["vps-q"]);
-    inbox.dropMaster("vps");
+    inbox.forgetMaster("vps");
     expect(inbox.items.map((i) => i.id)).toEqual(["here-1"]);
+  });
+
+  it("keeps a dropped master's items as not connected, with nothing sent for them, until it is back", async () => {
+    await inbox.refresh();
+    await inbox.followMaster("vps");
+    inbox.dropMaster("vps");
+    expect(inbox.items.map((i) => [i.id, !!i.offline])).toEqual([
+      ["vps-q", true],
+      ["here-1", false],
+      ["vps-2", true],
+    ]);
+    calls.length = 0;
+    expect(await inbox.answer("vps-q", { choice: "go", text: "" })).toBe(false);
+    inbox.remove("vps-2");
+    inbox.markRead();
+    expect(calls.filter((c) => c.where === "vps")).toEqual([]);
+    // Back: its own list replaces the copy.
+    await inbox.followMaster("vps");
+    expect(inbox.items.filter((i) => i.offline)).toEqual([]);
+    expect(inbox.items.map((i) => i.id)).toEqual(["vps-q", "here-1", "vps-2"]);
+    inbox.forgetMaster("vps");
+    expect(inbox.items.map((i) => i.id)).toEqual(["here-1"]);
+  });
+
+  it("clears one machine's items only when asked for one", async () => {
+    await inbox.refresh();
+    await inbox.followMaster("vps");
+    calls.length = 0;
+    inbox.clear("vps");
+    inbox.clear(null);
+    expect(calls.map((c) => `${c.where}:${c.cmd}`)).toEqual(["vps:inbox_clear", "here:inbox_clear"]);
+    calls.length = 0;
+    inbox.clear();
+    expect(calls.map((c) => `${c.where}:${c.cmd}`).sort()).toEqual(["here:inbox_clear", "vps:inbox_clear"]);
+    inbox.forgetMaster("vps");
   });
 
   it("sends what is done to an item to the machine that has it", async () => {
@@ -84,7 +119,7 @@ describe("a master's Inbox", () => {
     calls.length = 0;
     inbox.markRead();
     expect(calls.map((c) => `${c.where}:${c.cmd}`).sort()).toEqual(["here:inbox_mark_read", "vps:inbox_mark_read"]);
-    inbox.dropMaster("vps");
+    inbox.forgetMaster("vps");
   });
 
   it("follows the master's changes and tells a new question once to the desktop", async () => {
@@ -98,13 +133,15 @@ describe("a master's Inbox", () => {
     stream?.onmessage?.({ change: "answer", item: { ...question("vps-q", 200), status: "answered" } });
     await vi.waitFor(() => expect(inbox.items[0]?.id).toBe("vps-new"));
     expect(calls.filter((c) => c.cmd === "notify_item").length).toBe(1);
+    // The notification names the machine that asked.
+    expect((calls.find((c) => c.cmd === "notify_item")?.args.item as { machine?: string }).machine).toBe("vps");
     expect(heard).toEqual(["vps-q@vps"]);
     // A replaced item (same key) is not told again.
     calls.length = 0;
     stream?.onmessage?.({ change: "add", item: question("vps-new", 300), new: false });
     expect(calls.filter((c) => c.cmd === "notify_item").length).toBe(0);
     off();
-    inbox.dropMaster("vps");
+    inbox.forgetMaster("vps");
   });
 
   it("leaves an older master without Inbox commands as it was", async () => {

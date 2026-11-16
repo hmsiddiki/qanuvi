@@ -104,12 +104,23 @@ fn short(s: &str, max: usize) -> String {
     format!("{}…", cut.trim_end())
 }
 
+/// "basevm378: " before a master's item (24z3 C2), nothing before This PC's own.
+fn from(item: &InboxItem) -> String {
+    item.machine
+        .as_deref()
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .map(|m| format!("{m}: "))
+        .unwrap_or_default()
+}
+
 fn one(item: &InboxItem) -> Shown {
-    let title = match item.kind_of.as_str() {
+    let what = match item.kind_of.as_str() {
         "answer" => format!("Needs your answer: {}", item.title),
         "problem" => format!("Problem: {}", item.title),
         _ => item.title.clone(),
     };
+    let title = format!("{}{what}", from(item));
     Shown {
         title: short(&title, 120),
         text: short(&item.text, 240),
@@ -132,7 +143,11 @@ pub fn compose(items: &[InboxItem], bundle: bool) -> Vec<Shown> {
     } else {
         format!("{} new in the Inbox", items.len())
     };
-    let mut lines: Vec<String> = items.iter().take(3).map(|i| short(&i.title, 70)).collect();
+    let mut lines: Vec<String> = items
+        .iter()
+        .take(3)
+        .map(|i| short(&format!("{}{}", from(i), i.title), 70))
+        .collect();
     if items.len() > 3 {
         lines.push(format!("and {} more", items.len() - 3));
     }
@@ -185,6 +200,7 @@ mod tests {
             answer: None,
             answered_by: None,
             answered_at: None,
+            machine: None,
         }
     }
 
@@ -260,5 +276,25 @@ mod tests {
             compose(&items[..1], true)[0].id.as_deref(),
             Some("id-1a waits")
         );
+    }
+
+    #[test]
+    fn a_masters_item_names_its_machine() {
+        let on_vps = |kind_of: &str, title: &str| InboxItem {
+            machine: Some("basevm378".into()),
+            ..item(kind_of, title)
+        };
+        let shown = compose(&[on_vps("answer", "1a waits")], false);
+        assert_eq!(shown[0].title, "basevm378: Needs your answer: 1a waits");
+        let blank = InboxItem {
+            machine: Some("  ".into()),
+            ..item("info", "Run finished")
+        };
+        assert_eq!(compose(&[blank], false)[0].title, "Run finished");
+        let bundled = compose(
+            &[on_vps("info", "Run finished"), item("info", "Here")],
+            true,
+        );
+        assert_eq!(bundled[0].text, "basevm378: Run finished\nHere");
     }
 }

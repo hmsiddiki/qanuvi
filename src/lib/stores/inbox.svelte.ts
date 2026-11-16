@@ -6,9 +6,11 @@
  *
  * A connected master (a server without a window, 24z R2d part 3) has its own Inbox: a run there asks its questions
  * in it. Its items are shown in the same list, marked with the master, and what is done to one goes to that master.
+ * The Inbox screen is the one view shared by all machines (24z3 C2): a master whose connection ended keeps its items
+ * listed, marked offline, until it is back; nothing is answered or changed from that copy.
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { callMaster } from "$lib/remote";
+import { callMaster, machineName } from "$lib/remote";
 import { forgetNotifications, learnNotifications, notifyFor } from "./notify.svelte";
 import { listen } from "@tauri-apps/api/event";
 import type { Place } from "./ui.svelte";
@@ -70,6 +72,8 @@ export interface InboxItem {
   answeredAt?: number | null;
   /** The master whose Inbox has it; absent for this computer's own. Set by the window only. */
   master?: string;
+  /** Its master is not connected now: shown as it was, never answered or changed from this copy. Window only. */
+  offline?: boolean;
 }
 
 export type NewInboxItem = Pick<InboxItem, "kind" | "title" | "text"> &
@@ -160,7 +164,10 @@ class InboxStore {
       const item = c.item ? { ...c.item, master } : null;
       if (c.change === "answer" && item) for (const fn of this.#answered) fn(item);
       if (c.change === "add" && item && c.new !== false)
-        void invoke("notify_item", { item: c.item, settings: notifyFor(master) }).catch(() => {});
+        void invoke("notify_item", {
+          item: { ...c.item, machine: machineName(master) },
+          settings: notifyFor(master),
+        }).catch(() => {});
       void callMaster<InboxItem[]>(master, "inbox_list", {})
         .then((list) => this.#setRemote(master, list))
         .catch(() => {});
@@ -173,10 +180,21 @@ class InboxStore {
     }
   }
 
-  /** The connection to a master ended: its items leave the list (they stay on the master). */
+  /**
+   * The connection to a master ended: its items stay listed, marked offline (they stay on the master), so the Inbox
+   * shows "not connected" for them until it is back and its own list replaces them.
+   */
   dropMaster(master: string): void {
     this.#following.delete(master);
     forgetNotifications(master);
+    if (!(master in this.#remote)) return;
+    this.#remote[master] = this.#remote[master].map((i) => ({ ...i, offline: true }));
+    this.#merge();
+  }
+
+  /** The master was removed from the list: its items leave the Inbox. */
+  forgetMaster(master: string): void {
+    this.dropMaster(master);
     if (!(master in this.#remote)) return;
     delete this.#remote[master];
     this.#merge();
@@ -185,6 +203,12 @@ class InboxStore {
   /** The master that has this item, or null for this computer's own. */
   #masterOf(id: string): string | null {
     return this.items.find((i) => i.id === id)?.master ?? null;
+  }
+
+  /** The item can be answered or changed now (its machine is connected). */
+  #live(id: string): boolean {
+    const item = this.items.find((i) => i.id === id);
+    return !!item && !item.offline;
   }
 
   /** Calls the Inbox command on this computer, or on the master that has the item. */
@@ -208,6 +232,7 @@ class InboxStore {
    * closed it first. A plan step's answer is kept for its plan, so a run started later goes on with it too.
    */
   async answer(id: string, answer: InboxAnswer): Promise<boolean> {
+    if (!this.#live(id)) return false;
     const master = this.#masterOf(id);
     const done = await this.#call<InboxItem | null>(master, "inbox_answer", { id, answer }).catch(() => null);
     // A master's run reads its answer from the master's Inbox; its plan's state is kept there.
@@ -237,20 +262,27 @@ class InboxStore {
 
   /** Marks one item read, or all of them (open questions stay unread: they still need the owner). */
   markRead(id?: string): void {
-    const unread = this.items.filter((i) => !i.read && (id === undefined ? !isOpenQuestion(i) : i.id === id));
+    const unread = this.items.filter(
+      (i) => !i.read && !i.offline && (id === undefined ? !isOpenQuestion(i) : i.id === id),
+    );
     for (const master of new Set(unread.map((i) => i.master ?? null)))
       void this.#call(master, "inbox_mark_read", { id: id ?? null }).catch(() => {});
   }
 
   /** Removes an item; open questions are answered or closed, not removed. */
   remove(id: string): void {
+    if (!this.#live(id)) return;
     void this.#call(this.#masterOf(id), "inbox_remove", { id }).catch(() => {});
   }
 
-  /** Clears everything except open questions, here and on every connected master. */
-  clear(): void {
-    void invoke("inbox_clear").catch(() => {});
-    for (const master of this.#following) void callMaster(master, "inbox_clear", {}).catch(() => {});
+  /**
+   * Clears everything except open questions, here and on every connected master; or on one machine only (null is
+   * This PC), when the Inbox shows one machine's items.
+   */
+  clear(machine?: string | null): void {
+    if (machine === undefined || machine === null) void invoke("inbox_clear").catch(() => {});
+    for (const master of this.#following)
+      if (machine === undefined || machine === master) void callMaster(master, "inbox_clear", {}).catch(() => {});
   }
 }
 

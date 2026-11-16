@@ -335,6 +335,8 @@ class MastersStore {
     const m = this.list.find((x) => x.id === id);
     if (m?.relay) await invoke("remote_unpair", { pairing: m.relay.pairing }).catch(() => {});
     await this.disconnect(id);
+    // Its Inbox items were kept as "not connected"; a removed machine's leave (they stay on the machine).
+    inbox.forgetMaster(id);
     settings.set(
       "masters",
       this.list.filter((x) => x.id !== id),

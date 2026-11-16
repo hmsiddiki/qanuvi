@@ -1,5 +1,10 @@
 <script lang="ts">
-  /** The Inbox (24f, 15f): sessions waiting for the user, plan run reports, sign-ins to renew, newer knowledge. */
+  /**
+   * The Inbox (24f, 15f): sessions waiting for the user, plan run reports, sign-ins to renew, newer knowledge. The one
+   * screen shared by all machines (24z3 C2): every machine's items with its name, a filter by machine, answers sent to
+   * the machine that asked; only opening a step or plan switches to that machine. A machine not connected shows its
+   * items as they were, marked "not connected", with nothing to press.
+   */
   import { onMount } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { inbox, isOpenQuestion, type InboxItem } from "$lib/stores/inbox.svelte";
@@ -8,10 +13,31 @@
   import { ui } from "$lib/stores/ui.svelte";
   import { layout } from "$lib/layout/layout.svelte";
   import { ago } from "$lib/stores/git.svelte";
+  import { masters, displayName } from "$lib/stores/masters.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
+  import { pick } from "$lib/stores/machines";
 
-  let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting"));
-  let questions = $derived(inbox.items.filter(isOpenQuestion));
-  let happened = $derived(inbox.items.filter((i) => !isOpenQuestion(i)));
+  /** Which machines' items show: "all", "" (This PC) or a master's id. */
+  let only = $state("all");
+  /** With paired masters, each item names its machine and the filter shows. */
+  let several = $derived(masters.list.length > 0);
+  /** The filter's machine is gone from the list: all show again. */
+  let filter = $derived(only === "all" || only === "" || masters.list.some((m) => m.id === only) ? only : "all");
+  const mine = (i: InboxItem) => filter === "all" || (i.master ?? "") === filter;
+
+  /** The machine's name as shown in the switcher ("This PC" for this computer's own). */
+  function machineOf(i: InboxItem): { name: string; color?: string } {
+    if (!i.master) return { name: "This PC" };
+    const m = masters.list.find((x) => x.id === i.master);
+    return m ? { name: displayName(m), color: m.color || undefined } : { name: i.master };
+  }
+
+  // Sessions waiting are the shown machine's own (its chats); they show with it or with "all".
+  let waiting = $derived(
+    filter === "all" || filter === (switcher.shown ?? "") ? agent.sessions.filter((s) => s.status === "waiting") : [],
+  );
+  let questions = $derived(inbox.items.filter((i) => isOpenQuestion(i) && mine(i)));
+  let happened = $derived(inbox.items.filter((i) => !isOpenQuestion(i) && mine(i)));
 
   /** How an answered or closed question ended, in a few words. */
   function outcome(item: InboxItem): string {
@@ -29,10 +55,14 @@
     chats: "Chats",
   };
 
-  function open(item: InboxItem) {
+  async function open(item: InboxItem) {
+    if (item.offline) return;
     inbox.markRead(item.id);
     ui.inboxOpen = false;
     if (!item.open) return;
+    // Its step or plan is on the machine that has the item: that machine is shown first.
+    const machine = item.master ?? null;
+    if (machine !== switcher.shown) await pick(machine, projects.persist);
     if (item.open.projectId && projects.current?.id !== item.open.projectId) projects.select(item.open.projectId);
     if (!layout.state.workVisible) layout.toggleWork();
     ui.show(item.open.view);
@@ -68,21 +98,38 @@
 <div class="inbox" bind:this={root}>
   <header>
     <h2>Inbox</h2>
-    {#if happened.length}
-      <button type="button" class="link" onclick={() => inbox.clear()}>Clear all</button>
+    {#if several}
+      <select class="only" aria-label="Machines" bind:value={only}>
+        <option value="all">All machines</option>
+        <option value="">This PC</option>
+        {#each masters.list as m (m.id)}<option value={m.id}>{displayName(m)}</option>{/each}
+      </select>
+    {/if}
+    {#if happened.some((i) => !i.offline)}
+      <button type="button" class="link" onclick={() => inbox.clear(filter === "all" ? undefined : filter || null)}
+        >Clear all</button
+      >
     {/if}
   </header>
 
   {#if questions.length}
     <h3>Needs your answer</h3>
     {#each questions as item (item.id)}
-      <div class="item unread" data-id={item.id} class:focus={ui.inboxFocus === item.id}>
+      <div class="item unread" class:offline={item.offline} data-id={item.id} class:focus={ui.inboxFocus === item.id}>
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
+          {#if several}{@const m = machineOf(item)}<span class="machine"
+              ><span class="dot" style:background={m.color}></span>{m.name}</span
+            >{/if}
           <strong class="title">{item.title}</strong>
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
-        <InboxQuestion {item} onopen={open} />
+        {#if item.offline}
+          {#if item.text}<p class="text">{item.text}</p>{/if}
+          <p class="text gone">{machineOf(item).name} is not connected. Answer it once it is back.</p>
+        {:else}
+          <InboxQuestion {item} onopen={open} />
+        {/if}
       </div>
     {/each}
   {/if}
@@ -101,18 +148,31 @@
   {#if happened.length}
     <h3>What happened</h3>
     {#each happened as item (item.id)}
-      <div class="item" class:unread={!item.read} data-id={item.id} class:focus={ui.inboxFocus === item.id}>
+      <div
+        class="item"
+        class:unread={!item.read && !item.offline}
+        class:offline={item.offline}
+        data-id={item.id}
+        class:focus={ui.inboxFocus === item.id}
+      >
         <div class="line">
           <span class="kind">{KIND[item.kind]}</span>
+          {#if several}{@const m = machineOf(item)}<span class="machine"
+              ><span class="dot" style:background={m.color}></span>{m.name}</span
+            >{/if}
           <strong class="title">{item.title}</strong>
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
         {#if item.text}<p class="text">{item.text}</p>{/if}
         {#if item.type === "answer"}<p class="text">{outcome(item)}</p>{/if}
-        <div class="actions">
-          {#if item.open}<button type="button" class="btn" onclick={() => open(item)}>{item.open.label}</button>{/if}
-          <button type="button" class="link" onclick={() => inbox.remove(item.id)}>Remove</button>
-        </div>
+        {#if item.offline}
+          <p class="text gone">{machineOf(item).name} is not connected.</p>
+        {:else}
+          <div class="actions">
+            {#if item.open}<button type="button" class="btn" onclick={() => open(item)}>{item.open.label}</button>{/if}
+            <button type="button" class="link" onclick={() => inbox.remove(item.id)}>Remove</button>
+          </div>
+        {/if}
       </div>
     {/each}
   {:else if !waiting.length && !questions.length}
@@ -181,6 +241,41 @@
     display: flex;
     gap: 8px;
     align-items: baseline;
+  }
+
+  .only {
+    margin-left: auto;
+    font: inherit;
+    font-size: 11.5px;
+    padding: 2px 6px;
+    border: 1px solid var(--qx-border);
+    border-radius: 6px;
+    background: var(--qx-bg-window);
+    color: inherit;
+  }
+
+  .machine {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--qx-text-secondary);
+    white-space: nowrap;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--qx-text-secondary);
+  }
+
+  .item.offline {
+    opacity: 0.6;
+  }
+
+  .gone {
+    font-style: italic;
   }
 
   .kind {

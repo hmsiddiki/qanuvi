@@ -38,6 +38,10 @@ pub struct InboxItem {
     /// Which window or device answered (a window label, later "phone").
     pub answered_by: Option<String>,
     pub answered_at: Option<i64>,
+    /// The machine that has it, named in its desktop notification (24z3 C2): set by the window for a master's
+    /// item, never stored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine: Option<String>,
 }
 
 /// A new item as the interface sends it.
@@ -94,6 +98,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<InboxItem> {
         answer: parse(r.get(12)?),
         answered_by: r.get(13)?,
         answered_at: r.get(14)?,
+        machine: None,
     })
 }
 
@@ -198,6 +203,7 @@ pub fn add_new(db: &Db, item: &NewItem) -> Result<(InboxItem, bool), String> {
         answer: None,
         answered_by: None,
         answered_at: None,
+        machine: None,
     };
     insert(&conn, &new)?;
     prune(&conn)?;
@@ -395,6 +401,7 @@ pub fn import(db: &Db, old: &[OldItem]) -> Result<usize, String> {
             answer: None,
             answered_by: None,
             answered_at: None,
+            machine: None,
         };
         n += insert(&conn, &item)?;
     }

@@ -60,6 +60,11 @@ export function shownPlaceTitle(): string {
   return placeTitle(shownPlace());
 }
 
+/** A master's name as shown (its id until the masters store names it). */
+export function machineName(master: string): string {
+  return nameOf(master);
+}
+
 export function nameMachines(names: (master: string) => string): void {
   nameOf = names;
 }
