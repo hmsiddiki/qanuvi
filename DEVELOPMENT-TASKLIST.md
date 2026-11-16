@@ -379,7 +379,20 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 05:45): M1d BUILT, NOT YET DRIVEN LIVE (details in docs/MIGRATION-VIEWER.md,
+    RESUME HERE (newest, CHECKPOINT 2026-11-17 05:35, fresh conversation): M1d DRIVEN LIVE on the local test
+    master, ALL PASS (owner's yes to stop the old test master and to download the adapters). The test master was
+    stopped, both binaries rebuilt (release, from 24a470e), and the master started again on the new build
+    (`qanuvi-master serve --data %APPDATA%\dev.qanuvi.desktop.source\local-master`; still running). Settings,
+    Languages with the master shown: both debuggers "Not installed" there (This PC has them); Install downloaded
+    js-debug v1.140.1 and PHP Debug v1.40.2 into local-master\debug-adapters (host_fetch); versions shown through
+    host_read. PHP check ran on the master; its own Xdebug file (E:/DevTools/xdebug) set there -> Xdebug 3.5.3.
+    Scratch project E:\qc-scratch\m1b-drive (app.js added): js-debug started by qanuvi-master with port 0,
+    reached through the tunnel; paused at app.js:2 (a 2, b 3, call stack), continue -> "total is 5", debugging
+    ended, adapter gone. PHP: PHP Debug started by qanuvi-master, php with the master's Xdebug file, paused at
+    index.php:3 ($name "42", Xdebug's call back on the master's localhost); switching to This PC ended the session
+    and its processes. NEXT (fresh conversation): M1d on the VPS (Node there; PHP and Xdebug on the VPS need the
+    owner's yes), then M2 (account on the master).
+    RESUME HERE (before, 2026-11-17 05:45): M1d BUILT, NOT YET DRIVEN LIVE (details in docs/MIGRATION-VIEWER.md,
     debugger bullet). Checks green: clippy clean, 440 Rust lib tests, 446 front-end tests, svelte-check 0 errors,
     prettier. Driving it live needs the local test master to run the new master build (host_fetch, host_read) and
     the adapters on that master (download from GitHub, or a copy of This PC's test-data adapters). NEXT: drive M1d
