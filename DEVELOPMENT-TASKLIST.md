@@ -379,7 +379,24 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-16 18:25, fresh conversation): owner AGREED both findings below, as
+    RESUME HERE (newest, CHECKPOINT 2026-11-16 21:40, fresh conversation): OWNER DECISION, NEW DIRECTION. The
+    master is Qanuvi itself (projects, files, agents, plans, Inbox, memory, settings, its own server list), fully
+    usable from a terminal with no display; the app is only the visual container (editors, chat, voice, layout,
+    windows) and shows one master at a time. This PC runs its own master and the app shows it by default; a VPS runs
+    only a master and is added as a server from any app; masters can connect to masters (nested dropdown under This
+    PC's). Nothing on screen is shared with This PC. Today: the app has its own built-in core (desktop.rs, 199
+    commands) and masters answer 152; 57 are desktop-only (inbox_*, remote_*, lsp_*, dap_*, notify_*, account_*,
+    inspector_*, attachment_*, data_location_*, ...), which is why each screen part was moved one by one.
+    ORDER NOW: (1) release 0.1.23 from main as it is (fixes the false usage-limit stop of 0.1.22, plus 98 commits):
+    short everyday check of the release build on scratch projects (open project, chat, plan step, terminal, switch
+    machine, Inbox Open into another window), then scripts/publish-update.mjs 0.1.23 ONLY with the owner's yes;
+    GitHub CI does not block a local release. (2) write the migration plan (app = viewer of masters) before any
+    code. DROPPED for now (owner): i1, i2, step 5 Part F (the migration replaces them). Since 18:25: Linux CI FIXED
+    (275e4f6, terminal test waited for the Windows-only cursor question; green on GitHub), CI posts failing tests
+    as public annotations (393e284, dd87db8; read them with the checks API, 60 unsigned requests an hour); one
+    Windows "Checks and tests" failure on GitHub at 275e4f6 not explained (full verify passes here); VPS runs the
+    20:35 server build with agents_working (.prev kept). Rust 431 pass, vitest 428 pass, clippy clean.
+    RESUME HERE (before, CHECKPOINT 2026-11-16 18:25): owner AGREED both findings below, as
     proposed: (i1) a closing window (or the app) keeps its unsaved files as drafts on their machine (B2 park path, in
     onCloseRequested before the window goes) and the Inbox says so; (i2) agent processes start in a job object so the
     --mcp-browser helper ends with its agent. Not built yet. ORDER NOW: build i1 + i2 and drive them live (scratch
