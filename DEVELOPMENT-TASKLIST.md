@@ -369,7 +369,26 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
-    RESUME HERE (newest, 2026-11-16 06:40): OWNER AGREED the Qanuvi ecosystem picture and batch D8 (below), before
+    RESUME HERE (newest, 2026-11-16 07:20): 24z3 D8 BUILT (3438ed5, owner go) AND DRIVEN LIVE on This PC, the local
+    test master and the VPS, all pass. Built: memory column part (migration 11: scope '' -> me, else project);
+    Entry::part()/is_account(); This project needs a project, account parts drop it; the disk writes, reads and
+    restores account memory only (format 2; project entries in older files are left out); an account entry moved
+    into a project gets a new id and the old one a deleted mark (other machines drop it); a new entry from an agent
+    is always suggested; memory_suggest takes part (all_projects = me); Memory page: part radios first (project
+    picker only for This project, refused without one), kind second, list grouped About me / This project / Tools
+    and models, part filter, disk text says what travels. Checks: 419 Rust + 391 TS, clippy (desktop + server)
+    clean. Driven (release test build 07:00): both DBs migrated (the D6 and D7 test entries were project-scoped ->
+    This project). D6 disk test fact removed from the master's DB by hand (agreed clean-up). Master synced while
+    This PC's file was still format 1: the D6 fact did NOT come back, "0 entries on the disk". Master: This project
+    + Tools entries saved, grouped; sync "1 entry". This PC: start-up sync "0 entries" (its project fact stayed
+    home); About me entry + sync "2 entries", the master's Tools entry arrived as Tools, its project entry did not.
+    Saving This project with no project -> "Choose the project this entry is for." Moved About me -> projl: old id
+    deleted, new project copy; moved the master's Tools entry -> projl, synced: master "1 deleted here", no project
+    copy there. VPS (server build cross-built 07:10, swapped with pkill -x, serve restarted as before, card
+    reconnected green): Memory defaults to About me (no projects), About me + Tools saved and grouped, both deleted
+    again. Not driven: an agent's memory_suggest live (unit tests only; costs tokens). Small finding: the empty
+    text says "for this project" also on a machine with no project. NEXT: Part B (switcher) with (d).
+    RESUME HERE (before, 2026-11-16 06:40): OWNER AGREED the Qanuvi ecosystem picture and batch D8 (below), before
     Part B. NEXT: build D8 only when the owner says go; then Part B with (d). The later ideas (learning suggestions,
     research, voice, how the brain gains knowledge, the brain instructing models from memory) are in
     docs/IDEAS-UPCOMING.md "Brain and memory".
