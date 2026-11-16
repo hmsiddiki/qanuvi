@@ -161,7 +161,9 @@ This PC is untouched in M1.
 - **Debugger on a shown master:** js-debug and PHP Debug through the pipe. For Xdebug, the call back to the adapter
   goes through a forwarded port on the master.
   - BUILT 2026-11-17 (M1d), driven live on the local test master the same day (install, js-debug breakpoint and
-    continue, PHP Debug with Xdebug, session ends when the machine leaves the screen); the VPS is next:
+    continue, PHP Debug with Xdebug, session ends when the machine leaves the screen). On the VPS the same day:
+    install, PHP Debug and session end pass; js-debug fails there because js-debug 1.140 needs Node.js 20+ and the
+    VPS has Node 18 (findings q1, q2 in the tasklist, owner to decide). How it works:
     - `dap.rs` runs on the lsp `Host`: status, install and the PHP / Xdebug check ask the project's machine.
     - Install: the release is looked up from This PC; the machine downloads and unpacks it into its own data
       folder through two new generic master commands, `host_fetch` (an https archive, tar.gz or zip, swapped in

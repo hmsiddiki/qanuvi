@@ -379,7 +379,29 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17 05:35, fresh conversation): M1d DRIVEN LIVE on the local test
+    RESUME HERE (newest, 2026-11-17 06:00): M1d DRIVEN ON THE VPS (owner's yes for the server build and for PHP with
+    Xdebug). Server build cross-built from c57122a (zigbuild -j 1, 9.6 MB, 5m 51s), swapped into ~/.local/bin on
+    basevm378 (old one kept as qanuvi-master.prev, old serve ended with pkill -x, window reconnected by itself).
+    VPS note: basevm378 is a hosting server (nginx, php-fpm 5.6 to 8.5 all running). `apt install php-xdebug` went
+    to PHP 8.5 and switched it on for 8.5 fpm and cgi too; undone at once (phpdismod -s fpm/cgi, fpm reloaded; it
+    had Xdebug about a minute, no nginx site points at 8.5). The CLI `php` is 8.2, so php8.2-xdebug was installed
+    for the CLI only (fpm and cgi marked disabled_by_admin first, so the 8.2 sites never loaded it). Now: Xdebug
+    3.5.3 in the 8.2 and 8.5 CLIs only.
+    PASS: basevm378 shown -> Settings, Languages lists the VPS's own statuses (both debuggers "Not installed";
+    "PHP 8.2.35 NTS x64 · Xdebug 3.5.3 (loaded by php.ini)", /usr/bin/php). Install put js-debug v1.140.1 and PHP
+    Debug v1.40.2 into /root/.local/share/qanuvi/debug-adapters (host_fetch; versions through host_read). PHP Debug
+    in project ~/qanuvi-test/m1b-vps (app.js added): phpDebug.js run by the VPS's `qanuvi-master serve`, php with
+    xdebug.client_host=127.0.0.1 on the VPS; paused at index.php:3 ($name "42", call stack greet, {main}).
+    Switching to This PC ended the session and both VPS processes.
+    FAIL (findings, owner to decide): q1: js-debug on the VPS stops at once with "JavaScript debugger (js-debug)
+    did not say which port it listens on." Cause: js-debug 1.140 needs Node.js 20+ (RegExp `v` flag); the VPS has
+    Debian's Node 18.20.4 (apt offers nothing newer). The adapter's own error (SyntaxError ... flags 'v') is lost.
+    Proposal: dap.rs keeps the adapter's last stderr lines and shows them when it ends before naming its port; the
+    js-debug status and install check the machine's Node version first ("needs Node.js 20 or newer; basevm378 has
+    18.20.4"). To pass js-debug on the VPS: Node 20+ there (nodejs.org build or NodeSource repo; owner's yes).
+    q2 (small): the Xdebug file box's example is a Windows .dll path even when the shown machine is Linux; show a
+    .so example there. NEXT: owner decides q1/q2 (and Node 20 on the VPS), then M2 (account on the master).
+    RESUME HERE (before, CHECKPOINT 2026-11-17 05:35, fresh conversation): M1d DRIVEN LIVE on the local test
     master, ALL PASS (owner's yes to stop the old test master and to download the adapters). The test master was
     stopped, both binaries rebuilt (release, from 24a470e), and the master started again on the new build
     (`qanuvi-master serve --data %APPDATA%\dev.qanuvi.desktop.source\local-master`; still running). Settings,
