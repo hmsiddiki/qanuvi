@@ -369,6 +369,16 @@ runs on or off; with it off nothing is sent anywhere.
     favicon; v11 kept in docs/design). See 15i "Built (part 4)" and "Driven live (part 4)". Both findings FIXED (owner:
     "do as you suggested") and driven live. With part 4, 15i's order is done (Phpactor stays LATER). Owner: do NOT
     publish 0.1.20 yet.
+    FIXED (owner, 2026-11-16 09:00): FALSE USAGE LIMIT stopped the owner's TINYCODE-FINAL-PLAN run on 0.1.22 for an
+    hour after step 13 (08:18). The limit check ran on whole raw agent lines (last 8): a tool result quoting the plan
+    said "REST rate limit" and later "reached", so `rate[_ ]limit.*reached` matched, no reset time -> wait an hour,
+    session stopped, nothing saved, run looked stuck. Fix in the Rust runner (plan/limits.rs limit_notice, run.rs
+    limit_reset): only the agent's own error end counts (result with is_error, an assistant API-error message,
+    non-JSON agent output), checked on its text, at most 400 characters; tool results, ordinary replies, successful
+    ends and owner messages never do. The fake env now keeps every agent line with its session as the core does (the
+    old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
+    about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
+    the old check until the next published update (owner's yes).
     RESUME HERE (newest, 2026-11-16 08:15): 24z3 PART B2 BUILT (not driven live yet). A machine leaving the screen is
     wiped from the window (machines.ts park(), run at the start of show() and not waited for: every call names the
     machine being hidden, remote.ts callOn): the workspaces are flushed and their projects leave workspace.restored,

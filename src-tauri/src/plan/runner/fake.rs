@@ -516,7 +516,9 @@ impl RunEnv for FakeEnv {
             if steer(on_event(Some(&session("running"))), &mut end) {
                 return Ok(end);
             }
+            // Every agent line is kept with its session, as the core keeps it (session_lines answers them).
             for line in &reply.lines {
+                self.keep_line(&id, line);
                 if steer(
                     on_event(Some(&AgentEvent::Line { line: line.clone() })),
                     &mut end,
@@ -534,6 +536,7 @@ impl RunEnv for FakeEnv {
                 let line =
                     serde_json::json!({"type": "result", "result": text, "is_error": reply.is_error})
                         .to_string();
+                self.keep_line(&id, &line);
                 if steer(on_event(Some(&AgentEvent::Line { line })), &mut end) {
                     return Ok(end);
                 }

@@ -14,6 +14,42 @@ pub fn is_limit(text: &str) -> bool {
     RE.is_match(text)
 }
 
+/// The longest text a usage-limit notice can be: it is one sentence, never a page of work.
+const NOTICE_MAX: usize = 400;
+
+/// The usage-limit notice in one of a session's agent lines, or None when the line cannot be one.
+///
+/// Only the agent's own error end counts: a turn that ended in error (`result` with `is_error`), the agent's own
+/// error message (an `assistant` line marked as an API error) or plain output of the agent program that is not JSON.
+/// The agent's ordinary replies, tool results, files it read and the owner's messages never do, whatever they say
+/// (a step about a REST rate limit once read as the paid agent's limit and the run waited an hour for nothing).
+pub fn limit_notice(line: &str) -> Option<String> {
+    let text = match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(m) => {
+            let kind = m.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            match kind {
+                "result" if m.get("is_error").and_then(|v| v.as_bool()) == Some(true) => {
+                    m.get("result").and_then(|v| v.as_str())?.to_string()
+                }
+                "assistant"
+                    if m.get("error").is_some_and(|e| !e.is_null())
+                        || m.get("isApiErrorMessage").and_then(|v| v.as_bool()) == Some(true)
+                        || m.pointer("/message/model").and_then(|v| v.as_str())
+                            == Some("<synthetic>") =>
+                {
+                    m.pointer("/message/content/0/text")
+                        .and_then(|v| v.as_str())?
+                        .to_string()
+                }
+                _ => return None,
+            }
+        }
+        Err(_) => line.to_string(),
+    };
+    let text = text.trim();
+    (text.len() <= NOTICE_MAX && is_limit(text)).then(|| text.to_string())
+}
+
 /// The minutes from now until a wall-clock time in a time zone (the next time it comes round). An unknown zone, or
 /// none, is this computer's.
 fn minutes_until(hour: i64, minute: i64, zone: Option<&str>, now: Timestamp) -> i64 {
@@ -66,6 +102,53 @@ mod tests {
             "You've hit your session limit · resets 5:20am (Asia/Dhaka)"
         ));
         assert!(!is_limit("Tests failed."));
+    }
+
+    /// The step that once stopped a run for an hour: its work was about a REST rate limit, and a tool result quoting
+    /// the plan said "rate limit" and, further on, "reached". Only the agent's own error end is a limit notice.
+    #[test]
+    fn only_the_agents_own_error_end_is_a_limit_notice() {
+        let work =
+            "skips the REST rate limit (`rest.php:434`) … the limit is reached by any visitor";
+        let not_limits = [
+            // A tool result (a file it edited or read).
+            serde_json::json!({"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "t1", "content": work}]},
+                "tool_use_result": {"originalFile": work}})
+            .to_string(),
+            // The agent's reply and its successful end.
+            serde_json::json!({"type": "assistant", "message": {"content": [{"type": "text", "text": work}]}})
+                .to_string(),
+            serde_json::json!({"type": "result", "subtype": "success", "is_error": false, "result": work})
+                .to_string(),
+            // The owner's own message in the step's chat.
+            serde_json::json!({"type": "qanuvi_user", "text": "You've hit your session limit? rate limit reached?"})
+                .to_string(),
+            // An error end that is not a limit, and a long error that only mentions one.
+            serde_json::json!({"type": "result", "is_error": true, "result": "Tests failed."}).to_string(),
+            serde_json::json!({"type": "result", "is_error": true, "result": format!("{} {work}", "x".repeat(400))})
+                .to_string(),
+        ];
+        for l in &not_limits {
+            assert_eq!(limit_notice(l), None, "{l}");
+        }
+
+        let limit = "You've hit your session limit · resets 5:20am (Asia/Dhaka)";
+        let ended =
+            serde_json::json!({"type": "result", "is_error": true, "result": limit}).to_string();
+        assert_eq!(limit_notice(&ended).as_deref(), Some(limit));
+        let api_error = serde_json::json!({"type": "assistant", "error": "rate_limit",
+            "message": {"model": "<synthetic>", "content": [{"type": "text", "text": "Claude usage limit reached"}]}})
+        .to_string();
+        assert_eq!(
+            limit_notice(&api_error).as_deref(),
+            Some("Claude usage limit reached")
+        );
+        // Plain output of the agent program (not JSON).
+        assert_eq!(
+            limit_notice("Usage limit reached. Resets 11pm").as_deref(),
+            Some("Usage limit reached. Resets 11pm")
+        );
     }
 
     #[test]

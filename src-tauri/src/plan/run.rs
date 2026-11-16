@@ -18,7 +18,7 @@ use super::guidance::{self as g, Carry, Recent};
 use super::holdask::{self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply};
 use super::housekeeping::{archive_path, done_numbers};
 use super::js;
-use super::limits::{is_limit, limit_reset_at};
+use super::limits::{limit_notice, limit_reset_at};
 use super::ownermsg;
 use super::packet::{self, Outline, packet_prompt};
 use super::planner;
@@ -2306,20 +2306,11 @@ impl<'a> Loop<'a> {
         }
         let lines = self.env.session_lines(&a.session_id);
         let now = jiff::Timestamp::from_millisecond(self.env.now_ms()).ok()?;
+        // Only the agent's own error end can be a limit (limit_notice), never what the step's work says or reads.
         for l in lines.iter().rev().take(8) {
-            if !is_limit(l) {
-                continue;
-            }
-            let text = serde_json::from_str::<Value>(l)
-                .ok()
-                .and_then(|m| {
-                    m.get("result")
-                        .or_else(|| m.get("text"))
-                        .or_else(|| m.pointer("/message/content/0/text"))
-                        .and_then(|v| v.as_str().map(String::from))
-                })
-                .unwrap_or_else(|| l.clone());
-            if let Some(at) = limit_reset_at(&text, now) {
+            if let Some(notice) = limit_notice(l)
+                && let Some(at) = limit_reset_at(&notice, now)
+            {
                 return Some(at);
             }
         }

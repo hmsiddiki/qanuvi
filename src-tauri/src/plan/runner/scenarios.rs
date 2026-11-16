@@ -759,6 +759,38 @@ fn pausing_in_the_middle_of_a_step_keeps_its_session_for_resume() {
     );
 }
 
+/// A step whose work is about a rate limit (a tool result quoting the plan, the agent's reply) is no usage limit: the
+/// run goes on at once (once it waited an hour for nothing and looked stuck).
+#[test]
+fn a_step_about_a_rate_limit_is_not_the_agents_usage_limit() {
+    let env = world("# Plan\n\n- [ ] **1. Rate limit**\n- [ ] **2. Next**\n");
+    let started = env.now_ms();
+    env.set_agent(|c| {
+        let n = if c.env.prompts().len() == 1 { "1" } else { "2" };
+        c.env.mark(FILE, n, 'x');
+        let work =
+            "the REST rate limit (`rest.php:434`) is skipped; the limit is reached by any visitor";
+        AgentReply {
+            result: Some(format!("Step done. {work}")),
+            lines: vec![
+                json!({"type": "user", "message": {"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "content": work}]}})
+                .to_string(),
+            ],
+            ..Default::default()
+        }
+    });
+    let r = run(&env, options());
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(env.prompts().len(), 2, "each step once, no try again");
+    assert!(
+        env.now_ms() - started < 3_600_000,
+        "waited {} ms",
+        env.now_ms() - started
+    );
+    assert_eq!(step(&r, "1").attempts.len(), 1);
+}
+
 #[test]
 fn a_usage_limit_waits_for_the_reset_and_the_step_is_tried_again() {
     let env = world("# Plan\n\n- [ ] **1. One**\n");
