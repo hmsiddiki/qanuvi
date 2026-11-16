@@ -20,7 +20,10 @@ with the old order", and continue from the open items the migration replaced:
 2. i2: agent processes in a job object, so `--mcp-browser` ends with them.
 3. 24z3 step 5 Part F.
 4. R3 (queue, migration 10), R4 tray mode, R5 live, R6 cleanup of leftover sessions; then a full check and a release.
-5. Finding j1: a restored terminal tab whose shell ended with its master stays blank; it should say the shell ended.
+5. Language servers and the debugger on a shown master: postponed by the owner on 2026-11-15 ("lsp/dap on a
+   master later, said on screen until then", tasklist 24z3 A1). Today a master project gets no language servers
+   (lsp.svelte.ts #root) and dap_* fails with "cannot do this yet". Never given a step number; give it one.
+6. Finding j1: a restored terminal tab whose shell ended with its master stays blank; it should say the shell ended.
 
 Data from that time: see the backup folder named in the tasklist entry for 0.1.23 (database snapshot of the
 installed app). The 0.1.23 installer stays on the dev update channel.
