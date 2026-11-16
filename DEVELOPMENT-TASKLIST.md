@@ -379,7 +379,14 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17): M1b BUILT (language servers on a shown master; see MIGRATION-VIEWER.md M1b).
+    RESUME HERE (newest, 2026-11-17 02:30): 0.1.24 PUBLISHED from branch old-infrastructure (782a328, tag v0.1.24;
+    owner "publish anyway", release gate skipped). Fix (2271908, cherry-picked to main as 9be8f8e): the chat handover
+    keeps off the session a plan run works in, also between its turns (the core's session id goes empty there; on
+    0.1.23 the chat handover took Step 6 at 152k, its note went to a session nobody continued and the runner started
+    "try 2" from scratch); a step's chat and sessions continuing from it use the run's handover limit, other chats
+    the default; the stats line counts a running turn's model calls live (deduped by message id). Rust runner
+    untouched. Not driven live with a real run crossing the limit. NEXT: drive M1b in the app, then M1c.
+    RESUME HERE (before, 2026-11-17): M1b BUILT (language servers on a shown master; see MIGRATION-VIEWER.md M1b).
     Verify green (prettier, svelte-check, 432 vitest, fmt, clippy -D warnings both builds, 437 Rust tests). Live
     check: ignored test lsp::live_runs_a_server_on_a_real_master against a real `qanuvi-master --stdio` (env
     QANUVI_LIVE_MASTER/DATA/PROJECT): 30 messages in order (one 100 KB), error output, stop on connection end, pass.
