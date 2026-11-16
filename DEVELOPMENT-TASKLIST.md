@@ -379,7 +379,25 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-16 16:40): ORDER STEP 3 BUILT (not driven live). (f1) Projects "+" on a shown
+    RESUME HERE (newest, 2026-11-16 17:15): ORDER STEP 3 DRIVEN LIVE, ALL PASS. Release test build 16:55, server
+    build cross-built 16:58 (zigbuild -j 2, 9.3 MB) and swapped into ~/.local/bin on the VPS (owner yes). (f1) local
+    test master: "+" opens "Add a project folder on DESKTOP-R8G3PAK (test)" at its home folder, folders only; a typed
+    path + Enter goes there; a typed missing path is refused on "Add this folder" ("... cannot be found."); the real
+    folder was added on the master only (never in This PC's list) and opened. VPS: "+" opens at /root, a folder click
+    goes in ("No folders in here."), Up goes back; Cancel adds nothing. (f2) VPS shows no shell picker (one shell
+    only, picker hides at one) and its terminal is /bin/bash; local master keeps "Windows PowerShell". (a) a turn
+    started on the local master, switched to This PC at once: This PC's chat untouched, no "working" state; back on
+    the master the whole answer is there, Finished. (b) unsaved line in notes.md on the master, switched to This PC,
+    file deleted on disk, back: Inbox "Unsaved changes to notes.md on DESKTOP-R8G3PAK (test) are kept" with why and
+    the text; file put back, switch away and back: the draft is typed back (Unsaved), no second note. FINDINGS
+    (proposed, not fixed): (h1) that draft note is tagged "This PC" in the Inbox though the draft belongs to the
+    master (its title names the master); it should carry the master's tag and filter. (h2) the folder picker's height
+    follows the folder count, so Up and the path box move after opening a folder (a click aimed at Up hit the
+    backdrop and closed it); give the list a fixed height. (h3) chat answers with numbered paragraphs show "1." on
+    every item (each blank-line-separated item is its own list and its start number is ignored). Left in place:
+    scratch project step3-proj on the local master (session scratchpad), its notes.md draft unsaved. NEXT: owner
+    picks which of h1-h3 to fix, then step 4 (working icon + "Open in a new window"), step 5 Part F, R3-R5.
+    RESUME HERE (before, 2026-11-16 16:40): ORDER STEP 3 BUILT (not driven live). (f1) Projects "+" on a shown
     server opens Qanuvi's own folder picker on that machine (FolderPicker.svelte, stores/folderPicker.svelte.ts): starts
     at its home folder, path box (Enter goes there; a typed path is checked on the machine before "Add this folder"),
     Up, its folders (click opens one); every read names the machine (callOn), a switch closes it, and a folder picked
