@@ -388,8 +388,10 @@ runs on or off; with it off nothing is sent anywhere.
     machine filter (no This PC items shown). VPS on its older build: the same note lands tagged This PC (fallback,
     never lost), as designed. (h2) VPS picker: opening an empty folder keeps the dialog size; Up and the path box stay
     at the same place, Up goes back, Cancel closes. (h3) last session's six numbered paragraphs now read 4, 5, 6 ... in
-    one list. NEXT: swap the 17:32 server build onto the VPS (owner yes) and drive h1 there (note tagged basevm378),
-    then step 4 (working icon + "Open in a new window"), step 5 Part F, R3-R5.
+    one list. VPS (owner yes): 17:32 server build swapped into ~/.local/bin (old one kept as qanuvi-master.prev,
+    pkill -x, window reconnected by itself, 2/2, draft typed back); h1 there: note tagged basevm378 and only under
+    that filter. The This PC filter still holds two older test notes (the old-build fallback one and the step-3 one
+    from before the fix), test data only. h1-h3 DONE. NEXT: step 4 (working icon + "Open in a new window"), step 5 Part F, R3-R5.
     RESUME HERE (before, CHECKPOINT 2026-11-16 17:30, fresh conversation): h1-h3 FIXED (owner: "fix them"), not
     driven live. (h1) the window puts a note about a master's own work into that master's Inbox: inbox.add(item,
     master) calls the master's new inbox_add (master_inbox.rs: add_new + watchers "add"); an older master without it
