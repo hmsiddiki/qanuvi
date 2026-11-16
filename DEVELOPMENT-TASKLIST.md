@@ -380,8 +380,11 @@ runs on or off; with it off nothing is sent anywhere.
     scoped to a project is kept with that machine's project id; the disk carries it to other machines, where no
     project has that id, so it never shows there ("D6 disk test fact" is scoped to This PC's projl: in the master's
     DB but not on its page). Proposal for the owner: map the scope by the project's folder/name when merging, or show
-    entries of unknown projects under "every project" with a "from another machine" note. NEXT: VPS (server build
-    swap, owner yes), then Part B with (d).
+    entries of unknown projects under "every project" with a "from another machine" note. VPS (owner yes, 06:20): D7
+    server build (cross-built 05:51, 9.3 MB) swapped into ~/.local/bin with `pkill -x` (ssh -i ~/.ssh/vps_key),
+    reconnected from the card -> green. basevm378 shown -> Memory loads; New entry "D7 VPS memory test" (every
+    project) listed, Try it gives it, Delete removes it ("No entries yet"). Master left running as before. NEXT: owner
+    decides the project-scope fix (discussed 2026-11-16), then Part B with (d).
     RESUME HERE (before, 2026-11-16 05:40): 24z3 D7 BUILT (not driven live yet). A master answers memory_list,
     memory_save, memory_delete, memory_slice, memory_search from its own memory (master.rs, same arguments as the
     desktop; test answers_memory_entries_from_its_own_memory). (b) This PC's disk file is named "This PC"
