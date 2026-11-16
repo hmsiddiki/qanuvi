@@ -390,15 +390,18 @@ runs on or off; with it off nothing is sent anywhere.
     of a machine another window shows brings that window forward at the item (emitTo qanuvi-inbox-open, not driven
     yet). (c) Reopen: the main window keeps the machine windows open when it closes (qanuvi.machineWindows); the last
     window ends the app (as built in 15c: closing the main window alone leaves the others running); next start
-    brought the machine window back on its machine. FIX in 173fc7f (not yet seen live): the list was wider than the
-    sidebar with the new icons, so dots and ticks were cut off; now as wide as the sidebar (collapsed: 220px).
+    brought the machine window back on its machine. FIX in 173fc7f, seen live: the list was wider than the sidebar with the new icons, so dots and
+    ticks were cut off; now as wide as the sidebar (collapsed: 220px), long names shorten. Closing order FOUND + FIXED
+    (this commit, driven live): a machine window closed by itself came back at the next start (its own close note
+    did not leave in time); now the core announces a closed window's machine like its project, and the main window
+    keeps the list current on every change. Live: machine window closed first, then main: next start main only;
+    VPS window open, main closed first, then it: next start both, VPS window on basevm378.
     FINDINGS (proposed, not fixed): (i1) closing a window or the app drops unsaved text with no question and no draft
     (true before step 4 too; only closing a tab asks): proposal, a closing window keeps its unsaved files as drafts on
     their machine (the B2 park path, done in onCloseRequested before the window goes) and the Inbox says so. (i2) an
     agent turn's --mcp-browser helper (qanuvi-master/qanuvi --mcp-browser) stays running after its agent process
     ends when the app closes (Windows does not end children with their parent): proposal, start agent processes in a
-    job object that ends with them. NEXT: see the 173fc7f list live, the closing-order check (machine window closed
-    first: no reopen), Inbox Open into another window, then owner picks i1/i2; then step 5 Part F, R3-R5.
+    job object that ends with them. NEXT: Inbox Open into another window (not driven yet), then owner picks i1/i2; then step 5 Part F, R3-R5.
     GitHub Build: ubuntu job fails in "Rust tests one at a time" since 9f6b97f (last green da34ae9); logs need a
     signed-in view, test name unknown; Linux server test binaries cross-built (zigbuild --tests) ready to run on the
     VPS if the owner agrees.

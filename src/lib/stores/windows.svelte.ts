@@ -91,6 +91,8 @@ class WindowsStore {
       if (machine === null) delete next[label];
       else next[label] = machine;
       this.otherMachines = next;
+      // The main window keeps the list for the next start current (a window closed by itself leaves it at once).
+      if (!this.secondary) this.keepMachineWindows();
     });
     // A new window asks the others what they show.
     await listen<{ label: string }>("qanuvi-window-hello", (e) => {

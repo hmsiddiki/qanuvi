@@ -2142,6 +2142,13 @@ pub fn run() {
                     "qanuvi-window-project",
                     serde_json::json!({"label": window.label(), "projectId": null}),
                 );
+                // Nor its machine (24z3 step 4): a machine window closed by itself does not come back at the next
+                // start (the window's own note may not leave before it is gone).
+                let _ = tauri::Emitter::emit(
+                    window.app_handle(),
+                    "qanuvi-window-machine",
+                    serde_json::json!({"label": window.label(), "machine": null}),
+                );
                 // A second window takes only its own terminals with it; the last window ends everything.
                 let others = window
                     .app_handle()
