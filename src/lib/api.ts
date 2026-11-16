@@ -457,7 +457,12 @@ export const api = {
     // Language servers are the interface's (migration M1): the app runs them on This PC or, with `master`, on that
     // master through its pipes; these calls never go to a master themselves.
     statuses: (master: string | null) => invoke<LspStatus[]>("lsp_statuses", { master }),
-    install: (id: string, master: string | null) => invoke<LspStatus>("lsp_install", { id, master }),
+    /** `onLine` gets the install's output lines while it runs (npm or rustup, on that machine). */
+    install: (id: string, master: string | null, onLine: (line: string) => void = () => {}) => {
+      const channel = new Channel<string>();
+      channel.onmessage = onLine;
+      return invoke<LspStatus>("lsp_install", { id, master, onLine: channel });
+    },
     start: (projectId: string, id: string, master: string | null, onEvent: (e: LspEvent) => void) => {
       const channel = new Channel<LspEvent>();
       channel.onmessage = onEvent;

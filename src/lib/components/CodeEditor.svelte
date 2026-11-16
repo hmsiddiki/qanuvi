@@ -582,6 +582,9 @@
       <button type="button" onclick={() => lsp.notNow(o.server)}>Not now</button>
       <button type="button" onclick={() => lsp.never(o.server)}>Don't ask again</button>
       {#if lsp.installError}<span class="error">{lsp.installError}</span>{/if}
+      {#if lsp.installing === o.server && lsp.installLog.length}
+        <pre class="install-log" aria-live="polite">{lsp.installLog.join("\n")}</pre>
+      {/if}
     </div>
   {/if}
 </div>
@@ -665,6 +668,17 @@
     border-color: var(--qx-accent);
     background: var(--qx-accent);
     color: var(--qx-bg-app, #fff);
+  }
+
+  .lsp-offer .install-log {
+    flex-basis: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--qx-font-mono, monospace);
+    font-size: 11.5px;
+    white-space: pre;
+    text-overflow: ellipsis;
+    opacity: 0.75;
   }
 
   .lsp-offer .error {

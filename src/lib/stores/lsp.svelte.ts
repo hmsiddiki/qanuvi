@@ -50,6 +50,8 @@ export type BottomView = "terminal" | "problems" | "references" | "debug";
 const clientKey = (projectId: string, server: ServerId) => `${projectId}::${server}`;
 /** Statuses are kept per machine (This PC is ""). */
 const machineKey = (machine: string | null) => machine ?? "";
+/** How many of an install's newest output lines are shown while it runs. */
+const INSTALL_LINES = 4;
 
 class LspStore {
   /** What each machine has installed (migration M1: a shown master's servers run there). */
@@ -62,6 +64,8 @@ class LspStore {
   offer = $state<{ server: ServerId; status: LspStatus; machine: string | null } | null>(null);
   installing = $state<string | null>(null);
   installError = $state("");
+  /** The newest output lines of the install under way (shown under its button while the user waits). */
+  installLog = $state<string[]>([]);
   /** Server state per project and language, for the status bar. */
   state = $state<Record<string, "starting" | "ready" | "stopped" | "failed">>({});
   lastError = $state("");
@@ -349,8 +353,11 @@ class LspStore {
   ): Promise<boolean> {
     this.installing = server;
     this.installError = "";
+    this.installLog = [];
     try {
-      const st = await api.lsp.install(server, machine);
+      const st = await api.lsp.install(server, machine, (line) => {
+        if (this.installing === server) this.installLog = [...this.installLog, line].slice(-INSTALL_LINES);
+      });
       const k = machineKey(machine);
       this.#statuses = { ...this.#statuses, [k]: (this.#statuses[k] ?? []).map((s) => (s.id === st.id ? st : s)) };
       if (this.offer?.server === server) this.offer = null;
@@ -360,6 +367,7 @@ class LspStore {
       return false;
     } finally {
       this.installing = null;
+      this.installLog = [];
     }
   }
 

@@ -539,11 +539,16 @@ impl Master {
                     .filter(|c| !c.is_empty())
                     .map(PathBuf::from);
                 let timeout = Duration::from_secs(n(args, "timeoutSecs").clamp(5, 1800));
+                // Output lines as they come, when the caller listens (an install the user waits for).
+                let live = opt(args, "onEvent")
+                    .filter(|e| !e.is_empty())
+                    .map(|e| stream(&e));
                 crate::pipes::host::run(
                     &s(args, "program"),
                     &list(args, "args"),
                     cwd.as_deref(),
                     timeout,
+                    live,
                 )
             }
             "host_write_new" => {
@@ -2281,6 +2286,36 @@ mod tests {
             .unwrap();
             assert_eq!(r["code"], 3);
             assert_eq!(r["err"], "nope");
+            // A caller that listens gets the output lines through its stream (live install output).
+            let got = Arc::new(Mutex::new(Vec::<(String, String)>::new()));
+            let g = got.clone();
+            let streams = move |name: &str| {
+                let g = g.clone();
+                let name = name.to_string();
+                Sink::new(move |e: Value| {
+                    g.lock()
+                        .unwrap()
+                        .push((name.clone(), e["line"].as_str().unwrap_or("").into()));
+                    true
+                })
+            };
+            m.dispatch(
+                "host_run",
+                &json!({"program": node.to_string_lossy(), "onEvent": "s9",
+                        "args": ["-e", "console.log('one'); console.error('two')"]}),
+                &streams,
+                &Mutex::new(HashSet::new()),
+            )
+            .unwrap();
+            let mut lines = got.lock().unwrap().clone();
+            lines.sort();
+            assert_eq!(
+                lines,
+                [
+                    ("s9".to_string(), "one".to_string()),
+                    ("s9".into(), "two".into())
+                ]
+            );
         }
         let rel = format!("host-test-{}/a/package.json", uuid::Uuid::new_v4());
         call(&m, "host_write_new", json!({"path": rel, "text": "{}"})).unwrap();

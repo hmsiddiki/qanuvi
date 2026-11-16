@@ -74,8 +74,20 @@ describe("language servers per machine", () => {
     expect(await lsp.clientFor({ key: "t2", projectId: "here", path: "a.php" })).toBeNull();
     expect(lsp.offer).toMatchObject({ server: "php", machine: null });
     await lsp.install("php");
-    expect(api.lsp.install).toHaveBeenCalledWith("php", null);
+    expect(api.lsp.install).toHaveBeenCalledWith("php", null, expect.any(Function));
     expect(lsp.status("php", null)?.found).toBe("qanuvi");
+  });
+
+  it("shows the newest lines of an install while it runs, and clears them after", async () => {
+    let seen: string[] = [];
+    api.lsp.install.mockImplementationOnce((async (id: string, _m: string | null, onLine: (l: string) => void) => {
+      for (const l of ["a", "b", "c", "d", "e"]) onLine(l);
+      seen = [...lsp.installLog];
+      return st(id, "qanuvi");
+    }) as never);
+    expect(await lsp.install("php", "vps")).toBe(true);
+    expect(seen).toEqual(["b", "c", "d", "e"]);
+    expect(lsp.installLog).toEqual([]);
   });
 
   it("ends a machine's servers when it leaves the screen, and only its own", async () => {

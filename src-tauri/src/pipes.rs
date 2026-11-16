@@ -394,6 +394,7 @@ fn carry(link: Arc<dyn Link>, socket: TcpStream, remote: u16) {
 /// Generic questions about the master's machine, for a viewer's coding tools (migration M1): the viewer knows the
 /// tools; the master only answers where programs and files are, and runs a command to its end.
 pub mod host {
+    use crate::sink::Sink;
     use serde_json::{Value, json};
     use std::io::Read;
     use std::path::{Component, Path};
@@ -420,12 +421,47 @@ pub mod host {
         lines[lines.len().saturating_sub(40)..].join("\n")
     }
 
-    /// Runs a program to its end (at most `timeout`), answering its exit code and the end of its output.
+    /// Reads a program's output to its end; with `live`, each line (ended by a newline or a carriage return, as
+    /// npm's progress lines are) goes out as it comes, as `{"line": ...}`.
+    pub(crate) fn read_all(mut from: impl Read, live: Option<Sink<Value>>) -> Vec<u8> {
+        let mut all = Vec::new();
+        let mut line = Vec::new();
+        let mut buf = [0u8; 4096];
+        let send = |line: &mut Vec<u8>| {
+            if let Some(s) = &live {
+                let t = String::from_utf8_lossy(line).trim_end().to_string();
+                if !t.is_empty() {
+                    let _ = s.send(json!({"line": t}));
+                }
+            }
+            line.clear();
+        };
+        loop {
+            let n = match from.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => n,
+            };
+            all.extend_from_slice(&buf[..n]);
+            for &b in &buf[..n] {
+                if b == b'\n' || b == b'\r' {
+                    send(&mut line);
+                } else {
+                    line.push(b);
+                }
+            }
+        }
+        send(&mut line);
+        all
+    }
+
+    /// Runs a program to its end (at most `timeout`), answering its exit code and the end of its output; `live`
+    /// gets its output lines while it runs (an install the user waits for).
     pub fn run(
         program: &str,
         args: &[String],
         cwd: Option<&Path>,
         timeout: Duration,
+        live: Option<Sink<Value>>,
     ) -> Result<Value, String> {
         if program.trim().is_empty() {
             return Err("Which program?".into());
@@ -442,22 +478,11 @@ pub mod host {
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("Could not start {program} on this machine: {e}"))?;
-        let mut out = child.stdout.take();
-        let mut err = child.stderr.take();
-        let o = std::thread::spawn(move || {
-            let mut b = Vec::new();
-            if let Some(o) = out.as_mut() {
-                let _ = o.read_to_end(&mut b);
-            }
-            b
-        });
-        let e = std::thread::spawn(move || {
-            let mut b = Vec::new();
-            if let Some(e) = err.as_mut() {
-                let _ = e.read_to_end(&mut b);
-            }
-            b
-        });
+        let out = child.stdout.take();
+        let err = child.stderr.take();
+        let live2 = live.clone();
+        let o = std::thread::spawn(move || out.map(|o| read_all(o, live2)).unwrap_or_default());
+        let e = std::thread::spawn(move || err.map(|e| read_all(e, live)).unwrap_or_default());
         let start = Instant::now();
         let status = loop {
             if let Some(s) = child.try_wait().map_err(|e| e.to_string())? {
@@ -501,6 +526,27 @@ pub mod host {
 mod tests {
     use super::*;
     use std::sync::mpsc;
+
+    #[test]
+    fn sends_an_installs_output_lines_as_they_come_and_keeps_all_of_it() {
+        let (tx, rx) = mpsc::channel();
+        let live =
+            Sink::new(move |e: Value| tx.send(e["line"].as_str().unwrap().to_string()).is_ok());
+        // npm's progress overwrites its line with carriage returns; blank lines are not sent.
+        let text = b"added 1 package\r\n\nworking 1\rworking 2\rlast without end";
+        let all = host::read_all(&text[..], Some(live));
+        assert_eq!(all, text.to_vec());
+        let lines: Vec<String> = rx.try_iter().collect();
+        assert_eq!(
+            lines,
+            [
+                "added 1 package",
+                "working 1",
+                "working 2",
+                "last without end"
+            ]
+        );
+    }
 
     #[test]
     fn writes_in_sequence_order_whatever_order_they_arrive_in() {

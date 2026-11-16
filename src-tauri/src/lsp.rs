@@ -107,13 +107,15 @@ pub trait Host {
     fn join(&self, base: &str, parts: &[&str]) -> String;
     fn find(&self, program: &str) -> Option<String>;
     fn exists(&self, path: &str) -> bool;
-    /// Runs a program to its end: whether it succeeded, and the end of its error output.
+    /// Runs a program to its end: whether it succeeded, and the end of its error output. `live` gets its output
+    /// lines while it runs.
     fn run(
         &self,
         program: &str,
         args: &[String],
         cwd: Option<&str>,
         timeout_secs: u64,
+        live: Option<Sink<String>>,
     ) -> Result<(bool, String), String>;
     /// Writes a new file below the data folder (a file already there is kept).
     fn write_new(&self, relative: &str, text: &str) -> Result<(), String>;
@@ -128,6 +130,16 @@ fn ran(v: &Value) -> (bool, String) {
         v["code"].as_i64() == Some(0),
         v["err"].as_str().unwrap_or("").to_string(),
     )
+}
+
+/// `{"line": ...}` events (as `host_run` sends them) to a sink of lines.
+fn lines_to(live: Option<Sink<String>>) -> Option<Sink<Value>> {
+    live.map(|s| {
+        Sink::new(move |e: Value| match e["line"].as_str() {
+            Some(l) => s.send(l.to_string()).is_ok(),
+            None => true,
+        })
+    })
 }
 
 impl Host for Here {
@@ -154,12 +166,14 @@ impl Host for Here {
         args: &[String],
         cwd: Option<&str>,
         timeout_secs: u64,
+        live: Option<Sink<String>>,
     ) -> Result<(bool, String), String> {
         let v = crate::pipes::host::run(
             program,
             args,
             cwd.map(Path::new),
             std::time::Duration::from_secs(timeout_secs),
+            lines_to(live),
         )?;
         Ok(ran(&v))
     }
@@ -229,11 +243,12 @@ impl Host for On {
         args: &[String],
         cwd: Option<&str>,
         timeout_secs: u64,
+        live: Option<Sink<String>>,
     ) -> Result<(bool, String), String> {
         let v = self.link.call(
             "host_run",
             json!({"program": program, "args": args, "cwd": cwd, "timeoutSecs": timeout_secs}),
-            None,
+            lines_to(live),
         )?;
         Ok(ran(&v))
     }
@@ -272,7 +287,7 @@ fn own_entry(host: &dyn Host, spec: &Spec) -> Option<String> {
 
 /// rustup puts a rust-analyzer proxy on PATH even when the component is missing; asking it for its version tells.
 fn rust_analyzer_works(host: &dyn Host, program: &str) -> bool {
-    host.run(program, &["--version".to_string()], None, 30)
+    host.run(program, &["--version".to_string()], None, 30, None)
         .is_ok_and(|(ok, _)| ok)
 }
 
@@ -360,7 +375,12 @@ pub fn statuses(host: &dyn Host) -> Vec<Status> {
 }
 
 /// Installs a server (blocking; npm can take a minute). Only called after the user said yes in the window.
-pub fn install(host: &dyn Host, spec: &'static Spec) -> Result<Status, String> {
+/// `live` gets the install's output lines as they come, for the window to show while it waits.
+pub fn install(
+    host: &dyn Host,
+    spec: &'static Spec,
+    live: Option<Sink<String>>,
+) -> Result<Status, String> {
     let place = host.place();
     let (ok, err) = if spec.npm.is_empty() {
         let rustup = host.find("rustup").ok_or_else(|| {
@@ -369,7 +389,7 @@ pub fn install(host: &dyn Host, spec: &'static Spec) -> Result<Status, String> {
             )
         })?;
         let args = ["component", "add", "rust-analyzer"].map(String::from);
-        host.run(&rustup, &args, None, 900)?
+        host.run(&rustup, &args, None, 900, live)?
     } else {
         let npm = host.find("npm").ok_or_else(|| {
             format!(
@@ -393,7 +413,7 @@ pub fn install(host: &dyn Host, spec: &'static Spec) -> Result<Status, String> {
         .to_vec();
         args.push(dir.clone());
         args.extend(spec.npm.iter().map(|p| p.to_string()));
-        host.run(&npm, &args, Some(&dir), 900)?
+        host.run(&npm, &args, Some(&dir), 900, live)?
     };
     if !ok {
         let tail: Vec<&str> = err.lines().rev().take(8).collect();

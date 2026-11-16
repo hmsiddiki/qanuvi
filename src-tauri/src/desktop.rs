@@ -556,14 +556,23 @@ async fn lsp_install(
     state: State<'_, AppState>,
     id: String,
     master: Option<String>,
+    on_line: Channel<String>,
 ) -> Res<crate::lsp::Status> {
     let spec = crate::lsp::spec(&id)?;
     let link = lsp_host(&state, &master)?;
-    blocking(move || match link {
-        Some(l) => crate::lsp::install(&crate::lsp::On::new(l)?, spec),
-        None => crate::lsp::install(&crate::lsp::Here, spec),
+    // The install's output lines while it runs; nobody listens to them once it has answered.
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let d = done.clone();
+    let live = crate::sink::Sink::new(move |l: String| {
+        !d.load(std::sync::atomic::Ordering::SeqCst) && on_line.send(l).is_ok()
+    });
+    let r = blocking(move || match link {
+        Some(l) => crate::lsp::install(&crate::lsp::On::new(l)?, spec, Some(live)),
+        None => crate::lsp::install(&crate::lsp::Here, spec, Some(live)),
     })
-    .await
+    .await;
+    done.store(true, std::sync::atomic::Ordering::SeqCst);
+    r
 }
 
 #[tauri::command]

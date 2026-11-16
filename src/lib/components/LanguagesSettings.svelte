@@ -74,6 +74,9 @@
         <strong>{s.serves}</strong>
         <span class="muted">{s.label} · {where(s.found)}</span>
         {#if !s.found}<span class="muted small">{s.install || s.missing}</span>{/if}
+        {#if lsp.installing === s.id && lsp.installLog.length}
+          <pre class="install-log muted small" aria-live="polite">{lsp.installLog.join("\n")}</pre>
+        {/if}
         {#if l.never.includes(s.id)}
           <button type="button" class="link" onclick={() => forget(s.id)}>Offer it again when a file opens</button>
         {/if}
@@ -215,6 +218,14 @@
 
   .small {
     font-size: 11.5px;
+  }
+
+  .install-log {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--qx-font-mono, monospace);
+    white-space: pre;
+    text-overflow: ellipsis;
   }
 
   button {
