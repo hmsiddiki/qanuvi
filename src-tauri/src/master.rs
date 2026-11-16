@@ -1227,10 +1227,31 @@ fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
         cmd.creation_flags(0x0000_0008 | 0x0000_0200 | 0x0800_0000);
+        keep_own_stdio_from_children();
     }
     cmd.spawn()
         .map_err(|e| format!("The master service could not start: {e}"))?;
     Ok(())
+}
+
+/// Windows starts children with every inheritable handle, whatever their own stdio is. This process's
+/// stdin/stdout/stderr (the SSH session, or the pipes of whoever ran `--stdio`) would then stay open in the
+/// long-lived service, and the caller would never see the output end after this process exits (finding k1).
+/// The handles stay usable here; only children no longer get copies.
+#[cfg(windows)]
+fn keep_own_stdio_from_children() {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+    for h in [
+        std::io::stdin().as_raw_handle(),
+        std::io::stdout().as_raw_handle(),
+        std::io::stderr().as_raw_handle(),
+    ] {
+        if !h.is_null() && h as isize != -1 {
+            // A console handle or a closed one may refuse; nothing to keep from children then.
+            unsafe { SetHandleInformation(h as _, HANDLE_FLAG_INHERIT, 0) };
+        }
+    }
 }
 
 /// Connects to the service, starting it first when it is not running.

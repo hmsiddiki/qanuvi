@@ -379,7 +379,15 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17 03:50, fresh conversation): M1b DRIVEN LIVE ON THE VPS, ALL PASS. Node.js put on basevm378 with the
+    RESUME HERE (newest, 2026-11-17): k1 FIXED (owner's yes; no tray icon in it, the icon stays in M4). On Windows
+    master.rs start_service now clears HANDLE_FLAG_INHERIT on this process's own stdin/stdout/stderr before the
+    spawn, so the serve service no longer holds the --stdio caller's pipes. New integration test
+    tests/master_stdio.rs runs the real qanuvi-master --stdio, closes its input and needs the caller's output to
+    end while the service keeps running; it failed with the fix taken out (output never ended) and passes with it
+    (1.2 s), then stops its service. Rust verify green: fmt, clippy -D warnings desktop + server build, 437 lib
+    tests. Scratch services no longer need stopping by hand for a caller to finish. NEXT: M1b leftovers (need_gb
+    for TypeScript/Svelte/Pyright, live install output), then M1c preview through port_forward, M1d.
+    RESUME HERE (before, CHECKPOINT 2026-11-17 03:50, fresh conversation): M1b DRIVEN LIVE ON THE VPS, ALL PASS. Node.js put on basevm378 with the
     owner's yes (Debian packages: nodejs 18.20.4, npm 9.2.0; apt, no outside script). Reopened index.php: the bar
     now offered Install -> Intelephense went to /root/.local/share/qanuvi/language-servers/php, run by the VPS's
     `qanuvi-master serve` -> undefined_call() flagged, Problems 1, hover on greet over ssh shows its signature. This
