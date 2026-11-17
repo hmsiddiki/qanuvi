@@ -379,7 +379,23 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 06:40): M1d DRIVEN LIVE ON THE VPS, ALL PASS. Owner put Node v26.13.1 (nodejs.org
+    RESUME HERE (newest, CHECKPOINT 2026-11-17 06:45, fresh conversation): M1 IS DONE (M1a pipes, M1b language
+    servers, M1c preview, M1d debuggers, all driven live on the local test master and the VPS). Open, in order:
+    (1) r1, owner to decide (proposal in the entry below: a failed debugger-status reload says so with Check again,
+    instead of silently keeping the old list); (2) M2, the account on the master (docs/MIGRATION-VIEWER.md "M2"):
+    account_* to the master with the refresh token and application password in that machine's secret store,
+    `qanuvi-master login`, browser sign-in handed to the shown machine, Account page per shown machine; the site side
+    (qanuvi.com "Machine passwords" page) is the owner's, separate from this repo. Plan M2 with the owner before code.
+    Release grouping: M1 alone, so a release of M1 can come before M2 (owner's yes to publish).
+    State: test window = release test build 06:15 (src-tauri/target/release/qanuvi.exe); local test master still on
+    its 05:17 build (`qanuvi-master serve --data %APPDATA%\dev.qanuvi.desktop.source\local-master`, running; its exe
+    was in use, so the last two builds did not replace it). VPS basevm378 (165.99.219.195, ssh -i ~/.ssh/vps_key
+    root@): server build from c57122a (.prev kept), Node 26.13.1 in /usr/local/bin (Debian 18 in /usr/bin), PHP CLI
+    8.2 and 8.5 with Xdebug (fpm/cgi without it: it is a hosting server, never let an apt install enable PHP
+    extensions for fpm), debug adapters in /root/.local/share/qanuvi/debug-adapters, test project
+    ~/qanuvi-test/m1b-vps (index.php, app.js). Before any build: check free RAM (about 4 GB free today), cargo -j 1
+    or 2, timeouts on tests.
+    RESUME HERE (before, 2026-11-17 06:40): M1d DRIVEN LIVE ON THE VPS, ALL PASS. Owner put Node v26.13.1 (nodejs.org
     LTS, SHA256 OK) in /opt with links in /usr/local/bin (Debian's 18 stays in /usr/bin). basevm378: js-debug run by
     the VPS's `qanuvi-master serve` with /usr/local/bin/node (port 0, through the tunnel); paused at app.js:3 (a 2,
     b 3, call stack), Continue -> "total is 5", "Debugging ended.", nothing left on the VPS.
