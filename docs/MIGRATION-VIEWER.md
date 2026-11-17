@@ -247,7 +247,20 @@ Owner decisions (2026-11-17):
 - There is no data move: the master opens the same `qanuvi.db`.
 - The reduced `mark_app_data` mode ends: This PC's master runs its own start-up list, watches, sync and backups.
 - Remote access becomes This PC's master accepting relay sessions.
-- Measure the extra local hop: typing, file reads and the terminal must still feel instant.
+- The extra local hop is measured in M5 (owner, 2026-11-18): in M4 the window still calls its own core directly.
+
+Owner decisions (2026-11-18):
+- Built in three parts, each driven live before the next:
+  - M4a: the app always starts This PC's master at launch (or attaches to the running one), remote access on or not.
+    The master opens the same `qanuvi.db`. The window still calls its own core (that is M5).
+  - M4b: the background jobs move to the master and the reduced `mark_app_data` mode ends. The master runs the
+    start-up list, Claude Code auto-update, the OmniRoute watch, memory sync and backups; the app stops running
+    them, so nothing runs twice. Remote access is the master taking relay sessions.
+  - M4c: lifetime. A tray icon whenever the master runs (never hidden), with "Open Qanuvi" and "Quit Qanuvi" (Quit
+    stops the master). Before an update installs, the app stops the master (Windows locks its file).
+- Closing the last window: the master keeps running with its tray icon (R4). Until M5 only the background jobs go
+  on; agents, plan runs and terminals still live in the app and end with it.
+- A setting, off by default: "Start Qanuvi in the background when I sign in".
 
 ### M5. The window becomes a viewer
 
