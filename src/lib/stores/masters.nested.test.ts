@@ -73,6 +73,7 @@ const flush = async () => {
 beforeEach(async () => {
   for (const k of Object.keys(masters.status)) await masters.disconnect(k);
   switcher.held = null;
+  masters.nested = {};
   lists = { vps: [server("box", "build-box")], "vps/box": [server("deep", "")] };
   states = {
     vps: { box: { state: "on", info: hello("m-box", "box") } },
@@ -154,9 +155,9 @@ describe("machines reached through a master", () => {
     switcher.shown = "vps/box";
     watches.vps({ closed: "box", error: "The connection ended." });
     expect(switcher.held).toMatchObject({ id: "vps/box", mode: "lost" });
-    // The machines reached through it go with it.
+    // The machines reached through it go with it; its last known list stays, so they show off under it.
     expect(masters.statusOf("vps/box/deep").state).toBe("off");
-    expect(masters.tree.map((r) => r.m.id)).toEqual(["vps", "vps/box"]);
+    expect(masters.tree.map((r) => r.m.id)).toEqual(["vps", "vps/box", "vps/box/deep"]);
     expect(await masters.retryNow()).toBe(true);
     expect(calls.filter((c) => c.master === "vps" && c.cmd === "remote_connect")).toHaveLength(1);
     expect(machines.show).toHaveBeenCalledWith("vps/box");
@@ -175,10 +176,32 @@ describe("machines reached through a master", () => {
     switcher.shown = null;
   });
 
-  it("its master's connection ends: the machines under it go too", async () => {
+  it("its master's connection ends: the machines under it go too, and stay listed under it (finding n4)", async () => {
     handlers["remote-closed"]({ payload: { id: "vps" } });
-    expect(masters.statusOf("vps/box").state).not.toBe("on");
-    expect(masters.tree.map((r) => r.m.id)).toEqual(["vps"]);
+    expect(masters.statusOf("vps/box")).toMatchObject({ state: "error", error: "The connection to VPS ended." });
+    expect(masters.tree.map((r) => r.m.id)).toEqual(["vps", "vps/box", "vps/box/deep"]);
+  });
+
+  it("its master's connection ends while one under it is shown: held, and back through it (finding n4)", async () => {
+    showMachine("vps/box");
+    switcher.shown = "vps/box";
+    handlers["remote-closed"]({ payload: { id: "vps" } });
+    expect(switcher.held).toMatchObject({ id: "vps/box", mode: "lost" });
+    expect(machines.show).not.toHaveBeenCalledWith(null);
+    expect(await masters.retryNow()).toBe(true);
+    expect(masters.statusOf("vps").state).toBe("on");
+    expect(machines.show).toHaveBeenCalledWith("vps/box");
+    switcher.held = null;
+  });
+
+  it("its master disconnected on purpose: the one under it shown goes, nothing is tried again", async () => {
+    showMachine("vps/box");
+    switcher.shown = "vps/box";
+    await masters.disconnect("vps");
+    expect(switcher.held).toBeNull();
+    expect(machines.show).toHaveBeenCalledWith(null);
+    expect(masters.statusOf("vps/box").state).toBe("off");
+    switcher.shown = null;
   });
 
   it("the same computer reached another way is shown once", async () => {

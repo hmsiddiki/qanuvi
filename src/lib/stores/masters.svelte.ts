@@ -126,7 +126,8 @@ class MastersStore {
     const rows: TreeRow[] = [];
     const add = (key: string, m: MasterSettings, depth: number) => {
       rows.push({ m, depth });
-      if (depth >= MAX_DEPTH) return;
+      // A row that is the same computer as another shows its servers under that one only.
+      if (depth >= MAX_DEPTH || this.status[key]?.twin) return;
       for (const child of this.nested[key] ?? []) {
         const k = `${key}/${child.id}`;
         const found = this.find(k);
@@ -154,7 +155,14 @@ class MastersStore {
    * not below the deepest level.
    */
   #follow(key: string, info: MasterInfo): Promise<void> {
-    if (!info.forwards || depthOf(key) >= MAX_DEPTH) return Promise.resolve();
+    if (!info.forwards || depthOf(key) >= MAX_DEPTH) {
+      // A list known from before (it was updated to an older build): nothing shows under it now.
+      if (this.nested[key]) {
+        const { [key]: _gone, ...lists } = this.nested;
+        this.nested = lists;
+      }
+      return Promise.resolve();
+    }
     const run = (async () => {
       try {
         await this.#readNested(key);
@@ -315,18 +323,17 @@ class MastersStore {
   }
 
   #dropped(id: string, error?: string) {
-    // The machines reached through it go with it (their screens are lost the same way).
+    // The machines reached through it go with it. Ended by itself (an error): a shown one is held and tried again
+    // through it, as a lost one of This PC's is. Disconnected on purpose: they are off, and a shown one goes too.
+    // Its last known list stays (finding n4), so they show off under it and can be reached again through it.
     const below = `${id}/`;
-    const lostWith = `The connection to ${machineName(id)} ended.`;
+    const lostWith = error ? `The connection to ${machineName(id)} ended.` : undefined;
     for (const k of Object.keys(this.status)) {
       if (!k.startsWith(below) || depthOf(k) !== depthOf(id) + 1) continue;
-      if (this.status[k].state === "on" && shownMachine() === k && !switcher.held) this.#lose(k, lostWith);
-      else if (this.status[k].state === "on" || this.status[k].state === "connecting") this.#dropped(k, lostWith);
-      else this.#set(k, { state: "off" });
-    }
-    if (this.nested[id]) {
-      const { [id]: _list, ...lists } = this.nested;
-      this.nested = lists;
+      const on = this.status[k].state === "on" || this.status[k].state === "connecting";
+      if (lostWith && this.status[k].state === "on" && shownMachine() === k && !switcher.held) this.#lose(k, lostWith);
+      else if (on) this.#dropped(k, lostWith);
+      else if (!this.status[k].twin) this.#set(k, { state: "off" });
     }
     this.#following.delete(id);
     // A nested machine's connection is its master's; This PC only lets go of its port links to it.
@@ -790,5 +797,6 @@ export const masters = new MastersStore();
 // Messages from the router name the machine as the owner named it ("This cannot be done on VPS yet").
 nameMachines((id) => {
   const m = masters.find(id);
-  return m ? displayName(m) : id;
+  // A machine reached through others that is not known any more is never named by its path of ids (finding n5).
+  return m ? displayName(m) : id.includes("/") ? "that machine" : id;
 });
