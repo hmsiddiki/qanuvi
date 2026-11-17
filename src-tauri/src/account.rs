@@ -323,9 +323,16 @@ pub struct Accounts {
     cancel: std::sync::atomic::AtomicBool,
 }
 
+/// The account site's HTTP client. It trusts what the system trusts (its certificate store), so a site behind a
+/// company's or a developer's own certificate authority works as it does in the browser.
 fn agent() -> ureq::Agent {
     ureq::Agent::new_with_config(
         ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                    .build(),
+            )
             .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(30)))
             .build(),

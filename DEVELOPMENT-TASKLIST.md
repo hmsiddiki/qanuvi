@@ -379,7 +379,21 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 07:00): r1 DONE (edb21c1, owner yes): a failed reload of a machine's debugger
+    RESUME HERE (newest, 2026-11-17 12:45): runner fix d2799fe (handed-over steps not redone; also 0173046 on
+    old-infrastructure) PUBLISHED as 0.1.25 (7d39517, tag v0.1.25, owner "publish anyway"). M2 DRIVEN LIVE on the
+    master side against the local Qlopy site https://aloelo.dev/qanuvi/ (disk E:/Wnmp/nginx-bins/default/www/qanuvi,
+    mkcert certificate; JWT, OAuth, application passwords on; app "Qanuvi" client id qpc_5caa74da17fe15e9 with redirect
+    http://127.0.0.1:47213/callback; the site makes its own client ids, so qanuvi.com's real id goes into CLIENT_ID when
+    the app is registered there). Fix found: account calls now trust the system's certificate store (ureq
+    platform-verifier), the built-in list refused the mkcert site. PASS: qanuvi-master login (wrong password refused,
+    right one signed in via password), master account_me reads it, account_sign_out, account_begin -> browser Allow ->
+    code on 127.0.0.1:47213 -> account_finish (wrong state refused, finish once only, via browser), account_me,
+    qanuvi-master logout revokes. Site side: default theme /account/machine-passwords (inc/machine-passwords.php,
+    template-machine-passwords.php; one-use form token, so a reload makes no second password), driven with
+    Playwright. NOT yet driven: the window's own parts (Account page per shown machine, account_wait opening the real
+    browser) in a test build with QANUVI_ACCOUNT_SITE + QANUVI_ACCOUNT_CLIENT; local test master was stopped for the
+    release build (owner yes), restart it for that. Then M3.
+    RESUME HERE (before, 2026-11-17 07:00): r1 DONE (edb21c1, owner yes): a failed reload of a machine's debugger
     statuses keeps the old list and says "Could not check <machine> again: <error>" with Check again (Settings >
     Languages). M2 CORE BUILT (76a137e, owner agreed the plan as proposed; NOT driven live): account.rs in both builds;
     each machine keeps its own sign-in (This PC: credential store `account:<site>` as before, an old bare refresh
