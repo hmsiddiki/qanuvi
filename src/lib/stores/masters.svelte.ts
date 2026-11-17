@@ -204,18 +204,12 @@ class MastersStore {
   /** How a nested machine stands, as its master says: one that came on is read as This PC's servers are. */
   async #nestedState(key: string, st: MasterStatus): Promise<void> {
     if (st.state !== "on" || !st.info) {
-      if (this.statusOf(key).state !== "on") this.#set(key, st);
+      // On with no hello yet (finding n3): still connecting; it comes on with its hello, through #arrived.
+      const now: MasterStatus = st.state === "on" ? { state: "connecting" } : st;
+      if (this.statusOf(key).state !== "on") this.#set(key, now);
       return;
     }
     if (this.statusOf(key).state === "on" || this.#arriving.has(key)) return;
-    // The same computer reached another way already: shown once, this row leads to it.
-    const twin = st.info.machineId
-      ? this.onKeys.find((k) => k !== key && this.statusOf(k).info?.machineId === st.info?.machineId)
-      : undefined;
-    if (twin) {
-      this.#set(key, { state: "error", error: `This is the same computer as ${machineName(twin)}.`, twin });
-      return;
-    }
     this.#arriving.add(key);
     try {
       await this.#arrived(key, st.info);
@@ -482,6 +476,8 @@ class MastersStore {
         return said;
       }
       this.#fillIn(m.id, info);
+      // Known from now on, so a nested row of the same computer arriving meanwhile sees it (finding n1).
+      this.#set(m.id, { state: "connecting", info });
       await this.#arrived(m.id, info);
       return "";
     } catch (e) {
@@ -496,11 +492,28 @@ class MastersStore {
    * and runs are read as for any machine, and its own servers are followed.
    */
   async #arrived(key: string, info: MasterInfo): Promise<void> {
+    // The same computer twice (finding n1) is shown once: a nested row gives way to any other way to it, and This
+    // PC's own server takes over from a nested row that came first.
+    if (parentOf(key)) {
+      const twin = this.#twinOf(key, info);
+      if (twin) return this.#becomeTwin(key, twin);
+    } else if (info.machineId) {
+      for (const k of this.onKeys)
+        if (parentOf(k) && this.status[k].info?.machineId === info.machineId) this.#becomeTwin(k, key);
+    }
     // Listing them notes which ids are the master's (remote.ts), so runs and Inbox questions about them go there.
     const list = await callMaster<Project[]>(key, "projects_list", {});
     // Projects this computer has itself keep working here, not through the server.
     for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
     const theirs = list.filter((p) => !projects.isLocal(p.id));
+    // A way to the same computer came while its projects were read: they stay that one's.
+    const late = parentOf(key) ? this.#twinOf(key, info) : undefined;
+    if (late)
+      return this.#becomeTwin(
+        key,
+        late,
+        theirs.map((p) => p.id),
+      );
     this.projectCount = { ...this.projectCount, [key]: theirs.length };
     this.#set(key, { state: "on", info });
     // A project window opened for one of its projects shows this machine.
@@ -515,6 +528,32 @@ class MastersStore {
     void runner.masterConnected(key);
     // The machines it connects to itself show under it (migration M3c).
     void this.#follow(key, info);
+  }
+
+  /** Another way to the same computer, connected or answering now (not a row that itself leads elsewhere). */
+  #twinOf(key: string, info: MasterInfo): string | undefined {
+    if (!info.machineId) return undefined;
+    return Object.keys(this.status).find((k) => {
+      const st = this.status[k];
+      return (
+        k !== key &&
+        !st.twin &&
+        (st.state === "on" || st.state === "connecting") &&
+        st.info?.machineId === info.machineId
+      );
+    });
+  }
+
+  /**
+   * A nested row turns out to be a computer reached another way: it lets go of what it followed (its projects
+   * `ids` go back to that way) and leads there; shown, that way is shown instead.
+   */
+  #becomeTwin(key: string, twin: string, ids: string[] = []): void {
+    const wasShown = shownMachine() === key;
+    this.#dropped(key);
+    for (const id of ids) own(id, twin);
+    this.#set(key, { state: "error", error: `This is the same computer as ${machineName(twin)}.`, twin });
+    if (wasShown) void show(twin);
   }
 
   /**

@@ -1477,6 +1477,13 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(e, crate::remote::a_loop());
+        // Finding n3: a server whose hello is not in yet is connecting, never on with nothing known of it.
+        m.remotes.add_idle("v1", Value::Null);
+        assert_eq!(
+            call(&m, "remote_states", json!({})).unwrap()["v1"],
+            json!({"state": "connecting"})
+        );
+        m.remotes.disconnect("v1");
         let e = call(
             &m,
             "remote_call",

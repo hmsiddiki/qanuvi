@@ -349,6 +349,15 @@ impl Remotes {
         Ok(Routed { conn, rest, seen })
     }
 
+    /// A connection that sends nothing, with the hello given (tests: a connection still waiting has `Null`).
+    #[cfg(test)]
+    pub fn add_idle(&self, id: &str, info: Value) {
+        self.map
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), tests::idle_connection(info));
+    }
+
     /// The way to a machine by its key, starting here.
     pub fn link(&self, key: &str) -> Result<Arc<dyn crate::pipes::Link>, String> {
         let me = self.me.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -670,7 +679,7 @@ mod tests {
         );
     }
 
-    fn idle_connection(info: Value) -> Arc<Connection> {
+    pub(super) fn idle_connection(info: Value) -> Arc<Connection> {
         Arc::new(Connection {
             child: Mutex::new(None),
             stdin: Mutex::new(Box::new(std::io::sink())),

@@ -52,6 +52,12 @@
 
   let shownMaster = $derived(switcher.shown ? (masters.find(switcher.shown) ?? null) : null);
   let shownName = $derived(shownMaster ? nameOf(shownMaster.id) : "This PC");
+  /** A nested machine on the button (finding n2): the way to it shortens first, its own name stays readable. */
+  let shownVia = $derived.by(() => {
+    const parent = shownMaster ? parentOf(shownMaster.id) : null;
+    return parent ? `${masters.route(parent)} ›` : "";
+  });
+  let shownOwn = $derived(shownMaster ? displayName(shownMaster) : "This PC");
 
   /** Inbox items not read yet, per machine ("" is This PC). */
   let unread = $derived.by(() => {
@@ -156,7 +162,8 @@
       {#if shownMaster}<Server size={13} />{:else}<Monitor size={13} />{/if}
     </span>
     {#if !collapsed}
-      <span class="name">{shownName}</span>
+      {#if shownVia}<span class="via">{shownVia}</span>{/if}
+      <span class="name">{shownOwn}</span>
       {#if workingElsewhere > 0}<span class="working" title="{workingText(workingElsewhere)} on other machines"
           ><LoaderCircle size={13} /></span
         >{/if}
@@ -312,6 +319,22 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  .via {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--qx-text-secondary);
+    font-weight: 400;
+  }
+
+  .via + .name {
+    flex: none;
+    max-width: 70%;
+    margin-right: auto;
   }
 
   .pill {

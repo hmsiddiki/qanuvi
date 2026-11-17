@@ -72,6 +72,8 @@ impl Master {
         for server in crate::servers::list(&self.db)? {
             let id = server["id"].as_str().unwrap_or("").to_string();
             let state = match (infos.get(&id), errors.get(&id)) {
+                // Its hello is not in yet (finding n3): it is still connecting, not on with nothing known of it.
+                (Some(info), _) if info.is_null() => json!({"state": "connecting"}),
                 (Some(info), _) => json!({"state": "on", "info": info}),
                 (None, Some(e)) => json!({"state": "error", "error": e}),
                 (None, None) => json!({"state": "off"}),

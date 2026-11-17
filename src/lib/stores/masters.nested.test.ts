@@ -82,7 +82,10 @@ beforeEach(async () => {
   settings.set("masters", [server("vps", "VPS")]);
   vi.mocked(invoke).mockReset();
   vi.mocked(invoke).mockImplementation((async (cmd: string, a?: Args) => {
-    if (cmd === "remote_connect") return hello("m-vps", "vps");
+    if (cmd === "remote_connect") {
+      const id = (a as unknown as { id: string }).id;
+      return id === "direct" ? hello("m-box", "box", false) : hello("m-vps", "vps");
+    }
     if (cmd !== "remote_call" || !a) return null;
     calls.push(a);
     if (a.cmd === "servers_list") return { imported: true, servers: lists[a.master] ?? [] };
@@ -100,6 +103,18 @@ beforeEach(async () => {
 });
 
 describe("machines reached through a master", () => {
+  it("said to be on before its hello is in: connecting, then on with its hello (finding n3)", async () => {
+    await masters.disconnect("vps");
+    states.vps = { box: { state: "on", info: null } };
+    await masters.connect(masters.list[0]);
+    await flush();
+    expect(masters.statusOf("vps/box").state).toBe("connecting");
+    watches.vps({ connected: "box", info: hello("m-box", "box") });
+    await flush();
+    expect(masters.statusOf("vps/box")).toMatchObject({ state: "on", info: { machineId: "m-box" } });
+    expect(calls.some((c) => c.master === "vps/box" && c.cmd === "projects_list")).toBe(true);
+  });
+
   it("show under it, keyed by their path, at most three levels deep", () => {
     expect(masters.tree.map((r) => [r.m.id, r.depth])).toEqual([
       ["vps", 1],
@@ -170,5 +185,25 @@ describe("machines reached through a master", () => {
     watches["vps/box"]({ connected: "deep", info: hello("m-vps", "vps") });
     await flush();
     expect(masters.statusOf("vps/box/deep")).toMatchObject({ state: "error", twin: "vps" });
+  });
+
+  it("reached directly after it was reached through a master: the direct way is kept (finding n1)", async () => {
+    settings.set("masters", [server("vps", "VPS"), server("direct", "box direct")]);
+    await masters.connect(masters.list[1]);
+    await flush();
+    expect(masters.statusOf("direct").state).toBe("on");
+    expect(masters.statusOf("vps/box")).toMatchObject({ state: "error", twin: "direct" });
+    // What was reached through it goes with it.
+    expect(masters.tree.map((r) => r.m.id)).toEqual(["vps", "vps/box", "direct"]);
+  });
+
+  it("both ways connecting at once: the direct one is kept, the nested row leads to it (finding n1)", async () => {
+    await masters.disconnect("vps");
+    settings.set("masters", [server("vps", "VPS"), server("direct", "box direct")]);
+    await Promise.all([masters.connect(masters.list[0]), masters.connect(masters.list[1])]);
+    await flush();
+    expect(masters.statusOf("direct").state).toBe("on");
+    expect(masters.statusOf("vps/box")).toMatchObject({ state: "error", twin: "direct" });
+    expect(masters.onKeys.sort()).toEqual(["direct", "vps"]);
   });
 });

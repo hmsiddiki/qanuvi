@@ -384,6 +384,17 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    M3c BUILT (2026-11-17, 266d2a5; verify green 469 + 459): owner answer to the plan questions: a nested
+    machine behaves exactly as This PC's servers do (off/error rows too, connect on click, always shown, preview and
+    language servers too); depth 3 + loop guard driven when the owner provides another machine. Wire: remote_call
+    takes via + seen; a master refuses a loop (its id in seen) or a path deeper than 3 below the window, then passes
+    the call on (master_servers.rs route_for); hello says forwards: true and a path never goes through a master
+    without it (an older one would run the call on the wrong machine). remote.rs Routed is a pipes::Link, so calls,
+    port forwards (preview) and language servers go along "vps1/vps2". Window: masters.svelte.ts follows each
+    forwarding master's servers_list + remote_watch (nested, find, tree, route, reach); nested machines connect
+    through their master, a lost shown one is held and retried, one removed says why, a branch goes with its master,
+    the same computer twice shows once ("the same computer as ..."); switcher rows indented on a guide line, button
+    shows "VPS › build-box". Test masters.nested.test.ts (7). Design in docs/MIGRATION-VIEWER.md M3.
     PICKUP POINT (fresh conversation starts here, 2026-11-17 17:30, after 540e646): open items in order:
     (1) M3c: a call to a nested machine carries a path (["vps1", "vps2"]), each master forwards it with its streams
     (master_servers.rs remote_call is the one-hop start), loop guard by lasting id, depth at most 3, unpair drops the
