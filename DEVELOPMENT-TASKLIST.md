@@ -379,7 +379,17 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 12:45): runner fix d2799fe (handed-over steps not redone; also 0173046 on
+    RESUME HERE (newest, 2026-11-17 13:15): M2 DONE. Window parts DRIVEN LIVE in a test build of main (QANUVI_ACCOUNT_SITE
+    https://aloelo.dev/qanuvi, QANUVI_ACCOUNT_CLIENT qpc_5caa74da17fe15e9 set on the window; the local test master was
+    started by the window with the new binary and took the same settings). PASS: This PC Account page signed out ->
+    Sign in -> browser opened by account_wait -> owner Allow -> admin shown; local test master shows its own signed-out
+    page while This PC is signed in (title "Qanuvi account: DESKTOP-R8G3PAK (test)", kept-on-that-machine note,
+    qanuvi-master login note) -> Sign in -> browser -> Allow -> signed in there; Sign out on the master leaves This PC
+    signed in; Cancel during a sign-in closes the box with no error. VPS not driven (still the 2026-11-16 server build,
+    no M2). Finding m2a (awaits owner): on a master's Account page two sentences run together ("password.The browser
+    opens..."). Note: the page copy says qanuvi.com also when a test site is set (only seen with a test site). Next: m2a
+    (owner), then plan M3 with the owner before code.
+    RESUME HERE (before, 2026-11-17 12:45): runner fix d2799fe (handed-over steps not redone; also 0173046 on
     old-infrastructure) PUBLISHED as 0.1.25 (7d39517, tag v0.1.25, owner "publish anyway"). M2 DRIVEN LIVE on the
     master side against the local Qlopy site https://aloelo.dev/qanuvi/ (disk E:/Wnmp/nginx-bins/default/www/qanuvi,
     mkcert certificate; JWT, OAuth, application passwords on; app "Qanuvi" client id qpc_5caa74da17fe15e9 with redirect

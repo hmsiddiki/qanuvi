@@ -187,7 +187,7 @@ This PC is untouched in M1.
 - The Account page shows the shown machine's account.
 - **Site side (owner's site, separate from this repo):** a "Machine passwords" page on qanuvi.com, and application
   passwords switched on.
-- BUILT 2026-11-17 (76a137e), not driven live yet. Stores: This PC keeps `account:<site>` in the credential store; a
+- BUILT 2026-11-17 (76a137e); DRIVEN LIVE 2026-11-17 (master side d04b495, window parts in a test build: per-machine Account page, browser sign-in, sign out, cancel). DONE. Stores: This PC keeps `account:<site>` in the credential store; a
   desktop-build master `master-account:<machine id>:<site>`; a server build `account-sign-in.json` (0600, never in
   backups). The browser sign-in is `account_begin` (machine) → `account_wait` (window: browser + loopback) →
   `account_finish` (machine). `qanuvi-master login` / `logout`.
