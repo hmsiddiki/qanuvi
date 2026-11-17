@@ -379,7 +379,16 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 06:20): q1 + q2 FIXED (owner: "yes to both") and DRIVEN LIVE (release test
+    RESUME HERE (newest, 2026-11-17 06:40): M1d DRIVEN LIVE ON THE VPS, ALL PASS. Owner put Node v26.13.1 (nodejs.org
+    LTS, SHA256 OK) in /opt with links in /usr/local/bin (Debian's 18 stays in /usr/bin). basevm378: js-debug run by
+    the VPS's `qanuvi-master serve` with /usr/local/bin/node (port 0, through the tunnel); paused at app.js:3 (a 2,
+    b 3, call stack), Continue -> "total is 5", "Debugging ended.", nothing left on the VPS.
+    Finding r1 (owner to decide): the already open window kept showing js-debug's "needs Node.js 20 ... 18.20.4"
+    after Node 26 was in place; a fresh window showed it right. dap.loadStatuses falls back to the cached list when
+    the statuses call fails, silently, so the call most likely failed once (cause not seen). Proposal: on a failed
+    reload keep the list but say "Could not check <machine> again: <error>" with a Check again button.
+    NEXT: owner decides r1, then M2 (account on the master).
+    RESUME HERE (before, 2026-11-17 06:20): q1 + q2 FIXED (owner: "yes to both") and DRIVEN LIVE (release test
     build 06:15; the local test master still runs its 05:17 build, its exe was in use; nothing master-side changed).
     q1: each debugger spec has `min_node` (js-debug 20, PHP Debug 0); dap.rs `usable_node` asks the machine's
     `node --version` through `host.run` and refuses with "This debugger needs Node.js 20 or newer; that machine has
