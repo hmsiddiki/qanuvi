@@ -1466,10 +1466,21 @@ async fn backups_remove(path: String) -> Res<()> {
     .await
 }
 
+/// Remote access is on in This PC's settings (its master then stays when the last window closes, as before M4).
+fn remote_access_on(settings: &serde_json::Map<String, serde_json::Value>) -> bool {
+    settings
+        .get("remoteAccess")
+        .and_then(|v| v.get("enabled"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
 #[tauri::command]
 fn app_restart(app: tauri::AppHandle) -> Res<()> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // This PC's master has the data open: a move or a booked restore needs it closed. The new instance starts it again.
+    crate::master::stop_service(&crate::paths::data_dir());
     // The same project folder argument again (not the flags, not an older --after-pid).
     let keep: Vec<String> = std::env::args()
         .skip(1)
@@ -2245,6 +2256,14 @@ pub fn run() {
             // This data folder is the app's own: a master service started on it (remote access) is This PC, and leaves
             // the start-up list, watches, syncs and backups to this core.
             crate::master::mark_app_data(&dir);
+            // M4a: This PC runs its own master on this data folder from launch on (remote access on or not). Until
+            // M4b it leaves the background jobs to this core; until M5 the window still calls this core.
+            let master_dir = dir.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = crate::master::start_this_pc(&master_dir) {
+                    eprintln!("This PC's master did not start: {e}");
+                }
+            });
             // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
             // when the last good one is a day old.
             let backup_dir = dir.clone();
@@ -2313,6 +2332,12 @@ pub fn run() {
                 state.startup.stop_all();
                 state.inspector.close();
                 state.remotes.disconnect_all();
+                // Until M4c gives This PC's master its tray icon it would be a hidden process: it ends with the last
+                // window unless remote access needs it (as before M4).
+                let settings = crate::settings::get_all(&state.db).unwrap_or_default();
+                if !remote_access_on(&settings) {
+                    crate::master::stop_service(&crate::paths::data_dir());
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![

@@ -129,15 +129,22 @@ impl Master {
         if !app_data {
             crate::model_keys::use_master_names();
         }
-        // A restore booked in Settings, Backups (24z3 D3): applied now, before the database opens.
-        if let Some(note) = crate::backups::apply_pending(dir, dir, None, Some(&backups_default()))
+        // A restore booked in Settings, Backups (24z3 D3): applied now, before the database opens. On the app's own
+        // data the app applies it at its own start (M4: the app stops this master before it restarts for it).
+        if !app_data
+            && let Some(note) =
+                crate::backups::apply_pending(dir, dir, None, Some(&backups_default()))
         {
             eprintln!("{note}");
         }
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
         let machine_id = crate::machine::lasting_id(dir);
-        agent::mark_interrupted(&db);
-        runs::mark_interrupted(&db);
+        // Sessions and plan runs left running by a master that ended. On the app's own data they are the app's until
+        // M5 (agents and runs move here then): this master starting while the app works must not end them.
+        if !app_data {
+            agent::mark_interrupted(&db);
+            runs::mark_interrupted(&db);
+        }
         let accounts = accounts_for(dir, &machine_id, app_data);
         let remotes = crate::remote::Remotes::default();
         remotes.set_me(&machine_id);
@@ -1291,6 +1298,40 @@ pub fn is_running(dir: &Path) -> bool {
 /// `after`: a service that is ending (a restart); the new one waits for it before it opens the data.
 fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    spawn_service(&exe, dir, after)
+}
+
+/// The master program next to the running one (the desktop app ships `qanuvi-master` beside `qanuvi`).
+pub fn master_exe_beside_me() -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let master = exe.with_file_name(if cfg!(windows) {
+        "qanuvi-master.exe"
+    } else {
+        "qanuvi-master"
+    });
+    if master.is_file() {
+        Ok(master)
+    } else {
+        Err(format!(
+            "The master program was not found next to Qanuvi ({}).",
+            master.display()
+        ))
+    }
+}
+
+/// M4a: This PC's master on the desktop app's own data, started at the app's launch unless it runs already (or a
+/// restart of it is under way). Does not wait for it: the app's window does not call it yet (M5).
+pub fn start_this_pc(dir: &Path) -> Result<(), String> {
+    if is_running(dir) || restarting(dir) {
+        return Ok(());
+    }
+    let exe = master_exe_beside_me()?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(service_file(dir));
+    spawn_service(&exe, dir, None)
+}
+
+fn spawn_service(exe: &Path, dir: &Path, after: Option<u32>) -> Result<(), String> {
     let mut cmd = std::process::Command::new(exe);
     cmd.arg("serve").arg("--data").arg(dir);
     if let Some(pid) = after {
@@ -2004,6 +2045,34 @@ mod tests {
         call(&m, "settings_set", json!({"values": {"startup": [item]}})).unwrap();
         m.start_own();
         assert_eq!(call(&m, "startup_status", json!({})).unwrap(), json!([]));
+    }
+
+    #[test]
+    fn m4a_this_pcs_master_starting_leaves_the_apps_running_runs_alone() {
+        let status = |dir: &Path| -> String {
+            let db = Db::open(&dir.join("qanuvi.db")).unwrap();
+            db.conn()
+                .query_row("SELECT status FROM plan_runs WHERE id = 'r1'", [], |r| {
+                    r.get(0)
+                })
+                .unwrap()
+        };
+        for app_data in [true, false] {
+            let data = tempfile::tempdir().unwrap();
+            let project = tempfile::tempdir().unwrap();
+            {
+                let db = Db::open(&data.path().join("qanuvi.db")).unwrap();
+                let p = crate::projects::add(&db, &project.path().to_string_lossy()).unwrap();
+                runs::save(&db, &p.id, "r1", "PLAN.md", "running", "{\"steps\":[]}").unwrap();
+            }
+            if app_data {
+                mark_app_data(data.path());
+            }
+            let _m = Master::open(data.path()).unwrap();
+            // The app's run goes on; a master on its own data cleans up what its own last life left running.
+            let want = if app_data { "running" } else { "stopped" };
+            assert_eq!(status(data.path()), want, "app data: {app_data}");
+        }
     }
 
     #[test]
