@@ -49,7 +49,8 @@
     type Preflight,
     type RiskChoice,
   } from "$lib/plan/preflight";
-  import { finishedCost, planHistory } from "$lib/plan/costs";
+  import { budgetBelowFirstStep, finishedCost, planHistory, usualStepCost } from "$lib/plan/costs";
+  import { jobType, type ModelStats } from "$lib/plan/routing";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
   import { finishEstimate, offersFinish, FINISHER, type FinishAuto, type FinishLevel } from "$lib/plan/finishing";
 
@@ -62,9 +63,11 @@
     onclose: () => void;
     /** The plan file was changed here (the steps' models written in). */
     onchanged?: () => void;
+    /** Opened by "Raise budget": the budget box gets the focus. */
+    focusBudget?: boolean;
   }
 
-  let { project, file, plan, setup, onclose, onchanged }: Props = $props();
+  let { project, file, plan, setup, onclose, onchanged, focusBudget = false }: Props = $props();
 
   /** The agent for this run: any that works on this computer (Claude Code needs its command; Qanuvi's own, models). */
   let usable = $derived(
@@ -363,6 +366,36 @@
     const inR = r.length ? all.filter((s) => s.number && inRanges(s.number, r)) : all;
     return (onlyOne ? inR.slice(0, 1) : inR).slice(0, 40);
   }
+
+  /** What earlier runs learned (cost per finished step per model), read when the start panel opens. */
+  let learned = $state<Map<string, ModelStats>>(new Map());
+  $effect(() => {
+    if (setup)
+      void runner.learnedStats().then(
+        (m) => (learned = m),
+        () => (learned = new Map()),
+      );
+  });
+  /** The run's first step, its model and what a step usually costs there: a budget below it stops the run after it. */
+  let firstStepCost = $derived.by(() => {
+    void ranges;
+    void fromLine;
+    void onlyOne;
+    if (freeOnly && hasFree) return null;
+    const s = coveredSteps()[0];
+    if (!s) return null;
+    const model = oneModel || s.model?.trim() || keptModel(keptState, s) || settings.agent(provider.id).model;
+    if (!model || isFree(model)) return null;
+    const usual = usualStepCost(learned, model, jobType(s.title));
+    return usual === null ? null : { step: s, model, usual };
+  });
+  let budgetInput = $state<HTMLInputElement | null>(null);
+  $effect(() => {
+    if (setup && focusBudget && budgetInput) {
+      budgetInput.focus();
+      budgetInput.select();
+    }
+  });
 
   async function runCheck() {
     checking = true;
@@ -663,7 +696,7 @@
       </label>
       <label>
         Budget for the run (USD, 0 = none)
-        <input type="number" min="0" step="0.01" bind:value={budget} />
+        <input type="number" min="0" step="0.01" bind:value={budget} bind:this={budgetInput} />
       </label>
       <label title="A step that goes over pauses the run, so a runaway step cannot eat your limit. 0: no limit.">
         Per step at most (USD / minutes, 0 = none)
@@ -697,6 +730,16 @@
       </label>
     </div>
     {#if rangeError}<p class="hint warn">{rangeError}</p>{/if}
+    {#if firstStepCost && budgetBelowFirstStep(Number(budget) || 0, firstStepCost.usual)}
+      <p class="hint warn">
+        The budget of {formatCost(Number(budget) || 0)} is below what a step on {modelLabel(
+          provider,
+          firstStepCost.model,
+        )}
+        usually costs (about {formatCost(firstStepCost.usual)}, from earlier runs): the run will likely stop after step
+        {firstStepCost.step.number ?? firstStepCost.step.title}.
+      </p>
+    {/if}
     <p class="hint">
       A step can say what it needs first ("- Needs: 3, 5" or "- Needs: OTHER-PLAN.md#4"). When that is not done, the run
       skips it, writes why under it ("- Skipped: ..."), and carries on.
@@ -946,17 +989,21 @@
         <span class="main">
           {run.status === "done"
             ? "Run finished"
-            : run.status === "needs-you"
-              ? "Run ended: it needs you"
-              : run.status === "paused"
-                ? "Run paused"
-                : "Run stopped"}
+            : run.status === "stopped" && run.budgetReached
+              ? `Stopped: budget ${formatCost(run.budgetReached)} reached`
+              : run.status === "needs-you"
+                ? "Run ended: it needs you"
+                : run.status === "paused"
+                  ? "Run paused"
+                  : "Run stopped"}
           · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
             {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
             {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}{#if run.steps.some((s) => s.status === "held" || s.status === "set-aside")},
             {run.steps.filter((s) => s.status === "held" || s.status === "set-aside").length} set aside{/if}
           · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
-          {#if run.message}<span class="dim"> · {run.message}</span>{/if}
+          {#if run.message && !(run.status === "stopped" && run.budgetReached)}<span class="dim">
+              · {run.message}</span
+            >{/if}
         </span>
       {/if}
     </div>

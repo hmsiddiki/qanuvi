@@ -207,6 +207,36 @@ fn runs_a_plain_plan_to_the_end() {
     assert!(env.text(FILE).contains("- [x] **1. First**"));
     assert!(env.text(FILE).contains("- [x] **2. Second**"));
     assert_eq!(questions(&env), 0);
+    assert_eq!(r.budget_reached, None);
+}
+
+#[test]
+fn b1_a_run_stopped_by_its_budget_says_so_on_the_record() {
+    let env =
+        world("# Plan\n\n- [ ] **1. First**\n  - do it\n- [ ] **2. Second**\n  - then this\n");
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply {
+            cost: Some(1.16),
+            ..Default::default()
+        }
+    });
+    let r = run(
+        &env,
+        RunOptions {
+            budget_usd: 1.0,
+            ..options()
+        },
+    );
+    assert_eq!(r.status, RunStatus::Stopped);
+    assert_eq!(r.budget_reached, Some(1.0));
+    assert!(r.message.contains("budget of $1.00"), "{}", r.message);
+    assert_eq!(step(&r, "1").status, RunStepStatus::Done);
+    assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
 }
 
 #[test]

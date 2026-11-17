@@ -149,6 +149,8 @@ export interface PlanRun {
   steps: StepRun[];
   status: "running" | "done" | "stopped" | "failed" | "needs-you" | "paused";
   message: string;
+  /** The run stopped because it reached its own budget (this many USD): the plan says so and offers Raise budget. */
+  budgetReached?: number;
   startedAt: number;
   endedAt: number | null;
   /** Paused in the middle of a step: its session, so Resume goes on in it (also after a restart). */

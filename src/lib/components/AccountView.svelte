@@ -44,8 +44,7 @@
     </button>
     <p class="muted small">
       qanuvi.com opens in your browser, where you sign in with Google, Microsoft or GitHub. Qanuvi never sees your
-      password.{#if master}
-        The browser opens on this computer; the sign-in is kept on {place}, not here.{/if}
+      password.{#if master}{" "}The browser opens on this computer; the sign-in is kept on {place}, not here.{/if}
     </p>
     {#if master}
       <p class="muted small">

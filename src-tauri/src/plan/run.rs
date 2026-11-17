@@ -472,6 +472,7 @@ impl<'a> Loop<'a> {
             } else {
                 String::new()
             },
+            budget_reached: None,
             started_at: now as f64,
             ended_at: steps.is_empty().then_some(now as f64),
             paused_session: None,
@@ -1659,6 +1660,7 @@ impl<'a> Loop<'a> {
                     "The run reached its budget of ${:.2}.",
                     self.s.options.budget_usd
                 );
+                self.run.budget_reached = Some(self.s.options.budget_usd);
                 self.finish(RunStatus::Stopped, &m);
                 self.run.steps[i].status = RunStepStatus::Waiting;
                 break;

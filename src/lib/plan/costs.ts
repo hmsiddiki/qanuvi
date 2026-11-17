@@ -51,3 +51,30 @@ export function planHistory(
   }
   return { runs, steps, cost, perStep: steps ? cost / steps : null };
 }
+
+/**
+ * What one finished step usually costs on a model, from what earlier runs learned (keys "jobType|model"): the same
+ * kind of job first, else every kind on that model. Failed tries count in (a step pays for them too). Null when the
+ * model never finished a step.
+ */
+export function usualStepCost(
+  stats: Map<string, { successes: number; costUsd: number }>,
+  model: string,
+  type: string,
+): number | null {
+  const same = stats.get(`${type}|${model}`);
+  if (same && same.successes) return same.costUsd / same.successes;
+  let cost = 0;
+  let done = 0;
+  for (const [key, s] of stats) {
+    if (key.slice(key.indexOf("|") + 1) !== model) continue;
+    cost += s.costUsd;
+    done += s.successes;
+  }
+  return done ? cost / done : null;
+}
+
+/** A run budget (0 = none) below what its first step usually costs: the run would stop after that step. */
+export function budgetBelowFirstStep(budget: number, usual: number | null): boolean {
+  return budget > 0 && usual !== null && usual > budget;
+}

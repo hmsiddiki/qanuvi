@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { finishedCost, planHistory } from "./costs";
+import { budgetBelowFirstStep, finishedCost, planHistory, usualStepCost } from "./costs";
 
 describe("measuring plan runs", () => {
   it("compares a run with the plan's earlier runs", () => {
@@ -24,5 +24,25 @@ describe("measuring plan runs", () => {
     expect(h.steps).toBe(3);
     expect(h.cost).toBe(30);
     expect(h.perStep).toBe(10);
+  });
+});
+
+describe("a run budget against its first step (b1)", () => {
+  const stats = new Map([
+    ["feature|opus", { successes: 2, costUsd: 2.4 }],
+    ["fix|opus", { successes: 1, costUsd: 0.3 }],
+    ["docs|sonnet", { successes: 0, costUsd: 0.5 }],
+  ]);
+  it("uses the same kind of job first, else every kind on the model", () => {
+    expect(usualStepCost(stats, "opus", "feature")).toBeCloseTo(1.2);
+    expect(usualStepCost(stats, "opus", "docs")).toBeCloseTo(0.9);
+    expect(usualStepCost(stats, "sonnet", "docs")).toBeNull();
+    expect(usualStepCost(stats, "haiku", "feature")).toBeNull();
+  });
+  it("warns only when a set budget is below the usual cost", () => {
+    expect(budgetBelowFirstStep(1, 1.16)).toBe(true);
+    expect(budgetBelowFirstStep(2, 1.16)).toBe(false);
+    expect(budgetBelowFirstStep(0, 5)).toBe(false);
+    expect(budgetBelowFirstStep(1, null)).toBe(false);
   });
 });

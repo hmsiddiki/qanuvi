@@ -55,6 +55,8 @@
   import { formatCost } from "$lib/agent/events";
 
   let showRun = $state(false);
+  /** The start panel was opened by "Raise budget": its budget box gets the focus. */
+  let raising = $state(false);
   /** The steps shown under the open start panel anyway ("Show steps"); folded again each time it opens. */
   let peekSteps = $state(false);
   $effect(() => {
@@ -374,8 +376,25 @@
           title={canResume
             ? "Go on from the next open step (the settings open as they were, to change if you like)"
             : "Run the plan"}
-          onclick={() => (showRun = !showRun)}><Play size={12} /> {canResume ? "Resume" : "Run"}</button
+          onclick={() => {
+            raising = false;
+            showRun = !showRun;
+          }}><Play size={12} /> {canResume ? "Resume" : "Run"}</button
         >
+        {#if canResume && runner.run?.status === "stopped" && runner.run.budgetReached}
+          <!-- b1: the run stopped on its own budget; say so where Resume is, with the way out next to it. -->
+          <button
+            type="button"
+            class="link"
+            title="The last run stopped at its budget of {formatCost(
+              runner.run.budgetReached,
+            )}: open the run's settings with the budget ready to change"
+            onclick={() => {
+              raising = true;
+              showRun = true;
+            }}>Raise budget</button
+          >
+        {/if}
       {/if}
     {/if}
     {#if settings.value.ai}
@@ -468,7 +487,18 @@
         {/if}
       </div>
     {:else if plan}
-      <RunPanel {project} {file} {plan} setup={showRun} onclose={() => (showRun = false)} onchanged={load} />
+      <RunPanel
+        {project}
+        {file}
+        {plan}
+        setup={showRun}
+        focusBudget={raising}
+        onclose={() => {
+          showRun = false;
+          raising = false;
+        }}
+        onchanged={load}
+      />
       {#if showRun}
         <!-- The start panel has the screen; the steps wait under one line (a range may need their numbers). -->
         {@const all = plan.sections.flatMap((s) => s.steps)}
