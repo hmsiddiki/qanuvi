@@ -1056,6 +1056,21 @@ fn backups_default() -> PathBuf {
     crate::backups::master_default_dir(crate::data_location::from_source())
 }
 
+/// Where the daily backups of a data folder go and the window storage they take along. On the desktop app's own
+/// data (M4b) the app's: its backups folder and its WebView folder (settings and layout), so the app's Settings,
+/// Backups lists and prunes the same ones as before. Elsewhere a master's own folder, with no window storage.
+fn backup_place(dir: &Path, app_data: bool) -> (Option<PathBuf>, PathBuf) {
+    if app_data {
+        let from_source = crate::data_location::from_source();
+        (
+            crate::data_location::Defaults::real().webview_for(dir),
+            crate::backups::default_dir(from_source),
+        )
+    } else {
+        (None, backups_default())
+    }
+}
+
 /// Where the background service notes its address and token (readable by its user only).
 fn service_file(dir: &Path) -> PathBuf {
     dir.join("master.json")
@@ -1088,11 +1103,9 @@ fn restarting(dir: &Path) -> bool {
 impl Master {
     /// What this master does by itself once it runs (24z3 D4), with no window connected: starts its own start-up
     /// list, and keeps Claude Code current when its settings ask for that (20 seconds after start, then once a day;
-    /// never while an agent is working).
+    /// never while an agent is working). On the desktop app's own data (M4b) this master is This PC and does these
+    /// jobs in the app's place; the app no longer runs them, so nothing runs twice.
     pub fn start_own(self: &Arc<Self>) {
-        if self.app_data {
-            return;
-        }
         let settings = crate::settings::get_all(&self.db).unwrap_or_default();
         self.startup
             .start_all(&crate::startup::items_from_settings(&settings));
@@ -1129,7 +1142,11 @@ impl Master {
                 std::thread::sleep(crate::memory_disk::SYNC_EVERY);
             }
         });
-        // Its own servers (migration M3b): the ones marked to connect at start-up, now and again while away.
+        // Its own servers (migration M3b): the ones marked to connect at start-up, now and again while away. On the
+        // app's own data the window still holds This PC's server connections until M5.
+        if self.app_data {
+            return;
+        }
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {
             loop {
@@ -1181,7 +1198,6 @@ impl Master {
 /// The file the desktop app keeps in its own data folder (24z3 D6), so a master service opened on it knows it is This PC.
 const APP_MARK: &str = "qanuvi-app.mark";
 
-/// Called by the desktop app at start-up on its data folder.
 /// The account store of a master on a data folder: This PC's own names on the desktop app's data, else its own.
 fn accounts_for(dir: &Path, machine_id: &str, app_data: bool) -> crate::account::Accounts {
     if app_data {
@@ -1197,6 +1213,9 @@ pub fn accounts_at(dir: &Path) -> crate::account::Accounts {
     accounts_for(dir, &crate::machine::lasting_id(dir), on_app_data(dir))
 }
 
+/// Called by the desktop app at start-up on its data folder. A master on it keeps This PC's names and account, and
+/// leaves to the app what the app still holds until M5 (its running sessions and runs, a booked restore, This PC's
+/// server connections); since M4b it runs This PC's background jobs.
 pub fn mark_app_data(dir: &Path) {
     let file = dir.join(APP_MARK);
     if !file.is_file() {
@@ -1216,18 +1235,18 @@ pub fn serve(dir: &Path) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
     master.start_own();
     // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour. On the app's
-    // own data the desktop core makes This PC's backups.
+    // own data (M4b) these are This PC's backups: the app's folder, with its window storage, as the app made them.
     let backup_dir = dir.to_path_buf();
-    let app_data = master.app_data;
+    let (backup_web, backup_default) = backup_place(dir, master.app_data);
     std::thread::spawn(move || {
-        if app_data {
-            return;
-        }
         std::thread::sleep(Duration::from_secs(120));
         loop {
-            if let Err(e) =
-                crate::backups::run_due(&backup_dir, None, Some(&backups_default()), false)
-            {
+            if let Err(e) = crate::backups::run_due(
+                &backup_dir,
+                backup_web.as_deref(),
+                Some(&backup_default),
+                false,
+            ) {
                 eprintln!("Backup failed: {e}");
             }
             std::thread::sleep(Duration::from_secs(3600));
@@ -1424,6 +1443,79 @@ pub fn stdio_bridge(dir: &Path) -> Result<(), String> {
     let _ = to_service.shutdown(std::net::Shutdown::Both);
     let _ = down.join();
     Ok(())
+}
+
+/// Connects to This PC's master with its hello sent, waiting up to 10 seconds while it is starting (the app starts
+/// it at launch; this never starts a second one).
+fn this_pc_link(dir: &Path) -> Result<(TcpStream, BufReader<TcpStream>), String> {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let (mut s, token) = loop {
+        if let Some(c) = connect(dir) {
+            break c;
+        }
+        if Instant::now() >= deadline {
+            return Err("This PC's master is not running.".into());
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    };
+    writeln!(s, "{}", json!({"token": token})).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(s.try_clone().map_err(|e| e.to_string())?);
+    Ok((s, reader))
+}
+
+/// M4b: one call to This PC's master on the app's own data (its start-up list lives there now). The answer, or the
+/// master's error. Until M5 only the jobs that moved go this way; the window calls the app's core for the rest.
+pub fn this_pc_call(dir: &Path, cmd: &str, args: Value) -> Result<Value, String> {
+    let (mut s, reader) = this_pc_link(dir)?;
+    s.set_read_timeout(Some(Duration::from_secs(30)))
+        .map_err(|e| e.to_string())?;
+    writeln!(s, "{}", json!({"id": 1, "cmd": cmd, "args": args})).map_err(|e| e.to_string())?;
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("This PC's master did not answer: {e}"))?;
+        let Ok(msg) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if msg["id"] == 1 {
+            let _ = s.shutdown(std::net::Shutdown::Both);
+            return match msg.get("err") {
+                Some(e) => Err(e
+                    .as_str()
+                    .unwrap_or("This PC's master refused the call.")
+                    .into()),
+                None => Ok(msg["ok"].clone()),
+            };
+        }
+    }
+    Err("This PC's master closed the connection.".into())
+}
+
+/// M4b: follows the Inbox of This PC's master (what its own jobs add, such as the OmniRoute watch's sign-ins to
+/// renew) and hands each change to `on`, in the payload of the app's "qanuvi-inbox" event. Kept up while `go` says
+/// so: when the master restarts or is not up yet it tries again every 3 seconds.
+pub fn follow_this_pc_inbox(dir: &Path, go: impl Fn() -> bool, on: impl Fn(Value)) {
+    while go() {
+        if let Ok((mut s, reader)) = this_pc_link(dir)
+            && writeln!(
+                s,
+                "{}",
+                json!({"id": 1, "cmd": "inbox_watch", "args": {"onEvent": "inbox"}})
+            )
+            .is_ok()
+        {
+            for line in reader.lines().map_while(Result::ok) {
+                let Ok(msg) = serde_json::from_str::<Value>(&line) else {
+                    continue;
+                };
+                if msg["stream"] == "inbox" {
+                    on(msg["event"].clone());
+                }
+                if !go() {
+                    return;
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_secs(3));
+    }
 }
 
 /// Stops the running service, if any.
@@ -2038,13 +2130,83 @@ mod tests {
         assert!(on_app_data(data.path()));
         let m = Master::open(data.path()).unwrap().shared();
         assert!(m.app_data);
-        // Its start-up list is the desktop core's to start: nothing starts here.
+        // M4b: This PC's start-up list is its master's to start now (the app no longer starts it).
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap().to_string();
         let item = json!({"id": "proxy", "name": "proxy", "command": "no-such-program-xyz", "waitFor": addr, "enabled": true});
         call(&m, "settings_set", json!({"values": {"startup": [item]}})).unwrap();
         m.start_own();
-        assert_eq!(call(&m, "startup_status", json!({})).unwrap(), json!([]));
+        let st = call(&m, "startup_status", json!({})).unwrap();
+        assert_eq!(st[0]["id"], "proxy", "{st}");
+        m.startup.stop_all();
+        // Its backups are the app's: the app's folder (not the master's own), as the app made them before M4b.
+        let (_, folder) = backup_place(data.path(), true);
+        assert_eq!(
+            folder,
+            crate::backups::default_dir(crate::data_location::from_source())
+        );
+        let (web, folder) = backup_place(data.path(), false);
+        assert_eq!((web, folder), (None, backups_default()));
+    }
+
+    #[test]
+    fn m4b_the_app_reaches_this_pcs_master_and_hears_its_inbox() {
+        let data = tempfile::tempdir().unwrap();
+        mark_app_data(data.path());
+        // Not running: the call says so after its wait instead of starting a second master.
+        let missing = tempfile::tempdir().unwrap();
+        let started = Instant::now();
+        assert!(this_pc_call(missing.path(), "hello", json!({})).is_err());
+        assert!(started.elapsed() >= Duration::from_secs(9));
+        let m = Master::open(data.path()).unwrap().shared();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let token = "t0";
+        std::fs::write(
+            service_file(data.path()),
+            json!({"port": port, "token": token, "pid": std::process::id()}).to_string(),
+        )
+        .unwrap();
+        let server = m.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let master = server.clone();
+                std::thread::spawn(move || {
+                    let write_half = stream.try_clone().unwrap();
+                    let mut reader = BufReader::new(stream);
+                    let mut first = String::new();
+                    reader.read_line(&mut first).unwrap();
+                    let hello: Value = serde_json::from_str(&first).unwrap();
+                    assert_eq!(hello["token"], "t0");
+                    handle_connection(master, reader, Arc::new(Mutex::new(Box::new(write_half))));
+                });
+            }
+        });
+        let st = this_pc_call(data.path(), "startup_status", json!({})).unwrap();
+        assert_eq!(st, json!([]));
+        assert!(this_pc_call(data.path(), "startup_start", json!({"items": "nonsense"})).is_err());
+        // A change the master makes reaches the app's follower, in the app's event payload.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let dir = data.path().to_path_buf();
+        std::thread::spawn(move || {
+            follow_this_pc_inbox(
+                &dir,
+                || true,
+                move |v| {
+                    let _ = tx.send(v);
+                },
+            )
+        });
+        let item = json!({"kind": "test", "title": "Test note"});
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let got = loop {
+            call(&m, "inbox_add", json!({"item": item})).unwrap();
+            if let Ok(v) = rx.recv_timeout(Duration::from_millis(300)) {
+                break v;
+            }
+            assert!(Instant::now() < deadline, "no Inbox change heard");
+        };
+        assert_eq!(got["change"], "add");
     }
 
     #[test]

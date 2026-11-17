@@ -43,7 +43,6 @@ pub struct AppState {
     inspector: preview::Inspector,
     remotes: crate::remote::Remotes,
     accounts: crate::account::Accounts,
-    startup: crate::startup::Startup,
     runs: std::sync::Arc<crate::plan::live::Runs>,
 }
 
@@ -374,34 +373,30 @@ fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
     crate::secrets::set(&project_id, &name, &value)
 }
 
-/// Start with Qanuvi: starts the enabled commands that are not running yet, and answers how each one is.
+/// Start with Qanuvi (M4b: This PC's list is its master's): the same command on This PC's master, answered as is.
+async fn startup_on_this_pc(cmd: &'static str, args: serde_json::Value) -> Res<serde_json::Value> {
+    blocking(move || crate::master::this_pc_call(&crate::paths::data_dir(), cmd, args)).await
+}
+
+/// Starts the enabled commands that are not running yet, and answers how each one is.
 #[tauri::command]
-async fn startup_start(
-    state: State<'_, AppState>,
-    items: Vec<crate::startup::Item>,
-) -> Res<Vec<crate::startup::Status>> {
-    state.startup.start_all(&items);
-    Ok(state.startup.statuses())
+async fn startup_start(items: serde_json::Value) -> Res<serde_json::Value> {
+    startup_on_this_pc("startup_start", serde_json::json!({"items": items})).await
 }
 
 #[tauri::command]
-fn startup_status(state: State<AppState>) -> Vec<crate::startup::Status> {
-    state.startup.statuses()
+async fn startup_status() -> Res<serde_json::Value> {
+    startup_on_this_pc("startup_status", serde_json::json!({})).await
 }
 
 #[tauri::command]
-fn startup_restart(
-    state: State<AppState>,
-    item: crate::startup::Item,
-) -> Vec<crate::startup::Status> {
-    state.startup.restart(&item);
-    state.startup.statuses()
+async fn startup_restart(item: serde_json::Value) -> Res<serde_json::Value> {
+    startup_on_this_pc("startup_restart", serde_json::json!({"item": item})).await
 }
 
 #[tauri::command]
-fn startup_stop(state: State<AppState>, id: String) -> Vec<crate::startup::Status> {
-    state.startup.stop(&id);
-    state.startup.statuses()
+async fn startup_stop(id: String) -> Res<serde_json::Value> {
+    startup_on_this_pc("startup_stop", serde_json::json!({"id": id})).await
 }
 
 /// What Qanuvi uses in all: itself and every process it started.
@@ -2204,84 +2199,30 @@ pub fn run() {
                     r
                 },
                 accounts: crate::account::Accounts::this_pc(&dir),
-                startup: crate::startup::Startup::default(),
                 runs: std::sync::Arc::default(),
             });
-            // This PC's own start-up list and Claude Code update (24z3 D4), from its own settings, whichever machine
-            // the window shows: started here, as a master does in serve. The window still starts the list again
-            // when This PC is shown (each command starts only once).
-            {
-                let state = app.state::<AppState>();
-                let settings = crate::settings::get_all(&state.db).unwrap_or_default();
-                state
-                    .startup
-                    .start_all(&crate::startup::items_from_settings(&settings));
-            }
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(20));
-                loop {
-                    if let Some(state) = handle.try_state::<AppState>() {
-                        crate::claude_update::auto_update(&state.db);
-                    }
-                    std::thread::sleep(std::time::Duration::from_secs(24 * 3600));
-                }
-            });
-            // The OmniRoute watch (15f; in the core since 24z3 D5): a minute after start, then every 30 minutes, sign-ins
-            // to renew and keys that stopped working go to the Inbox, shown or not.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(60));
-                let notify = plan_runs::notify(&handle);
-                loop {
-                    if let Some(state) = handle.try_state::<AppState>() {
-                        crate::omniroute::look(&state.db, &*notify);
-                    }
-                    std::thread::sleep(crate::omniroute::WATCH_EVERY);
-                }
-            });
-            // The memory disk (Milestone 18; in the core since 24z3 D6): 90 seconds after start, then every 10 minutes,
-            // with the disk and passphrase This PC keeps, shown or not.
-            let mem_dir = dir.clone();
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(90));
-                loop {
-                    if let Some(state) = handle.try_state::<AppState>() {
-                        crate::memory_disk::sync_due(&state.db, &mem_dir);
-                    }
-                    std::thread::sleep(crate::memory_disk::SYNC_EVERY);
-                }
-            });
-            // This data folder is the app's own: a master service started on it (remote access) is This PC, and leaves
-            // the start-up list, watches, syncs and backups to this core.
+            // This data folder is the app's own: a master service started on it is This PC.
             crate::master::mark_app_data(&dir);
-            // M4a: This PC runs its own master on this data folder from launch on (remote access on or not). Until
-            // M4b it leaves the background jobs to this core; until M5 the window still calls this core.
+            // M4a: This PC runs its own master on this data folder from launch on (remote access on or not). M4b: it
+            // runs This PC's background jobs (start-up list, Claude Code update, OmniRoute watch, memory disk sync,
+            // daily backups); this core no longer runs them. Until M5 the window still calls this core for the rest.
             let master_dir = dir.clone();
             std::thread::spawn(move || {
                 if let Err(e) = crate::master::start_this_pc(&master_dir) {
                     eprintln!("This PC's master did not start: {e}");
                 }
             });
-            // The daily backup (1d): checked 2 minutes after start (start-up is busy enough), then every hour; made
-            // when the last good one is a day old.
-            let backup_dir = dir.clone();
-            let backup_web = crate::data_location::Defaults::real().webview_for(&dir);
-            let backup_default = backups_default();
+            // What the master's jobs add to the Inbox (the OmniRoute watch's sign-ins to renew, keys that stopped
+            // working) reaches the windows and the notifications as the app's own changes do.
+            let inbox_dir = dir.clone();
+            let handle = app.handle().clone();
             std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(120));
-                loop {
-                    if let Err(e) = crate::backups::run_due(
-                        &backup_dir,
-                        backup_web.as_deref(),
-                        Some(&backup_default),
-                        false,
-                    ) {
-                        eprintln!("Backup failed: {e}");
-                    }
-                    std::thread::sleep(std::time::Duration::from_secs(3600));
-                }
+                let notify = plan_runs::notify(&handle);
+                crate::master::follow_this_pc_inbox(
+                    &inbox_dir,
+                    || true,
+                    move |change| notify("qanuvi-inbox", change),
+                );
             });
             // Agent processes of sessions idle for 10 minutes are closed (memory); a new message opens them again.
             let handle = app.handle().clone();
@@ -2328,12 +2269,11 @@ pub fn run() {
                 state.languages.stop_all();
                 state.debuggers.stop_all();
                 state.agents.stop_all();
-                // Only what Qanuvi started at start-up (a proxy it found already running stays).
-                state.startup.stop_all();
                 state.inspector.close();
                 state.remotes.disconnect_all();
                 // Until M4c gives This PC's master its tray icon it would be a hidden process: it ends with the last
-                // window unless remote access needs it (as before M4).
+                // window unless remote access needs it (as before M4), and its start-up list with it (only what it
+                // started; a proxy it found already running stays). With remote access on, its jobs go on (M4b).
                 let settings = crate::settings::get_all(&state.db).unwrap_or_default();
                 if !remote_access_on(&settings) {
                     crate::master::stop_service(&crate::paths::data_dir());

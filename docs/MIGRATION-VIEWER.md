@@ -261,6 +261,11 @@ Owner decisions (2026-11-18):
 - Closing the last window: the master keeps running with its tray icon (R4). Until M5 only the background jobs go
   on; agents, plan runs and terminals still live in the app and end with it.
 - A setting, off by default: "Start Qanuvi in the background when I sign in".
+- M4a BUILT + DRIVEN LIVE (246e6a5). M4b BUILT + DRIVEN LIVE (2026-11-18): This PC's master runs the start-up list,
+  Claude Code update, OmniRoute watch, memory disk sync and daily backups (the app's backups folder, with the window
+  storage); the app runs none of them. The window's start-up commands go to the master (`this_pc_call`), and the
+  app follows the master's Inbox (`follow_this_pc_inbox`) so its notices reach every window and notification.
+  Until M5 the app keeps its running sessions and runs, a booked restore and This PC's server connections.
 
 ### M5. The window becomes a viewer
 

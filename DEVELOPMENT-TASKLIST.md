@@ -384,7 +384,26 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 02:40): M4 agreed (docs/MIGRATION-VIEWER.md M4: M4a-M4c,
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 03:00): M4b BUILT + DRIVEN LIVE. Next: M4c (tray icon
+    whenever the master runs with "Open Qanuvi" and "Quit Qanuvi", the master staying after the last window closes,
+    "Start Qanuvi in the background when I sign in" off by default, the app stopping the master before an update
+    installs). State: test build of M4b in target/release; test window, This PC's test master and local test master
+    all stopped; test start-up list empty again.
+    M4b BUILT + DRIVEN LIVE (2026-11-18; verify: clippy clean, Rust 462): This PC's master runs the background jobs
+    on the app's data (start_own no longer skips them: start-up list, Claude Code update, OmniRoute watch, memory
+    disk sync; serve's daily backup into the app's own backups folder with its WebView storage, backup_place). The
+    app no longer runs any of them (its Startup is gone from AppState). Still the app's until M5: running sessions and
+    runs (mark_interrupted), a booked restore, This PC's server connections (the master skips connect_away_servers
+    on app data), the idle agent closing. The window's startup_* commands go to the master (master::this_pc_call,
+    waits up to 10 s, never starts a second one); the app follows the master's inbox_watch
+    (follow_this_pc_inbox) and hands each change to its own "qanuvi-inbox" event and notifications.
+    Driven: start-up item started under This PC's master (not the app); Settings, Start-up showed it running,
+    Restart/Off/On went through the master; a note added on the master showed in the Inbox at once (badge 1, under
+    This PC); the master's OmniRoute watch put a "sign in again" notice in the Inbox 60 s after start; memory disk
+    sync ran at 90 s; with the backup made due, the master made it at 2 min in Documents/"Qanuvi backups (test
+    build)" with its window folder; last window closed -> master and start-up item gone. Remote access is the
+    master's relay already (since M4a). Not driven: remote access on with the window closed (jobs go on).
+    PICKUP POINT (before, 2026-11-18 02:40): M4 agreed (docs/MIGRATION-VIEWER.md M4: M4a-M4c,
     master keeps running with a tray icon after the last window closes, "Start Qanuvi in the background when I sign
     in" off by default, the hop measured in M5). M3c depth 3 + loop guard is later step M3d. Next: M4b (background
     jobs move to the master; reduced mark_app_data mode ends), then M4c (tray icon, Quit, start at sign-in, stop
