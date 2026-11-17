@@ -139,6 +139,8 @@ impl Master {
         agent::mark_interrupted(&db);
         runs::mark_interrupted(&db);
         let accounts = accounts_for(dir, &machine_id, app_data);
+        let remotes = crate::remote::Remotes::default();
+        remotes.set_me(&machine_id);
         Ok(Self {
             dir: dir.to_path_buf(),
             accounts,
@@ -153,7 +155,7 @@ impl Master {
             runs: Arc::default(),
             watchers: Arc::default(),
             inbox_watchers: Arc::default(),
-            remotes: crate::remote::Remotes::default(),
+            remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
             remote_errors: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
@@ -203,6 +205,8 @@ impl Master {
                 "host": hostname(),
                 "dataDir": paths::data_dir().to_string_lossy(),
                 "machineId": self.machine_id,
+                // It passes calls on along a path to its own servers (migration M3c).
+                "forwards": true,
             })),
             // Remote access through a relay (Milestone 20), managed from this computer's own window.
             "relay_status" => to(Ok(self.relay.status())),
@@ -1458,6 +1462,32 @@ mod tests {
             &m,
             "remote_call",
             json!({"master": "v1", "cmd": "hello", "args": {}}),
+        )
+        .unwrap_err();
+        assert!(e.contains("Not connected"), "{e}");
+        // Migration M3c: a call that already passed this machine is a loop; a path longer than three machines below
+        // the window is refused; both before anything is sent on.
+        let hello = call(&m, "hello", json!({})).unwrap();
+        assert_eq!(hello["forwards"], true);
+        let me = hello["machineId"].clone();
+        let e = call(
+            &m,
+            "remote_call",
+            json!({"master": "v1", "seen": ["pc", me], "cmd": "hello", "args": {}}),
+        )
+        .unwrap_err();
+        assert_eq!(e, crate::remote::a_loop());
+        let e = call(
+            &m,
+            "remote_call",
+            json!({"master": "v1", "via": ["x", "y"], "seen": ["pc"], "cmd": "hello", "args": {}}),
+        )
+        .unwrap_err();
+        assert_eq!(e, crate::remote::too_deep());
+        let e = call(
+            &m,
+            "remote_call",
+            json!({"master": "v1", "via": ["x"], "seen": ["pc"], "cmd": "hello", "args": {}}),
         )
         .unwrap_err();
         assert!(e.contains("Not connected"), "{e}");

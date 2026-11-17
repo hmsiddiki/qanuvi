@@ -15,7 +15,7 @@
   import { ui } from "$lib/stores/ui.svelte";
 
   let held = $derived(switcher.held);
-  let m = $derived(held ? (masters.list.find((x) => x.id === held.id) ?? null) : null);
+  let m = $derived(held ? (masters.find(held.id) ?? null) : null);
   let name = $derived(m ? displayName(m) : "The server");
   let trying = $derived(!!held && masters.statusOf(held.id).state === "connecting");
 

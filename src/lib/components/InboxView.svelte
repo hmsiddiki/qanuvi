@@ -23,13 +23,13 @@
   /** With paired masters, each item names its machine and the filter shows. */
   let several = $derived(masters.list.length > 0);
   /** The filter's machine is gone from the list: all show again. */
-  let filter = $derived(only === "all" || only === "" || masters.list.some((m) => m.id === only) ? only : "all");
+  let filter = $derived(only === "all" || only === "" || masters.find(only) !== undefined ? only : "all");
   const mine = (i: InboxItem) => filter === "all" || (i.master ?? "") === filter;
 
   /** The machine's name as shown in the switcher ("This PC" for this computer's own). */
   function machineOf(i: InboxItem): { name: string; color?: string } {
     if (!i.master) return { name: "This PC" };
-    const m = masters.list.find((x) => x.id === i.master);
+    const m = i.master ? masters.find(i.master) : undefined;
     return m ? { name: displayName(m), color: m.color || undefined } : { name: i.master };
   }
 
@@ -108,7 +108,7 @@
       <select class="only" aria-label="Machines" bind:value={only}>
         <option value="all">All machines</option>
         <option value="">This PC</option>
-        {#each masters.list as m (m.id)}<option value={m.id}>{displayName(m)}</option>{/each}
+        {#each masters.tree as { m } (m.id)}<option value={m.id}>{masters.route(m.id)}</option>{/each}
       </select>
     {/if}
     {#if happened.some((i) => !i.offline)}

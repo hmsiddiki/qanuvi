@@ -152,6 +152,41 @@ impl Master {
         }
     }
 
+    /// Where a `remote_call` goes (migration M3c): to `master`, one of this machine's servers, and from there along
+    /// `via`. `seen` holds the lasting ids of the machines the call came through (the window's first); a call that
+    /// already passed this machine is a loop, and one whose path would hold more than three machines below the
+    /// window is refused, both before anything is sent on.
+    fn route_for(&self, args: &Value) -> Result<crate::remote::Routed, String> {
+        let list = |v: &Value| -> Vec<String> {
+            v.as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let mut seen = list(&args["seen"]);
+        if seen.iter().any(|id| id == &self.machine_id) {
+            return Err(crate::remote::a_loop());
+        }
+        seen.push(self.machine_id.clone());
+        let via = list(&args["via"]);
+        // Below the window: the masters passed (this one included), the next one, and the rest of the path.
+        if seen.len() + via.len() > crate::remote::MAX_DEPTH {
+            return Err(crate::remote::too_deep());
+        }
+        let first = s(args, "master");
+        if first.contains('/') || via.iter().any(|v| v.contains('/')) {
+            return Err("A machine's path holds server ids, not paths.".into());
+        }
+        let key = std::iter::once(first)
+            .chain(via)
+            .collect::<Vec<_>>()
+            .join("/");
+        self.remotes.route(&key, seen)
+    }
+
     /// The `servers_*` and `remote_*` commands.
     pub(super) fn servers(
         &self,
@@ -188,7 +223,7 @@ impl Master {
             }
             "remote_connect" => self.connect_server(args),
             "remote_call" => {
-                let conn = self.remotes.get(&s(args, "master"))?;
+                let route = self.route_for(args)?;
                 let events = if b(args, "streams") {
                     opt(args, "onEvent")
                         .filter(|n| !n.is_empty())
@@ -196,7 +231,7 @@ impl Master {
                 } else {
                     None
                 };
-                conn.call(&s(args, "cmd"), args["args"].clone(), events)
+                crate::pipes::Link::call(&route, &s(args, "cmd"), args["args"].clone(), events)
             }
             "remote_list" => to(Ok(self.remotes.connected())),
             "remote_states" => self.remote_states(),

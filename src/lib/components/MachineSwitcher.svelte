@@ -5,6 +5,9 @@
    * own. This PC is always in the list. A master's SSH address shows on hover only, so the list stays small.
    * Step 4: a working icon per machine (how many agents work there, on hover), and a machine's right-click menu opens
    * it in a window of its own; picking a machine another window shows brings that window forward.
+   * Migration M3c: the machines a master connects to itself show under it, indented on a guide line (at most three
+   * levels), and behave as This PC's servers do: their state, picking one connects it first, a right-click opens it
+   * in a window of its own. The button shows the way to a nested machine ("VPS › build-box").
    */
   import AppWindow from "@lucide/svelte/icons/app-window";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
@@ -13,7 +16,7 @@
   import Monitor from "@lucide/svelte/icons/monitor";
   import Server from "@lucide/svelte/icons/server";
   import Settings2 from "@lucide/svelte/icons/settings-2";
-  import { masters, displayName } from "$lib/stores/masters.svelte";
+  import { masters, displayName, parentOf } from "$lib/stores/masters.svelte";
   import { inbox } from "$lib/stores/inbox.svelte";
   import { pick } from "$lib/stores/machines";
   import { switcher } from "$lib/stores/switcher.svelte";
@@ -37,8 +40,8 @@
 
   const nameOf = (id: string) => {
     if (!id) return "This PC";
-    const m = masters.list.find((x) => x.id === id);
-    return m ? displayName(m) : id;
+    const m = masters.find(id);
+    return m ? (parentOf(id) ? masters.route(id) : displayName(m)) : id;
   };
 
   async function openWindow(id: string) {
@@ -47,8 +50,8 @@
     await windows.openMachine(id || null, nameOf(id)).catch(() => {});
   }
 
-  let shownMaster = $derived(masters.list.find((m) => m.id === switcher.shown) ?? null);
-  let shownName = $derived(shownMaster ? displayName(shownMaster) : "This PC");
+  let shownMaster = $derived(switcher.shown ? (masters.find(switcher.shown) ?? null) : null);
+  let shownName = $derived(shownMaster ? nameOf(shownMaster.id) : "This PC");
 
   /** Inbox items not read yet, per machine ("" is This PC). */
   let unread = $derived.by(() => {
@@ -64,11 +67,17 @@
   );
 
   /** On hover: how the machine is reached. */
-  const reach = (m: MasterSettings) =>
-    m.relay ? "Through the relay" : m.target === "local" ? "On this PC (test master)" : `SSH: ${m.target}`;
+  const reach = (m: MasterSettings) => {
+    const how = m.relay ? "through the relay" : m.target === "local" ? "on this PC (test master)" : `SSH: ${m.target}`;
+    const parent = parentOf(m.id);
+    // A nested machine is reached by its master, the way that master reaches it.
+    if (parent) return `Through ${masters.route(parent)}, ${how}`;
+    return how.charAt(0).toUpperCase() + how.slice(1);
+  };
 
   const stateText = (m: MasterSettings) => {
     const s = masters.statusOf(m.id);
+    if (s.twin) return `the same computer as ${nameOf(s.twin)}`;
     if (switcher.held?.id === m.id && switcher.held.mode === "lost" && s.state !== "on") return "reconnecting…";
     return s.state === "on"
       ? "connected"
@@ -94,7 +103,10 @@
       return;
     }
     if (id) {
-      const m = masters.list.find((x) => x.id === id);
+      // The same computer reached another way: that one is shown.
+      const twin = masters.statusOf(id).twin;
+      if (twin && masters.statusOf(twin).state === "on") return choose(twin);
+      const m = masters.find(id);
       if (!m) return;
       if (masters.statusOf(id).state !== "on") {
         // Not connected: connect first; the screen stays on the machine shown until it answers.
@@ -184,11 +196,13 @@
           >{#if switcher.shown === null}<Check size={13} />{/if}</span
         >
       </button>
-      {#each masters.list as m (m.id)}
+      {#each masters.tree as { m, depth } (m.id)}
         {@const st = masters.statusOf(m.id)}
         <button
           type="button"
           class="machine"
+          class:nested={depth > 1}
+          style:--depth={depth - 1}
           role="option"
           aria-selected={switcher.shown === m.id}
           title={[
@@ -358,6 +372,21 @@
   .machine:hover:not(:disabled),
   .manage:hover {
     background: var(--qx-bg-raised);
+  }
+
+  /* A machine reached through the one above: indented on a guide line, one step per level. */
+  .machine.nested {
+    position: relative;
+    padding-left: calc(8px + var(--depth) * 14px);
+  }
+
+  .machine.nested::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(16px + (var(--depth) - 1) * 14px);
+    border-left: 1px solid var(--qx-border);
   }
 
   .machine:disabled {

@@ -54,7 +54,7 @@
   let machine = $derived(project.master ?? null);
   let machineInfo = $derived.by(() => {
     if (!machine) return null;
-    const m = masters.list.find((x) => x.id === machine);
+    const m = masters.find(machine);
     return { name: m ? displayName(m) : machine, color: m?.color || "" };
   });
   /** What the page frame, the inspector and "Open in the browser" load. */

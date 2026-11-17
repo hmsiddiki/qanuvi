@@ -83,10 +83,12 @@
         await restoreShown((id) => masters.statusOf(id).state === "on");
         // The machine windows open when the app last closed come back, each on its machine.
         for (const m of windows.takeMachineWindows()) {
-          const known = m === "" || masters.list.some((x) => x.id === m);
+          const known = m === "" || masters.find(m) !== undefined || m.includes("/");
           if (known && m !== (switcher.shown ?? "")) {
-            const master = masters.list.find((x) => x.id === m);
-            void windows.openMachine(m || null, master ? displayName(master) : "This PC").catch(() => {});
+            const master = masters.find(m);
+            void windows
+              .openMachine(m || null, master ? displayName(master) : m ? masters.route(m) : "This PC")
+              .catch(() => {});
           }
         }
       });
@@ -132,7 +134,8 @@
    */
   async function openOn(machine: string | null) {
     if (!machine) return;
-    const m = masters.list.find((x) => x.id === machine);
+    // A machine reached through others: the machines on its path are connected first (migration M3c).
+    const m = await masters.reach(machine);
     if (!m) return;
     if (masters.statusOf(machine).state !== "on") await masters.connect(m);
     if (masters.statusOf(machine).state === "on") await pick(machine, false);

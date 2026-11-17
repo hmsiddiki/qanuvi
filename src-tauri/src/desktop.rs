@@ -532,7 +532,7 @@ fn lsp_host(
     master: &Option<String>,
 ) -> Res<Option<std::sync::Arc<dyn crate::pipes::Link>>> {
     match master.as_deref().filter(|m| !m.is_empty()) {
-        Some(m) => Ok(Some(state.remotes.get(m)?)),
+        Some(m) => Ok(Some(state.remotes.link(m)?)),
         None => Ok(None),
     }
 }
@@ -1650,8 +1650,9 @@ fn remote_unpair(pairing: String) -> Res<()> {
     crate::pairing_keys::delete(&pairing)
 }
 
-/// Passes one of the window's calls to a master. With `streams`, events of what it starts (terminal output, agent
-/// events) go to `on_event`.
+/// Passes one of the window's calls to a master: one of This PC's, or one reached through them by its path
+/// ("vps1/vps2", migration M3c). With `streams`, events of what it starts (terminal output, agent events) go to
+/// `on_event`.
 #[tauri::command]
 async fn remote_call(
     state: State<'_, AppState>,
@@ -1661,8 +1662,8 @@ async fn remote_call(
     streams: bool,
     on_event: Channel<serde_json::Value>,
 ) -> Res<serde_json::Value> {
-    let conn = state.remotes.get(&master)?;
-    blocking(move || conn.call(&cmd, args, streams.then(|| on_event.into()))).await
+    let link = state.remotes.link(&master)?;
+    blocking(move || link.call(&cmd, args, streams.then(|| on_event.into()))).await
 }
 
 /// The masters this app is connected to (a new window joins them).
@@ -2185,7 +2186,12 @@ pub fn run() {
                 agents: agent::Agents::default(),
                 indexes: index::Indexes::default(),
                 inspector: preview::Inspector::default(),
-                remotes: crate::remote::Remotes::default(),
+                remotes: {
+                    // This PC starts every path its calls take (migration M3c: the loop guard).
+                    let r = crate::remote::Remotes::default();
+                    r.set_me(&crate::machine::lasting_id(&crate::paths::data_dir()));
+                    r
+                },
                 accounts: crate::account::Accounts::this_pc(&dir),
                 startup: crate::startup::Startup::default(),
                 runs: std::sync::Arc::default(),

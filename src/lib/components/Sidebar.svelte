@@ -231,7 +231,7 @@
                   [{ label: "Remove from Qanuvi…", danger: true, action: () => removeProject(p.id, p.name) }],
                 ])}
               title="{p.master
-                ? `On ${masters.list.find((m) => m.id === p.master)?.name ?? 'a server'}: `
+                ? `On ${(p.master && masters.find(p.master)?.name) ?? 'a server'}: `
                 : ''}{p.path}  ·  {style.label}"
               onclick={() => {
                 // A project open in another window: bring that window forward instead of editing it twice.

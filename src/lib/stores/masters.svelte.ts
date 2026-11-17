@@ -3,10 +3,10 @@
  * connection ends. The calls themselves are routed in remote.ts; the sidebar lists only the machine on screen
  * (24z3 Part A2), so a master's projects show once it is shown.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
-import { callMaster, disown, forgetMaster, nameMachines, own, shownMachine } from "$lib/remote";
+import { callMaster, disown, forgetMaster, machineName, nameMachines, own, shownMachine } from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
 import { show, showOffline } from "./machines";
@@ -36,24 +36,60 @@ export interface MasterInfo {
   dataDir: string;
   /** The machine's lasting id (kept in its data folder); an older master has none. */
   machineId?: string;
+  /** It passes calls on to its own servers (migration M3c); an older master does not. */
+  forwards?: boolean;
 }
 
 export interface MasterStatus {
   state: "off" | "connecting" | "on" | "error";
   info?: MasterInfo;
   error?: string;
+  /** A machine reached by another way already (its key): picking this one shows that one. */
+  twin?: string;
+}
+
+/** What a master says on its `remote_watch` stream when one of its servers comes or goes. */
+export interface WatchEvent {
+  connected?: string;
+  info?: MasterInfo;
+  closed?: string;
+  error?: string;
+  removed?: boolean;
+}
+
+/**
+ * Machines reached through others (migration M3c): a server of a connected master is a machine of its own in the
+ * window, keyed by the path of server ids ("vps1" is one of This PC's servers, "vps1/vps2" one of vps1's). Calls to it
+ * go along that path (remote.rs); at most three machines below the window.
+ */
+export const MAX_DEPTH = 3;
+
+/** The key of the machine a nested one is a server of (null: one of This PC's). */
+export function parentOf(key: string): string | null {
+  const i = key.lastIndexOf("/");
+  return i < 0 ? null : key.slice(0, i);
+}
+
+/** How many machines its path holds (1: one of This PC's servers). */
+export function depthOf(key: string): number {
+  return key.split("/").length;
+}
+
+/** The id its parent keeps it under. */
+function serverIdOf(key: string): string {
+  return key.slice(key.lastIndexOf("/") + 1);
+}
+
+/** A machine in the switcher's list: its settings (the id is its key) and how deep it is. */
+export interface TreeRow {
+  m: MasterSettings;
+  depth: number;
 }
 
 /** A machine's name for the screen: as typed, or until it has said its computer name, its address. */
 export function displayName(m: MasterSettings): string {
   return m.name || (m.relay ? "A computer" : m.target);
 }
-
-// Messages from the router name the machine as the owner named it ("This cannot be done on VPS yet").
-nameMachines((id) => {
-  const m = settings.value.masters.find((x) => x.id === id);
-  return m ? displayName(m) : id;
-});
 
 class MastersStore {
   status = $state<Record<string, MasterStatus>>({});
@@ -65,9 +101,157 @@ class MastersStore {
   /** Changes to the kept list go to This PC one after another, in the order they were made. */
   #keeping: Promise<unknown> = Promise.resolve();
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Each connected master's own server list (migration M3c), by its key. */
+  nested = $state<Record<string, MasterSettings[]>>({});
+  /** The reading of a master's server list under way, by its key (a window opening on a nested machine waits). */
+  #following = new Map<string, Promise<void>>();
+  /** Nested machines whose arrival (projects, Inbox, runs) is being read, so it is read once. */
+  #arriving = new Set<string>();
 
   get list(): MasterSettings[] {
     return settings.value.masters;
+  }
+
+  /** A machine by its key: one of This PC's servers, or a server of a connected master (its id is the key). */
+  find(key: string): MasterSettings | undefined {
+    const parent = parentOf(key);
+    if (!parent) return this.list.find((x) => x.id === key);
+    const m = this.nested[parent]?.find((x) => x.id === serverIdOf(key));
+    // A server its master has not named shows its computer name once connected.
+    return m ? { ...m, id: key, name: m.name || this.status[key]?.info?.host || "" } : undefined;
+  }
+
+  /** Every machine in the switcher's order: This PC's servers, each followed by the ones reached through it. */
+  get tree(): TreeRow[] {
+    const rows: TreeRow[] = [];
+    const add = (key: string, m: MasterSettings, depth: number) => {
+      rows.push({ m, depth });
+      if (depth >= MAX_DEPTH) return;
+      for (const child of this.nested[key] ?? []) {
+        const k = `${key}/${child.id}`;
+        const found = this.find(k);
+        if (found) add(k, found, depth + 1);
+      }
+    };
+    for (const m of this.list) add(m.id, m, 1);
+    return rows;
+  }
+
+  /** The keys of every machine connected now (This PC's servers and the ones reached through them). */
+  get onKeys(): string[] {
+    return Object.keys(this.status).filter((k) => this.status[k].state === "on");
+  }
+
+  /** The way to a machine, for sentences and hover: "VPS › build-box". */
+  route(key: string): string {
+    const parts = key.split("/");
+    return parts.map((_, i) => machineName(parts.slice(0, i + 1).join("/"))).join(" › ");
+  }
+
+  /**
+   * Reads a connected master's own server list and follows it (migration M3c): its servers show under it, each
+   * with how it stands, and come and go as that master connects to them. Only a master that passes calls on, and
+   * not below the deepest level.
+   */
+  #follow(key: string, info: MasterInfo): Promise<void> {
+    if (!info.forwards || depthOf(key) >= MAX_DEPTH) return Promise.resolve();
+    const run = (async () => {
+      try {
+        await this.#readNested(key);
+        const ch = new Channel<WatchEvent>();
+        ch.onmessage = (e) => void this.#watched(key, e);
+        const states = await callMaster<Record<string, MasterStatus>>(key, "remote_watch", { onEvent: ch });
+        if (this.statusOf(key).state !== "on") return;
+        await Promise.all(Object.entries(states).map(([id, st]) => this.#nestedState(`${key}/${id}`, st)));
+      } catch {
+        // A master with no list of its own (an older one): nothing shows under it.
+      }
+    })();
+    this.#following.set(key, run);
+    return run;
+  }
+
+  async #readNested(key: string): Promise<void> {
+    const kept = await callMaster<{ servers: MasterSettings[] }>(key, "servers_list", {});
+    if (this.statusOf(key).state === "on") this.nested = { ...this.nested, [key]: kept.servers };
+  }
+
+  /** A master's list changed on its Servers screen (a server added, renamed, coloured): read again. */
+  nestedChanged(key: string): void {
+    if (this.statusOf(key).state === "on" && this.nested[key]) void this.#readNested(key).catch(() => {});
+  }
+
+  /** One of a followed master's servers came or went. */
+  async #watched(parent: string, e: WatchEvent): Promise<void> {
+    if (this.statusOf(parent).state !== "on") return;
+    if (e.connected && e.info) {
+      await this.#readNested(parent).catch(() => {});
+      await this.#nestedState(`${parent}/${e.connected}`, { state: "on", info: e.info });
+    } else if (e.closed) {
+      const key = `${parent}/${e.closed}`;
+      if (e.removed) return this.#removedNested(key);
+      const now = this.statusOf(key);
+      if (!e.error) {
+        // Disconnected on purpose (here or from another window): it is off.
+        if (now.state === "on") this.#dropped(key);
+        else this.#set(key, { state: "off" });
+      } else if (now.state === "on" && shownMachine() === key && !switcher.held) this.#lose(key, e.error);
+      else if (now.state === "on") this.#dropped(key, e.error);
+      else if (now.state !== "connecting") this.#set(key, { state: "error", error: e.error });
+    }
+  }
+
+  /** How a nested machine stands, as its master says: one that came on is read as This PC's servers are. */
+  async #nestedState(key: string, st: MasterStatus): Promise<void> {
+    if (st.state !== "on" || !st.info) {
+      if (this.statusOf(key).state !== "on") this.#set(key, st);
+      return;
+    }
+    if (this.statusOf(key).state === "on" || this.#arriving.has(key)) return;
+    // The same computer reached another way already: shown once, this row leads to it.
+    const twin = st.info.machineId
+      ? this.onKeys.find((k) => k !== key && this.statusOf(k).info?.machineId === st.info?.machineId)
+      : undefined;
+    if (twin) {
+      this.#set(key, { state: "error", error: `This is the same computer as ${machineName(twin)}.`, twin });
+      return;
+    }
+    this.#arriving.add(key);
+    try {
+      await this.#arrived(key, st.info);
+    } catch (e) {
+      this.#dropped(key, errorText(e));
+    } finally {
+      this.#arriving.delete(key);
+    }
+  }
+
+  /** Its master took it out of its list: it goes from the switcher, and a screen showing it says why. */
+  async #removedNested(key: string): Promise<void> {
+    const parent = parentOf(key) ?? "";
+    const said = `It was taken out of the server list of ${machineName(parent)}.`;
+    const wasShown = shownMachine() === key || switcher.shown === key;
+    this.nested = { ...this.nested, [parent]: (this.nested[parent] ?? []).filter((x) => x.id !== serverIdOf(key)) };
+    if (switcher.held?.id === key) this.#letGo();
+    this.#dropped(key, said);
+    inbox.forgetMaster(key);
+    const { [key]: _gone, ...rest } = this.status;
+    this.status = rest;
+    if (wasShown) await showOffline(key, said);
+  }
+
+  /**
+   * The machine by its key, with every machine on its path connected and their lists read (a window opening on a
+   * nested machine). Undefined: it is not in the list it should be in.
+   */
+  async reach(key: string): Promise<MasterSettings | undefined> {
+    const parent = parentOf(key);
+    if (!parent) return this.find(key);
+    const p = await this.reach(parent);
+    if (!p) return undefined;
+    if (this.statusOf(parent).state !== "on") await this.connect(p);
+    await this.#following.get(parent);
+    return this.find(key);
   }
 
   /**
@@ -137,6 +321,22 @@ class MastersStore {
   }
 
   #dropped(id: string, error?: string) {
+    // The machines reached through it go with it (their screens are lost the same way).
+    const below = `${id}/`;
+    const lostWith = `The connection to ${machineName(id)} ended.`;
+    for (const k of Object.keys(this.status)) {
+      if (!k.startsWith(below) || depthOf(k) !== depthOf(id) + 1) continue;
+      if (this.status[k].state === "on" && shownMachine() === k && !switcher.held) this.#lose(k, lostWith);
+      else if (this.status[k].state === "on" || this.status[k].state === "connecting") this.#dropped(k, lostWith);
+      else this.#set(k, { state: "off" });
+    }
+    if (this.nested[id]) {
+      const { [id]: _list, ...lists } = this.nested;
+      this.nested = lists;
+    }
+    this.#following.delete(id);
+    // A nested machine's connection is its master's; This PC only lets go of its port links to it.
+    if (id.includes("/")) invoke("remote_disconnect", { id }).catch(() => {});
     // A machine held on screen (lost or not connected, Part E) stays shown; its calls fail, never run on This PC.
     const held = switcher.held?.id === id;
     forgetMaster(id, held);
@@ -183,7 +383,7 @@ class MastersStore {
     this.#retryTimer = null;
     const h = switcher.held;
     if (!h) return false;
-    const m = this.list.find((x) => x.id === h.id);
+    const m = this.find(h.id);
     if (!m) {
       switcher.held = null;
       await show(null);
@@ -259,6 +459,7 @@ class MastersStore {
    */
   async connect(m: MasterSettings, fresh = false): Promise<string> {
     await this.#listen();
+    if (parentOf(m.id)) return this.#connectNested(m);
     this.#set(m.id, { state: "connecting" });
     try {
       const info = await invoke<MasterInfo>("remote_connect", {
@@ -281,29 +482,67 @@ class MastersStore {
         return said;
       }
       this.#fillIn(m.id, info);
-      // Listing them notes which ids are the master's (remote.ts), so runs and Inbox questions about them go there.
-      const list = await callMaster<Project[]>(m.id, "projects_list", {});
-      // Projects this computer has itself keep working here, not through the server.
-      for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
-      const theirs = list.filter((p) => !projects.isLocal(p.id));
-      this.projectCount = { ...this.projectCount, [m.id]: theirs.length };
-      this.#set(m.id, { state: "on", info });
-      // A project window opened for one of its projects shows this machine.
-      const want = projects.startWith;
-      if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want)) void show(m.id);
-      else if (projects.machine === m.id) void projects.load();
-      // Its plans' kept data (holds, picks, run settings) lives there, where its runner reads it.
-      void planData.loadMaster(m.id);
-      // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
-      void inbox.followMaster(m.id);
-      // A run going on there (it goes on when no computer is connected) is shown.
-      void runner.masterConnected(m.id);
+      await this.#arrived(m.id, info);
       return "";
     } catch (e) {
       invoke("remote_disconnect", { id: m.id }).catch(() => {});
       this.#dropped(m.id, errorText(e));
       return "";
     }
+  }
+
+  /**
+   * A machine answered (one of This PC's servers, or one reached through them): its projects, plans' data, Inbox
+   * and runs are read as for any machine, and its own servers are followed.
+   */
+  async #arrived(key: string, info: MasterInfo): Promise<void> {
+    // Listing them notes which ids are the master's (remote.ts), so runs and Inbox questions about them go there.
+    const list = await callMaster<Project[]>(key, "projects_list", {});
+    // Projects this computer has itself keep working here, not through the server.
+    for (const p of list) if (projects.isLocal(p.id)) disown(p.id);
+    const theirs = list.filter((p) => !projects.isLocal(p.id));
+    this.projectCount = { ...this.projectCount, [key]: theirs.length };
+    this.#set(key, { state: "on", info });
+    // A project window opened for one of its projects shows this machine.
+    const want = projects.startWith;
+    if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want)) void show(key);
+    else if (projects.machine === key) void projects.load();
+    // Its plans' kept data (holds, picks, run settings) lives there, where its runner reads it.
+    void planData.loadMaster(key);
+    // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
+    void inbox.followMaster(key);
+    // A run going on there (it goes on when no computer is connected) is shown.
+    void runner.masterConnected(key);
+    // The machines it connects to itself show under it (migration M3c).
+    void this.#follow(key, info);
+  }
+
+  /**
+   * Connects a nested machine: its master connects to it (or answers the connection it has), after the machines on
+   * its path are connected themselves. Answers "" (its state says how it went), as for This PC's servers.
+   */
+  async #connectNested(m: MasterSettings): Promise<string> {
+    const key = m.id;
+    const parent = parentOf(key) ?? "";
+    this.#set(key, { state: "connecting" });
+    try {
+      if (this.statusOf(parent).state !== "on") {
+        const p = await this.reach(parent);
+        if (p && this.statusOf(parent).state !== "on") await this.connect(p);
+      }
+      if (this.statusOf(parent).state !== "on") throw new Error(`${this.route(parent)} is not connected.`);
+      const server = this.nested[parent]?.find((x) => x.id === serverIdOf(key));
+      if (!server) throw new Error(`It is not in the server list of ${machineName(parent)} any more.`);
+      const info = await callMaster<MasterInfo>(parent, "remote_connect", { ...server });
+      if (this.statusOf(key).state !== "on") {
+        // Its state is set again by what it turns out to be (a twin, or arrived).
+        this.#set(key, { state: "off" });
+        await this.#nestedState(key, { state: "on", info });
+      }
+    } catch (e) {
+      this.#dropped(key, errorText(e));
+    }
+    return "";
   }
 
   /** Takes a machine out of the list (its relay pairing on this device too). */
@@ -398,7 +637,7 @@ class MastersStore {
    * when it was shown. Answers an error text, empty when it is back.
    */
   async restart(id: string): Promise<string> {
-    const m = this.list.find((x) => x.id === id);
+    const m = this.find(id);
     if (!m) return "That machine is not in the list.";
     const wasShown = shownMachine() === id;
     try {
@@ -406,7 +645,7 @@ class MastersStore {
     } catch (e) {
       return errorText(e);
     }
-    await invoke("remote_disconnect", { id }).catch(() => {});
+    await this.#letConnectionGo(id);
     this.#dropped(id);
     this.#set(id, { state: "connecting" });
     // The new service waits for the old one to end, then applies the restore before it answers.
@@ -421,8 +660,15 @@ class MastersStore {
     return this.statusOf(id).error ?? `No answer from ${displayName(m)} after the restart.`;
   }
 
-  async disconnect(id: string): Promise<void> {
+  /** Ends the connection to a machine: This PC's own, or for a nested one its master's. */
+  async #letConnectionGo(id: string): Promise<void> {
+    const parent = parentOf(id);
+    if (parent) await callMaster(parent, "remote_disconnect", { id: serverIdOf(id) }).catch(() => {});
     await invoke("remote_disconnect", { id }).catch(() => {});
+  }
+
+  async disconnect(id: string): Promise<void> {
+    await this.#letConnectionGo(id);
     // Disconnected on purpose (or removed): a held screen of it goes, This PC is shown.
     if (switcher.held?.id === id) this.#letGo();
     this.#dropped(id);
@@ -501,3 +747,9 @@ class MastersStore {
 }
 
 export const masters = new MastersStore();
+
+// Messages from the router name the machine as the owner named it ("This cannot be done on VPS yet").
+nameMachines((id) => {
+  const m = masters.find(id);
+  return m ? displayName(m) : id;
+});

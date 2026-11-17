@@ -34,8 +34,68 @@ pub struct Connection {
 #[derive(Default)]
 pub struct Remotes {
     map: Mutex<HashMap<String, Arc<Connection>>>,
-    /// Local ports that reach a master's localhost port (migration M1), by master and its port.
+    /// Local ports that reach a master's localhost port (migration M1), by machine key and its port.
     forwards: Mutex<HashMap<(String, u16), crate::pipes::Forward>>,
+    /// This machine's lasting id: the first entry of every path's `seen` list (migration M3c).
+    me: Mutex<String>,
+}
+
+/// How many machines a path may hold below the window (owner, M3: at most 3 levels).
+pub const MAX_DEPTH: usize = 3;
+
+pub fn too_deep() -> String {
+    format!(
+        "That machine is more than {MAX_DEPTH} steps away. Qanuvi reaches machines at most {MAX_DEPTH} steps below the window."
+    )
+}
+
+pub fn a_loop() -> String {
+    "That path comes back to a machine it has already passed, so the call is refused.".into()
+}
+
+/// A machine's key in the window: the server ids along its path joined with "/" ("vps1" is a server of this
+/// machine, "vps1/vps2" a server of vps1). Server ids are UUIDs, so "/" never appears inside one.
+pub fn split_path(key: &str) -> Result<Vec<String>, String> {
+    let parts: Vec<String> = key.split('/').map(str::to_string).collect();
+    if parts.iter().any(|p| p.trim().is_empty()) {
+        return Err(format!("\"{key}\" is not a machine's path."));
+    }
+    if parts.len() > MAX_DEPTH {
+        return Err(too_deep());
+    }
+    Ok(parts)
+}
+
+/// The way to a machine along a path (migration M3c): this machine's connection to the first one, and the rest of
+/// the path for it to pass on. A call to the end of the path goes as it is; any other goes as `remote_call` on the
+/// first machine with the rest of the path in `via` and the machines passed so far in `seen`.
+pub struct Routed {
+    conn: Arc<Connection>,
+    rest: Vec<String>,
+    seen: Vec<String>,
+}
+
+impl Routed {
+    fn wrap(&self, cmd: &str, args: Value, streams: bool) -> (String, Value) {
+        match self.rest.split_first() {
+            None => (cmd.to_string(), args),
+            Some((next, via)) => (
+                "remote_call".to_string(),
+                json!({"master": next, "via": via, "seen": self.seen, "cmd": cmd, "args": args, "streams": streams}),
+            ),
+        }
+    }
+}
+
+impl crate::pipes::Link for Routed {
+    fn call(&self, cmd: &str, args: Value, events: Option<Sink<Value>>) -> Reply {
+        let (cmd, args) = self.wrap(cmd, args, events.is_some());
+        self.conn.call(&cmd, args, events)
+    }
+    fn tell(&self, cmd: &str, args: Value) {
+        let (cmd, args) = self.wrap(cmd, args, false);
+        self.conn.tell(&cmd, args)
+    }
 }
 
 /// Checks an SSH target ("user@host", "host", "host:port" is not SSH syntax; use an SSH config alias for ports).
@@ -263,6 +323,39 @@ impl Write for LineSender {
 }
 
 impl Remotes {
+    /// Sets this machine's lasting id (the start of every path it sends calls along).
+    pub fn set_me(&self, machine_id: &str) {
+        *self.me.lock().unwrap_or_else(|e| e.into_inner()) = machine_id.to_string();
+    }
+
+    /// The way to a machine by its key, with the machines the call has passed already (`seen`, this one last).
+    /// Refused: a path too long, a next machine already passed (a loop), or a next machine too old to pass calls on.
+    pub fn route(&self, key: &str, seen: Vec<String>) -> Result<Routed, String> {
+        let mut rest = split_path(key)?;
+        let first = rest.remove(0);
+        let conn = self.get(&first)?;
+        let info = conn.info.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if let Some(id) = info["machineId"].as_str()
+            && seen.iter().any(|s| s == id)
+        {
+            return Err(a_loop());
+        }
+        if !rest.is_empty() && info["forwards"] != true {
+            return Err(
+                "That machine runs an older Qanuvi that cannot pass calls on to its servers. Update it first."
+                    .into(),
+            );
+        }
+        Ok(Routed { conn, rest, seen })
+    }
+
+    /// The way to a machine by its key, starting here.
+    pub fn link(&self, key: &str) -> Result<Arc<dyn crate::pipes::Link>, String> {
+        let me = self.me.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let seen = if me.is_empty() { vec![] } else { vec![me] };
+        Ok(Arc::new(self.route(key, seen)?))
+    }
+
     pub fn get(&self, id: &str) -> Result<Arc<Connection>, String> {
         self.map
             .lock()
@@ -422,12 +515,12 @@ impl Remotes {
     /// A local port that reaches `port` on the master's localhost (the same one again when asked twice). It ends
     /// when the master is disconnected.
     pub fn forward(&self, id: &str, port: u16) -> Result<u16, String> {
-        let conn = self.get(id)?;
+        let link = self.link(id)?;
         let mut all = self.forwards.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(f) = all.get(&(id.to_string(), port)) {
             return Ok(f.local);
         }
-        let f = crate::pipes::forward(conn, port)?;
+        let f = crate::pipes::forward(link, port)?;
         let local = f.local;
         all.insert((id.to_string(), port), f);
         Ok(local)
@@ -465,11 +558,17 @@ impl Remotes {
             .collect()
     }
 
+    /// Ends a connection, with the port links to it and to every machine reached through it. A nested key
+    /// ("vps1/vps2") only drops the port links: the connection to it is vps1's own.
     pub fn disconnect(&self, id: &str) {
+        let below = format!("{id}/");
         self.forwards
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .retain(|(m, _), _| m != id);
+            .retain(|(m, _), _| m != id && !m.starts_with(&below));
+        if id.contains('/') {
+            return;
+        }
         let conn = self
             .map
             .lock()
@@ -569,6 +668,79 @@ mod tests {
             &args[args.len() - 3..],
             ["root@host", "qanuvi-master", "--stdio"]
         );
+    }
+
+    fn idle_connection(info: Value) -> Arc<Connection> {
+        Arc::new(Connection {
+            child: Mutex::new(None),
+            stdin: Mutex::new(Box::new(std::io::sink())),
+            closed: AtomicBool::new(false),
+            pending: Mutex::default(),
+            streams: Mutex::default(),
+            next: AtomicU64::new(0),
+            info: Mutex::new(info),
+        })
+    }
+
+    #[test]
+    fn a_path_holds_at_most_three_machines() {
+        assert_eq!(split_path("a").unwrap(), ["a"]);
+        assert_eq!(split_path("a/b/c").unwrap(), ["a", "b", "c"]);
+        assert_eq!(split_path("a/b/c/d").unwrap_err(), too_deep());
+        assert!(split_path("a//b").is_err());
+        assert!(split_path("").is_err());
+    }
+
+    #[test]
+    fn a_call_along_a_path_goes_as_remote_call_with_the_rest() {
+        let r = Routed {
+            conn: idle_connection(json!({})),
+            rest: vec!["b".into(), "c".into()],
+            seen: vec!["pc".into()],
+        };
+        let (cmd, args) = r.wrap("projects_list", json!({"x": 1}), true);
+        assert_eq!(cmd, "remote_call");
+        assert_eq!(
+            args,
+            json!({"master": "b", "via": ["c"], "seen": ["pc"], "cmd": "projects_list", "args": {"x": 1}, "streams": true})
+        );
+        let end = Routed {
+            conn: idle_connection(json!({})),
+            rest: vec![],
+            seen: vec![],
+        };
+        assert_eq!(
+            end.wrap("hello", json!({}), false),
+            ("hello".into(), json!({}))
+        );
+    }
+
+    #[test]
+    fn a_route_refuses_loops_and_old_masters() {
+        let remotes = Remotes::default();
+        remotes.set_me("pc");
+        let add = |id: &str, info: Value| {
+            remotes
+                .map
+                .lock()
+                .unwrap()
+                .insert(id.to_string(), idle_connection(info));
+        };
+        add("back", json!({"machineId": "pc", "forwards": true}));
+        add("old", json!({"machineId": "o"}));
+        add("new", json!({"machineId": "n", "forwards": true}));
+        assert_eq!(remotes.link("back").err().unwrap(), a_loop());
+        assert!(remotes.link("old").is_ok());
+        assert!(
+            remotes
+                .link("old/x")
+                .err()
+                .unwrap()
+                .contains("older Qanuvi")
+        );
+        assert!(remotes.link("new/x/y").is_ok());
+        assert_eq!(remotes.link("new/x/y/z").err().unwrap(), too_deep());
+        assert!(remotes.link("gone/x").is_err());
     }
 
     #[test]

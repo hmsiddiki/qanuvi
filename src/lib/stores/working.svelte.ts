@@ -34,7 +34,7 @@ class WorkingStore {
   /** Reads the counts now (the switcher's list also asks when it opens). */
   async refresh(): Promise<void> {
     const ids: (string | null)[] = [null];
-    for (const m of masters.list) if (masters.statusOf(m.id).state === "on") ids.push(m.id);
+    ids.push(...masters.onKeys);
     const read = await Promise.all(
       ids.map((id) =>
         callOn<number>(id, "agents_working", {})

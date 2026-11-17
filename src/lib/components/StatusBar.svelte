@@ -82,7 +82,7 @@
   let running = $derived(agent.sessions.filter((s) => s.status === "running").length);
   let waiting = $derived(agent.sessions.filter((s) => s.status === "waiting").length);
   /** The paired machine on screen, shown in its colour so it is never mistaken for This PC (which stays plain). */
-  let shownMaster = $derived(masters.list.find((m) => m.id === projects.machine));
+  let shownMaster = $derived(projects.machine ? masters.find(projects.machine) : undefined);
   let connected = $derived(masters.list.filter((m) => masters.statusOf(m.id).state === "on").length);
   let serverProblem = $derived(masters.list.some((m) => masters.statusOf(m.id).state === "error"));
   let diskOn = $derived(settings.value.memoryDisk.mode !== "off");

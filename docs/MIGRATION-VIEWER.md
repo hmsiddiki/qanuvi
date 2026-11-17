@@ -216,6 +216,25 @@ Owner decisions (2026-11-17):
 - M3b BUILT + DRIVEN LIVE 2026-11-17 (024d1da): a master answers servers_* and remote_* from its own list and store;
   its Servers screen in the window is that machine's list; `qanuvi-master servers` / `pair` in its terminal. A master
   refuses "local"/"self" as its servers (only the app has them).
+- M3c owner decision (2026-11-17): a nested machine behaves exactly as This PC's servers do. Its master's off and
+  error servers show too, and picking one has that master connect it; nested rows are always shown (no folding),
+  as This PC's list is; preview (port forwarding), language servers and terminals work on a nested machine as on
+  a direct one. Depth 3 and the loop guard are driven when the owner provides another machine; until then depth 2
+  (window -> local test master -> VPS).
+- M3c design:
+  - Wire: `remote_call` takes `via` (the rest of the path) and `seen` (lasting ids of the machines passed, the
+    window's first). A master refuses a call whose `seen` holds its own id (loop) or whose path would hold more than
+    3 machines below the window, then sends `remote_call` on to `master` with the rest. Stream events come back
+    hop by hop. A master's hello says `forwards: true`; a path is never sent through one that does not (an older
+    master would run the call on the wrong machine).
+  - Window: a nested machine's key is its path of server ids joined with "/" ("vps1/vps2"; ids are UUIDs). Every
+    store keyed by machine works unchanged; the app's `remote_call`, `port_forward` and language-server pipes take
+    the key and go along the path (remote.rs `Routed`, a `pipes::Link`).
+  - Each connected master that forwards (and is above the deepest level) has its list followed (`servers_list` +
+    `remote_watch`); its servers show indented under it on a guide line. The button shows the route
+    ("VPS › build-box"). Its master ending, unpairing or dropping it removes the whole branch at once; a shown one
+    lost is held and retried through its master, one taken out says why. The same computer reached two ways shows
+    once: the second row says "the same computer as ..." and picking it shows the first.
 
 ### M4. This PC runs its own master
 

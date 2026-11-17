@@ -2,14 +2,14 @@
  * The server list of the master on screen (migration M3b). Every machine keeps the servers it connects to in its own
  * database, with their pairing keys, and connects to them itself; the Servers screen of a shown master reads and
  * changes that machine's list through its servers_* and remote_* commands, never This PC's. This PC's own list stays
- * in masters.svelte.ts (its switcher). Showing a master's servers from the switcher comes with nested machines (M3c).
+ * in masters.svelte.ts (its switcher), which also follows each master's list for the machines nested under it (M3c).
  */
 import { Channel } from "@tauri-apps/api/core";
 import { errorText } from "$lib/api";
 import { callOn, machineName } from "$lib/remote";
 import { nameProblem, pickColor, uniqueName } from "$lib/machineNames";
 import type { MasterSettings } from "./settings.svelte";
-import { displayName, type MasterInfo, type MasterStatus } from "./masters.svelte";
+import { displayName, masters, type MasterInfo, type MasterStatus } from "./masters.svelte";
 
 /** What a master says on its `remote_watch` stream when one of its servers comes or goes. */
 interface WatchEvent {
@@ -91,6 +91,7 @@ class MachineServersStore {
     await this.#call("servers_save", { server: m });
     const known = this.list.some((x) => x.id === m.id);
     this.list = known ? this.list.map((x) => (x.id === m.id ? m : x)) : [...this.list, m];
+    if (this.machine) masters.nestedChanged(this.machine);
   }
 
   /**
@@ -208,6 +209,7 @@ class MachineServersStore {
       this.list = this.list.filter((x) => x.id !== m.id);
       const { [m.id]: _gone, ...rest } = this.status;
       this.status = rest;
+      if (this.machine) masters.nestedChanged(this.machine);
     } catch (e) {
       this.error = errorText(e);
     }
