@@ -379,6 +379,14 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
+    PICKUP POINT (fresh conversation starts here, 2026-11-17 13:20): open items in order: (1) m2a, one-space fix in
+    src/lib/components/AccountView.svelte, waits for the owner's yes; (2) plan M3 (docs/MIGRATION-VIEWER.md "M3. Each
+    machine owns its server list") with the owner before any code; (3) the VPS still runs the 2026-11-16 server build
+    (no M2): swap in a new server build before M3 is driven there. Test build: npx tauri build --no-bundle with
+    CARGO_BUILD_JOBS=2 (about 6 min; check free RAM first), start it with QANUVI_ACCOUNT_SITE and QANUVI_ACCOUNT_CLIENT
+    set (values above) so the window and the local test master use the local Qlopy site; drive with ui.ps1 (UIA,
+    screenshots), the owner clicks Allow in the browser. Scripts (ui.ps1, go.ps1, room.ps1) in the scratchpad of
+    session 21bcfc6b. No release is waiting.
     RESUME HERE (newest, 2026-11-17 13:15): M2 DONE. Window parts DRIVEN LIVE in a test build of main (QANUVI_ACCOUNT_SITE
     https://aloelo.dev/qanuvi, QANUVI_ACCOUNT_CLIENT qpc_5caa74da17fe15e9 set on the window; the local test master was
     started by the window with the new binary and took the same settings). PASS: This PC Account page signed out ->
