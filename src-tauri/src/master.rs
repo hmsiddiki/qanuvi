@@ -54,6 +54,9 @@ pub struct Master {
     watchers: Arc<plan_runs::Watchers>,
     /// The connections that follow this master's Inbox (24z R2d part 3).
     inbox_watchers: Arc<inbox_cmds::InboxWatchers>,
+    /// The connections that follow what plans keep between runs (migration M5a: every window of This PC sees a
+    /// change made in another, or by a run).
+    plan_data_watchers: Arc<inbox_cmds::InboxWatchers>,
     /// Its Qanuvi account (migration M2), kept in its own store.
     accounts: crate::account::Accounts,
     /// The servers this master connects to itself (migration M3b), the followers of their comings and goings, and
@@ -164,6 +167,7 @@ impl Master {
             runs: Arc::default(),
             watchers: Arc::default(),
             inbox_watchers: Arc::default(),
+            plan_data_watchers: Arc::default(),
             remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
             app_links: inbox_cmds::InboxWatchers::default(),
@@ -455,13 +459,30 @@ impl Master {
             }
             // What a plan keeps between runs, in this master's database, where its runner reads it.
             "plan_data_list" => to(crate::plan_data::list(db)),
+            // The list, and every change after it on the stream (M5a): another window's writes, a run's.
+            "plan_data_watch" => {
+                if let Some(name) = opt(args, "onEvent").filter(|n| !n.is_empty()) {
+                    self.plan_data_watchers.add(stream(&name));
+                }
+                to(crate::plan_data::list(db))
+            }
             "plan_data_set" => {
                 let id = s(args, "projectId");
                 projects::get(db, &id)?;
                 let kind: crate::plan_data::Kind =
                     serde_json::from_value(args["kind"].clone()).map_err(|e| e.to_string())?;
-                crate::plan_data::set(db, &id, &s(args, "file"), kind, &args["value"])?;
+                let file = s(args, "file");
+                let kept = crate::plan_data::set(db, &id, &file, kind, &args["value"])?;
+                let value = kept.map(|e| e.value).unwrap_or(Value::Null);
+                self.plan_data_watchers
+                    .send(&json!({"project_id": id, "file": file, "kind": kind, "value": value}));
                 Ok(Value::Null)
+            }
+            // A window's old copies (kept in its own storage before 24z R2a), moved in once.
+            "plan_data_import" => {
+                let entries: Vec<crate::plan_data::Entry> =
+                    serde_json::from_value(args["entries"].clone()).map_err(|e| e.to_string())?;
+                to(crate::plan_data::import(db, &entries))
             }
             // Unsaved text of this master's files while the window shows another machine (24z3 Part B2).
             "drafts_put" => {
@@ -996,6 +1017,32 @@ impl Master {
                 to(agent::delete(db, &s(args, "sessionId")))
             }
             "agent_usage_since" => to(agent::usage_since(db, args["since"].as_i64().unwrap_or(0))),
+            // What the chat attaches: a web page, an image kept with a message (migration M5a).
+            "attachment_page" => to(crate::attachments::read_page(&s(args, "url"))),
+            "attachment_image" => to(crate::attachments::stored_image(
+                &self.dir.join("attachments"),
+                &s(args, "file"),
+            )),
+            // The brain's one-off decision with this machine's keys, and the shared knowledge it reads (M5a).
+            "core_decide" => {
+                let setup = crate::brain::with_keys(&s(args, "setup"), crate::model_keys::get)?;
+                let setup: crate::brain::Setup =
+                    serde_json::from_str(&setup).map_err(|e| e.to_string())?;
+                to(crate::brain::decide(
+                    &setup,
+                    &s(args, "system"),
+                    &s(args, "prompt"),
+                ))
+            }
+            "knowledge_fetch" => {
+                let url = s(args, "url");
+                let url = if url.trim().is_empty() {
+                    crate::knowledge::DEFAULT_URL.to_string()
+                } else {
+                    url
+                };
+                to(crate::knowledge::fetch(&url, crate::knowledge::PUBLIC_KEY))
+            }
             "browser_agent_view" => to(Ok(crate::preview::agent_view(&agent::browser_state_file(
                 &s(args, "sessionId"),
             )?))),
@@ -3024,9 +3071,97 @@ mod tests {
         );
     }
 
+    /// M5a: what the app's core did for This PC's windows, its master does: plan data told to every follower (a
+    /// window's write and a run's), the one-time moves out of old window storage, and the chat's attachments.
+    #[test]
+    fn m5a_plan_data_is_followed_and_the_moved_commands_answer() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+        let heard: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let h = heard.clone();
+        let streams = move |_: &str| {
+            let h = h.clone();
+            Sink::new(move |v: Value| {
+                h.lock().unwrap().push(v);
+                true
+            })
+        };
+        let open = Mutex::new(HashSet::new());
+        let first = m
+            .dispatch(
+                "plan_data_watch",
+                &json!({"onEvent": "d1"}),
+                &streams,
+                &open,
+            )
+            .unwrap();
+        assert_eq!(first, json!([]));
+        call(
+            &m,
+            "plan_data_set",
+            json!({"projectId": id, "file": "PLAN.md", "kind": "notes", "value": {"a": 1}}),
+        )
+        .unwrap();
+        assert_eq!(
+            heard.lock().unwrap().last().unwrap(),
+            &json!({"project_id": id, "file": "PLAN.md", "kind": "notes", "value": {"a": 1}})
+        );
+        // A run's plan data reaches the followers too, not only the run's watchers.
+        let env = m.run_env(&id).unwrap();
+        (env.notify)(
+            "qanuvi-plan-data",
+            json!({"project_id": id, "file": "PLAN.md", "kind": "state", "value": 2}),
+        );
+        assert_eq!(heard.lock().unwrap().last().unwrap()["kind"], "state");
+
+        // The old window copies move in once.
+        let n = call(
+            &m,
+            "plan_data_import",
+            json!({"entries": [{"project_id": id, "file": "B.md", "kind": "picks", "value": [1]}]}),
+        )
+        .unwrap();
+        assert_eq!(n, 1);
+        let n = call(
+            &m,
+            "inbox_import",
+            json!({"items": [{"id": "old-1", "at": 1, "kind": "info", "title": "An old note"}]}),
+        )
+        .unwrap();
+        assert_eq!(n, 1);
+        let list = call(&m, "inbox_list", json!({})).unwrap();
+        assert!(
+            list.as_array()
+                .unwrap()
+                .iter()
+                .any(|i| i["title"] == "An old note")
+        );
+
+        // The chat's attachments and the brain's calls answer here (their own errors, never an unknown command).
+        for (cmd, args) in [
+            ("attachment_image", json!({"file": "missing.png"})),
+            ("attachment_page", json!({"url": "not a page"})),
+            (
+                "core_decide",
+                json!({"setup": "{}", "system": "", "prompt": ""}),
+            ),
+        ] {
+            let e = call(&m, cmd, args).unwrap_err();
+            assert!(!e.contains("does not know the command"), "{cmd}: {e}");
+        }
+    }
+
     // Migration M0 (docs/MIGRATION-VIEWER.md): every command the app answers is answered by the master too, or it
-    // belongs to the interface. The known gaps are listed with the phase that closes them; each phase removes its
-    // lines. M6 empties GAPS and from then on the app answers only INTERFACE.
+    // belongs to the interface. M5a/M6 removed the second core: the app answers only INTERFACE (and the links to
+    // masters, which a master answers as well), and the window keeps every INTERFACE command on screen.
 
     /// Commands that stay with the interface (the visual container).
     const INTERFACE: &[&str] = &[
@@ -3041,9 +3176,6 @@ mod tests {
         "app_info",
         "app_restart",
         "startup_path",
-        "term_kill_window",
-        "inbox_import",
-        "plan_data_import",
         "data_location_move",
         "data_location_cancel",
         "data_location_remove_old",
@@ -3075,14 +3207,6 @@ mod tests {
         "browser_agent_shot",
         // The app's own lifecycle (M4c): it stops This PC's master before an update installs.
         "this_pc_master_stop",
-    ];
-
-    /// Commands only the app answers today that move to the master, with the phase that moves them.
-    const GAPS: &[(&str, &str)] = &[
-        ("core_decide", "M6"),
-        ("knowledge_fetch", "M6"),
-        ("attachment_page", "M6"),
-        ("attachment_image", "M6"),
     ];
 
     /// The command names of the app's `generate_handler!` list.
@@ -3144,7 +3268,7 @@ mod tests {
         let window = window_commands();
         let master = master_commands();
         assert!(
-            window.len() > 150,
+            window.len() > 30,
             "the handler list was not read ({})",
             window.len()
         );
@@ -3153,32 +3277,31 @@ mod tests {
                 && master.contains("inbox_list")
                 && master.contains("plan_run_start")
         );
-        let gaps: HashSet<&str> = GAPS.iter().map(|g| g.0).collect();
         let interface: HashSet<&str> = INTERFACE.iter().copied().collect();
-        assert_eq!(gaps.len(), GAPS.len(), "a gap is listed twice");
         assert_eq!(
             interface.len(),
             INTERFACE.len(),
             "an interface command is listed twice"
         );
-
+        // The links to masters: the app's and a master's own (M3b), so both answer them.
+        let links = |c: &str| c.starts_with("remote_");
         let missing: Vec<&String> = window
             .iter()
-            .filter(|c| {
-                !master.contains(*c)
-                    && !interface.contains(c.as_str())
-                    && !gaps.contains(c.as_str())
-            })
+            .filter(|c| !master.contains(*c) && !interface.contains(c.as_str()))
             .collect();
         assert!(
             missing.is_empty(),
             "the app answers these but the master does not: {missing:?}. Answer them in the master, or add them to \
-             INTERFACE (the screen's own) or GAPS (with the phase that moves them)."
+             INTERFACE (the screen's own)."
         );
-        let closed: Vec<&(&str, &str)> = GAPS.iter().filter(|g| master.contains(g.0)).collect();
+        // M6: no second core. Every command the app answers is the screen's own or a link.
+        let core: Vec<&String> = window
+            .iter()
+            .filter(|c| !interface.contains(c.as_str()) && !links(c))
+            .collect();
         assert!(
-            closed.is_empty(),
-            "the master answers these now, remove them from GAPS: {closed:?}"
+            core.is_empty(),
+            "the app answers these, which are the master's: {core:?}. Remove them from the app."
         );
         let both: Vec<&&str> = INTERFACE.iter().filter(|c| master.contains(**c)).collect();
         assert!(
@@ -3188,17 +3311,39 @@ mod tests {
         let stale: Vec<&str> = INTERFACE
             .iter()
             .copied()
-            .chain(GAPS.iter().map(|g| g.0))
             .filter(|c| !window.iter().any(|w| w == c))
             .collect();
         assert!(
             stale.is_empty(),
-            "the app no longer has these, remove them from the lists: {stale:?}"
+            "the app no longer has these, remove them from the list: {stale:?}"
         );
-        let overlap: Vec<&&str> = INTERFACE.iter().filter(|c| gaps.contains(**c)).collect();
+    }
+
+    /// M5a: the window sends a call to This PC's master unless remote.ts keeps it on screen (WINDOW_ONLY). Every
+    /// command only the app answers must be kept there, and nothing the app no longer answers.
+    #[test]
+    fn the_window_keeps_the_interface_commands_on_screen() {
+        let src = include_str!("../../src/lib/remote.ts");
+        let from = src
+            .find("const WINDOW_ONLY")
+            .expect("WINDOW_ONLY in remote.ts");
+        let list = &src[from..from + src[from..].find("]);").expect("its end")];
+        let kept: HashSet<String> = list
+            .lines()
+            .map(|l| l.split("//").next().unwrap_or("").trim())
+            .filter_map(|l| l.strip_prefix('"').and_then(|l| l.split('"').next()))
+            .map(str::to_string)
+            .collect();
+        let window: HashSet<String> = window_commands().into_iter().collect();
+        let not_kept: Vec<&&str> = INTERFACE.iter().filter(|c| !kept.contains(**c)).collect();
         assert!(
-            overlap.is_empty(),
-            "listed as both interface and gap: {overlap:?}"
+            not_kept.is_empty(),
+            "the window would send these to This PC's master, which does not answer them: {not_kept:?}"
+        );
+        let gone: Vec<&String> = kept.iter().filter(|c| !window.contains(*c)).collect();
+        assert!(
+            gone.is_empty(),
+            "remote.ts keeps these on screen, but the app no longer answers them: {gone:?}"
         );
     }
 }

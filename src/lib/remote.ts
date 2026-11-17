@@ -4,8 +4,15 @@
  * the machine on screen. Calls about this window or this install (its sign-in, its list of masters, its banners) stay
  * on This PC. A master answers the same commands with the same arguments, so the rest of the interface does not need
  * to know; a command a master does not answer yet ends in `NotOnMachine`, never on This PC instead.
+ *
+ * Migration M5a: This PC is a machine like any other. Its calls go to its own master over the "this-computer" link
+ * (the app makes it on the first call); only the screen's own commands (WINDOW_ONLY) are answered by the app.
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+
+/** The link to This PC's own master (desktop.rs THIS_PC); remote access uses it too. */
+export const THIS_PC = "this-computer";
 
 /** Which master owns an id (project, agent session or terminal); ids are unique across machines. */
 const owners = new Map<string, string>();
@@ -74,14 +81,21 @@ export function nameMachines(names: (master: string) => string): void {
 }
 
 /**
- * Commands about this window or this install, never sent to a machine (24z3 Part A map, group 3): the app itself,
- * the switcher's list of masters, the account sign-in, desktop banners, the preview pane, a file picked on this
- * screen, one-time moves out of old window storage, and stopping this window's own terminals and servers.
+ * Commands about this window or this install, answered by the app and never sent to a machine (24z3 Part A map,
+ * group 3; M5a: exactly master.rs INTERFACE, plus the links to masters): the app itself, the switcher's links, the
+ * browser half of a sign-in, desktop notifications, the preview pane's inspector, a file picked on this screen, the
+ * data folder and the coding tools.
  */
 const WINDOW_ONLY = new Set([
   "app_info",
   "app_restart",
   "data_test_build",
+  "startup_path",
+  "data_location_move",
+  "data_location_cancel",
+  "data_location_remove_old",
+  "this_pc_master_stop",
+  "browser_agent_shot",
   "remote_call",
   "remote_connect",
   "remote_disconnect",
@@ -101,10 +115,6 @@ const WINDOW_ONLY = new Set([
   "inspector_scroll",
   "inspector_show",
   "attachment_file",
-  "knowledge_fetch",
-  "inbox_import",
-  "plan_data_import",
-  "term_kill_window",
   // Coding tools are the interface's (migration M1); a master's are reached through the app's lsp_* with `master`.
   "lsp_statuses",
   "lsp_install",
@@ -144,13 +154,35 @@ export function machineFor(cmd: string, args?: Record<string, unknown>): string 
 }
 
 export async function routed<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const master = machineFor(cmd, args);
-  return master ? callMaster<T>(master, cmd, args ?? {}) : invoke<T>(cmd, args);
+  if (windowOnly(cmd)) return invoke<T>(cmd, args);
+  return callOn<T>(machineFor(cmd, args), cmd, args ?? {});
 }
 
-/** A call to one machine whatever is shown (24z3 Part B2: a machine being hidden; null is This PC). */
+/** A call to one machine whatever is shown (24z3 Part B2: a machine being hidden; null is This PC's master). */
 export function callOn<T>(machine: string | null, cmd: string, args: Record<string, unknown>): Promise<T> {
-  return machine ? callMaster<T>(machine, cmd, args) : invoke<T>(cmd, args);
+  return machine ? callMaster<T>(machine, cmd, args) : callThisPc<T>(cmd, args);
+}
+
+/**
+ * A call to This PC's master (M5a). Its ids stay This PC's (null owner), as before, so nothing else needs to know the
+ * work moved there; a command it does not answer says so as for any machine.
+ */
+export async function callThisPc<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+  return linkCall<T>(THIS_PC, cmd, args);
+}
+
+/**
+ * Calls `fn` each time This PC's link ended (its master restarted, M5a), a moment later, so a stream it follows is
+ * asked for again (the next call makes the link again). The returned promise settles once it listens.
+ */
+export async function onThisPcLinkEnd(fn: () => void): Promise<void> {
+  try {
+    await listen<{ id: string }>("remote-closed", (e) => {
+      if (e.payload?.id === THIS_PC) setTimeout(fn, 1000);
+    });
+  } catch {
+    // No app events (tests, a browser preview).
+  }
 }
 
 /** A command the machine does not answer yet (24z3 Part A): said on screen, never done on This PC instead. */
@@ -159,7 +191,7 @@ export class NotOnMachine extends Error {
     readonly master: string,
     readonly cmd: string,
   ) {
-    super(`This cannot be done on ${nameOf(master)} yet (${cmd}).`);
+    super(`This cannot be done on ${master === THIS_PC ? "this computer" : nameOf(master)} yet (${cmd}).`);
     this.name = "NotOnMachine";
   }
 }
@@ -169,6 +201,13 @@ const UNKNOWN = /^This master does not know the command [a-z_0-9]+\.$/;
 
 /** Sends a call to a master. A `Channel` in `onEvent` receives what it streams (terminal output, agent events). */
 export async function callMaster<T>(master: string, cmd: string, args: Record<string, unknown>): Promise<T> {
+  const result = await linkCall<T>(master, cmd, args);
+  remember(master, cmd, result);
+  return result;
+}
+
+/** One call on a link, with what it streams going to the `Channel` in `onEvent`. */
+async function linkCall<T>(master: string, cmd: string, args: Record<string, unknown>): Promise<T> {
   const { onEvent, ...rest } = args;
   const streams = onEvent instanceof Channel;
   let result: T;
@@ -183,7 +222,6 @@ export async function callMaster<T>(master: string, cmd: string, args: Record<st
   } catch (e) {
     throw typeof e === "string" && UNKNOWN.test(e) ? new NotOnMachine(master, cmd) : e;
   }
-  remember(master, cmd, result);
   return result;
 }
 

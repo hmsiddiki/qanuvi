@@ -6,6 +6,8 @@ const invoke = vi.fn(async (..._args: unknown[]): Promise<unknown> => undefined)
 vi.mock("@tauri-apps/api/core", () => ({ Channel: class {}, invoke: (...a: unknown[]) => invoke(...a) }));
 vi.mock("./settings.svelte", () => ({ settings: { value: { defaultShell: "pwsh" } } }));
 
+const { onThisPc, thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { TerminalsStore } = await import("./terminals.svelte");
 const { switcher } = await import("./switcher.svelte");
 
@@ -26,7 +28,7 @@ describe("terminals per machine", () => {
     await t.park(null, true);
     expect(t.tabs.filter((x) => x.machine === null).every((x) => x.parked)).toBe(true);
     expect(t.tabs.find((x) => x.machine === "vps")?.parked).toBeFalsy();
-    expect(invoke, "only the running one is told").toHaveBeenCalledWith("term_detach", { id: "term-a" });
+    expect(invoke, "only the running one is told").toHaveBeenCalledWith(...onThisPc("term_detach", { id: "term-a" }));
     expect(invoke).toHaveBeenCalledTimes(1);
 
     switcher.shown = null;
@@ -58,9 +60,9 @@ describe("terminals per machine", () => {
     t.parkOne(key);
     expect(t.tabs[0].parked).toBe(true);
     expect(t.tabs[0].termId, "the next screen attaches to the same shell").toBe("term-x");
-    expect(invoke).toHaveBeenCalledWith("term_detach", { id: "term-x" });
+    expect(invoke).toHaveBeenCalledWith(...onThisPc("term_detach", { id: "term-x" }));
     t.close(key);
-    expect(invoke).toHaveBeenCalledWith("term_kill", { id: "term-x" });
+    expect(invoke).toHaveBeenCalledWith(...onThisPc("term_kill", { id: "term-x" }));
     expect(t.tabs).toEqual([]);
   });
 });

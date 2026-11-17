@@ -114,6 +114,16 @@ impl Master {
                 }
                 to(Ok(gone))
             }
+            // A window's old list (kept in its own storage before 24u part 4), moved in once.
+            "inbox_import" => {
+                let items: Vec<inbox::OldItem> =
+                    serde_json::from_value(args["items"].clone()).map_err(|e| e.to_string())?;
+                let n = inbox::import(db, &items)?;
+                if n > 0 {
+                    self.inbox_changed("add", None);
+                }
+                to(Ok(n))
+            }
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
     }

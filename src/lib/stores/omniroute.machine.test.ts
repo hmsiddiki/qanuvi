@@ -12,6 +12,8 @@ vi.stubGlobal("localStorage", {
 
 const { invoke: rawInvoke } = await import("@tauri-apps/api/core");
 const invoke = vi.mocked(rawInvoke);
+const { thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { showMachine } = await import("$lib/remote");
 const { omni, moveOldMuted } = await import("./omniroute.svelte");
 const { settings, parseSettings } = await import("./settings.svelte");

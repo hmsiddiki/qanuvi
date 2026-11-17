@@ -138,3 +138,28 @@ describe("a project on this computer", () => {
     expect(routeOf("git_status", { projectId: "same-id" })).toBeNull();
   });
 });
+
+describe("This PC is a machine like any other (migration M5a)", () => {
+  it("sends This PC's work to its own master, and keeps the screen's own commands in the app", async () => {
+    invoke.mockReset().mockResolvedValue([]);
+    showMachine(null);
+    await routed("projects_list");
+    expect(invoke).toHaveBeenLastCalledWith(
+      "remote_call",
+      expect.objectContaining({ master: "this-computer", cmd: "projects_list", args: {}, streams: false }),
+    );
+    await routed("app_info");
+    expect(invoke).toHaveBeenLastCalledWith("app_info", undefined);
+    // Its ids stay This PC's: nothing is owned by the link.
+    await routed("agent_start", { projectId: "here" });
+    expect(routeOf("git_status", { projectId: "here" })).toBeNull();
+  });
+
+  it("says what This PC's master does not answer, in words about this computer", async () => {
+    invoke.mockReset().mockRejectedValue("This master does not know the command nothing_here.");
+    showMachine(null);
+    const e: unknown = await routed("nothing_here").catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(NotOnMachine);
+    expect((e as Error).message).toBe("This cannot be done on this computer yet (nothing_here).");
+  });
+});

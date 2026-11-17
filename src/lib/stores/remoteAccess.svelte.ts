@@ -7,10 +7,11 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { errorText } from "$lib/api";
-import { callMaster, shownMachine } from "$lib/remote";
+import { THIS_PC, callMaster, shownMachine } from "$lib/remote";
 import { settings } from "./settings.svelte";
 
-const ME = "this-computer";
+/** This PC's own master service: the same link the window's calls about This PC take (M5a). */
+const ME = THIS_PC;
 
 /** Whose remote access the page shows: the shown master, or This PC's own master service. */
 function target(): string {

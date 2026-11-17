@@ -6,7 +6,17 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
-import { callMaster, disown, forgetMaster, machineName, nameMachines, own, shownMachine } from "$lib/remote";
+import {
+  THIS_PC,
+  callMaster,
+  callThisPc,
+  disown,
+  forgetMaster,
+  machineName,
+  nameMachines,
+  own,
+  shownMachine,
+} from "$lib/remote";
 import { planData } from "$lib/plan/planData.svelte";
 import { inbox } from "./inbox.svelte";
 import { show, showOffline } from "./machines";
@@ -262,10 +272,10 @@ class MastersStore {
    */
   async load(): Promise<void> {
     try {
-      const kept = await invoke<{ imported: boolean; servers: MasterSettings[] }>("servers_list");
+      const kept = await callThisPc<{ imported: boolean; servers: MasterSettings[] }>("servers_list");
       const list = kept.imported
         ? kept.servers
-        : await invoke<MasterSettings[]>("servers_import", { servers: settings.value.masters });
+        : await callThisPc<MasterSettings[]>("servers_import", { servers: settings.value.masters });
       settings.set("masters", list);
       this.keepError = "";
     } catch (e) {
@@ -276,7 +286,7 @@ class MastersStore {
   /** Sends one change of the list to This PC's database. */
   #keep(cmd: "servers_save" | "servers_remove", args: Record<string, unknown>): void {
     this.#keeping = this.#keeping
-      .then(() => invoke(cmd, args))
+      .then(() => callThisPc(cmd, args))
       .then(() => {
         this.keepError = "";
       })
@@ -313,7 +323,8 @@ class MastersStore {
     // A connection that ended by itself (network gone, server restarted).
     await listen<{ id: string }>("remote-closed", (e) => {
       const id = e.payload.id;
-      if (this.statusOf(id).state !== "on") return;
+      // This PC's own link: the app makes it again on the next call.
+      if (id === THIS_PC || this.statusOf(id).state !== "on") return;
       invoke("remote_disconnect", { id }).catch(() => {});
       const said = "The connection ended. Work on the server goes on; connect again to see it.";
       // The machine on screen: it stays, read-only, while it reconnects (24z3 Part E).

@@ -10,6 +10,8 @@ vi.stubGlobal("localStorage", {
 });
 
 const { invoke } = await import("@tauri-apps/api/core");
+const { thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { nameMachines, showMachine } = await import("$lib/remote");
 const { brain, keyEnvName } = await import("./brain.svelte");
 const { settings } = await import("./settings.svelte");

@@ -450,8 +450,6 @@ export const api = {
       channel.onmessage = onEvent;
       return invoke<void>("term_attach", { id, onEvent: channel });
     },
-    /** Stops this window's terminals (before the interface reloads). */
-    killWindow: () => invoke<void>("term_kill_window"),
   },
   lsp: {
     // Language servers are the interface's (migration M1): the app runs them on This PC or, with `master`, on that

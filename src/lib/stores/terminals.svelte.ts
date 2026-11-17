@@ -83,6 +83,15 @@ export class TerminalsStore {
     await Promise.all(running.map((t) => callOn(machine, "term_detach", { id: t.termId }).catch(() => {})));
   }
 
+  /**
+   * Stops this window's terminals on This PC (before its interface reloads; the list is kept, so they start again
+   * afterwards). M5a: they run in This PC's master, which would otherwise keep them until the link ends.
+   */
+  async stopThisPc(): Promise<void> {
+    const running = this.tabs.filter((t) => t.machine === null && t.termId && !t.ended);
+    await Promise.all(running.map((t) => callOn(null, "term_kill", { id: t.termId }).catch(() => {})));
+  }
+
   /** A machine was removed from the switcher: its tabs go (its terminals ended with its connection). */
   forgetMachine(machine: string): void {
     this.tabs = this.tabs.filter((t) => t.machine !== machine);

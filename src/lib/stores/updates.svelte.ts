@@ -13,6 +13,7 @@ import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
 import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
+import { terminals } from "./terminals.svelte";
 
 /** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
 const EVERY = 60 * 60 * 1000;
@@ -125,7 +126,7 @@ class UpdatesStore {
    */
   async reloadWindow(): Promise<void> {
     // The window's shells stop; the list of terminals is kept, so they open again after the reload.
-    await api.term.killWindow().catch(() => {});
+    await terminals.stopThisPc();
     await api.lsp.stopWindow().catch(() => {});
     await api.dap.stopWindow().catch(() => {});
     location.reload();

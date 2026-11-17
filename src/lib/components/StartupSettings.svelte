@@ -1,7 +1,6 @@
 <script lang="ts">
   /** Settings, Start-up: commands Qanuvi starts with itself (Headroom, for example), their state and output. */
-  import { routed as invoke, shownMachine, shownPlace } from "$lib/remote";
-  import { invoke as ownInvoke } from "@tauri-apps/api/core";
+  import { callThisPc, routed as invoke, shownMachine, shownPlace } from "$lib/remote";
   import { errorText } from "$lib/api";
   import { settings, type StartupItem } from "$lib/stores/settings.svelte";
   import { startup } from "$lib/stores/startup.svelte";
@@ -22,7 +21,7 @@
   let atSignInError = $state("");
 
   $effect(() => {
-    ownInvoke<boolean>("sign_in_start")
+    callThisPc<boolean>("sign_in_start")
       .then((on) => (atSignIn = on))
       .catch((e) => (atSignInError = errorText(e)));
   });
@@ -30,7 +29,7 @@
   async function setAtSignIn(on: boolean) {
     atSignInError = "";
     try {
-      atSignIn = await ownInvoke<boolean>("sign_in_start_set", { on });
+      atSignIn = await callThisPc<boolean>("sign_in_start_set", { on });
     } catch (e) {
       atSignInError = errorText(e);
     }

@@ -12,6 +12,8 @@ vi.stubGlobal("localStorage", {
 
 const { invoke: rawInvoke } = await import("@tauri-apps/api/core");
 const invoke = vi.mocked(rawInvoke);
+const { thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { showMachine } = await import("$lib/remote");
 const { memory } = await import("./memory.svelte");
 

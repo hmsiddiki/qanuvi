@@ -4,8 +4,7 @@
  * copy of This PC's server list, which This PC keeps in its database since M3a: masters.svelte.ts) and a copy of This
  * PC's settings in local storage, so it starts at once with them.
  */
-import { invoke } from "@tauri-apps/api/core";
-import { callMaster, shownMachine } from "$lib/remote";
+import { callOn, shownMachine } from "$lib/remote";
 import { DEFAULT_TEAM, parseTeam } from "$lib/core/decider";
 import { PROVIDERS, providerById } from "$lib/agents/providers";
 import { own } from "$lib/agents/ownModels.svelte";
@@ -474,7 +473,7 @@ export function parseBrain(raw: unknown): Settings["brain"] {
 
 /** A machine's settings call: null is This PC. */
 function call<T>(machine: string | null, cmd: string, args: Values = {}): Promise<T> {
-  return machine ? callMaster<T>(machine, cmd, args) : invoke<T>(cmd, args);
+  return callOn<T>(machine, cmd, args);
 }
 
 class SettingsStore {

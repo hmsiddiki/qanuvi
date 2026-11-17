@@ -10,9 +10,18 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string, args: Record<string, unknown> = {}) => {
+    // M5a: This PC's calls go to its master; recorded as the plain command they carry.
+    if (cmd === "remote_call" && args.master === "this-computer") {
+      const inner = args.args as Record<string, unknown>;
+      const onEvent = args.onEvent as { onmessage?: (e: unknown) => void };
+      cmd = args.cmd as string;
+      args = inner;
+      // Its stream: what the master tells every window (another window's write, a run's change).
+      if (cmd === "plan_data_watch") h.listener = (e) => onEvent.onmessage?.(e.payload);
+    }
     h.calls.push({ cmd, args });
     if (h.fail) throw "core is gone";
-    if (cmd === "plan_data_list") return h.rows;
+    if (cmd === "plan_data_watch") return h.rows;
     if (cmd === "remote_call" && args.cmd === "plan_data_list") return h.masterRows;
     return null;
   }),

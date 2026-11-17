@@ -1,17 +1,14 @@
-//! The desktop app (Tauri): the commands its window calls, registered in [`run`]. The core modules are in lib.rs.
+//! The desktop app (Tauri): the window's own commands, registered in [`run`]. Since migration M5a the window is a
+//! viewer: everything about This PC's work goes to This PC's master over the "this-computer" link (`remote_call`),
+//! as for any paired master; what is left here is the screen's own (notifications, the inspector, coding tools, the
+//! browser half of a sign-in, the data folder, the links to masters).
 
-use crate::{
-    agent, agent_config, checks, files, git, inbox, index, paths, preview, projects, runs, store,
-    terminal,
-};
+use crate::{agent, preview, projects};
 
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::ipc::Channel;
 use tauri::{Manager, State};
-
-#[path = "desktop_runs.rs"]
-mod plan_runs;
 
 /// Basic facts about the running app, shown in the interface and used by later milestones (updates, diagnostics).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -34,22 +31,35 @@ impl AppInfo {
 }
 
 pub struct AppState {
-    db: store::Db,
-    terminals: terminal::Terminals,
     languages: crate::lsp::Servers,
     debuggers: crate::dap::Adapters,
-    agents: agent::Agents,
-    indexes: index::Indexes,
     inspector: preview::Inspector,
     remotes: crate::remote::Remotes,
     accounts: crate::account::Accounts,
-    runs: std::sync::Arc<crate::plan::live::Runs>,
 }
 
 type Res<T> = Result<T, String>;
 
-fn project_root(state: &AppState, id: &str) -> Res<PathBuf> {
-    Ok(PathBuf::from(projects::get(&state.db, id)?.path))
+/// The link id of This PC's own master (remote.ts THIS_PC): every call about This PC's work goes on it.
+const THIS_PC: &str = "this-computer";
+
+/// One connect at a time to This PC's master, so two windows asking at once never start two links.
+static THIS_PC_CONNECT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// A This PC project's folder, as This PC's master keeps it (the language servers and debuggers run here, M5c).
+fn project_root(id: &str) -> Res<PathBuf> {
+    let list = crate::master::this_pc_call(
+        &crate::paths::data_dir(),
+        "projects_list",
+        serde_json::json!({}),
+    )?;
+    list.as_array()
+        .into_iter()
+        .flatten()
+        .find(|p| p["id"] == id)
+        .and_then(|p| p["path"].as_str())
+        .map(PathBuf::from)
+        .ok_or_else(|| "That project is not in the list any more.".to_string())
 }
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Res<T> + Send + 'static) -> Res<T> {
@@ -77,446 +87,6 @@ pub fn startup_folder(args: impl Iterator<Item = String>, cwd: &std::path::Path)
 fn startup_path() -> Option<String> {
     let cwd = std::env::current_dir().ok()?;
     startup_folder(std::env::args(), &cwd)
-}
-
-// Projects ------------------------------------------------------------------------------------------------------
-
-#[tauri::command]
-fn projects_list(state: State<AppState>) -> Res<Vec<projects::Project>> {
-    projects::list(&state.db)
-}
-
-#[tauri::command]
-fn projects_add(state: State<AppState>, path: String) -> Res<projects::Project> {
-    projects::add(&state.db, &path)
-}
-
-#[tauri::command]
-fn projects_remove(state: State<AppState>, id: String) -> Res<()> {
-    state.terminals.kill_project(&id);
-    let _ = crate::drafts::drop_project(&state.db, &id);
-    state.languages.stop_project(&id);
-    state.debuggers.stop_project(&id);
-    state.agents.stop_project(&id);
-    projects::remove(&state.db, &id)
-}
-
-#[tauri::command]
-fn projects_update(
-    state: State<AppState>,
-    id: String,
-    name: String,
-    settings: projects::ProjectSettings,
-) -> Res<projects::Project> {
-    projects::update(&state.db, &id, &name, &settings)
-}
-
-#[tauri::command]
-fn projects_touch(state: State<AppState>, id: String) -> Res<()> {
-    projects::touch(&state.db, &id)
-}
-
-#[tauri::command]
-fn projects_redetect(state: State<AppState>, id: String) -> Res<projects::Project> {
-    projects::redetect(&state.db, &id)
-}
-
-// Files -----------------------------------------------------------------------------------------------------------
-
-#[tauri::command]
-async fn files_list_dir(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-) -> Res<Vec<files::Entry>> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::list_dir(&root, &path)).await
-}
-
-#[derive(Serialize)]
-struct FileList {
-    files: Vec<String>,
-    truncated: bool,
-}
-
-/// Files modified since a moment (milliseconds since 1970): what a plan step changed.
-#[tauri::command]
-async fn files_changed_since(
-    state: State<'_, AppState>,
-    project_id: String,
-    since_ms: u64,
-) -> Res<Vec<String>> {
-    let root = project_root(&state, &project_id)?;
-    let since = std::time::UNIX_EPOCH + std::time::Duration::from_millis(since_ms);
-    blocking(move || files::changed_since(&root, since, 200)).await
-}
-
-/// Qanuvi's own record of the project's files before a piece of work (git or not). `also`: folders followed even
-/// where ignore rules leave them out (the plan's folder).
-#[tauri::command]
-async fn snapshots_take(
-    state: State<'_, AppState>,
-    project_id: String,
-    also: Vec<String>,
-) -> Res<crate::snapshots::Taken> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || crate::snapshots::take(&root, &also)).await
-}
-
-/// What changed since a snapshot, with each file's change; `git`: the user chose git's diffs where git sees the file.
-/// `skip`: a path left out (the plan file itself).
-#[tauri::command]
-async fn snapshots_changes(
-    state: State<'_, AppState>,
-    project_id: String,
-    before: String,
-    also: Vec<String>,
-    git: bool,
-    skip: Option<String>,
-) -> Res<crate::snapshots::Changes> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || {
-        let skip = skip.unwrap_or_default();
-        crate::snapshots::changes(&root, &before, &also, git, &|p| {
-            !skip.is_empty() && p == skip
-        })
-    })
-    .await
-}
-
-/// Adds to a plan step's log (under .qanuvi/plan-logs).
-#[tauri::command]
-async fn files_log_append(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-    text: String,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::log_append(&root, &path, &text)).await
-}
-
-/// Every Markdown file in the project, ignore rules or not: where the Plan view finds task lists.
-#[tauri::command]
-async fn files_markdown(state: State<'_, AppState>, project_id: String) -> Res<Vec<String>> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::markdown_files(&root)).await
-}
-
-#[tauri::command]
-async fn files_list_all(state: State<'_, AppState>, project_id: String) -> Res<FileList> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || {
-        files::list_files(&root).map(|(files, truncated)| FileList { files, truncated })
-    })
-    .await
-}
-
-#[tauri::command]
-async fn files_read(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-) -> Res<files::FileContent> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::read_file(&root, &path)).await
-}
-
-/// Renames or moves a file or folder inside the project.
-#[tauri::command]
-async fn files_rename(
-    state: State<'_, AppState>,
-    project_id: String,
-    from: String,
-    to: String,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::rename(&root, &from, &to)).await
-}
-
-/// Moves a file or folder to the Recycle Bin.
-#[tauri::command]
-async fn files_trash(state: State<'_, AppState>, project_id: String, path: String) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::trash(&root, &path)).await
-}
-
-#[tauri::command]
-async fn files_create(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-    folder: bool,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::create(&root, &path, folder)).await
-}
-
-#[tauri::command]
-async fn files_write(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-    text: String,
-    expected_hash: Option<String>,
-) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::write_file(&root, &path, &text, expected_hash.as_deref())).await
-}
-
-#[tauri::command]
-async fn files_search(
-    state: State<'_, AppState>,
-    project_id: String,
-    query: String,
-    regex: bool,
-    case_sensitive: bool,
-    options: Option<files::SearchOptions>,
-) -> Res<files::SearchResult> {
-    let root = project_root(&state, &project_id)?;
-    let o = options.unwrap_or(files::SearchOptions {
-        regex,
-        case_sensitive,
-        ..Default::default()
-    });
-    blocking(move || files::search_with(&root, &query, &o, 5000)).await
-}
-
-/// Replaces the matches of a search in the project's files (only in `paths` when given).
-#[tauri::command]
-async fn files_replace(
-    state: State<'_, AppState>,
-    project_id: String,
-    query: String,
-    options: files::SearchOptions,
-    replacement: String,
-    paths: Option<Vec<String>>,
-) -> Res<files::ReplaceResult> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || files::replace_with(&root, &query, &options, &replacement, paths.as_deref()))
-        .await
-}
-
-#[derive(Serialize)]
-struct SymbolHit {
-    path: String,
-    name: String,
-    kind: &'static str,
-    line: usize,
-    container: Option<String>,
-}
-
-/// "Go to symbol" across the project.
-#[tauri::command]
-async fn index_find(
-    state: State<'_, AppState>,
-    project_id: String,
-    query: String,
-) -> Res<Vec<SymbolHit>> {
-    let root = project_root(&state, &project_id)?;
-    state.indexes.with(&root, |idx| {
-        idx.find(&query, None, 80)
-            .into_iter()
-            .map(|f| SymbolHit {
-                path: f.path,
-                name: f.symbol.name,
-                kind: f.symbol.kind,
-                line: f.symbol.line,
-                container: f.symbol.container,
-            })
-            .collect()
-    })
-}
-
-/// "Go to symbol in file".
-#[tauri::command]
-async fn index_outline(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-) -> Res<Vec<index::Symbol>> {
-    let root = project_root(&state, &project_id)?;
-    state.indexes.with(&root, |idx| {
-        idx.outline(&path).map(|s| s.to_vec()).unwrap_or_default()
-    })
-}
-
-/// Runs a project's test command for a plan step (at most `timeout_secs`, capped at 30 minutes).
-#[tauri::command]
-async fn checks_run(
-    state: State<'_, AppState>,
-    project_id: String,
-    command: String,
-    timeout_secs: u64,
-) -> Res<checks::CheckResult> {
-    let root = project_root(&state, &project_id)?;
-    let timeout = std::time::Duration::from_secs(timeout_secs.clamp(5, 1800));
-    let env = crate::secrets::env(&project_id);
-    blocking(move || checks::run_with_env(&root, &command, timeout, &env)).await
-}
-
-/// The names of a project's secrets (never the values).
-#[tauri::command]
-fn secrets_names(project_id: String) -> Vec<String> {
-    crate::secrets::names(&project_id)
-}
-
-/// Where this machine keeps project secrets ("store"; a server build answers "environment").
-#[tauri::command]
-fn secrets_store(project_id: String) -> &'static str {
-    let _ = project_id;
-    crate::secrets::kind()
-}
-
-#[tauri::command]
-fn secrets_set(project_id: String, name: String, value: String) -> Res<()> {
-    crate::secrets::set(&project_id, &name, &value)
-}
-
-/// Start with Qanuvi (M4b: This PC's list is its master's): the same command on This PC's master, answered as is.
-async fn startup_on_this_pc(cmd: &'static str, args: serde_json::Value) -> Res<serde_json::Value> {
-    blocking(move || crate::master::this_pc_call(&crate::paths::data_dir(), cmd, args)).await
-}
-
-/// Starts the enabled commands that are not running yet, and answers how each one is.
-#[tauri::command]
-async fn startup_start(items: serde_json::Value) -> Res<serde_json::Value> {
-    startup_on_this_pc("startup_start", serde_json::json!({"items": items})).await
-}
-
-#[tauri::command]
-async fn startup_status() -> Res<serde_json::Value> {
-    startup_on_this_pc("startup_status", serde_json::json!({})).await
-}
-
-#[tauri::command]
-async fn startup_restart(item: serde_json::Value) -> Res<serde_json::Value> {
-    startup_on_this_pc("startup_restart", serde_json::json!({"item": item})).await
-}
-
-#[tauri::command]
-async fn startup_stop(id: String) -> Res<serde_json::Value> {
-    startup_on_this_pc("startup_stop", serde_json::json!({"id": id})).await
-}
-
-/// What Qanuvi uses in all: itself and every process it started.
-#[tauri::command]
-fn qanuvi_usage() -> Option<crate::usage::Usage> {
-    crate::usage::usage()
-}
-
-/// Claude Code's installed and newest versions.
-#[tauri::command]
-async fn claude_versions() -> Res<crate::claude_update::Versions> {
-    blocking(crate::claude_update::versions).await
-}
-
-/// Updates Claude Code through its own `claude update`.
-#[tauri::command]
-async fn claude_update() -> Res<String> {
-    blocking(crate::claude_update::update).await
-}
-
-/// Where Headroom is installed, if it is (for the one-click setup).
-#[tauri::command]
-fn startup_headroom() -> Option<String> {
-    crate::startup::headroom_path()
-}
-
-/// The proxy address Claude Code's own user settings send it to (headroom wrap sets one), if any: then every Claude
-/// Code, Qanuvi's too, goes through it already.
-#[tauri::command]
-fn claude_settings_base_url() -> Option<String> {
-    crate::claude_update::settings_base_url()
-}
-
-/// A plan's private details (the plan run puts them into each step's request).
-#[tauri::command]
-fn plan_private(project_id: String, file: String) -> Vec<String> {
-    crate::secrets::plan_private(&project_id, &file)
-}
-
-#[tauri::command]
-fn plan_private_add(project_id: String, file: String, text: String) -> Res<()> {
-    crate::secrets::plan_private_add(&project_id, &file, &text)
-}
-
-#[tauri::command]
-fn plan_private_clear(project_id: String, file: String) -> Res<()> {
-    crate::secrets::plan_private_clear(&project_id, &file)
-}
-
-#[tauri::command]
-fn secrets_remove(project_id: String, name: String) -> Res<()> {
-    crate::secrets::remove(&project_id, &name)
-}
-
-// Terminals -------------------------------------------------------------------------------------------------------
-
-#[tauri::command]
-fn term_shells() -> Vec<terminal::Shell> {
-    terminal::shells()
-}
-
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-fn term_spawn(
-    window: tauri::Window,
-    state: State<AppState>,
-    project_id: String,
-    shell: String,
-    cols: u16,
-    rows: u16,
-    dir: Option<String>,
-    on_event: Channel<terminal::TermEvent>,
-) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    let cwd = files::folder_in(&root, dir.as_deref())?;
-    let id = state
-        .terminals
-        .spawn(&project_id, &cwd, &shell, cols, rows, on_event.into())?;
-    state.terminals.set_owner(&id, window.label());
-    Ok(id)
-}
-
-/// Stops the terminals of this window (before its interface reloads; they start again afterwards).
-#[tauri::command]
-fn term_kill_window(window: tauri::Window, state: State<AppState>) {
-    state.terminals.kill_owner(window.label());
-}
-
-#[tauri::command]
-fn term_write(state: State<AppState>, id: String, data: String) -> Res<()> {
-    state.terminals.write(&id, &data)
-}
-
-#[tauri::command]
-fn term_resize(state: State<AppState>, id: String, cols: u16, rows: u16) -> Res<()> {
-    state.terminals.resize(&id, cols, rows)
-}
-
-/// The switcher hid this terminal's machine (24z3 Part B2): its output stops reaching the window; the shell goes on.
-#[tauri::command]
-fn term_detach(state: State<AppState>, id: String) {
-    state.terminals.detach(&id);
-}
-
-/// The window shows the terminal's machine again: its recent output first, then what comes.
-#[tauri::command]
-fn term_attach(
-    window: tauri::Window,
-    state: State<AppState>,
-    id: String,
-    on_event: Channel<terminal::TermEvent>,
-) -> Res<()> {
-    state.terminals.attach(&id, on_event.into())?;
-    state.terminals.set_owner(&id, window.label());
-    Ok(())
-}
-
-#[tauri::command]
-fn term_kill(state: State<AppState>, id: String) {
-    state.terminals.kill(&id);
 }
 
 // Language servers (15i) ------------------------------------------------------------------------------------
@@ -586,7 +156,8 @@ async fn lsp_start(
         return blocking(move || servers.start_on(link, &project_id, &owner, &id, on_event.into()))
             .await;
     }
-    let root = project_root(&state, &project_id)?;
+    let pid = project_id.clone();
+    let root = blocking(move || project_root(&pid)).await?;
     blocking(move || servers.start(&project_id, &owner, &root, &id, on_event.into())).await
 }
 
@@ -670,7 +241,8 @@ async fn dap_start(
         })
         .await;
     }
-    let root = project_root(&state, &project_id)?;
+    let pid = project_id.clone();
+    let root = blocking(move || project_root(&pid)).await?;
     blocking(move || adapters.start(&project_id, &owner, &root, &id, on_event.into())).await
 }
 
@@ -696,241 +268,7 @@ fn dap_stop_window(window: tauri::Window, state: State<AppState>) {
     state.debuggers.stop_owner(window.label());
 }
 
-// Git -------------------------------------------------------------------------------------------------------------
-
-#[tauri::command]
-async fn git_status(state: State<'_, AppState>, project_id: String) -> Res<git::Status> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::status(&root)).await
-}
-
-#[tauri::command]
-async fn git_diff(state: State<'_, AppState>, project_id: String, path: String) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::diff(&root, &path)).await
-}
-
-#[tauri::command]
-async fn git_stage(state: State<'_, AppState>, project_id: String, path: String) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::stage(&root, &path)).await
-}
-
-#[tauri::command]
-async fn git_revert(state: State<'_, AppState>, project_id: String, path: String) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::revert(&root, &path)).await
-}
-
-#[tauri::command]
-async fn git_versions(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-) -> Res<git::Versions> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::versions(&root, &path)).await
-}
-
-#[tauri::command]
-async fn git_set_index(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-    text: String,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::set_index(&root, &path, &text)).await
-}
-
-#[tauri::command]
-async fn git_unstage(state: State<'_, AppState>, project_id: String, path: String) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::unstage(&root, &path)).await
-}
-
-#[tauri::command]
-async fn git_stage_all(state: State<'_, AppState>, project_id: String) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::stage_all(&root)).await
-}
-
-#[tauri::command]
-async fn git_commit(
-    state: State<'_, AppState>,
-    project_id: String,
-    message: String,
-    amend: bool,
-    all: bool,
-) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::commit(&root, &message, amend, all)).await
-}
-
-#[tauri::command]
-async fn git_sync(state: State<'_, AppState>, project_id: String, action: String) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::sync(&root, &action)).await
-}
-
-#[tauri::command]
-async fn git_branches(state: State<'_, AppState>, project_id: String) -> Res<Vec<git::Branch>> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::branches(&root)).await
-}
-
-#[tauri::command]
-async fn git_switch(
-    state: State<'_, AppState>,
-    project_id: String,
-    name: String,
-    create: bool,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::switch(&root, &name, create)).await
-}
-
-#[tauri::command]
-async fn git_stashes(state: State<'_, AppState>, project_id: String) -> Res<Vec<git::Stash>> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::stashes(&root)).await
-}
-
-#[tauri::command]
-async fn git_stash(
-    state: State<'_, AppState>,
-    project_id: String,
-    action: String,
-    index: u32,
-    message: String,
-) -> Res<()> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::stash(&root, &action, index, &message)).await
-}
-
-#[tauri::command]
-async fn git_log(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: Option<String>,
-    max: u32,
-) -> Res<Vec<git::Commit>> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::log(&root, path.as_deref(), max)).await
-}
-
-#[tauri::command]
-async fn git_show(
-    state: State<'_, AppState>,
-    project_id: String,
-    sha: String,
-    path: Option<String>,
-) -> Res<String> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::show(&root, &sha, path.as_deref())).await
-}
-
-#[tauri::command]
-async fn git_blame(
-    state: State<'_, AppState>,
-    project_id: String,
-    path: String,
-    line: u32,
-) -> Res<git::Blame> {
-    let root = project_root(&state, &project_id)?;
-    blocking(move || git::blame(&root, &path, line)).await
-}
-
-// Agents ----------------------------------------------------------------------------------------------------------
-
-#[tauri::command]
-fn agent_info() -> agent::AgentInfo {
-    agent::info()
-}
-
-/// How many agents work on this PC now (the machine switcher's working icon, 24z3 step 4).
-#[tauri::command]
-fn agents_working(state: State<AppState>) -> i64 {
-    agent::working_count(&state.db)
-}
-
-#[tauri::command]
-fn agent_sessions(state: State<AppState>, project_id: String) -> Res<Vec<agent::Session>> {
-    agent::list_sessions(&state.db, &project_id)
-}
-
-/// The agent sessions of a project that changed a file (the project panel's Timeline).
-#[tauri::command]
-fn agent_file_history(
-    state: State<AppState>,
-    project_id: String,
-    path: String,
-) -> Res<Vec<agent::FileTouch>> {
-    agent::file_history(&state.db, &project_id, &path)
-}
-
-#[tauri::command]
-fn agent_session_events(state: State<AppState>, session_id: String) -> Res<Vec<String>> {
-    agent::session_events(&state.db, &session_id)
-}
-
-#[tauri::command]
-fn agent_session_times(state: State<AppState>, session_id: String) -> Res<Vec<i64>> {
-    agent::session_event_times(&state.db, &session_id)
-}
-
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-fn agent_start(
-    state: State<AppState>,
-    project_id: String,
-    session_id: Option<String>,
-    prompt: String,
-    model: String,
-    mode: String,
-    base_url: Option<String>,
-    effort: Option<String>,
-    lean: Option<bool>,
-    index_tools: Option<bool>,
-    browser_tools: Option<bool>,
-    context: Option<String>,
-    files: Option<Vec<agent::Attachment>>,
-    agent: Option<String>,
-    setup: Option<serde_json::Value>,
-    on_event: Channel<agent::AgentEvent>,
-) -> Res<agent::Session> {
-    let project = projects::get(&state.db, &project_id)?;
-    let setup = setup
-        .filter(|v| !v.is_null())
-        .map(|v| crate::brain::with_keys(&v.to_string(), model_key))
-        .transpose()?;
-    state.agents.start(
-        &state.db,
-        &project,
-        session_id.as_deref(),
-        &prompt,
-        &model,
-        &mode,
-        base_url.as_deref(),
-        effort.as_deref(),
-        lean.unwrap_or(false),
-        index_tools.unwrap_or(false),
-        browser_tools.unwrap_or(false),
-        context.as_deref(),
-        &files.unwrap_or_default(),
-        agent.as_deref().unwrap_or("claude-code"),
-        setup.as_deref(),
-        on_event.into(),
-    )
-}
-
-/// The page the agent's browser tools are on, for the preview tab to follow.
-#[tauri::command]
-fn browser_agent_view(session_id: String) -> Res<Option<serde_json::Value>> {
-    Ok(preview::agent_view(&agent::browser_state_file(
-        &session_id,
-    )?))
-}
+// The preview pane's inspector and an agent's browser picture ---------------------------------------------------
 
 #[tauri::command]
 fn browser_agent_shot(session_id: String) -> Res<String> {
@@ -972,64 +310,7 @@ async fn inspector_page_text(state: State<'_, AppState>, url: String) -> Res<Str
     blocking(move || i.page_text(&url)).await
 }
 
-// Memory (Milestone 17). The argument is `project` (not `projectId`): the memory stays on this PC, also for a
-// server's projects.
-
-#[tauri::command]
-fn memory_list(
-    state: State<AppState>,
-    project: Option<String>,
-    suggested: bool,
-) -> Res<Vec<crate::memory::Entry>> {
-    crate::memory::list(&state.db, project.as_deref(), suggested)
-}
-
-#[tauri::command]
-fn memory_save(state: State<AppState>, entry: crate::memory::Entry) -> Res<crate::memory::Entry> {
-    crate::memory::save(&state.db, &entry)
-}
-
-#[tauri::command]
-fn memory_delete(state: State<AppState>, id: String) -> Res<()> {
-    crate::memory::delete(&state.db, &id)
-}
-
-/// What an agent gets from the memory with a request.
-#[tauri::command]
-fn memory_slice(
-    state: State<AppState>,
-    project: Option<String>,
-    query: String,
-    budget: usize,
-    count: Option<bool>,
-) -> Res<crate::memory::Slice> {
-    crate::memory::slice(
-        &state.db,
-        project.as_deref(),
-        &query,
-        budget.clamp(200, 20000),
-        count.unwrap_or(false),
-    )
-}
-
-#[tauri::command]
-fn memory_search(
-    state: State<AppState>,
-    project: Option<String>,
-    query: String,
-) -> Res<Vec<crate::memory::Entry>> {
-    crate::memory::search(&state.db, project.as_deref(), &query, 50)
-}
-
 // Signing in with a Qlopy site account (Milestone 19).
-
-/// Begins a browser sign-in for This PC's account (migration M2: a master's begins on the master); the window opens
-/// the address with `account_wait` and ends it with `account_finish`.
-#[tauri::command]
-fn account_begin(state: State<AppState>) -> Res<crate::account::Begun> {
-    let (site, client) = crate::account::home();
-    state.accounts.begin(&site, &client)
-}
 
 /// The window's part of any machine's browser sign-in: qanuvi.com's sign-in page opens in this computer's browser
 /// (Google, Microsoft or GitHub there); this waits up to 5 minutes for its answer and gives back the one-time code.
@@ -1055,100 +336,15 @@ async fn account_wait(app: tauri::AppHandle, url: String, state: String) -> Res<
     .map_err(|e| e.to_string())?
 }
 
-/// Ends This PC's browser sign-in with the code the window caught.
-#[tauri::command]
-async fn account_finish(
-    app: tauri::AppHandle,
-    state: String,
-    code: String,
-) -> Res<crate::account::Account> {
-    let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        app2.state::<AppState>().accounts.finish(&state, &code)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
 #[tauri::command]
 fn account_cancel(state: State<AppState>) {
     state.accounts.cancel();
 }
 
-/// Who is signed in (after a restart too, from the kept sign-in).
-#[tauri::command]
-async fn account_me(app: tauri::AppHandle) -> Res<crate::account::Account> {
-    let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let (site, client) = crate::account::home();
-        app2.state::<AppState>().accounts.me_at(&site, &client)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-async fn account_sign_out(app: tauri::AppHandle) -> Res<()> {
-    let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let (site, client) = crate::account::home();
-        app2.state::<AppState>().accounts.sign_out(&site, &client)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-// Memory disk (Milestone 18; per machine since 24z3 D6). The passphrase lives in the system's credential store (Windows
-// Credential Manager, macOS Keychain, the Secret Service on Linux), never in a file; the disk is the one This PC's own
-// settings name, and This PC's core syncs it on its own (see `run`).
-
+/// The memory disk's passphrase in the system's credential store (the test below; the master keeps it now).
 #[cfg(test)]
 fn keyring_entry(service: &str) -> Res<keyring::Entry> {
     keyring::Entry::new(service, "memory-disk").map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn memory_disk_device() -> Res<crate::memory_disk::Device> {
-    let dir = crate::paths::data_dir();
-    Ok(crate::memory_disk::device(&dir))
-}
-
-#[tauri::command]
-fn memory_disk_passphrase_set(passphrase: String) -> Res<()> {
-    crate::memory_disk::passphrase_set(&passphrase)
-}
-
-#[tauri::command]
-fn memory_disk_passphrase_saved() -> bool {
-    crate::memory_disk::passphrase().is_ok()
-}
-
-#[tauri::command]
-fn memory_disk_passphrase_forget() -> Res<()> {
-    crate::memory_disk::passphrase_forget()
-}
-
-#[tauri::command]
-fn memory_disk_status(state: State<AppState>) -> crate::memory_disk::Status {
-    crate::memory_disk::status(&state.db)
-}
-
-#[tauri::command]
-async fn memory_disk_sync(state: State<'_, AppState>) -> Res<crate::memory_disk::Report> {
-    let db = state.db.clone();
-    blocking(move || crate::memory_disk::sync_here(&db, &crate::paths::data_dir())).await
-}
-
-#[tauri::command]
-async fn memory_disk_versions(state: State<'_, AppState>) -> Res<Vec<crate::memory_disk::Version>> {
-    let db = state.db.clone();
-    blocking(move || crate::memory_disk::versions_here(&db, &crate::paths::data_dir())).await
-}
-
-#[tauri::command]
-async fn memory_disk_restore(state: State<'_, AppState>, name: String) -> Res<usize> {
-    let db = state.db.clone();
-    blocking(move || crate::memory_disk::restore_here(&db, &crate::paths::data_dir(), &name)).await
 }
 
 // Masters without a window (Milestone 16) -------------------------------------------------------------------------
@@ -1179,10 +375,8 @@ async fn remote_connect(
                 key,
             })
         }
-        // This computer's own master, on the app's own data (remote access, Milestone 20).
-        "self" => {
-            crate::remote::Transport::Process(crate::remote::command_for("self", "", None, &data)?)
-        }
+        // This computer's own master, on the app's own data (remote access, Milestone 20; This PC itself, M5a).
+        "self" => this_pc_transport()?,
         t => crate::remote::Transport::Process(crate::remote::command_for(
             t,
             program.trim(),
@@ -1191,17 +385,45 @@ async fn remote_connect(
         )?),
     };
     let _ = &state;
+    blocking(move || connect_link(&app, &id, transport)).await
+}
+
+/// The way to This PC's master: its program in bridge mode on the app's own data folder.
+fn this_pc_transport() -> Res<crate::remote::Transport> {
+    Ok(crate::remote::Transport::Process(
+        crate::remote::command_for("self", "", None, &crate::paths::data_dir())?,
+    ))
+}
+
+/// Opens a link and answers the master's hello; its end is told to the windows ("remote-closed").
+fn connect_link(
+    app: &tauri::AppHandle,
+    id: &str,
+    transport: crate::remote::Transport,
+) -> Res<serde_json::Value> {
+    let state = app.state::<AppState>();
     let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = app2.state::<AppState>();
-        let app3 = app2.clone();
-        let on_end: crate::remote::OnEnd = std::sync::Arc::new(move |id: &str| {
-            let _ = tauri::Emitter::emit(&app3, "remote-closed", serde_json::json!({"id": id}));
-        });
-        state.remotes.connect(on_end, &id, transport)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    let on_end: crate::remote::OnEnd = std::sync::Arc::new(move |id: &str| {
+        let _ = tauri::Emitter::emit(&app2, "remote-closed", serde_json::json!({"id": id}));
+    });
+    if id == THIS_PC {
+        let _one = THIS_PC_CONNECT.lock().unwrap_or_else(|e| e.into_inner());
+        return state.remotes.connect(on_end, id, transport);
+    }
+    state.remotes.connect(on_end, id, transport)
+}
+
+/// The link a call goes on. This PC's is made when first needed and again after it ended (its master restarted).
+fn link_for(app: &tauri::AppHandle, master: &str) -> Res<std::sync::Arc<dyn crate::pipes::Link>> {
+    let state = app.state::<AppState>();
+    match state.remotes.link(master) {
+        Ok(l) => Ok(l),
+        Err(_) if master == THIS_PC => {
+            connect_link(app, THIS_PC, this_pc_transport()?)?;
+            state.remotes.link(master)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -1212,141 +434,10 @@ struct RelayTarget {
     pairing: String,
 }
 
-/// A provider's key on this computer (model_keys.rs: the credential store, or QANUVI_KEY_<PROVIDER>).
-fn model_key(endpoint: &str) -> Option<String> {
-    crate::model_keys::get(endpoint)
-}
-
-/// Where this computer keeps model keys: "store" (the credential store) or "environment".
-#[tauri::command]
-fn model_key_store() -> &'static str {
-    crate::model_keys::kind()
-}
-
-/// Keeps a provider's key in the credential store (an empty key forgets it).
-#[tauri::command]
-fn model_key_set(endpoint: String, key: String) -> Res<()> {
-    crate::model_keys::set(&endpoint, &key)
-}
-
-/// Whether a provider has a key (the key itself never goes to the window).
-#[tauri::command]
-fn model_key_has(endpoint: String) -> bool {
-    crate::model_keys::has(&endpoint)
-}
-
-/// The models a provider offers (OpenRouter: free ones that can use tools, unless `all`).
-#[tauri::command]
-async fn models_list(
-    endpoint: crate::llm::Endpoint,
-    all: Option<bool>,
-) -> Res<Vec<crate::llm::ModelInfo>> {
-    blocking(move || {
-        crate::llm::list_models(&crate::model_keys::with_key(endpoint), all.unwrap_or(false))
-    })
-    .await
-}
-
-/// Tries a model with one tiny message (llm::probe).
-#[tauri::command]
-async fn model_probe(endpoint: crate::llm::Endpoint, model: String) -> Res<f64> {
-    blocking(move || crate::llm::probe(crate::model_keys::with_key(endpoint), model)).await
-}
-
-/// Checks a provider's key (OpenRouter: also the free requests left today).
-#[tauri::command]
-async fn model_key_check(endpoint: crate::llm::Endpoint) -> Res<String> {
-    blocking(move || crate::llm::check_key(&crate::model_keys::with_key(endpoint))).await
-}
-
-/// This computer's memory and graphics card, for suggesting local models that fit.
-#[tauri::command]
-async fn machine_info() -> Res<crate::machine::Machine> {
-    blocking(|| Ok(crate::machine::detect())).await
-}
-
-/// Whether a local provider's program (Ollama, OmniRoute) is installed on this computer.
-#[tauri::command]
-fn local_server_status(
-    endpoint: crate::llm::Endpoint,
-    start: Option<String>,
-) -> Option<crate::local_servers::LocalServer> {
-    crate::local_servers::status(&endpoint, start.as_deref())
-}
-
-/// Connects Qanuvi to the OmniRoute on this computer: asks it for a key named "Qanuvi" and keeps the key in the
-/// credential store. The key never reaches the window.
-#[tauri::command]
-async fn omniroute_connect(endpoint: crate::llm::Endpoint) -> Res<()> {
-    blocking(move || crate::omniroute::connect(&endpoint)).await
-}
-
-/// The tools the setup wizard looks for (Ollama, Node.js, npm, OmniRoute, winget).
-#[tauri::command]
-async fn setup_tools() -> Res<crate::local_servers::Tools> {
-    blocking(|| Ok(crate::local_servers::tools())).await
-}
-
-/// How one of them is installed here: the command the wizard shows before the user says yes (24z3 D2).
-#[tauri::command]
-fn setup_install_plan(tool: String) -> Res<crate::local_servers::InstallPlan> {
-    crate::local_servers::install_plan(&tool)
-}
-
-/// Runs the install in a terminal the wizard shows (typing, a password prompt included, goes through term_write).
-#[tauri::command]
-fn setup_install_start(
-    window: tauri::Window,
-    state: State<AppState>,
-    tool: String,
-    cols: u16,
-    rows: u16,
-    on_event: Channel<terminal::TermEvent>,
-) -> Res<String> {
-    let id =
-        crate::local_servers::install_start(&state.terminals, &tool, cols, rows, on_event.into())?;
-    state.terminals.set_owner(&id, window.label());
-    Ok(id)
-}
-
-/// Free memory and free graphics memory right now (GB), for the wizard's first page.
-#[tauri::command]
-async fn machine_room() -> Res<Option<(f64, f64)>> {
-    blocking(|| Ok(crate::machine::room().map(|r| (r.free_ram_gb, r.free_vram_gb)))).await
-}
-
-/// Where Qanuvi keeps its data, a move booked for the next start, and a copy left by the last move.
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DataLocationInfo {
-    current: String,
-    default_dir: String,
-    pending: Option<String>,
-    old: Option<String>,
-    note: Option<String>,
-    /// Set where it starts (a master's --data); false here, a move is booked from the window.
-    fixed: bool,
-}
-
 /// Whether this is a test build from the source tree (it keeps its own data; the title bar says so).
 #[tauri::command]
 fn data_test_build() -> bool {
     crate::data_location::from_source()
-}
-
-#[tauri::command]
-fn data_location_info() -> DataLocationInfo {
-    let d = crate::data_location::Defaults::real();
-    let loc = crate::data_location::read(&d.base);
-    let s = |p: &std::path::Path| p.to_string_lossy().into_owned();
-    DataLocationInfo {
-        current: s(&crate::paths::data_dir()),
-        default_dir: s(&d.base),
-        pending: loc.pending.as_deref().map(s),
-        old: loc.old.as_deref().map(s),
-        note: loc.note,
-        fixed: false,
-    }
 }
 
 /// Books a move to `folder` for the next start (checked: empty, writable, room on the drive). Answers the folder.
@@ -1386,96 +477,10 @@ fn backups_default() -> std::path::PathBuf {
     crate::backups::default_dir(crate::data_location::from_source())
 }
 
-fn backups_webview() -> Option<std::path::PathBuf> {
-    crate::data_location::Defaults::real().webview_for(&crate::paths::data_dir())
-}
-
-/// Backups (1d): where they go, whether daily backups are on, the last one, the list, and a restore booked.
-#[tauri::command]
-async fn backups_info() -> Res<crate::backups::Info> {
-    blocking(|| {
-        Ok(crate::backups::info(
-            &crate::paths::data_dir(),
-            &crate::data_location::Defaults::real().base,
-            Some(&backups_default()),
-        ))
-    })
-    .await
-}
-
-/// Sets the backups folder (empty: the default one) and whether daily backups run.
-#[tauri::command]
-async fn backups_set(folder: String, off: bool) -> Res<()> {
-    blocking(move || crate::backups::set(&crate::paths::data_dir(), &folder, off)).await
-}
-
-/// Backs up now. Answers the new backup's folder.
-#[tauri::command]
-async fn backups_now() -> Res<String> {
-    blocking(|| {
-        let web = backups_webview();
-        crate::backups::now_backup(
-            &crate::paths::data_dir(),
-            web.as_deref(),
-            Some(&backups_default()),
-        )
-    })
-    .await
-}
-
-/// Books a backup to be restored at the next start (the window asked the user first).
-#[tauri::command]
-async fn backups_restore(path: String) -> Res<()> {
-    blocking(move || {
-        crate::backups::book_restore(
-            &crate::paths::data_dir(),
-            &crate::data_location::Defaults::real().base,
-            Some(&backups_default()),
-            std::path::Path::new(&path),
-        )
-    })
-    .await
-}
-
-#[tauri::command]
-fn backups_cancel_restore() -> Res<()> {
-    crate::backups::cancel_restore(&crate::data_location::Defaults::real().base)
-}
-
-/// Takes away the note about the last restore.
-#[tauri::command]
-fn backups_dismiss_note() -> Res<()> {
-    crate::backups::dismiss_note(&crate::data_location::Defaults::real().base)
-}
-
-/// Removes one backup (the window asked the user first).
-#[tauri::command]
-async fn backups_remove(path: String) -> Res<()> {
-    blocking(move || {
-        crate::backups::remove_one(
-            &crate::paths::data_dir(),
-            Some(&backups_default()),
-            std::path::Path::new(&path),
-        )
-    })
-    .await
-}
-
 /// M4c: stops This PC's master before an update installs (Windows keeps its program file locked while it runs).
 #[tauri::command]
 fn this_pc_master_stop() -> Res<bool> {
     Ok(crate::master::stop_service(&crate::paths::data_dir()))
-}
-
-/// M4c: whether signing in to this computer starts Qanuvi in the background.
-#[tauri::command]
-fn sign_in_start() -> Res<bool> {
-    crate::sign_in_start::is_on()
-}
-
-#[tauri::command]
-fn sign_in_start_set(on: bool) -> Res<bool> {
-    crate::sign_in_start::set(on)
 }
 
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
@@ -1498,153 +503,10 @@ fn app_restart(app: tauri::AppHandle) -> Res<()> {
     Ok(())
 }
 
-/// A short decision from Qanuvi core's free models (no tools), asked one after another: `setup` names them in order.
-#[tauri::command]
-async fn core_decide(setup: String, system: String, prompt: String) -> Res<(String, String)> {
-    blocking(move || {
-        let setup = crate::brain::with_keys(&setup, model_key)?;
-        let setup: crate::brain::Setup = serde_json::from_str(&setup).map_err(|e| e.to_string())?;
-        crate::brain::decide(&setup, &system, &prompt)
-    })
-    .await
-}
-
 /// A file from this computer for the next message (the composer's + menu).
 #[tauri::command]
 async fn attachment_file(path: String) -> Res<agent::Attachment> {
     blocking(move || crate::attachments::read_file(std::path::Path::new(&path))).await
-}
-
-/// An image sent earlier in a conversation (by its stored name), for the window to show.
-#[tauri::command]
-async fn attachment_image(file: String) -> Res<String> {
-    blocking(move || {
-        crate::attachments::stored_image(&crate::paths::data_dir().join("attachments"), &file)
-    })
-    .await
-}
-
-/// A web page as text for the next message.
-#[tauri::command]
-async fn attachment_page(url: String) -> Res<agent::Attachment> {
-    blocking(move || crate::attachments::read_page(&url)).await
-}
-
-/// Qanuvi's remote knowledge file (24c), its signature checked against the built-in key; empty `url`: the default.
-#[tauri::command]
-async fn knowledge_fetch(url: String) -> Res<String> {
-    blocking(move || {
-        let url = if url.trim().is_empty() {
-            crate::knowledge::DEFAULT_URL.to_string()
-        } else {
-            url
-        };
-        crate::knowledge::fetch(&url, crate::knowledge::PUBLIC_KEY)
-    })
-    .await
-}
-
-/// OmniRoute's provider connections and their health.
-#[tauri::command]
-async fn omniroute_connections(
-    endpoint: crate::llm::Endpoint,
-) -> Res<Vec<crate::omniroute::Connection>> {
-    blocking(move || crate::omniroute::connections(&endpoint)).await
-}
-
-/// OmniRoute's whole provider catalog (for users who choose their own).
-#[tauri::command]
-async fn omniroute_catalog(
-    endpoint: crate::llm::Endpoint,
-) -> Res<Vec<crate::omniroute::CatalogEntry>> {
-    blocking(move || crate::omniroute::catalog(&endpoint)).await
-}
-
-/// Connects a provider in OmniRoute with an API key: one the user pasted, or (`saved`) the key Qanuvi keeps for one of
-/// its own providers, which goes from the credential store to OmniRoute without passing through the window.
-#[tauri::command]
-async fn omniroute_add_key(
-    endpoint: crate::llm::Endpoint,
-    provider: String,
-    key: Option<String>,
-    saved: Option<String>,
-) -> Res<()> {
-    blocking(move || crate::omniroute::add_key_with(&endpoint, &provider, key, saved)).await
-}
-
-/// Looks at this computer's OmniRoute now (the watch, 24z3 D5): its Inbox items kept, its connections answered.
-#[tauri::command]
-async fn omniroute_look(app: tauri::AppHandle) -> Res<Option<Vec<crate::omniroute::Connection>>> {
-    blocking(move || {
-        let notify = plan_runs::notify(&app);
-        let state = app.state::<AppState>();
-        Ok(crate::omniroute::look(&state.db, &*notify))
-    })
-    .await
-}
-
-#[tauri::command]
-async fn omniroute_test(endpoint: crate::llm::Endpoint, id: String) -> Res<()> {
-    blocking(move || crate::omniroute::test(&endpoint, &id)).await
-}
-
-/// Removes a connection from OmniRoute (asked for and confirmed in the window).
-#[tauri::command]
-async fn omniroute_remove(endpoint: crate::llm::Endpoint, id: String) -> Res<()> {
-    blocking(move || crate::omniroute::remove(&endpoint, &id)).await
-}
-
-/// Renews a sign-in ("panel": open OmniRoute's own page for this provider instead).
-#[tauri::command]
-async fn omniroute_sign_in(endpoint: crate::llm::Endpoint, provider: String) -> Res<()> {
-    blocking(move || crate::omniroute::sign_in(&endpoint, &provider)).await
-}
-
-#[tauri::command]
-async fn omniroute_make_combo(
-    endpoint: crate::llm::Endpoint,
-    name: String,
-    models: Vec<String>,
-) -> Res<()> {
-    blocking(move || crate::omniroute::make_combo(&endpoint, &name, &models)).await
-}
-
-/// Starts a local provider's server and waits until it answers.
-#[tauri::command]
-async fn local_server_start(endpoint: crate::llm::Endpoint, start: Option<String>) -> Res<()> {
-    blocking(move || {
-        let mut ep = endpoint;
-        ep.key = model_key(&ep.id);
-        crate::local_servers::start(&ep, start.as_deref())
-    })
-    .await
-}
-
-/// Downloads a model into Ollama; progress goes to `on_event`.
-#[tauri::command]
-async fn ollama_pull(
-    endpoint: crate::llm::Endpoint,
-    model: String,
-    on_event: Channel<serde_json::Value>,
-) -> Res<()> {
-    blocking(move || {
-        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
-        crate::llm::ollama_pull(&endpoint, &model, |status, done, total| {
-            // A few updates a second are enough.
-            if last.elapsed().as_millis() >= 250 || status == "success" {
-                last = std::time::Instant::now();
-                let _ = on_event
-                    .send(serde_json::json!({"status": status, "done": done, "total": total}));
-            }
-        })
-    })
-    .await
-}
-
-/// What the brain has learned about each model (turns, broken tool calls, rests).
-#[tauri::command]
-fn brain_records() -> crate::brain::Records {
-    crate::brain::Records::load(&crate::paths::data_dir())
 }
 
 /// Pairs this device with a computer showing a pairing code; the key goes to the credential store.
@@ -1669,15 +531,18 @@ fn remote_unpair(pairing: String) -> Res<()> {
 /// `on_event`.
 #[tauri::command]
 async fn remote_call(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     master: String,
     cmd: String,
     args: serde_json::Value,
     streams: bool,
     on_event: Channel<serde_json::Value>,
 ) -> Res<serde_json::Value> {
-    let link = state.remotes.link(&master)?;
-    blocking(move || link.call(&cmd, args, streams.then(|| on_event.into()))).await
+    blocking(move || {
+        let link = link_for(&app, &master)?;
+        link.call(&cmd, args, streams.then(|| on_event.into()))
+    })
+    .await
 }
 
 /// The masters this app is connected to (a new window joins them).
@@ -1708,78 +573,16 @@ fn inspector_close(state: State<AppState>) {
     state.inspector.close();
 }
 
-fn optional_project(state: &AppState, project_id: &Option<String>) -> Res<Option<PathBuf>> {
-    match project_id {
-        Some(id) if !id.is_empty() => Ok(Some(project_root(state, id)?)),
-        _ => Ok(None),
+/// A change to This PC's Inbox, heard from its master: told to every window ("qanuvi-inbox"), so they all show the
+/// same list, with the desktop notification for a new item (once).
+fn inbox_heard(app: &tauri::AppHandle, change: serde_json::Value) {
+    if change["change"] == "add"
+        && change["new"] == true
+        && let Ok(item) = serde_json::from_value::<crate::inbox::InboxItem>(change["item"].clone())
+    {
+        crate::desktop_notify::new_item(app, &item);
     }
-}
-
-fn home() -> Res<PathBuf> {
-    agent_config::home_dir().ok_or_else(|| "Your home folder could not be found.".to_string())
-}
-
-#[tauri::command]
-fn agent_config_list(
-    state: State<AppState>,
-    provider: String,
-    project_id: Option<String>,
-) -> Res<Vec<agent_config::ConfigFile>> {
-    let project = optional_project(&state, &project_id)?;
-    agent_config::list(&provider, &home()?, project.as_deref())
-}
-
-#[tauri::command]
-fn agent_config_read(
-    state: State<AppState>,
-    provider: String,
-    id: String,
-    project_id: Option<String>,
-) -> Res<files::FileContent> {
-    let project = optional_project(&state, &project_id)?;
-    agent_config::read(&provider, &id, &home()?, project.as_deref())
-}
-
-#[tauri::command]
-fn agent_config_write(
-    state: State<AppState>,
-    provider: String,
-    id: String,
-    project_id: Option<String>,
-    text: String,
-    expected_hash: Option<String>,
-) -> Res<String> {
-    let project = optional_project(&state, &project_id)?;
-    agent_config::write(
-        &provider,
-        &id,
-        &home()?,
-        project.as_deref(),
-        &text,
-        expected_hash.as_deref(),
-    )
-}
-
-#[tauri::command]
-fn runs_save(
-    state: State<AppState>,
-    project_id: String,
-    id: String,
-    file: String,
-    status: String,
-    data: String,
-) -> Res<()> {
-    projects::get(&state.db, &project_id)?;
-    runs::save(&state.db, &project_id, &id, &file, &status, &data)
-}
-
-// The Inbox (24u part 4): every change is told to every window ("qanuvi-inbox"), so they all show the same list.
-fn inbox_changed(app: &tauri::AppHandle, change: &str, item: Option<&inbox::InboxItem>) {
-    let _ = tauri::Emitter::emit(
-        app,
-        "qanuvi-inbox",
-        serde_json::json!({"change": change, "item": item}),
-    );
+    let _ = tauri::Emitter::emit(app, "qanuvi-inbox", change);
 }
 
 // Desktop notifications (24u part 4, session B): the window sends This PC's settings (24z3 D2: never a master's); a click that started Qanuvi
@@ -1812,7 +615,7 @@ fn notify_test(app: tauri::AppHandle) -> Res<()> {
 fn notify_item(
     app: tauri::AppHandle,
     notifier: State<crate::desktop_notify::Notifier>,
-    item: inbox::InboxItem,
+    item: crate::inbox::InboxItem,
     settings: Option<crate::notify::NotifySettings>,
 ) {
     if notifier.first_time(&item.id) {
@@ -1820,303 +623,9 @@ fn notify_item(
     }
 }
 
-#[tauri::command]
-fn inbox_list(state: State<AppState>) -> Res<Vec<inbox::InboxItem>> {
-    inbox::list(&state.db)
-}
-
-#[tauri::command]
-fn inbox_add(
-    app: tauri::AppHandle,
-    state: State<AppState>,
-    item: inbox::NewItem,
-) -> Res<inbox::InboxItem> {
-    let (added, new) = inbox::add_new(&state.db, &item)?;
-    inbox_changed(&app, "add", Some(&added));
-    if new {
-        crate::desktop_notify::new_item(&app, &added);
-    }
-    Ok(added)
-}
-
-#[tauri::command]
-fn inbox_answer(
-    app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
-    state: State<AppState>,
-    id: Option<String>,
-    key: Option<String>,
-    answer: serde_json::Value,
-) -> Res<Option<inbox::InboxItem>> {
-    let by = window.label().to_string();
-    let done = match (id, key) {
-        (Some(id), _) => inbox::answer(&state.db, &id, &answer, &by)?,
-        (None, Some(key)) => inbox::answer_key(&state.db, &key, &answer, &by)?,
-        _ => return Err("Which question?".into()),
-    };
-    if let Some(item) = &done {
-        inbox_changed(&app, "answer", Some(item));
-        plan_runs::answered(&app, item);
-    }
-    Ok(done)
-}
-
-#[tauri::command]
-fn inbox_close(app: tauri::AppHandle, state: State<AppState>, id: String) -> Res<bool> {
-    let closed = inbox::close(&state.db, &id)?;
-    if closed {
-        inbox_changed(&app, "close", inbox::get(&state.db, &id)?.as_ref());
-    }
-    Ok(closed)
-}
-
-#[tauri::command]
-fn inbox_resolve(app: tauri::AppHandle, state: State<AppState>, key: String) -> Res<bool> {
-    let gone = inbox::resolve(&state.db, &key)?;
-    if gone {
-        inbox_changed(&app, "remove", None);
-    }
-    Ok(gone)
-}
-
-#[tauri::command]
-fn inbox_mark_read(app: tauri::AppHandle, state: State<AppState>, id: Option<String>) -> Res<bool> {
-    let changed = inbox::mark_read(&state.db, id.as_deref())?;
-    if changed {
-        inbox_changed(&app, "read", None);
-    }
-    Ok(changed)
-}
-
-#[tauri::command]
-fn inbox_remove(app: tauri::AppHandle, state: State<AppState>, id: String) -> Res<bool> {
-    let gone = inbox::remove(&state.db, &id)?;
-    if gone {
-        inbox_changed(&app, "remove", None);
-    }
-    Ok(gone)
-}
-
-#[tauri::command]
-fn inbox_clear(app: tauri::AppHandle, state: State<AppState>) -> Res<bool> {
-    let gone = inbox::clear(&state.db)?;
-    if gone {
-        inbox_changed(&app, "remove", None);
-    }
-    Ok(gone)
-}
-
-#[tauri::command]
-fn inbox_import(
-    app: tauri::AppHandle,
-    state: State<AppState>,
-    items: Vec<inbox::OldItem>,
-) -> Res<usize> {
-    let n = inbox::import(&state.db, &items)?;
-    if n > 0 {
-        inbox_changed(&app, "add", None);
-    }
-    Ok(n)
-}
-
-// What a plan keeps between runs (24z R2a): every change is told to every window ("qanuvi-plan-data"), so each keeps
-// the same copy; the runner in the core writes the same rows.
-fn plan_data_changed(
-    app: &tauri::AppHandle,
-    project_id: &str,
-    file: &str,
-    kind: crate::plan_data::Kind,
-    value: &serde_json::Value,
-) {
-    let _ = tauri::Emitter::emit(
-        app,
-        "qanuvi-plan-data",
-        serde_json::json!({"project_id": project_id, "file": file, "kind": kind, "value": value}),
-    );
-}
-
 // This PC's settings (24z3 A3): the Settings page while This PC is shown.
-#[tauri::command]
-fn settings_get(state: State<AppState>) -> Res<serde_json::Map<String, serde_json::Value>> {
-    crate::settings::get_all(&state.db)
-}
-
-#[tauri::command]
-fn settings_set(
-    state: State<AppState>,
-    values: serde_json::Map<String, serde_json::Value>,
-) -> Res<()> {
-    crate::settings::set_many(&state.db, &values)
-}
-
 // This PC's own server list (migration M3a), once only in the window's localStorage.
-#[tauri::command]
-fn servers_list(state: State<AppState>) -> Res<serde_json::Value> {
-    Ok(serde_json::json!({
-        "imported": crate::servers::imported(&state.db)?,
-        "servers": crate::servers::list(&state.db)?,
-    }))
-}
-
-#[tauri::command]
-fn servers_import(
-    state: State<AppState>,
-    servers: Vec<serde_json::Value>,
-) -> Res<Vec<serde_json::Value>> {
-    crate::servers::import(&state.db, &servers)
-}
-
-#[tauri::command]
-fn servers_save(state: State<AppState>, server: serde_json::Value) -> Res<()> {
-    crate::servers::save(&state.db, &server)
-}
-
-#[tauri::command]
-fn servers_remove(state: State<AppState>, id: String) -> Res<bool> {
-    crate::servers::remove(&state.db, &id)
-}
-
-#[tauri::command]
-fn plan_data_list(state: State<AppState>) -> Res<Vec<crate::plan_data::Entry>> {
-    crate::plan_data::list(&state.db)
-}
-
-#[tauri::command]
-fn plan_data_set(
-    app: tauri::AppHandle,
-    state: State<AppState>,
-    project_id: String,
-    file: String,
-    kind: crate::plan_data::Kind,
-    value: serde_json::Value,
-) -> Res<()> {
-    let kept = crate::plan_data::set(&state.db, &project_id, &file, kind, &value)?;
-    let value = kept.map(|e| e.value).unwrap_or(serde_json::Value::Null);
-    plan_data_changed(&app, &project_id, &file, kind, &value);
-    Ok(())
-}
-
 // Unsaved text of a machine the switcher hid (24z3 Part B2), kept here when the file is this computer's.
-#[tauri::command]
-fn drafts_put(state: State<AppState>, draft: crate::drafts::Draft) -> Res<()> {
-    crate::drafts::put(&state.db, &draft)
-}
-
-#[tauri::command]
-fn drafts_list(state: State<AppState>, project_id: String) -> Res<Vec<crate::drafts::Draft>> {
-    crate::drafts::list(&state.db, &project_id)
-}
-
-#[tauri::command]
-fn drafts_drop(state: State<AppState>, project_id: String, path: String) -> Res<()> {
-    crate::drafts::drop(&state.db, &project_id, &path)
-}
-
-#[tauri::command]
-fn plan_data_import(state: State<AppState>, entries: Vec<crate::plan_data::Entry>) -> Res<usize> {
-    crate::plan_data::import(&state.db, &entries)
-}
-
-#[tauri::command]
-fn runs_list_all(state: State<AppState>, limit: usize) -> Res<Vec<runs::RunRecord>> {
-    runs::list_all(&state.db, limit)
-}
-
-#[tauri::command]
-fn agent_usage_since(state: State<AppState>, since: i64) -> Res<agent::Usage> {
-    agent::usage_since(&state.db, since)
-}
-
-#[tauri::command]
-fn runs_list(state: State<AppState>, project_id: String) -> Res<Vec<runs::RunRecord>> {
-    runs::list(&state.db, &project_id)
-}
-
-#[tauri::command]
-fn agent_respond(
-    state: State<AppState>,
-    session_id: String,
-    request_id: String,
-    allow: bool,
-    remember: Option<String>,
-) -> Res<()> {
-    state.agents.respond(
-        &state.db,
-        &session_id,
-        &request_id,
-        allow,
-        remember.as_deref().unwrap_or(""),
-    )
-}
-
-#[tauri::command]
-fn agent_grants(state: State<AppState>, session_id: String) -> Vec<agent::Grant> {
-    state.agents.grants(&session_id)
-}
-
-#[tauri::command]
-fn agent_forget_grants(state: State<AppState>, session_id: String) {
-    state.agents.forget_grants(&session_id);
-}
-
-/// A running session's model or mode, changed now from the picker.
-#[tauri::command]
-fn agent_configure(
-    state: State<AppState>,
-    session_id: String,
-    model: Option<String>,
-    mode: Option<String>,
-) -> Res<()> {
-    state
-        .agents
-        .configure(&state.db, &session_id, model.as_deref(), mode.as_deref())
-}
-
-/// "Stop this command, read my message now": ends the agent's turn, keeps the session (24r).
-#[tauri::command]
-fn agent_interrupt(state: State<AppState>, session_id: String) -> Res<()> {
-    state.agents.interrupt(&state.db, &session_id)
-}
-
-#[tauri::command]
-fn agent_stop(state: State<AppState>, session_id: String) -> Res<()> {
-    agent::mark_stopped(&state.db, &session_id);
-    state.agents.stop(&session_id);
-    Ok(())
-}
-
-#[tauri::command]
-fn agent_rename(state: State<AppState>, session_id: String, title: String) -> Res<()> {
-    agent::rename(&state.db, &session_id, &title)
-}
-
-#[tauri::command]
-fn agent_link(state: State<AppState>, session_id: String, from: String) -> Res<()> {
-    agent::link(&state.db, &session_id, &from)
-}
-
-#[tauri::command]
-fn agent_handover_off(state: State<AppState>, session_id: String, off: bool) -> Res<()> {
-    agent::set_handover_off(&state.db, &session_id, off)
-}
-
-#[tauri::command]
-fn agent_saved(state: State<AppState>, session_id: String, saved: bool) -> Res<()> {
-    agent::set_saved(&state.db, &session_id, saved)
-}
-
-#[tauri::command]
-fn agent_delete(state: State<AppState>, session_id: String) -> Res<()> {
-    state.agents.stop(&session_id);
-    agent::delete(&state.db, &session_id)
-}
-
-/// Chat clean-up (24t): deletes chats not used for `days` days, keeping the chats in `keep` (open now).
-#[tauri::command]
-fn agent_clean_up(state: State<AppState>, days: i64, keep: Vec<String>) -> Res<usize> {
-    agent::clean_up_chats(&state.db, days, &keep, store::now())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Started by Qanuvi's own restart: the old instance closes first, so nothing it holds open is copied.
@@ -2177,11 +686,9 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             let dir = data.clone();
-            paths::set_data_dir(dir.clone());
+            crate::paths::set_data_dir(dir.clone());
             std::fs::create_dir_all(&dir)?;
-            let db = store::Db::open(&dir.join("qanuvi.db"))?;
-            agent::mark_interrupted(&db);
-            runs::mark_interrupted(&db);
+            // M5a: the app no longer opens the database; This PC's master is the only one with it open.
             app.manage(crate::desktop_notify::Notifier::default());
             let args: Vec<String> = std::env::args().collect();
             crate::desktop_notify::started_with(app.handle(), &args);
@@ -2202,12 +709,8 @@ pub fn run() {
                 }
             }
             app.manage(AppState {
-                db,
-                terminals: terminal::Terminals::default(),
                 languages: crate::lsp::Servers::default(),
                 debuggers: crate::dap::Adapters::default(),
-                agents: agent::Agents::default(),
-                indexes: index::Indexes::default(),
                 inspector: preview::Inspector::default(),
                 remotes: {
                     // This PC starts every path its calls take (migration M3c: the loop guard).
@@ -2216,29 +719,27 @@ pub fn run() {
                     r
                 },
                 accounts: crate::account::Accounts::this_pc(&dir),
-                runs: std::sync::Arc::default(),
             });
             // This data folder is the app's own: a master service started on it is This PC.
             crate::master::mark_app_data(&dir);
             // M4a: This PC runs its own master on this data folder from launch on (remote access on or not). M4b: it
-            // runs This PC's background jobs (start-up list, Claude Code update, OmniRoute watch, memory disk sync,
-            // daily backups); this core no longer runs them. Until M5 the window still calls this core for the rest.
+            // runs This PC's background jobs. M5a: it does all of This PC's work; the window reaches it on the
+            // "this-computer" link, made on the first call.
             let master_dir = dir.clone();
             std::thread::spawn(move || {
                 if let Err(e) = crate::master::start_this_pc(&master_dir) {
                     eprintln!("This PC's master did not start: {e}");
                 }
             });
-            // What the master's jobs add to the Inbox (the OmniRoute watch's sign-ins to renew, keys that stopped
-            // working) reaches the windows and the notifications as the app's own changes do.
+            // Every change to This PC's Inbox (made by any window, a run or the master's jobs) reaches all windows as
+            // "qanuvi-inbox", and a new item raises the desktop notification once.
             let inbox_dir = dir.clone();
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let notify = plan_runs::notify(&handle);
                 crate::master::follow_this_pc_inbox(
                     &inbox_dir,
                     || true,
-                    move |change| notify("qanuvi-inbox", change),
+                    move |change| inbox_heard(&handle, change),
                 );
             });
             // M4c: the tray of This PC's master reaches the windows: "Open Qanuvi" shows one, "Quit Qanuvi" closes them
@@ -2273,16 +774,6 @@ pub fn run() {
             });
             // An entry that starts Qanuvi at sign-in follows the app when it moved.
             std::thread::spawn(crate::sign_in_start::refresh);
-            // Agent processes of sessions idle for 10 minutes are closed (memory); a new message opens them again.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                loop {
-                    std::thread::sleep(std::time::Duration::from_secs(60));
-                    if let Some(state) = handle.try_state::<AppState>() {
-                        state.agents.close_idle(&state.db, 600);
-                    }
-                }
-            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -2302,38 +793,33 @@ pub fn run() {
                     "qanuvi-window-machine",
                     serde_json::json!({"label": window.label(), "machine": null}),
                 );
-                // A second window takes only its own terminals with it; the last window ends everything.
+                // A second window takes only its own coding tools with it; the last window ends the window's side.
                 let others = window
                     .app_handle()
                     .webview_windows()
                     .keys()
                     .any(|l| l != window.label());
                 if others {
-                    state.terminals.kill_owner(window.label());
                     state.languages.stop_owner(window.label());
                     state.debuggers.stop_owner(window.label());
                     return;
                 }
-                state.terminals.kill_all();
                 state.languages.stop_all();
                 state.debuggers.stop_all();
-                state.agents.stop_all();
                 state.inspector.close();
                 state.remotes.disconnect_all();
-                // M4c: This PC's master stays with its tray icon, and its background jobs go on (start-up list,
-                // watches, sync, backups, remote access). Its tray's "Quit Qanuvi" stops it.
+                // M4c: This PC's master stays with its tray icon, and its work goes on there (M5a: agents and plan
+                // runs too; the window said so before it closed). Its tray's "Quit Qanuvi" stops it. The link's
+                // terminals end with the link.
             }
         })
         .invoke_handler(tauri::generate_handler![
             this_pc_master_stop,
-            sign_in_start,
-            sign_in_start_set,
             notify_settings,
             notify_take_start,
             notify_test,
             notify_item,
             app_info,
-            browser_agent_view,
             browser_agent_shot,
             inspector_show,
             inspector_scroll,
@@ -2347,100 +833,16 @@ pub fn run() {
             port_unforward,
             remote_list,
             remote_pair,
-            model_key_set,
-            model_key_has,
-            model_key_store,
-            models_list,
-            brain_records,
-            model_key_check,
-            machine_info,
-            ollama_pull,
-            local_server_status,
-            local_server_start,
-            omniroute_connect,
-            omniroute_look,
-            omniroute_connections,
-            omniroute_remove,
-            core_decide,
-            knowledge_fetch,
             attachment_file,
-            attachment_page,
-            attachment_image,
-            data_location_info,
             data_test_build,
             data_location_move,
             data_location_cancel,
             data_location_remove_old,
-            backups_info,
-            backups_set,
-            backups_now,
-            backups_restore,
-            backups_cancel_restore,
-            backups_dismiss_note,
-            backups_remove,
             app_restart,
-            setup_tools,
-            setup_install_plan,
-            setup_install_start,
-            machine_room,
-            omniroute_catalog,
-            omniroute_add_key,
-            omniroute_test,
-            omniroute_sign_in,
-            omniroute_make_combo,
-            model_probe,
             remote_unpair,
-            memory_list,
-            memory_save,
-            memory_delete,
-            memory_slice,
-            memory_search,
-            memory_disk_device,
-            account_begin,
             account_wait,
-            account_finish,
             account_cancel,
-            account_me,
-            account_sign_out,
-            memory_disk_passphrase_set,
-            memory_disk_passphrase_saved,
-            memory_disk_passphrase_forget,
-            memory_disk_status,
-            memory_disk_sync,
-            memory_disk_versions,
-            memory_disk_restore,
             startup_path,
-            projects_list,
-            projects_add,
-            projects_remove,
-            projects_update,
-            projects_touch,
-            projects_redetect,
-            files_list_dir,
-            files_list_all,
-            files_markdown,
-            files_log_append,
-            files_changed_since,
-            snapshots_take,
-            snapshots_changes,
-            files_replace,
-            files_read,
-            files_write,
-            files_create,
-            files_rename,
-            files_trash,
-            files_search,
-            index_find,
-            checks_run,
-            index_outline,
-            term_shells,
-            term_spawn,
-            term_write,
-            term_kill_window,
-            term_attach,
-            term_detach,
-            term_resize,
-            term_kill,
             lsp_statuses,
             lsp_install,
             lsp_start,
@@ -2455,99 +857,6 @@ pub fn run() {
             dap_send,
             dap_stop,
             dap_stop_window,
-            git_status,
-            git_diff,
-            git_stage,
-            git_revert,
-            git_versions,
-            git_set_index,
-            git_unstage,
-            git_stage_all,
-            git_commit,
-            git_sync,
-            git_branches,
-            git_switch,
-            git_stashes,
-            git_stash,
-            git_log,
-            git_show,
-            git_blame,
-            agent_info,
-            agents_working,
-            agent_sessions,
-            agent_session_events,
-            agent_session_times,
-            agent_file_history,
-            agent_start,
-            agent_respond,
-            runs_save,
-            runs_list,
-            runs_list_all,
-            inbox_list,
-            inbox_add,
-            inbox_answer,
-            inbox_close,
-            inbox_resolve,
-            inbox_mark_read,
-            inbox_remove,
-            inbox_clear,
-            inbox_import,
-            settings_get,
-            settings_set,
-            servers_list,
-            servers_import,
-            servers_save,
-            servers_remove,
-            plan_data_list,
-            plan_data_set,
-            plan_data_import,
-            drafts_put,
-            drafts_list,
-            drafts_drop,
-            plan_runs::plan_run_start,
-            plan_runs::plan_run_finish,
-            plan_runs::plan_run_state,
-            plan_runs::plan_run_active,
-            plan_runs::plan_run_stop,
-            plan_runs::plan_run_pause,
-            plan_runs::plan_run_finish_without,
-            plan_runs::plan_run_answer,
-            plan_runs::plan_run_message,
-            plan_runs::plan_run_interrupt,
-            plan_runs::plan_run_tell,
-            plan_runs::plan_run_model,
-            plan_runs::plan_run_mode,
-            agent_usage_since,
-            agent_config_list,
-            agent_config_read,
-            agent_config_write,
-            agent_stop,
-            agent_interrupt,
-            agent_configure,
-            secrets_names,
-            secrets_store,
-            secrets_set,
-            secrets_remove,
-            plan_private,
-            startup_start,
-            startup_status,
-            startup_restart,
-            startup_stop,
-            startup_headroom,
-            claude_versions,
-            qanuvi_usage,
-            claude_update,
-            claude_settings_base_url,
-            plan_private_add,
-            plan_private_clear,
-            agent_grants,
-            agent_forget_grants,
-            agent_rename,
-            agent_link,
-            agent_handover_off,
-            agent_saved,
-            agent_delete,
-            agent_clean_up,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Qanuvi");

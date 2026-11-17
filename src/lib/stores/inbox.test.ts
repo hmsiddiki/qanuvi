@@ -12,6 +12,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 
 const { invoke } = await import("@tauri-apps/api/core");
+const { thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { inbox } = await import("./inbox.svelte");
 
 const item = (id: string, at: number, extra: Record<string, unknown> = {}) => ({

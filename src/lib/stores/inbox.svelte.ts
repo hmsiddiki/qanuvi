@@ -10,7 +10,7 @@
  * listed, marked offline, until it is back; nothing is answered or changed from that copy.
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { callMaster, machineName } from "$lib/remote";
+import { callMaster, callOn, callThisPc, machineName } from "$lib/remote";
 import { forgetNotifications, learnNotifications, notifyFor } from "./notify.svelte";
 import { listen } from "@tauri-apps/api/event";
 import type { Place } from "./ui.svelte";
@@ -122,7 +122,7 @@ class InboxStore {
     try {
       const raw = localStorage.getItem(OLD_KEY);
       const old = raw ? JSON.parse(raw) : null;
-      if (Array.isArray(old) && old.length) await invoke("inbox_import", { items: old });
+      if (Array.isArray(old) && old.length) await callThisPc("inbox_import", { items: old });
       if (raw !== null) localStorage.removeItem(OLD_KEY);
     } catch {
       // A broken old list is not worth keeping.
@@ -133,7 +133,7 @@ class InboxStore {
 
   async refresh(): Promise<void> {
     try {
-      this.#local = await invoke<InboxItem[]>("inbox_list");
+      this.#local = await callThisPc<InboxItem[]>("inbox_list");
       this.#merge();
     } catch {
       // Keeps what it shows; the next change refreshes again.
@@ -213,7 +213,7 @@ class InboxStore {
 
   /** Calls the Inbox command on this computer, or on the master that has the item. */
   #call<T>(master: string | null, cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-    return master ? callMaster<T>(master, cmd, args) : invoke<T>(cmd, args);
+    return callOn<T>(master, cmd, args);
   }
 
   /** Called with every answered question, whichever window (or later device) answered it. */
@@ -229,7 +229,7 @@ class InboxStore {
    */
   add(item: NewInboxItem, master: string | null = null): void {
     const args = { item: { type: "info", ...item } };
-    const here = () => void invoke<InboxItem>("inbox_add", args).catch(() => {});
+    const here = () => void callThisPc<InboxItem>("inbox_add", args).catch(() => {});
     if (!master) return here();
     void callMaster<InboxItem>(master, "inbox_add", args).catch(here);
   }
@@ -253,18 +253,18 @@ class InboxStore {
 
   /** The run panel answered a question: it closes everywhere (the run panel keeps the answer itself). */
   answerKey(key: string, answer: InboxAnswer): void {
-    void invoke("inbox_answer", { key, answer }).catch(() => {});
+    void callThisPc("inbox_answer", { key, answer }).catch(() => {});
   }
 
   /** The question is no longer asked (its step got done another way). */
   close(id: string): void {
-    void invoke("inbox_close", { id }).catch(() => {});
+    void callThisPc("inbox_close", { id }).catch(() => {});
   }
 
   /** Removes the item with this key, if any (the problem it told about is gone). */
   resolve(key: string): void {
     // Asked of the database even before the list is loaded (start-up checks resolve early).
-    void invoke("inbox_resolve", { key }).catch(() => {});
+    void callThisPc("inbox_resolve", { key }).catch(() => {});
   }
 
   /** Marks one item read, or all of them (open questions stay unread: they still need the owner). */
@@ -287,7 +287,7 @@ class InboxStore {
    * This PC), when the Inbox shows one machine's items.
    */
   clear(machine?: string | null): void {
-    if (machine === undefined || machine === null) void invoke("inbox_clear").catch(() => {});
+    if (machine === undefined || machine === null) void callThisPc("inbox_clear").catch(() => {});
     for (const master of this.#following)
       if (machine === undefined || machine === master) void callMaster(master, "inbox_clear", {}).catch(() => {});
   }

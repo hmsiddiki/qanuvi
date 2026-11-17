@@ -12,6 +12,8 @@ vi.stubGlobal("localStorage", {
 
 const { invoke: rawInvoke } = await import("@tauri-apps/api/core");
 const invoke = vi.mocked(rawInvoke);
+const { onThisPc, thisPcAsPlainCommands } = await import("$lib/testing/thisPc");
+thisPcAsPlainCommands(invoke);
 const { showMachine } = await import("$lib/remote");
 const { startup } = await import("./startup.svelte");
 const { claudeUpdate } = await import("./claudeUpdate.svelte");
@@ -89,17 +91,17 @@ describe("the On box", () => {
     calls.length = 0;
     await startup.setEnabled("hr", false);
     expect(calls[0]).toBe("startup_stop");
-    expect(invoke).toHaveBeenCalledWith("startup_stop", { id: "hr" });
+    expect(invoke).toHaveBeenCalledWith(...onThisPc("startup_stop", { id: "hr" }));
     expect(settings.value.startup).toEqual([expect.objectContaining({ id: "hr", enabled: false })]);
     // Nothing turned on is started by the off box.
-    expect(invoke).toHaveBeenLastCalledWith("startup_start", { items: [] });
+    expect(invoke).toHaveBeenLastCalledWith(...onThisPc("startup_start", { items: [] }));
 
     calls.length = 0;
     await startup.setEnabled("hr", true);
     expect(calls).not.toContain("startup_stop");
-    expect(invoke).toHaveBeenLastCalledWith("startup_start", {
-      items: [expect.objectContaining({ id: "hr", enabled: true })],
-    });
+    expect(invoke).toHaveBeenLastCalledWith(
+      ...onThisPc("startup_start", { items: [expect.objectContaining({ id: "hr", enabled: true })] }),
+    );
     expect(settings.value.startup).toHaveLength(1);
   });
 });

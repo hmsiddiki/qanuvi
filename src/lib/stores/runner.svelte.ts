@@ -1,18 +1,15 @@
 /**
- * The window's view of plan runs (24z R2d part 2). The run itself goes on in Qanuvi's core (src-tauri/src/plan/run.rs):
- * this store starts it, sends the owner's asks (Stop, Pause, answers, messages, model and mode) to its plan_run_*
- * commands, and shows what the core tells: "qanuvi-run" brings the run's view, "qanuvi-run-agent" the steps' agent
- * events, which go to the chat like any session's. Closing the window never ends a run.
- *
- * A project on a master (a server without a window) runs there: its view and agent events come on the stream of the
- * master's plan_run_watch (24z R2d part 3), one per project while the connection lasts.
+ * The window's view of plan runs (24z R2d part 2). The run itself goes on in the machine's master
+ * (src-tauri/src/plan/run.rs; M5a: This PC's too): this store starts it, sends the owner's asks (Stop, Pause,
+ * answers, messages, model and mode) to its plan_run_* commands, and shows what the master tells on the stream of its
+ * plan_run_watch (24z R2d part 3), one per project while the link lasts: the run's view, and the steps' agent events,
+ * which go to the chat like any session's. Closing the window never ends a run.
  *
  * What stays here: "Pick models" (before a run), what earlier runs taught about models, a plan's private details for
  * chats in its step sessions, and going on from a step the last run stopped at.
  */
 import { Channel } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { callMaster, ownerOf } from "$lib/remote";
+import { THIS_PC, callOn, onThisPcLinkEnd, ownerOf } from "$lib/remote";
 import { api, errorText, type AgentEvent, type Project, type RunView, type Session } from "$lib/api";
 import { modelLabel, providerById, type AgentProvider } from "$lib/agents/providers";
 import { freeDecide, ownSetup } from "./brain.svelte";
@@ -120,7 +117,7 @@ class RunnerStore {
   #shape = "";
   #resume: Resume | null = null;
   #ready: Promise<void> | null = null;
-  /** Projects on a master whose run this window follows, with that master. */
+  /** Projects whose run this window follows, with their machine (THIS_PC for This PC's). */
   #watched = new Map<string, string>();
   /** The master the shown run is on (null for this computer). */
   #shownOn: string | null = null;
@@ -143,32 +140,34 @@ class RunnerStore {
     return this.run ? runTotals(this.run) : null;
   }
 
-  /** Listens to the core's run events once (the window may open while a run already goes on). */
+  /** Follows This PC's runs from the start (the window may open while a run already goes on there). */
   #listen(): Promise<void> {
     this.#ready ??= (async () => {
+      // This PC's master restarted: its streams ended with the link; the shown run is followed again.
+      await onThisPcLinkEnd(() => {
+        for (const [p, m] of this.#watched) if (m === THIS_PC) this.#watched.delete(p);
+        if (this.#project && !ownerOf(this.#project)) void this.#watch(this.#project);
+      });
       try {
-        await listen<RunView>("qanuvi-run", (e) => this.#take(e.payload));
-        await listen<{ projectId: string; sessionId: string | null; event: AgentEvent }>("qanuvi-run-agent", (e) =>
-          this.#agentEvent(e.payload),
-        );
-        // A run that went on while no window was open (the core keeps it): show it.
+        // A run that went on while no window was open (the master keeps it): show it.
         const active = await api.planRun.active().catch(() => [] as string[]);
-        if (active.length && !this.#running) this.#take(await api.planRun.state(active[0]));
+        if (active.length && !this.#running) {
+          await this.#watch(active[0]);
+          this.#take(await api.planRun.state(active[0]));
+        }
       } catch {
-        // No core events (tests, a browser preview): nothing to follow.
+        // No master (tests, a browser preview): nothing to follow.
       }
     })();
     return this.#ready;
   }
 
-  /**
-   * A project on a master: follows its run on the master's stream (once per connection). This computer's projects
-   * come by the "qanuvi-run" events already.
-   */
+  /** Follows a project's run on its machine's stream (once per link). */
   async #watch(projectId: string): Promise<void> {
-    const master = ownerOf(projectId);
-    if (!master || this.#watched.get(projectId) === master) return;
-    this.#watched.set(projectId, master);
+    const owner = ownerOf(projectId);
+    const link = owner ?? THIS_PC;
+    if (this.#watched.get(projectId) === link) return;
+    this.#watched.set(projectId, link);
     type Streamed =
       | { kind: "view"; view: RunView }
       | { kind: "agent"; sessionId: string | null; event: AgentEvent }
@@ -177,12 +176,12 @@ class RunnerStore {
     events.onmessage = (m) => {
       if (m.kind === "view") this.#take(m.view);
       else if (m.kind === "agent") this.#agentEvent({ projectId, sessionId: m.sessionId, event: m.event });
-      // The master runner's plan data (holds, state, notes) as it changes there; its Inbox changes come on its own
-      // Inbox stream (inbox.svelte.ts).
-      else if (m.kind === "event" && m.event === "qanuvi-plan-data") planData.heard(m.value as Entry);
+      // A master runner's plan data (holds, state, notes) as it changes there; its Inbox changes come on its own
+      // Inbox stream (inbox.svelte.ts). This PC's come on its plan data stream (planData.svelte.ts).
+      else if (owner && m.kind === "event" && m.event === "qanuvi-plan-data") planData.heard(m.value as Entry);
     };
     try {
-      this.#take(await callMaster<RunView>(master, "plan_run_watch", { projectId, onEvent: events }));
+      this.#take(await callOn<RunView>(owner, "plan_run_watch", { projectId, onEvent: events }));
     } catch {
       // An older master: no run news from it.
       this.#watched.delete(projectId);
@@ -192,7 +191,7 @@ class RunnerStore {
   /** A master connected: a run going on there (started from any computer) is shown when nothing runs here. */
   async masterConnected(master: string): Promise<void> {
     await this.#listen();
-    const active = await callMaster<string[]>(master, "plan_run_active", {}).catch(() => [] as string[]);
+    const active = await callOn<string[]>(master, "plan_run_active", {}).catch(() => [] as string[]);
     if (active.length && !this.#running && !this.finishing) await this.loadLast(active[0]);
   }
 

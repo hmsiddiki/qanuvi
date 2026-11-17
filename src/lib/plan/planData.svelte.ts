@@ -3,11 +3,12 @@
  * settings. Kept in the core's database (plan_data), so a run going on in the core reads and writes the same; the
  * window keeps a copy that reads at once and writes through. It answers the same keys localStorage had, so the
  * callers stay as they were; the first start brings the old localStorage values in and removes them. A project on a
- * master keeps its plan data in that master's database, where the master's runner reads it (R2e part 2).
+ * master keeps its plan data in that master's database, where the master's runner reads it (R2e part 2). M5a: This
+ * PC's are in its master's database too; its `plan_data_watch` stream brings the changes made by other windows and
+ * runs.
  */
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { callMaster, ownerOf } from "$lib/remote";
+import { Channel } from "@tauri-apps/api/core";
+import { callMaster, callThisPc, onThisPcLinkEnd, ownerOf } from "$lib/remote";
 
 export type PlanDataKind = "picks" | "state" | "notes" | "run";
 
@@ -84,7 +85,8 @@ class PlanData {
       Promise.resolve(callMaster(master, "plan_data_set", args)).then(done, done);
       return;
     }
-    Promise.resolve(invoke("plan_data_set", args)).catch(() => {
+    // This PC's master echoes it on the plan data stream, as for every window.
+    Promise.resolve(callThisPc("plan_data_set", args)).catch(() => {
       // No echo comes for it; the copy here holds it for this window and the next change writes again.
       this.#echoed(key);
     });
@@ -135,14 +137,22 @@ class PlanData {
       }
     }
     if (old.length) this.changed++;
-    await listen<Entry>("qanuvi-plan-data", (e) => this.#take(e.payload));
+    await onThisPcLinkEnd(() => void this.#follow().catch(() => {}));
     try {
-      if (old.length) await invoke("plan_data_import", { entries: old });
+      if (old.length) await callThisPc("plan_data_import", { entries: old });
       for (const e of old) localStorage.removeItem(keyOf(e));
-      for (const e of await invoke<Entry[]>("plan_data_list")) if (!this.#pending.has(keyOf(e))) this.#take(e, false);
+      await this.#follow();
     } catch {
       // The old copies stay in localStorage for the next start.
     }
+  }
+
+  /** This PC's kept values, and its changes from then on (made again after its master restarted). */
+  async #follow(): Promise<void> {
+    const events = new Channel<Entry>();
+    events.onmessage = (e) => this.heard(e);
+    const rows = await callThisPc<Entry[]>("plan_data_watch", { onEvent: events });
+    for (const e of rows) if (!this.#pending.has(keyOf(e))) this.#take(e, false);
   }
 
   #take(e: Entry, echo = true): void {
