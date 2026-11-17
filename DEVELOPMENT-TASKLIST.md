@@ -379,6 +379,15 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
+    Finding b1 (owner yes 2026-11-17, to build after M3): a run stopped by its budget looked "blocked". QVTHEME-PLAN
+    run had a $1.00 budget, step 1 on Opus cost $1.16, the run stopped after it; the reason was only in the Inbox
+    ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
+    when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
+    says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    M3a BUILT (2026-11-17, f2e193a; not yet driven live): This PC keeps its server list in its database (store v13:
+    servers + flags tables, servers.rs; servers_list/import/save/remove), the window's old list moved in once,
+    window copy kept current (going back to 0.1.25 still finds the servers). M3 decisions in docs/MIGRATION-VIEWER.md
+    (e7a5a59): depth 3, unpair at once, pairing from window and master terminal, VPS server build first (owner yes).
     PICKUP POINT (fresh conversation starts here, 2026-11-17 13:20): open items in order: (1) m2a, one-space fix in
     src/lib/components/AccountView.svelte, waits for the owner's yes; (2) plan M3 (docs/MIGRATION-VIEWER.md "M3. Each
     machine owns its server list") with the owner before any code; (3) the VPS still runs the 2026-11-16 server build
