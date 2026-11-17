@@ -309,6 +309,13 @@ Owner decisions (2026-11-18):
       helped, with "Don't ask again".
     - The setting is renamed from "...when I sign in" to "Start Qanuvi when Windows starts", so it is never read as
       the Qanuvi account.
+    - Qanuvi cleans up after itself (owner, 2026-11-18; measured in %TEMP%: qanuvi-browser-* test browser profiles
+      0.7 GB, about 25 Qanuvi-0.1.x-updater-* folders 0.25 GB, one per update and never removed):
+      - A headless browser's profile (`browser.rs` `Browser::launch`, `qanuvi-browser-<pid>-<uuid>`) is removed
+        when that browser ends, and when the master exits.
+      - At start the master removes leftover `qanuvi-browser-<pid>-*` profiles whose pid is no longer running (a
+        crash or power cut skips the exit cleanup), never one of a running process.
+      - After an update has installed, the older `Qanuvi-*-updater-*` folders are removed.
   - M5c, the rest: This PC's coding tools (language servers, debuggers, inspector) through the same pipes as every
     machine; a booked restore and This PC's server connections on its master; i1 (unsaved text kept as drafts,
     shown as "Draft, not saved to disk"); j1 (a terminal whose shell ended says so); "earlier output trimmed" after a

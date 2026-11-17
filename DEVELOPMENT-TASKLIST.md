@@ -388,6 +388,9 @@ runs on or off; with it off nothing is sent anywhere.
     M5a cut-over with the second core deleted in the same pass, no old-core adapting; M5b watcher + crash limit of 3
     then the brain investigates, runs resume after a Windows restart when "Start Qanuvi when Windows starts" is on;
     M5c coding tools, i1, j1, notices). New M10: account gate + same-account device discovery with one-click pairing.
+    Added to M5b (owner, 2026-11-18): Qanuvi cleans up after itself: qanuvi-browser-* profiles removed when the
+    browser/master ends and stale ones (dead pid) at start; old Qanuvi-*-updater-* folders removed after an update.
+    (The qc_src_* and qctest_* temp folders are the qCommerce test suite's, not Qanuvi's.)
     Next: build M5a. Starting map (measured 2026-11-18): the window already reaches This PC's running master through
     remote_connect target "self" (qanuvi-master --stdio = master::stdio_bridge into the service), so M5a = keep a
     "this-pc" link up from launch and make routed()/callOn() in src/lib/remote.ts send null (This PC) to it instead
