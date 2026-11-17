@@ -238,6 +238,8 @@ Owner decisions (2026-11-17):
 - M3c BUILT (266d2a5) + DRIVEN LIVE at depth 2 (3fb5878, findings n1-n5 fixed): window -> local test master -> VPS
   (calls, terminal, preview, lost and back). A master that goes away keeps its last known list, so its servers show
   off under it and a shown one comes back through it. Depth 3 and the loop guard wait for the owner's extra machine.
+- Owner, 2026-11-17: depth 3 and the loop guard are a later step (M3d in DEVELOPMENT-TASKLIST.md) for when they
+  arrange another machine; M3 counts as done for the migration, which goes on with M4.
 
 ### M4. This PC runs its own master
 

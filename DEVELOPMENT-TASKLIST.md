@@ -385,8 +385,8 @@ runs on or off; with it off nothing is sent anywhere.
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
     PICKUP POINT (fresh conversation starts here, 2026-11-17 20:15, after d57f56b): open items in order:
-    (1) M3c depth 3 + loop guard driven live when the owner provides another machine (unchanged, see below; the VPS
-    can now be a middle hop). (2) m2a seen live on a master's Account page (fix in, only checked by svelte-check).
+    (1) M3c depth 3 + loop guard moved to later step M3d (owner, 2026-11-17: when they arrange another machine); the
+    migration goes on with M4. (2) m2a seen live on a master's Account page (fix in, only checked by svelte-check).
     State: test build of d57f56b in target/release; test window and local test master stopped. VPS basevm378 runs
     the server build of d57f56b (cross-built 19:50, 9.9 MB, zigbuild -j 2), swapped into ~/.local/bin, the Nov 16
     build kept as qanuvi-master.prev; serve started again with setsid (no service manager there). Drive scripts
@@ -2732,6 +2732,12 @@ runs on or off; with it off nothing is sent anywhere.
   the plan's FINISH.md log and the inbox. Also folded in: the planner and the rewrite of a failed step number new
   steps after the plan's archive too; the chat footer says "switching after the edit in hand" while a picked model
   waits. Code: plan/finishing.ts (+ tests), runner finishPass. Not driven live yet: try it on the scratch plan.
+- [ ] **M3d. Nested masters at depth 3 and the loop guard, driven live (owner, 2026-11-17, later: when the owner
+  arranges another machine)**: M3c is built and driven at depth 2 (window -> local test master -> VPS). Drive: window ->
+  local test master -> VPS -> the new machine (calls, terminal, preview through three hops); a path back to a machine
+  already passed is refused with a plain message (loop); a fourth level is refused (depth). Also not driven yet: a
+  master disconnected on purpose while one under it is shown; unpair (removed) live; a language server on a nested
+  machine (unit-tested). The VPS already runs a server build that forwards (d57f56b).
 - [ ] **24k. Master OmniRoute (owner, 2026-11-12, later)**: OmniRoute is said to reach about 300 models with about 1.6
   billion free tokens a month. Learn its providers, limits and sign-ins; automate as much of the setup as possible
   (connections, keys, combos, health); keep what is learnt in Qanuvi's brain (the signed remote knowledge, 24c) so
