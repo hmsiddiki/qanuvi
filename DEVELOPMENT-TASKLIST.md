@@ -379,7 +379,23 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, CHECKPOINT 2026-11-17 06:45, fresh conversation): M1 IS DONE (M1a pipes, M1b language
+    RESUME HERE (newest, 2026-11-17 07:00): r1 DONE (edb21c1, owner yes): a failed reload of a machine's debugger
+    statuses keeps the old list and says "Could not check <machine> again: <error>" with Check again (Settings >
+    Languages). M2 CORE BUILT (76a137e, owner agreed the plan as proposed; NOT driven live): account.rs in both builds;
+    each machine keeps its own sign-in (This PC: credential store `account:<site>` as before, an old bare refresh
+    token still reads; a desktop-build master: `master-account:<machine id>:<site>`; a server build:
+    `account-sign-in.json` in its data folder, 0600, in backups' SKIP). Browser sign-in split: `account_begin` +
+    `account_finish` on the shown machine (verifier stays there), `account_wait` + `account_cancel` in the window
+    (INTERFACE; browser + 127.0.0.1:47213 here). `qanuvi-master login [--site] [--password-stdin]` (application
+    password as HTTP Basic, checked at users/me first, no echo) and `logout`. Account page + status bar show the
+    shown machine's account (`via` browser/password). settings.account.signedIn is no longer read (left in the
+    settings shape). Tests: 9 account (file store, stand-in site: begin/finish, wrong state, finish once, refresh,
+    revoke, app password, 0600), parity test with account_* off GAPS, window account.svelte.test.ts; 453 TS tests.
+    NEXT: drive M2 live against a local Qlopy site (owner builds it: REST + JWT + OAuth on, app `qanuvi-desktop`
+    with redirect http://127.0.0.1:47213/callback, application passwords on, a test user with one): This PC
+    browser sign-in, the local test master browser sign-in, `qanuvi-master login` on the local test master; test
+    builds get QANUVI_ACCOUNT_SITE (window and master). Then M3.
+    RESUME HERE (before, CHECKPOINT 2026-11-17 06:45, fresh conversation): M1 IS DONE (M1a pipes, M1b language
     servers, M1c preview, M1d debuggers, all driven live on the local test master and the VPS). Open, in order:
     (1) r1, owner to decide (proposal in the entry below: a failed debugger-status reload says so with Check again,
     instead of silently keeping the old list); (2) M2, the account on the master (docs/MIGRATION-VIEWER.md "M2"):
