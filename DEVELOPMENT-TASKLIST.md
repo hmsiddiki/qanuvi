@@ -384,6 +384,35 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 06:00): M5a BUILT (b633c95 cut-over, 4f9f15f notices
+    + r1 fix), NOT YET DRIVEN LIVE with the r1 fix. Next: drive M5a live on a scratch project (every page, terminal,
+    Inbox, Settings; last window closed with work running says what keeps going; with no window, the master's own
+    notification; tray Quit asks first; "Stopped when Qanuvi was quit" on the run after relaunch), then M5b.
+    State: a release test build of 4f9f15f was building into target/release (rebuild if it is not there); all test
+    build processes were stopped first. Scratch project for the drive: m5a-proj (git, docs/note1..40.md) in the
+    scratchpad of session dac38bdc, already in This PC's test project list (d05f80a7). Drive helpers there: ui.ps1,
+    procs.ps1, mcall.js, hop.js, tdb.js (fake-work <projectId> adds a waiting session so the master reports work;
+    fake-run adds a running run record; clear-work removes both).
+    M5a BUILT (2026-11-18; verify: clippy clean, Rust 468, web 479, svelte-check 0): the window is a viewer.
+    remote.ts sends every This PC call to its master over the "this-computer" link (callThisPc; desktop.rs makes it
+    on the first call under a lock, again after it ended); WINDOW_ONLY = master.rs INTERFACE (a test checks both
+    ways). desktop.rs lost the second core (167 commands, desktop_runs.rs; 43 + notify_notice left), opens no
+    database; lsp/dap find a This PC project's folder through the master. The master answers core_decide,
+    knowledge_fetch, attachment_page, attachment_image, inbox_import, plan_data_import, and plan_data_watch (every
+    window hears plan data changes, a run's too). Runner follows This PC runs on plan_run_watch; the app still
+    follows This PC's Inbox and raises its notifications. Parity test: GAPS gone, the app answers only INTERFACE +
+    links. Part 2: This PC's master marks its own leftover sessions/runs (the M4a "leave the app's runs" rule ended);
+    update/Quit/restart write why (master-stopped-why), the next start puts it in the run's message; Restart,
+    Restart to update and tray Quit (MessageBox) ask with "N agent sessions and N plan runs"; no quiet install on
+    close while work runs; last window closing with work: notice "... keep going on this computer. Quit Qanuvi from
+    the tray icon to stop them."; no window following: master_notify.rs shows the item itself (click opens Qanuvi
+    at it). Hop measured (direct TCP vs the stdio bridge, 20 calls each): +0.1 to +2.5 ms per call (hello 0.76 vs
+    0.97, files_search 24.6 vs 26.1, git_status 123.6 both), so no direct link is needed.
+    r1 (found driving the first build, fixed in 4f9f15f): the M3c loop guard refused the "this-computer" link (same
+    machine id as the app): "That path comes back to a machine it has already passed". Only that link now starts
+    the path at This PC; any other link back to this machine is still a loop.
+    Left for later: This PC's server connections at start (master skips them on app data, M5c); a crash or power
+    cut leaves no stop reason yet (M5b); tray Quit confirm is Windows-only (others with M5b's watcher).
     PICKUP POINT (fresh conversation starts here, 2026-11-18 05:30): M5 AGREED (docs/MIGRATION-VIEWER.md M5:
     M5a cut-over with the second core deleted in the same pass, no old-core adapting; M5b watcher + crash limit of 3
     then the brain investigates, runs resume after a Windows restart when "Start Qanuvi when Windows starts" is on;

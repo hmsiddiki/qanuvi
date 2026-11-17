@@ -321,6 +321,9 @@ Owner decisions (2026-11-18):
     shown as "Draft, not saved to disk"); j1 (a terminal whose shell ended says so); "earlier output trimmed" after a
     reconnect; a restarting language server shows "checking…" instead of an empty list of problems.
 
+- M5a BUILT (2026-11-18: b633c95 cut-over with the second core deleted, 4f9f15f notices + r1 loop-guard fix); live
+  drive pending. Hop measured: the stdio bridge adds 0.1 to 2.5 ms per call, so no direct TCP link is needed.
+
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 
 - From `desktop.rs`, remove the core wrappers, plus `desktop_runs.rs`, the Inbox copy, the loops and the shutdown
