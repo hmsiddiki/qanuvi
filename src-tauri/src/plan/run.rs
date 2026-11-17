@@ -376,6 +376,9 @@ struct Loop<'a> {
     last_totals: Totals,
     resume_text: String,
     resume_is_handover: bool,
+    /// Each reviewed step's snapshot from its first try: a review sees the whole step's work, also what a session
+    /// before a handover, a model switch, a pause or a failed try did (not only the last session's).
+    step_snaps: HashMap<String, Snap>,
     keep_for_resume: bool,
     free_until: Option<i64>,
     asked_changes_from: bool,
@@ -509,6 +512,7 @@ impl<'a> Loop<'a> {
             last_totals: Totals::default(),
             resume_text: String::new(),
             resume_is_handover: false,
+            step_snaps: HashMap::new(),
             keep_for_resume: false,
             free_until: None,
             asked_changes_from: false,
@@ -1121,13 +1125,19 @@ impl<'a> Loop<'a> {
                     .cloned()
             })
             .unwrap_or_default();
-        let prompt = decider::review_prompt_in(
+        let step_log = self
+            .env
+            .read(&g::log_path(&file, step.number.as_deref(), &step.title))
+            .map(|f| f.text)
+            .unwrap_or_default();
+        let prompt = decider::review_prompt_with_log(
             &step.title,
             &step.details,
             &changed.parts.join("\n"),
             tests,
             &home,
             &done_line,
+            &step_log,
         );
         let name = self.run.steps[i]
             .number
@@ -1811,8 +1821,10 @@ impl<'a> Loop<'a> {
                     "An earlier try"
                 };
                 prompt.push_str(&format!(
-                    "\n\n{who} already worked on this step, but the review turned it down: {}\nCheck its changes and \
-                     finish the step properly.",
+                    "\n\n{who} already worked on this step, but the review turned it down: {}\nIts work is kept: do \
+                     not redo what is already done and recorded (the step's Progress note and Done line say what was \
+                     checked). Do only what the review names as missing or wrong, record it in the step's log, then \
+                     finish the step.",
                     &rejected.note["Review: ".len()..]
                 ));
             }
@@ -1824,7 +1836,16 @@ impl<'a> Loop<'a> {
             }
             let reviewed = is_free(&model) || extra.is_some();
             let before = if reviewed {
-                self.snapshot().map(|s| s.0)
+                match self.step_snaps.get(&key(&st)) {
+                    Some(s) => Some(s.clone()),
+                    None => {
+                        let s = self.snapshot().map(|s| s.0);
+                        if let Some(s) = &s {
+                            self.step_snaps.insert(key(&st), s.clone());
+                        }
+                        s
+                    }
+                }
             } else {
                 None
             };
@@ -1832,21 +1853,34 @@ impl<'a> Loop<'a> {
                 let ctx = self.context(&fresh);
                 prompt = packet_prompt(&prompt, &ctx, &test_command);
             }
-            // Same model, same section, still small: the step continues the last step's session.
+            // Same model, same section, still small: the step continues the last step's session. A reviewed step
+            // (extra checks, a free model) starts fresh when the session is already past half the handover limit, so
+            // it does not hand over half-way through its checks.
             let section = fresh.section.clone();
+            let handover_at = self
+                .s
+                .options
+                .handover_limit
+                .map_or(g::HANDOVER_DEFAULT, |h| h as u64);
+            let too_big_for_checks = reviewed
+                && self
+                    .carry
+                    .as_ref()
+                    .is_some_and(|c| c.1.tokens >= handover_at / 2);
             let carry_on = (!resumed_with.is_empty() && !handed_over && self.carry.is_some())
-                || g::can_carry(
-                    self.carry.as_ref().map(|c| &c.1),
-                    &model,
-                    if self.s.options.carry_across_sections == Some(false) {
-                        &section
-                    } else {
-                        self.carry
-                            .as_ref()
-                            .map_or(section.as_str(), |c| c.1.section.as_str())
-                    },
-                    self.s.options.carry_limit.unwrap_or(150_000.0) as u64,
-                );
+                || !too_big_for_checks
+                    && g::can_carry(
+                        self.carry.as_ref().map(|c| &c.1),
+                        &model,
+                        if self.s.options.carry_across_sections == Some(false) {
+                            &section
+                        } else {
+                            self.carry
+                                .as_ref()
+                                .map_or(section.as_str(), |c| c.1.section.as_str())
+                        },
+                        self.s.options.carry_limit.unwrap_or(150_000.0) as u64,
+                    );
             if !carry_on {
                 self.drop_carry();
             }

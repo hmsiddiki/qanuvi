@@ -404,6 +404,54 @@ pub fn review_prompt_in(
     out.join("\n")
 }
 
+/// `review_prompt_in` with the step's own log: work that leaves no file change (live checks, test runs) is recorded
+/// there, also by a session before a handover. Without a log it is `review_prompt_in` exactly.
+#[allow(clippy::too_many_arguments)]
+pub fn review_prompt_with_log(
+    title: &str,
+    details: &[String],
+    diff: &str,
+    tests: &str,
+    home: &str,
+    done: &str,
+    log: &str,
+) -> String {
+    let base = review_prompt_in(title, details, diff, tests, home, done);
+    let log = log.trim();
+    if log.is_empty() {
+        return base;
+    }
+    // The newest part of the log matters most (the Progress note and what came after it).
+    let n = js::len(log);
+    let shown = if n > 6_000 {
+        format!(
+            "(start cut)\n{}",
+            log.chars().skip(n - 6_000).collect::<String>()
+        )
+    } else {
+        log.to_string()
+    };
+    let mut out = base.replacen(
+        "Tests: none were run.",
+        "Tests: Qanuvi ran none itself; the agents' own test runs and checks are recorded in the step's log below.",
+        1,
+    );
+    let done = js::cut(done, 1500);
+    if !done.is_empty()
+        && !out.contains(&format!(
+            "Done line, to check against the files themselves: {done}"
+        ))
+    {
+        out.push_str(&format!("\n\nThe step's Done line: {done}"));
+    }
+    out.push_str(&format!(
+        "\n\nThe step's log (its sessions' Progress notes, also from before a handover; the diff above covers every \
+         session of this step):\n{shown}\n\nChecks recorded in the log as done and passed count as done (live checks \
+         and test runs leave no file change); reject only for what is missing or wrong, and name exactly that."
+    ));
+    out
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Review {
     pub ok: bool,

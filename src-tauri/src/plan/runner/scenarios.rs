@@ -1364,3 +1364,61 @@ fn a_rule_said_in_step_1_reaches_step_3_on_another_model_and_a_one_off_note_stay
         "{kept:?}"
     );
 }
+
+/// Step 10 of EMAIL-ROUTER-PLAN (2026-11-17): the session before a handover did the live check and changed files; the
+/// next one only wrote the Done line. The review must see the whole step's diff and its log, not only the last
+/// session's work, so the step is not sent back to redo everything.
+#[test]
+fn a_review_after_a_handover_sees_the_whole_steps_work_and_its_log() {
+    let env = world("# Plan\n\n- [ ] **10. Live check**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let log = crate::plan::guidance::log_path(FILE, Some("10"), "Live check");
+    let log2 = log.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if c.model == "claude-opus-5-5" {
+            c.env.put("tinycode.md", "## Email router\nnotes\n");
+            c.env.put(
+                &log2,
+                "Progress: live check done, 7 mails arrived once; full suite passed 133/0.\n",
+            );
+            sh.controls.switch_model("claude-sonnet-5-5");
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, "10", 'x');
+        AgentReply::default()
+    });
+    let r = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            extra_checks: extra("10", "changes local site state"),
+            ..options()
+        },
+        stop,
+    )
+    .wait();
+    assert_eq!(r.status, RunStatus::Done);
+    let asked = env
+        .requests()
+        .into_iter()
+        .find(|q| {
+            q.title
+                .as_deref()
+                .is_some_and(|t| t.starts_with("Decider: review"))
+        })
+        .expect("the decider was asked to review");
+    assert!(
+        asked.prompt.contains("+## Email router"),
+        "the first session's change is in the diff"
+    );
+    assert!(
+        asked.prompt.contains("full suite passed 133/0"),
+        "the log is read"
+    );
+    assert!(!asked.prompt.contains("Tests: none were run."));
+    assert_eq!(step(&r, "10").attempts.len(), 2, "no fix round");
+}
