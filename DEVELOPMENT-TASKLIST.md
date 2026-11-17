@@ -384,7 +384,7 @@ runs on or off; with it off nothing is sent anywhere.
     machine owns its server list") with the owner before any code; (3) the VPS still runs the 2026-11-16 server build
     (no M2): swap in a new server build before M3 is driven there. Test build: npx tauri build --no-bundle with
     CARGO_BUILD_JOBS=2 (about 6 min; check free RAM first), start it with QANUVI_ACCOUNT_SITE and QANUVI_ACCOUNT_CLIENT
-    set (values above) so the window and the local test master use the local Qlopy site; drive with ui.ps1 (UIA,
+    set (values in the entry below) so the window and the local test master use the local Qlopy site; drive with ui.ps1 (UIA,
     screenshots), the owner clicks Allow in the browser. Scripts (ui.ps1, go.ps1, room.ps1) in the scratchpad of
     session 21bcfc6b. No release is waiting.
     RESUME HERE (newest, 2026-11-17 13:15): M2 DONE. Window parts DRIVEN LIVE in a test build of main (QANUVI_ACCOUNT_SITE
