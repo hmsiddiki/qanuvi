@@ -384,7 +384,21 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-17 20:15, after d57f56b): open items in order:
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 02:40): M4 agreed (docs/MIGRATION-VIEWER.md M4: M4a-M4c,
+    master keeps running with a tray icon after the last window closes, "Start Qanuvi in the background when I sign
+    in" off by default, the hop measured in M5). M3c depth 3 + loop guard is later step M3d. Next: M4b (background
+    jobs move to the master; reduced mark_app_data mode ends), then M4c (tray icon, Quit, start at sign-in, stop
+    before update). State: test build of M4a in target/release; test window, This PC's test master and local test
+    master all stopped.
+    M4a BUILT + DRIVEN LIVE (2026-11-18; verify: clippy clean, Rust 461): the app starts `qanuvi-master serve --data
+    <app data>` at launch (master.rs start_this_pc, the exe beside the app) or reuses a running one. A master on
+    the app's data skips mark_interrupted and the booked restore (they were cutting the app's live runs off when
+    remote access started a master; test m4a_this_pcs_master_starting_leaves_the_apps_running_runs_alone). Until
+    M4c: the last window closing stops it unless remote access is on; app_restart stops it first (move/restore).
+    Driven: no master before -> one on the app data after launch (window normal on the same DB); a running run
+    survived a master restart; last window closed -> master gone (remote access off); remote access on -> it stays;
+    a second launch reused the running master (one serve). Not driven: app_restart after a data move or restore.
+    PICKUP POINT (before, 2026-11-17 20:15, after d57f56b): open items in order:
     (1) M3c depth 3 + loop guard moved to later step M3d (owner, 2026-11-17: when they arrange another machine); the
     migration goes on with M4. (2) m2a seen live on a master's Account page (fix in, only checked by svelte-check).
     State: test build of d57f56b in target/release; test window and local test master stopped. VPS basevm378 runs
