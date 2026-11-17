@@ -279,7 +279,42 @@ Owner decisions (2026-11-18):
 - This PC's coding tools use the same pipes as every other machine.
 - Window state (shown machine, layout, tabs, panel, machine windows) stays in the window.
 
-### M6. Delete the second core
+Owner decisions (2026-11-18):
+- No adapting to the old core: the owner is the only user, so there is no mixed state to support. M6 folds into
+  M5a (the second core is deleted in the same pass), and the "two processes on one DB" rule ends with it.
+- Built in three parts, each driven live on This PC (every page) before the next:
+  - M5a, the cut-over: all of This PC's calls and streams (plain calls, terminals, agent sessions, plan runs, the
+    Inbox) go to its master over one link, as for any paired master. The second core goes (M6 below). The hop is
+    measured on whole actions as the user feels them (open a project, expand the tree, search, open a file, git
+    status), direct against through the master, and reported to the owner. Notices:
+    - The last window closing while work runs says what keeps going ("2 agents and 1 plan run keep going on this
+      computer. Quit Qanuvi from the tray icon to stop them."); with nothing running it closes quietly.
+    - With no window following it, the master raises the OS notifications itself (a blocked step's question or a
+      budget stop never waits unseen).
+    - Quit and installing an update say first what they will stop; afterwards the run says why it stopped
+      ("stopped by update"), with Resume.
+  - M5b, stops and restarts:
+    - `qanuvi-master` becomes a small watcher (tray icon, restarts) plus the core that does the work. A crashed core
+      is restarted with a short wait, and the watcher keeps why (exit code, last log lines, what it was doing).
+    - Crash limit by count, not by time: on the 3rd crash the watcher stops restarting and the brain investigates.
+      It reads the crash notes with a cheap local model first and checks known causes (port taken, locked database,
+      a start-up item that crashes it, out of memory). Safe fixes run on their own (free the port, clear a stale
+      lock, start once without the crashing item) and the owner is told what was done. Anything touching data,
+      settings or Qanuvi's code, or anything unexplained, goes to the owner as a notification with the report; no
+      change until a yes. The count resets after a clean Quit or a long clean run.
+    - A run never stops silently: "stopped when the computer shut down" / "stopped when Qanuvi's background part
+      crashed", with Resume.
+    - With "Start Qanuvi when Windows starts" on, cut-off runs resume on their own after the restart (and say so).
+      With it off, the next launch shows the stop with Resume and offers the setting, each time it would have
+      helped, with "Don't ask again".
+    - The setting is renamed from "...when I sign in" to "Start Qanuvi when Windows starts", so it is never read as
+      the Qanuvi account.
+  - M5c, the rest: This PC's coding tools (language servers, debuggers, inspector) through the same pipes as every
+    machine; a booked restore and This PC's server connections on its master; i1 (unsaved text kept as drafts,
+    shown as "Draft, not saved to disk"); j1 (a terminal whose shell ended says so); "earlier output trimmed" after a
+    reconnect; a restarting language server shows "checking…" instead of an empty list of problems.
+
+### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 
 - From `desktop.rs`, remove the core wrappers, plus `desktop_runs.rs`, the Inbox copy, the loops and the shutdown
   copies.
@@ -330,6 +365,19 @@ The rule: the master does everything the app does today, updates included.
 - Old installs: the server list import and existing data.
 - Publish only with the owner's yes.
 
+### M10. Account gate and device discovery (owner, 2026-11-18; after the system is built)
+
+- Signed out of the Qanuvi account, Qanuvi is a plain code editor: This PC's master runs only while a window is
+  open; no models, agents or plan runs, sync, memory, account settings, background work, tray staying, or "start
+  when Windows starts" offer.
+- Signed in, everything is unlocked. The gate sits in one place on the master, not spread over the screens.
+- No master (a VPS included) can be added to any app unless both sides are signed in to the same account.
+- Discovery: every device signed in to the same account shows in the app's machine list as "not added yet". One
+  click adds it: the two masters set up the pairing themselves (make and swap the keys, reusing today's pairing keys
+  and relay; nothing typed), and it joins This PC's list.
+- Safety: only the account's own devices are shown or can be added; the added machine says "added by <machine>"
+  with Remove; signing a device out takes it off every list.
+
 ## Nothing in Qanuvi's plan changes (owner, 2026-11-17)
 
 Everything built and planned for Qanuvi stays as it is. Only the layer design changes: the screen becomes a
@@ -355,7 +403,7 @@ Every open item of the old plan is kept and lands here:
 
 - **This PC's master after the screen closes:** it keeps running with its tray icon visible, until the user quits
   from the icon (this is R4 in the new design).
-- **Releases:** M1 alone, then M2+M3, then M4-M6 together, then M7-M9. Each only with the owner's yes.
+- **Releases:** M1 alone, then M2+M3, then M4-M6 together, then M7-M9, then M10. Each only with the owner's yes.
 
 ## Risks
 

@@ -384,7 +384,12 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 04:30): M4c BUILT + DRIVEN LIVE, so M4 is DONE. Next: M5
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 05:30): M5 AGREED (docs/MIGRATION-VIEWER.md M5:
+    M5a cut-over with the second core deleted in the same pass, no old-core adapting; M5b watcher + crash limit of 3
+    then the brain investigates, runs resume after a Windows restart when "Start Qanuvi when Windows starts" is on;
+    M5c coding tools, i1, j1, notices). New M10: account gate + same-account device discovery with one-click pairing.
+    Next: build M5a.
+    PICKUP POINT (before, 2026-11-18 04:30): M4c BUILT + DRIVEN LIVE, so M4 is DONE. Next: M5
     (the window becomes a viewer: This PC's calls go through its master; measure the hop). State: test build of M4c
     in target/release; test window, This PC's test master and local test master all stopped; no sign-in entry.
     M4c BUILT + DRIVEN LIVE (2026-11-18; verify: clippy clean desktop + server build, Rust 463, web 476): This PC's
