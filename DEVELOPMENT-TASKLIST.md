@@ -384,7 +384,13 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    M3a BUILT (2026-11-17, f2e193a; not yet driven live): This PC keeps its server list in its database (store v13:
+    M3a DRIVEN LIVE (2026-11-17, test build of f2e193a on the source data folder): store v12 -> v13; the window's
+    2 servers (local test master, basevm378) moved in once, same order and fields, flag set; both connected (2/2),
+    switcher shows them; a colour change on the Servers screen reached the servers table; after a restart the list
+    came from the database, the flag kept its first time (no second move); no error line on the Servers screen.
+    Next: M3b (remote_* on the master + pairing from a master; remote.rs split from the window's events, a writable
+    0600 key file for the server build's pairing keys).
+    M3a BUILT (2026-11-17, f2e193a): This PC keeps its server list in its database (store v13:
     servers + flags tables, servers.rs; servers_list/import/save/remove), the window's old list moved in once,
     window copy kept current (going back to 0.1.25 still finds the servers). M3 decisions in docs/MIGRATION-VIEWER.md
     (e7a5a59): depth 3, unpair at once, pairing from window and master terminal, VPS server build first (owner yes).
