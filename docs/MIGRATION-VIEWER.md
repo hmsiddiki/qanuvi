@@ -266,6 +266,10 @@ Owner decisions (2026-11-18):
   storage); the app runs none of them. The window's start-up commands go to the master (`this_pc_call`), and the
   app follows the master's Inbox (`follow_this_pc_inbox`) so its notices reach every window and notification.
   Until M5 the app keeps its running sessions and runs, a booked restore and This PC's server connections.
+- M4c BUILT + DRIVEN LIVE (2026-11-18), M4 DONE: This PC's master shows a tray icon while it runs ("Open Qanuvi",
+  "Quit Qanuvi"; a click opens), stays when the last window closes, and starts at sign-in when "Start Qanuvi in the
+  background when I sign in" is on (off by default; `qanuvi --background` starts the master with no window). The
+  window stops the master before an update installs. The tray lives in the `qanuvi-master` program only.
 
 ### M5. The window becomes a viewer
 

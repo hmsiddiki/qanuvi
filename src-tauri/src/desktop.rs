@@ -1461,13 +1461,21 @@ async fn backups_remove(path: String) -> Res<()> {
     .await
 }
 
-/// Remote access is on in This PC's settings (its master then stays when the last window closes, as before M4).
-fn remote_access_on(settings: &serde_json::Map<String, serde_json::Value>) -> bool {
-    settings
-        .get("remoteAccess")
-        .and_then(|v| v.get("enabled"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
+/// M4c: stops This PC's master before an update installs (Windows keeps its program file locked while it runs).
+#[tauri::command]
+fn this_pc_master_stop() -> Res<bool> {
+    Ok(crate::master::stop_service(&crate::paths::data_dir()))
+}
+
+/// M4c: whether signing in to this computer starts Qanuvi in the background.
+#[tauri::command]
+fn sign_in_start() -> Res<bool> {
+    crate::sign_in_start::is_on()
+}
+
+#[tauri::command]
+fn sign_in_start_set(on: bool) -> Res<bool> {
+    crate::sign_in_start::set(on)
 }
 
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
@@ -2134,6 +2142,15 @@ pub fn run() {
     ) {
         eprintln!("{note}");
     }
+    // M4c: started at sign-in ("Start Qanuvi in the background when I sign in"): This PC's master starts on the
+    // app's data with its tray icon, and the app ends without a window.
+    if std::env::args().any(|a| a == crate::sign_in_start::FLAG) {
+        crate::master::mark_app_data(&data);
+        if let Err(e) = crate::master::start_this_pc(&data) {
+            eprintln!("This PC's master did not start: {e}");
+        }
+        return;
+    }
     // A test build sets it always: WebView2's own default is the installed copy's folder (named after the app id),
     // which a test build must never share.
     if (data != defaults.base || crate::data_location::from_source())
@@ -2224,6 +2241,38 @@ pub fn run() {
                     move |change| notify("qanuvi-inbox", change),
                 );
             });
+            // M4c: the tray of This PC's master reaches the windows: "Open Qanuvi" shows one, "Quit Qanuvi" closes them
+            // all (each as when closed by hand), and the master then ends.
+            let app_dir = dir.clone();
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                crate::master::follow_this_pc_app(
+                    &app_dir,
+                    || true,
+                    move |ask| {
+                        let windows = handle.webview_windows();
+                        match ask["do"].as_str() {
+                            Some("show") => {
+                                if let Some(w) =
+                                    windows.get("main").or_else(|| windows.values().next())
+                                {
+                                    let _ = w.unminimize();
+                                    let _ = w.show();
+                                    let _ = w.set_focus();
+                                }
+                            }
+                            Some("quit") => {
+                                for w in windows.values() {
+                                    let _ = w.close();
+                                }
+                            }
+                            _ => {}
+                        }
+                    },
+                );
+            });
+            // An entry that starts Qanuvi at sign-in follows the app when it moved.
+            std::thread::spawn(crate::sign_in_start::refresh);
             // Agent processes of sessions idle for 10 minutes are closed (memory); a new message opens them again.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -2271,16 +2320,14 @@ pub fn run() {
                 state.agents.stop_all();
                 state.inspector.close();
                 state.remotes.disconnect_all();
-                // Until M4c gives This PC's master its tray icon it would be a hidden process: it ends with the last
-                // window unless remote access needs it (as before M4), and its start-up list with it (only what it
-                // started; a proxy it found already running stays). With remote access on, its jobs go on (M4b).
-                let settings = crate::settings::get_all(&state.db).unwrap_or_default();
-                if !remote_access_on(&settings) {
-                    crate::master::stop_service(&crate::paths::data_dir());
-                }
+                // M4c: This PC's master stays with its tray icon, and its background jobs go on (start-up list,
+                // watches, sync, backups, remote access). Its tray's "Quit Qanuvi" stops it.
             }
         })
         .invoke_handler(tauri::generate_handler![
+            this_pc_master_stop,
+            sign_in_start,
+            sign_in_start_set,
             notify_settings,
             notify_take_start,
             notify_test,

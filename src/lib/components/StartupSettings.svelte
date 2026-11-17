@@ -1,6 +1,8 @@
 <script lang="ts">
   /** Settings, Start-up: commands Qanuvi starts with itself (Headroom, for example), their state and output. */
   import { routed as invoke, shownMachine, shownPlace } from "$lib/remote";
+  import { invoke as ownInvoke } from "@tauri-apps/api/core";
+  import { errorText } from "$lib/api";
   import { settings, type StartupItem } from "$lib/stores/settings.svelte";
   import { startup } from "$lib/stores/startup.svelte";
 
@@ -15,6 +17,24 @@
   /** The machine this page shows (null: This PC), and its name for sentences. */
   let machine = $state<string | null>(null);
   let place = $state("this computer");
+  /** M4c: signing in to this computer starts Qanuvi in the background (This PC only; off until turned on). */
+  let atSignIn = $state<boolean | null>(null);
+  let atSignInError = $state("");
+
+  $effect(() => {
+    ownInvoke<boolean>("sign_in_start")
+      .then((on) => (atSignIn = on))
+      .catch((e) => (atSignInError = errorText(e)));
+  });
+
+  async function setAtSignIn(on: boolean) {
+    atSignInError = "";
+    try {
+      atSignIn = await ownInvoke<boolean>("sign_in_start_set", { on });
+    } catch (e) {
+      atSignInError = errorText(e);
+    }
+  }
 
   // Asked again when another machine is shown: its Headroom, its Claude Code settings (24z3 D4).
   $effect(() => {
@@ -102,8 +122,24 @@
   <p class="intro">
     Commands Qanuvi starts with itself, hidden, for example a Headroom proxy that makes Claude Code use fewer tokens.
     When one has an address to wait for, agents wait until it answers; when it already answers (you started it), Qanuvi
-    leaves it alone. Qanuvi stops only what it started, when it closes.
+    leaves it alone. They keep running after the last window closes, while Qanuvi's icon shows in the tray; Qanuvi stops
+    only what it started, when you choose Quit Qanuvi there.
   </p>
+  <div class="card">
+    <label class="check"
+      ><input
+        type="checkbox"
+        checked={atSignIn === true}
+        disabled={atSignIn === null}
+        onchange={(e) => void setAtSignIn(e.currentTarget.checked)}
+      /> Start Qanuvi in the background when I sign in</label
+    >
+    <p class="muted small">
+      Qanuvi starts with no window, its icon in the tray: these commands, its daily backup and remote access run from
+      then on. Open Qanuvi there shows the window.
+    </p>
+    {#if atSignInError}<p class="note bad">{atSignInError}</p>{/if}
+  </div>
 {/if}
 
 {#if startup.problem}<p class="note bad">{startup.problem}</p>{/if}

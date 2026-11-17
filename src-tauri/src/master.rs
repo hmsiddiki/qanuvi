@@ -60,6 +60,8 @@ pub struct Master {
     /// why each away one is away.
     remotes: crate::remote::Remotes,
     remote_watchers: inbox_cmds::InboxWatchers,
+    /// The desktop app's links to This PC's master (migration M4c): the tray's Open and Quit reach the app on them.
+    app_links: inbox_cmds::InboxWatchers,
     remote_errors: Mutex<std::collections::HashMap<String, String>>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
@@ -164,6 +166,7 @@ impl Master {
             inbox_watchers: Arc::default(),
             remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
+            app_links: inbox_cmds::InboxWatchers::default(),
             remote_errors: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
@@ -215,6 +218,25 @@ impl Master {
                 // It passes calls on along a path to its own servers (migration M3c).
                 "forwards": true,
             })),
+            // Migration M4c: the desktop app follows This PC's master, so the tray's Open and Quit reach its windows.
+            "app_follow" => {
+                if let Some(name) = opt(args, "onEvent").filter(|n| !n.is_empty()) {
+                    self.app_links.add(stream(&name));
+                }
+                Ok(json!({"tray": self.app_data}))
+            }
+            // "Start Qanuvi in the background when I sign in" (M4c): only This PC's master starts at sign-in.
+            "sign_in_start" => to(if self.app_data {
+                crate::sign_in_start::is_on()
+            } else {
+                Ok(false)
+            }),
+            "sign_in_start_set" => {
+                if !self.app_data {
+                    return Err("Only This PC's Qanuvi starts when you sign in.".into());
+                }
+                to(crate::sign_in_start::set(b(args, "on")))
+            }
             // Remote access through a relay (Milestone 20), managed from this computer's own window.
             "relay_status" => to(Ok(self.relay.status())),
             "relay_activity" => to(Ok(self.relay.activity())),
@@ -1042,12 +1064,29 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
     for t in running {
         let _ = t.join();
     }
+    // The other side is gone: what this connection followed (the app's link, an Inbox, a run) hears so at once. A
+    // socket whose peer closed can still take a first write on Windows, so a follower would seem to listen (M4c: the
+    // tray's Open then started no app).
+    *out.lock().unwrap_or_else(|e| e.into_inner()) = Box::new(Gone);
     for id in terminals.lock().unwrap_or_else(|e| e.into_inner()).iter() {
         if crate::pipes::is_pipe(id) {
             master.pipes.stop(id);
         } else {
             master.terminals.kill(id);
         }
+    }
+}
+
+/// The writer of a connection that ended: every write fails.
+struct Gone;
+
+impl Write for Gone {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::ErrorKind::BrokenPipe.into())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::ErrorKind::BrokenPipe.into())
     }
 }
 
@@ -1158,6 +1197,54 @@ impl Master {
         });
     }
 
+    /// Ends this master: its agent sessions, terminals, start-up commands and server connections end with it.
+    pub fn end(&self) -> ! {
+        self.agents.stop_all();
+        self.terminals.kill_all();
+        self.startup.stop_all();
+        self.remotes.disconnect_all();
+        let _ = std::fs::remove_file(service_file(&self.dir));
+        std::process::exit(0);
+    }
+
+    /// M4c, the tray's "Open Qanuvi": a running app shows its window; with none, the app beside this master starts.
+    pub fn open_app(&self) {
+        if self.app_links.reach(&json!({"do": "show"})) > 0 {
+            return;
+        }
+        match crate::sign_in_start::app_exe() {
+            Ok(exe) => {
+                let started = std::process::Command::new(exe)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn();
+                if let Err(e) = started {
+                    eprintln!("Qanuvi could not start: {e}");
+                }
+            }
+            Err(e) => eprintln!("{e}"),
+        }
+    }
+
+    /// M4c, the tray's "Quit Qanuvi": the app's windows close first, as when closed by hand, then this master ends.
+    /// A window still open after 20 seconds (its closing was cancelled) keeps everything running.
+    pub fn quit_all(&self) {
+        if self.app_links.reach(&json!({"do": "quit"})) > 0 {
+            let deadline = Instant::now() + Duration::from_secs(20);
+            loop {
+                std::thread::sleep(Duration::from_millis(300));
+                if self.app_links.reach(&json!({"do": "wait"})) == 0 {
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    return;
+                }
+            }
+        }
+        self.end()
+    }
+
     /// Looks at this master's OmniRoute once; its Inbox changes go to the connections that follow the Inbox.
     fn omniroute_look(&self) -> Option<Vec<crate::omniroute::Connection>> {
         let watchers = self.inbox_watchers.clone();
@@ -1230,8 +1317,12 @@ fn on_app_data(dir: &Path) -> bool {
     dir.join(APP_MARK).is_file()
 }
 
-/// Runs the background service until it is stopped.
-pub fn serve(dir: &Path) -> Result<(), String> {
+/// What shows This PC's master's tray icon and answers it until the master ends (migration M4c). Only the desktop
+/// build's `qanuvi-master` program has one (it links the tray; the library and its tests do not).
+pub type Tray = fn(Arc<Master>) -> !;
+
+/// Runs the background service until it is stopped. `tray`: shown when this master is This PC's.
+pub fn serve(dir: &Path, tray: Option<Tray>) -> Result<(), String> {
     let master = Master::open(dir)?.shared();
     master.start_own();
     // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour. On the app's
@@ -1267,6 +1358,19 @@ pub fn serve(dir: &Path) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &file).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(restart_mark(dir));
+    // M4c: This PC's master shows its tray icon while it runs (never a hidden process); the icon needs the main
+    // thread, so the connections are taken on another one.
+    if let Some(tray) = tray.filter(|_| master.app_data) {
+        let m = master.clone();
+        std::thread::spawn(move || accept(listener, m, token));
+        tray(master);
+    }
+    accept(listener, master, token);
+    Ok(())
+}
+
+/// Takes the service's connections: each must open with its token.
+fn accept(listener: TcpListener, master: Arc<Master>, token: String) {
     for stream in listener.incoming().flatten() {
         let (master, token) = (master.clone(), token.clone());
         std::thread::spawn(move || {
@@ -1284,18 +1388,12 @@ pub fn serve(dir: &Path) -> Result<(), String> {
                 return;
             }
             if hello["stop"] == true {
-                // Agent sessions and terminals end with the service.
-                master.agents.stop_all();
-                master.terminals.kill_all();
-                master.startup.stop_all();
-                master.remotes.disconnect_all();
-                std::process::exit(0);
+                master.end();
             }
             let out: Out = Arc::new(Mutex::new(Box::new(write_half)));
             handle_connection(master, reader, out);
         });
     }
-    Ok(())
 }
 
 /// Connects to the running service (with its token), if there is one.
@@ -1493,12 +1591,23 @@ pub fn this_pc_call(dir: &Path, cmd: &str, args: Value) -> Result<Value, String>
 /// renew) and hands each change to `on`, in the payload of the app's "qanuvi-inbox" event. Kept up while `go` says
 /// so: when the master restarts or is not up yet it tries again every 3 seconds.
 pub fn follow_this_pc_inbox(dir: &Path, go: impl Fn() -> bool, on: impl Fn(Value)) {
+    follow_this_pc(dir, "inbox_watch", go, on)
+}
+
+/// M4c: the app's link to This PC's master; what the tray asks of the app's windows ({"do": "show"} or "quit")
+/// goes to `on`. Kept up as `follow_this_pc_inbox` is.
+pub fn follow_this_pc_app(dir: &Path, go: impl Fn() -> bool, on: impl Fn(Value)) {
+    follow_this_pc(dir, "app_follow", go, on)
+}
+
+/// Keeps one streaming command to This PC's master open while `go` says so, handing its events to `on`.
+fn follow_this_pc(dir: &Path, cmd: &str, go: impl Fn() -> bool, on: impl Fn(Value)) {
     while go() {
         if let Ok((mut s, reader)) = this_pc_link(dir)
             && writeln!(
                 s,
                 "{}",
-                json!({"id": 1, "cmd": "inbox_watch", "args": {"onEvent": "inbox"}})
+                json!({"id": 1, "cmd": cmd, "args": {"onEvent": "follow"}})
             )
             .is_ok()
         {
@@ -1506,7 +1615,7 @@ pub fn follow_this_pc_inbox(dir: &Path, go: impl Fn() -> bool, on: impl Fn(Value
                 let Ok(msg) = serde_json::from_str::<Value>(&line) else {
                     continue;
                 };
-                if msg["stream"] == "inbox" {
+                if msg["stream"] == "follow" {
                     on(msg["event"].clone());
                 }
                 if !go() {
@@ -2209,6 +2318,99 @@ mod tests {
         assert_eq!(got["change"], "add");
     }
 
+    static TRAY_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    fn test_tray(_: Arc<Master>) -> ! {
+        TRAY_SHOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+        loop {
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    }
+
+    #[test]
+    fn m4c_this_pcs_master_shows_its_tray_and_reaches_the_apps_windows() {
+        // A master on the app's data hands its thread to the tray and still answers on another one.
+        let data = tempfile::tempdir().unwrap();
+        mark_app_data(data.path());
+        let dir = data.path().to_path_buf();
+        std::thread::spawn(move || {
+            let _ = serve(&dir, Some(test_tray));
+        });
+        let hello = this_pc_call(data.path(), "hello", json!({})).unwrap();
+        assert_eq!(hello["name"], "Qanuvi master");
+        assert!(TRAY_SHOWN.load(std::sync::atomic::Ordering::SeqCst));
+        // The app's link hears the tray's "Open Qanuvi" (a running app shows its window, no second app starts).
+        let m = Master::open(data.path()).unwrap().shared();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let other = tempfile::tempdir().unwrap();
+        mark_app_data(other.path());
+        std::fs::write(
+            service_file(other.path()),
+            json!({"port": port, "token": "t1", "pid": std::process::id()}).to_string(),
+        )
+        .unwrap();
+        let server = m.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let master = server.clone();
+                std::thread::spawn(move || {
+                    let write_half = stream.try_clone().unwrap();
+                    let mut reader = BufReader::new(stream);
+                    let mut first = String::new();
+                    reader.read_line(&mut first).unwrap();
+                    handle_connection(master, reader, Arc::new(Mutex::new(Box::new(write_half))));
+                });
+            }
+        });
+        let (tx, rx) = std::sync::mpsc::channel();
+        let link_dir = other.path().to_path_buf();
+        std::thread::spawn(move || {
+            follow_this_pc_app(
+                &link_dir,
+                || true,
+                move |v| {
+                    let _ = tx.send(v);
+                },
+            );
+        });
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while m.app_links.reach(&json!({"do": "wait"})) == 0 {
+            assert!(Instant::now() < deadline, "the app's link did not come");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        m.open_app();
+        let mut asked = Vec::new();
+        while let Ok(v) = rx.recv_timeout(Duration::from_secs(5)) {
+            asked.push(v["do"].as_str().unwrap_or("").to_string());
+            if asked.contains(&"show".to_string()) {
+                break;
+            }
+        }
+        assert!(asked.contains(&"show".to_string()), "{asked:?}");
+        // A link whose connection ended counts no more (Open then starts the app), even before a write fails.
+        let ended = Master::open(other.path()).unwrap().shared();
+        let input = std::io::Cursor::new(
+            format!(
+                "{}\n",
+                json!({"id": 1, "cmd": "app_follow", "args": {"onEvent": "follow"}})
+            )
+            .into_bytes(),
+        );
+        handle_connection(
+            ended.clone(),
+            input,
+            Arc::new(Mutex::new(Box::new(std::io::sink()))),
+        );
+        assert_eq!(ended.app_links.reach(&json!({"do": "wait"})), 0);
+        // Another master never starts at sign-in.
+        let plain = tempfile::tempdir().unwrap();
+        let pm = Master::open(plain.path()).unwrap().shared();
+        assert_eq!(call(&pm, "sign_in_start", json!({})).unwrap(), json!(false));
+        assert!(call(&pm, "sign_in_start_set", json!({"on": true})).is_err());
+        assert_eq!(call(&pm, "app_follow", json!({})).unwrap()["tray"], false);
+    }
+
     #[test]
     fn m4a_this_pcs_master_starting_leaves_the_apps_running_runs_alone() {
         let status = |dir: &Path| -> String {
@@ -2378,7 +2580,7 @@ mod tests {
         let dir = data.path().to_path_buf();
         let d2 = dir.clone();
         std::thread::spawn(move || {
-            let _ = serve(&d2);
+            let _ = serve(&d2, None);
         });
         let deadline = Instant::now() + Duration::from_secs(10);
         while !is_running(&dir) {
@@ -2871,6 +3073,8 @@ mod tests {
         "inspector_page_text",
         "inspector_close",
         "browser_agent_shot",
+        // The app's own lifecycle (M4c): it stops This PC's master before an update installs.
+        "this_pc_master_stop",
     ];
 
     /// Commands only the app answers today that move to the master, with the phase that moves them.

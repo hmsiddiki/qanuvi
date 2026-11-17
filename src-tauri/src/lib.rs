@@ -48,6 +48,7 @@ pub mod runs;
 pub mod secrets;
 pub mod servers;
 pub mod settings;
+pub mod sign_in_start;
 pub mod sink;
 pub mod snapshots;
 pub mod startup;

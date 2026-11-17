@@ -24,6 +24,13 @@ impl InboxWatchers {
             .unwrap_or_else(|e| e.into_inner())
             .retain(|sink| sink.send(v.clone()).is_ok());
     }
+
+    /// Sends to every follower and says how many still listen.
+    pub fn reach(&self, v: &Value) -> usize {
+        let mut all = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        all.retain(|sink| sink.send(v.clone()).is_ok());
+        all.len()
+    }
 }
 
 impl Master {

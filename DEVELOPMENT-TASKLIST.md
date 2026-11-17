@@ -384,7 +384,32 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 03:00): M4b BUILT + DRIVEN LIVE. Next: M4c (tray icon
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 04:30): M4c BUILT + DRIVEN LIVE, so M4 is DONE. Next: M5
+    (the window becomes a viewer: This PC's calls go through its master; measure the hop). State: test build of M4c
+    in target/release; test window, This PC's test master and local test master all stopped; no sign-in entry.
+    M4c BUILT + DRIVEN LIVE (2026-11-18; verify: clippy clean desktop + server build, Rust 463, web 476): This PC's
+    master shows a tray icon while it runs (master_tray.rs, part of the qanuvi-master program only: tao + tray-icon
+    on its main thread, connections on another; the library and its tests never link the tray, whose comctl32 v6
+    calls need the app manifest). Menu "Open Qanuvi" (also a left click): a running app shows its window through its
+    link (app_follow, follow_this_pc_app), else the app beside the master starts; "Quit Qanuvi": the app's windows
+    close as by hand, then the master ends (end(); a window still open after 20 s keeps everything). The last
+    window closing no longer stops the master (remote access or not). Settings, Start-up (This PC only): "Start
+    Qanuvi in the background when I sign in", off by default (sign_in_start.rs: the user's Run key on Windows,
+    ~/.config/autostart on Linux, a LaunchAgent on macOS; the entry is the setting; a test build has its own entry;
+    written again at start when the app moved) runs `qanuvi --background`: the app starts This PC's master and
+    ends with no window. The window stops the master before an update installs (this_pc_master_stop, both install
+    paths). Also: a connection that ended gets a refusing writer, so its followers count as gone at once (a closed
+    socket can take a first write on Windows).
+    Driven: launch -> master + tray icon "Qanuvi (test build)" (Windows 11 puts it in the hidden-icons overflow);
+    window minimized + icon clicked -> window back in front, no second app; menu Open with the app running -> same;
+    last window closed -> app gone, master + icon stay and answer; Open with no app -> the app starts on the same
+    master; Quit -> window, master and icon gone (no ghost icon); setting on -> Run entry "Qanuvi (test build)" =
+    "...\target\release\qanuvi.exe" --background (installed entry untouched); that command run after Quit ->
+    launcher ends at once, master + icon up, no window; setting shown On again, turned off -> entry removed. Not
+    driven: an update installing (needs a published one), Linux/macOS sign-in entries, a cancelled close during Quit.
+    Drive tricks: the tray menu is owner-drawn (no UIA items): click rows by position in the #32768 window of the
+    master's pid; match the icon as a Button (its tooltip has the same name).
+    PICKUP POINT (before, 2026-11-18 03:00): M4b BUILT + DRIVEN LIVE. Next: M4c (tray icon
     whenever the master runs with "Open Qanuvi" and "Quit Qanuvi", the master staying after the last window closes,
     "Start Qanuvi in the background when I sign in" off by default, the app stopping the master before an update
     installs). State: test build of M4b in target/release; test window, This PC's test master and local test master

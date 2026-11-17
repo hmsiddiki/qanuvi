@@ -49,7 +49,10 @@ class UpdatesStore {
     // A downloaded update not restarted for installs quietly when Qanuvi closes; the next start is the new version.
     getCurrentWindow()
       .onCloseRequested(async () => {
-        if (this.state === "ready" && this.#update) await this.#update.install().catch(() => {});
+        if (this.state === "ready" && this.#update) {
+          await stopThisPcsMaster();
+          await this.#update.install().catch(() => {});
+        }
       })
       .catch(() => {});
   }
@@ -101,6 +104,7 @@ class UpdatesStore {
     if (!this.#update || this.state !== "ready") return;
     if (!(await this.#okToStop())) return;
     try {
+      await stopThisPcsMaster();
       await this.#update.install();
       await restartQanuvi();
     } catch (e) {
@@ -144,6 +148,11 @@ export const updates = new UpdatesStore();
  * single-instance lock (one installed Qanuvi at a time) is free when it starts. A plain relaunch would start it while
  * this one still runs, and it would hand over to this one and quit.
  */
+/** M4c: This PC's master runs from a file beside Qanuvi's, which Windows keeps locked while it runs; it stops first. */
+function stopThisPcsMaster(): Promise<unknown> {
+  return invoke("this_pc_master_stop").catch(() => {});
+}
+
 function restartQanuvi(): Promise<void> {
   return invoke("app_restart");
 }

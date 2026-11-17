@@ -14,6 +14,19 @@
 
 use std::path::PathBuf;
 
+#[cfg(feature = "desktop")]
+#[path = "../master_tray.rs"]
+mod master_tray;
+
+/// This PC's master shows a tray icon where there is a desktop to show it on (migration M4c).
+fn tray() -> Option<qanuvi_lib::master::Tray> {
+    #[cfg(feature = "desktop")]
+    if master_tray::can_show() {
+        return Some(master_tray::run);
+    }
+    None
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     // Qanuvi's own tools for agents (the same as the desktop app's).
@@ -65,7 +78,7 @@ fn main() {
                         std::time::Duration::from_secs(30),
                     );
                 }
-                qanuvi_lib::master::serve(&data)
+                qanuvi_lib::master::serve(&data, tray())
             }
             Some("stop") => {
                 let stopped = qanuvi_lib::master::stop_service(&data);
