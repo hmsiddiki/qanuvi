@@ -388,7 +388,15 @@ runs on or off; with it off nothing is sent anywhere.
     M5a cut-over with the second core deleted in the same pass, no old-core adapting; M5b watcher + crash limit of 3
     then the brain investigates, runs resume after a Windows restart when "Start Qanuvi when Windows starts" is on;
     M5c coding tools, i1, j1, notices). New M10: account gate + same-account device discovery with one-click pairing.
-    Next: build M5a.
+    Next: build M5a. Starting map (measured 2026-11-18): the window already reaches This PC's running master through
+    remote_connect target "self" (qanuvi-master --stdio = master::stdio_bridge into the service), so M5a = keep a
+    "this-pc" link up from launch and make routed()/callOn() in src/lib/remote.ts send null (This PC) to it instead
+    of the app's invoke; the ~44 direct invoke() calls in stores/components are mostly WINDOW_ONLY already (check
+    each); runner.svelte.ts + masters.svelte.ts #listen and desktop_runs.rs app.emit go over to the master streams;
+    then remove the core from desktop.rs (224 fns, handler list at generate_handler!) down to master.rs INTERFACE,
+    and GAPS (core_decide, knowledge_fetch, attachment_page, attachment_image) move to the master. The hop through
+    the stdio bridge is two hops (window -> bridge process -> TCP); measure it, and a direct TCP link is the fix if
+    it is slow. Free RAM was 4.7 of 15.3 GB: run the Rust builds alone.
     PICKUP POINT (before, 2026-11-18 04:30): M4c BUILT + DRIVEN LIVE, so M4 is DONE. Next: M5
     (the window becomes a viewer: This PC's calls go through its master; measure the hop). State: test build of M4c
     in target/release; test window, This PC's test master and local test master all stopped; no sign-in entry.
