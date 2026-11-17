@@ -384,6 +384,19 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    PICKUP POINT (fresh conversation starts here, 2026-11-17 17:30, after 540e646): open items in order:
+    (1) M3c: a call to a nested machine carries a path (["vps1", "vps2"]), each master forwards it with its streams
+    (master_servers.rs remote_call is the one-hop start), loop guard by lasting id, depth at most 3, unpair drops the
+    whole branch at once, nested dropdown in the switcher (docs/MIGRATION-VIEWER.md "M3"); plan the path format and
+    the dropdown with the owner before code. (2) Before M3c is driven on the VPS: swap in a new server build there
+    (owner yes is in the plan; cargo zigbuild for Linux, `pkill -x qanuvi-master`, keep .prev). (3) m2a, one-space fix
+    in src/lib/components/AccountView.svelte, waits for the owner's yes. (4) b1 (budget stop looks blocked) after M3.
+    State now: local test master (dev.qanuvi.desktop.source/local-master) runs the 540e646 master build and keeps
+    basevm378 as its own auto-connect server (SSH, ~/.ssh/vps_key). Test build: owner rule, no asking for build,
+    test master stop/restart/swap, launch or drive (clear stray old-session processes and check RAM first); the master
+    exe is locked while its service runs (`qanuvi-master stop --data <folder>` first; closing the test window with
+    taskkill /T ends the service too). Drive scripts ui.ps1 + go.ps1 (setval, invoke, clickxy, shot; an "invoke" by
+    name can hit a tooltip, click buttons by position) in the scratchpad of session 42bf40bb.
     M3b DRIVEN LIVE (2026-11-17, test build of 024d1da; window -> local test master -> VPS basevm378 over SSH with
     ~/.ssh/vps_key, the VPS binary unchanged): terminal `qanuvi-master servers add root@165.99.219.195 --name VPS
     --program ~/.local/bin/qanuvi-master --key ~/.ssh/vps_key` connected (basevm378, master 0.1.23), duplicate name
@@ -412,7 +425,7 @@ runs on or off; with it off nothing is sent anywhere.
     servers + flags tables, servers.rs; servers_list/import/save/remove), the window's old list moved in once,
     window copy kept current (going back to 0.1.25 still finds the servers). M3 decisions in docs/MIGRATION-VIEWER.md
     (e7a5a59): depth 3, unpair at once, pairing from window and master terminal, VPS server build first (owner yes).
-    PICKUP POINT (fresh conversation starts here, 2026-11-17 13:20): open items in order: (1) m2a, one-space fix in
+    PICKUP POINT (before, 2026-11-17 13:20): open items in order: (1) m2a, one-space fix in
     src/lib/components/AccountView.svelte, waits for the owner's yes; (2) plan M3 (docs/MIGRATION-VIEWER.md "M3. Each
     machine owns its server list") with the owner before any code; (3) the VPS still runs the 2026-11-16 server build
     (no M2): swap in a new server build before M3 is driven there. Test build: npx tauri build --no-bundle with
