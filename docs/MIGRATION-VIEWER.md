@@ -235,6 +235,9 @@ Owner decisions (2026-11-17):
     ("VPS › build-box"). Its master ending, unpairing or dropping it removes the whole branch at once; a shown one
     lost is held and retried through its master, one taken out says why. The same computer reached two ways shows
     once: the second row says "the same computer as ..." and picking it shows the first.
+- M3c BUILT (266d2a5) + DRIVEN LIVE at depth 2 (3fb5878, findings n1-n5 fixed): window -> local test master -> VPS
+  (calls, terminal, preview, lost and back). A master that goes away keeps its last known list, so its servers show
+  off under it and a shown one comes back through it. Depth 3 and the loop guard wait for the owner's extra machine.
 
 ### M4. This PC runs its own master
 

@@ -384,6 +384,29 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    PICKUP POINT (fresh conversation starts here, 2026-11-17 19:45, after 3fb5878): open items in order:
+    (1) M3c depth 3 + loop guard driven live when the owner provides another machine (window -> local test master ->
+    VPS -> new machine, and a path back to a machine already passed). Not driven yet either: a master disconnected on
+    purpose while one under it is shown, unpair (removed) live, a language server on a nested machine (unit-tested;
+    same Routed link as preview, which was driven). (2) VPS server build swap before the VPS is a middle hop (owner
+    yes in the plan; the VPS was only the end of the path so far, binary 0.1.23 unchanged). (3) m2a waits for the
+    owner's yes. (4) b1 after M3. State: test build of 3fb5878 in target/release; test window and local test master
+    stopped (start with go.ps1; the master exe is locked while its service runs: `qanuvi-master stop --data <folder>`).
+    Drive scripts ui.ps1/go.ps1/room.ps1 now in the scratchpad of session 81c1f6f0. Test data: This PC's basevm378
+    has "Connect when Qanuvi starts" on, so at start the local test master's basevm378 shows as "the same computer as
+    basevm378"; disconnect the direct one on This PC's Servers screen to use the path.
+    M3c DRIVEN LIVE at depth 2 (2026-11-17, test build of 3fb5878; window -> local test master -> VPS basevm378 with its
+    binary unchanged): the VPS shows under the test master on a guide line; with the direct connection off the VPS has
+    exactly one `qanuvi-master --stdio` (the test master's) and a terminal there answered hostname through it; preview
+    of the VPS's localhost:8765 loaded through two hops (test web server removed after); button "DESKTOP-R… ›
+    basevm378"; the window's link to the test master ended by itself -> the shown VPS held "connection lost,
+    reconnecting" and came back through it by itself. Findings, all FIXED and driven: n1 the same computer direct and
+    nested showed twice (now "the same computer as basevm378", picking it shows the direct one; race-proof); n2 the
+    button cut the shown machine's name; n3 a master said "on" with no hello while a connection opened and the window
+    took it as on without reading it (no twin check, projects, Inbox); n4 a master that went away wiped its list, so a
+    shown one under it could not be retried and This PC was shown (list kept, its servers show off under it); n5 a
+    machine no longer known was named by its path of ids ("that machine" now). Disconnected on purpose: the branch is
+    off and nothing is tried again. Verify green 474 + 459.
     M3c BUILT (2026-11-17, 266d2a5; verify green 469 + 459): owner answer to the plan questions: a nested
     machine behaves exactly as This PC's servers do (off/error rows too, connect on click, always shown, preview and
     language servers too); depth 3 + loop guard driven when the owner provides another machine. Wire: remote_call
@@ -395,7 +418,7 @@ runs on or off; with it off nothing is sent anywhere.
     through their master, a lost shown one is held and retried, one removed says why, a branch goes with its master,
     the same computer twice shows once ("the same computer as ..."); switcher rows indented on a guide line, button
     shows "VPS › build-box". Test masters.nested.test.ts (7). Design in docs/MIGRATION-VIEWER.md M3.
-    PICKUP POINT (fresh conversation starts here, 2026-11-17 17:30, after 540e646): open items in order:
+    PICKUP POINT (before, 2026-11-17 17:30, after 540e646): open items in order:
     (1) M3c: a call to a nested machine carries a path (["vps1", "vps2"]), each master forwards it with its streams
     (master_servers.rs remote_call is the one-hop start), loop guard by lasting id, depth at most 3, unpair drops the
     whole branch at once, nested dropdown in the switcher (docs/MIGRATION-VIEWER.md "M3"); plan the path format and
