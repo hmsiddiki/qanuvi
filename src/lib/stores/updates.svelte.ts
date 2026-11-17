@@ -9,11 +9,12 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
-import { agent } from "./agent.svelte";
 import { settings } from "./settings.svelte";
 import { terminals } from "./terminals.svelte";
+import { keepVerb, thisPcWork, workText } from "./thisPcWork";
 
 /** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
 const EVERY = 60 * 60 * 1000;
@@ -40,22 +41,32 @@ class UpdatesStore {
     getVersion()
       .then((v) => (this.current = v))
       .catch(() => {});
-    if (this.#timer || import.meta.env.DEV) return;
+    if (this.#timer) return;
+    // M5a: the window is a viewer. Its closing never stops This PC's work; the last window says what goes on, and a
+    // downloaded update installs on close only when nothing works (installing stops This PC's master).
+    getCurrentWindow()
+      .onCloseRequested(async () => {
+        const last = (await getAllWebviewWindows().catch(() => [])).length <= 1;
+        const work = await thisPcWork().catch(() => null);
+        const what = work ? workText(work) : null;
+        if (this.state === "ready" && this.#update && !what) {
+          await stopThisPcsMaster();
+          await this.#update.install().catch(() => {});
+        } else if (last && work && what) {
+          await invoke("notify_notice", {
+            title: "Qanuvi keeps working",
+            text: `${what} ${keepVerb(work)} going on this computer. Quit Qanuvi from the tray icon to stop them.`,
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    if (import.meta.env.DEV) return;
     setTimeout(() => this.check().catch(() => {}), 15_000);
     this.#timer = setInterval(() => this.check().catch(() => {}), EVERY);
     // Back at the window after a while: a quick look, so a new release shows within minutes.
     window.addEventListener("focus", () => {
       if (!this.checkedAt || Date.now() - this.checkedAt > ON_RETURN) this.check().catch(() => {});
     });
-    // A downloaded update not restarted for installs quietly when Qanuvi closes; the next start is the new version.
-    getCurrentWindow()
-      .onCloseRequested(async () => {
-        if (this.state === "ready" && this.#update) {
-          await stopThisPcsMaster();
-          await this.#update.install().catch(() => {});
-        }
-      })
-      .catch(() => {});
   }
 
   /** Looks for a newer version; one that is found waits for a click (or downloads at once, when set so). */
@@ -103,7 +114,7 @@ class UpdatesStore {
   /** Installs the downloaded version quietly and opens Qanuvi again. */
   async restartToUpdate(): Promise<void> {
     if (!this.#update || this.state !== "ready") return;
-    if (!(await this.#okToStop())) return;
+    if (!(await this.#okToStop(true))) return;
     try {
       await stopThisPcsMaster();
       await this.#update.install();
@@ -132,12 +143,19 @@ class UpdatesStore {
     location.reload();
   }
 
-  async #okToStop(): Promise<boolean> {
-    const busy = agent.sessions.filter((s) => s.status === "running" || s.status === "waiting").length;
-    if (!busy) return true;
+  /** M5a: says first what This PC's master stops (agent sessions and plan runs); nothing stops without a yes. */
+  async #okToStop(update = false): Promise<boolean> {
+    const work = await thisPcWork().catch(() => null);
+    const what = work ? workText(work) : null;
+    if (!what) return true;
     return ask(
-      `${busy} agent session${busy === 1 ? " is" : "s are"} still working. Restart anyway? They stop and can be continued afterwards.`,
-      { title: "Restart Qanuvi", kind: "warning", okLabel: "Restart", cancelLabel: "Wait" },
+      `${update ? "Installing the update" : "Restarting Qanuvi"} stops ${what} on this computer. They can be resumed afterwards.`,
+      {
+        title: update ? "Install the update" : "Restart Qanuvi",
+        kind: "warning",
+        okLabel: update ? "Install" : "Restart",
+        cancelLabel: "Wait",
+      },
     );
   }
 }

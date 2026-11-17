@@ -86,6 +86,35 @@ pub fn quiet_now(s: &NotifySettings, minute: u16) -> bool {
     }
 }
 
+fn xml_text(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// One notification as a Windows toast. `protocol`: a click starts its qanuvi:// link (an installed Qanuvi: from the
+/// banner, the notification centre or with Qanuvi closed); otherwise the program that showed it reads the click while
+/// the banner shows (a test build). "long" keeps the banner about 25 s.
+pub fn toast_xml(one: &Shown, protocol: bool) -> String {
+    let url = link(one.id.as_deref());
+    let launch = if protocol {
+        format!(r#" activationType="protocol" launch="{}""#, xml_text(&url))
+    } else {
+        format!(r#" launch="{}""#, xml_text(&url))
+    };
+    let text = if one.text.is_empty() {
+        String::new()
+    } else {
+        format!("<text>{}</text>", xml_text(&one.text))
+    };
+    format!(
+        r#"<toast duration="long"{launch}><visual><binding template="ToastGeneric"><text>{}</text>{text}</binding></visual></toast>"#,
+        xml_text(&one.title)
+    )
+}
+
 /// One notification as shown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shown {

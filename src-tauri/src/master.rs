@@ -144,12 +144,12 @@ impl Master {
         }
         let db = Db::open(&dir.join("qanuvi.db")).map_err(|e| e.to_string())?;
         let machine_id = crate::machine::lasting_id(dir);
-        // Sessions and plan runs left running by a master that ended. On the app's own data they are the app's until
-        // M5 (agents and runs move here then): this master starting while the app works must not end them.
-        if !app_data {
-            agent::mark_interrupted(&db);
-            runs::mark_interrupted(&db);
-        }
+        // Sessions and plan runs left running by a master that ended (M5a: This PC's too, they are all here now). The
+        // runs say why when the last master said (an update, Quit, a restart).
+        agent::mark_interrupted(&db);
+        let why = std::fs::read_to_string(stop_note_file(dir)).ok();
+        let _ = std::fs::remove_file(stop_note_file(dir));
+        runs::mark_interrupted_because(&db, why.as_deref().map(str::trim));
         let accounts = accounts_for(dir, &machine_id, app_data);
         let remotes = crate::remote::Remotes::default();
         remotes.set_me(&machine_id);
@@ -1177,6 +1177,11 @@ fn restart_mark(dir: &Path) -> PathBuf {
     dir.join("master-restarting")
 }
 
+/// Why this master was asked to end ("update", "quit", "restart"), read once by the next one (M5a).
+fn stop_note_file(dir: &Path) -> PathBuf {
+    dir.join("master-stopped-why")
+}
+
 /// A restart mark younger than half a minute.
 fn restarting(dir: &Path) -> bool {
     std::fs::metadata(restart_mark(dir))
@@ -1246,6 +1251,14 @@ impl Master {
 
     /// Ends this master: its agent sessions, terminals, start-up commands and server connections end with it.
     pub fn end(&self) -> ! {
+        self.end_because("")
+    }
+
+    /// Ends this master, keeping why for its runs to say after the next start (M5a: "Stopped by the update").
+    pub fn end_because(&self, why: &str) -> ! {
+        if runs::stop_note(why).is_some() {
+            let _ = std::fs::write(stop_note_file(&self.dir), why);
+        }
         self.agents.stop_all();
         self.terminals.kill_all();
         self.startup.stop_all();
@@ -1256,12 +1269,21 @@ impl Master {
 
     /// M4c, the tray's "Open Qanuvi": a running app shows its window; with none, the app beside this master starts.
     pub fn open_app(&self) {
+        self.open_app_at(None);
+    }
+
+    /// Opens Qanuvi; started for a notification's item (M5a), it opens its Inbox there.
+    pub fn open_app_at(&self, item: Option<String>) {
         if self.app_links.reach(&json!({"do": "show"})) > 0 {
             return;
         }
         match crate::sign_in_start::app_exe() {
             Ok(exe) => {
-                let started = std::process::Command::new(exe)
+                let mut c = std::process::Command::new(exe);
+                if item.is_some() {
+                    c.arg(crate::notify::link(item.as_deref()));
+                }
+                let started = c
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
@@ -1277,6 +1299,14 @@ impl Master {
     /// M4c, the tray's "Quit Qanuvi": the app's windows close first, as when closed by hand, then this master ends.
     /// A window still open after 20 seconds (its closing was cancelled) keeps everything running.
     pub fn quit_all(&self) {
+        // M5a: work going on here stops with it; said first, and nothing stops without a yes.
+        if let Some(what) = work_text(self.work())
+            && !confirm_quit(&format!(
+                "Quitting Qanuvi stops {what} on this computer. They can be resumed afterwards.\n\nQuit anyway?"
+            ))
+        {
+            return;
+        }
         if self.app_links.reach(&json!({"do": "quit"})) > 0 {
             let deadline = Instant::now() + Duration::from_secs(20);
             loop {
@@ -1289,17 +1319,76 @@ impl Master {
                 }
             }
         }
-        self.end()
+        self.end_because("quit")
     }
 
     /// Looks at this master's OmniRoute once; its Inbox changes go to the connections that follow the Inbox.
     fn omniroute_look(&self) -> Option<Vec<crate::omniroute::Connection>> {
-        let watchers = self.inbox_watchers.clone();
+        let tell = self.inbox_teller();
         crate::omniroute::look(&self.db, &move |event: &str, value: Value| {
             if event == "qanuvi-inbox" {
-                watchers.send(&value);
+                tell(&value);
             }
         })
+    }
+
+    /// What works on this master now: agent sessions working, and plan runs going (M5a: said before it all stops).
+    pub fn work(&self) -> (i64, usize) {
+        (agent::working_count(&self.db), self.runs.active().len())
+    }
+
+    /// Tells a change of this master's Inbox (made by its own work) to the connections that follow it; on This PC
+    /// with no window following, a new item is told on the desktop by the master itself (M5a).
+    pub(crate) fn inbox_teller(&self) -> Arc<dyn Fn(&Value) + Send + Sync> {
+        let watchers = self.inbox_watchers.clone();
+        let me = self.me.get().cloned();
+        Arc::new(move |change: &Value| {
+            watchers.send(change);
+            #[cfg(feature = "desktop")]
+            if let Some(m) = me.as_ref().and_then(std::sync::Weak::upgrade) {
+                m.tell_when_alone(change);
+            }
+            #[cfg(not(feature = "desktop"))]
+            let _ = &me;
+        })
+    }
+
+    /// A new Inbox item while no window follows This PC's master: told on the desktop by This PC's Notifications
+    /// settings, once; a click opens Qanuvi at it. With a window following, the app tells it (desktop.rs).
+    #[cfg(feature = "desktop")]
+    fn tell_when_alone(self: &Arc<Self>, change: &Value) {
+        if !self.app_data || change["change"] != "add" || change["new"] != true {
+            return;
+        }
+        let Ok(item) = serde_json::from_value::<crate::inbox::InboxItem>(change["item"].clone())
+        else {
+            return;
+        };
+        if self.app_links.reach(&json!({"do": "wait"})) > 0 {
+            return;
+        }
+        let s: crate::notify::NotifySettings = crate::settings::get_all(&self.db)
+            .ok()
+            .and_then(|all| all.get("notifications").cloned())
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default();
+        if !crate::notify::wanted(&s, &item)
+            || crate::notify::quiet_now(&s, crate::notify::local_minute())
+        {
+            return;
+        }
+        for one in crate::notify::compose(std::slice::from_ref(&item), false) {
+            let me = Arc::downgrade(self);
+            let shown =
+                crate::master_notify::show(&one, !crate::data_location::from_source(), move |id| {
+                    if let Some(m) = me.upgrade() {
+                        m.open_app_at(Some(id.unwrap_or_default()).filter(|i| !i.is_empty()));
+                    }
+                });
+            if let Err(e) = shown {
+                eprintln!("Desktop notification failed: {e}");
+            }
+        }
     }
 
     /// Starts a new service that waits for this one to end, then ends this one: its agent sessions and terminals
@@ -1311,6 +1400,7 @@ impl Master {
             .and_then(|w| w.upgrade())
             .ok_or("The master is not ready.")?;
         std::fs::write(restart_mark(dir), b"").map_err(|e| e.to_string())?;
+        let _ = std::fs::write(stop_note_file(dir), "restart");
         if let Err(e) = start_service(dir, Some(std::process::id())) {
             let _ = std::fs::remove_file(restart_mark(dir));
             return Err(e);
@@ -1327,6 +1417,49 @@ impl Master {
         });
         Ok(())
     }
+}
+
+/// What would stop, in words ("2 agent sessions and 1 plan run"), or None when nothing works.
+pub fn work_text((agents, runs): (i64, usize)) -> Option<String> {
+    let part = |n: u64, one: &str| match n {
+        0 => None,
+        1 => Some(format!("1 {one}")),
+        n => Some(format!("{n} {one}s")),
+    };
+    let parts: Vec<String> = [
+        part(agents.max(0) as u64, "agent session"),
+        part(runs as u64, "plan run"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    (!parts.is_empty()).then(|| parts.join(" and "))
+}
+
+/// Asks before the tray's Quit stops work (M5a). Yes quits; anything else keeps it all running.
+#[cfg(all(windows, feature = "desktop"))]
+fn confirm_quit(text: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        IDYES, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MessageBoxW,
+    };
+    let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+    let (text, title) = (wide(text), wide("Quit Qanuvi"));
+    // SAFETY: both strings are NUL-terminated UTF-16 that live for the call; no owner window.
+    let answer = unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text.as_ptr(),
+            title.as_ptr(),
+            MB_YESNO | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND,
+        )
+    };
+    answer == IDYES
+}
+
+/// No box to ask with here: the tray's Quit goes on (Linux and macOS trays come with M5b's watcher).
+#[cfg(not(all(windows, feature = "desktop")))]
+fn confirm_quit(_text: &str) -> bool {
+    true
 }
 
 /// The file the desktop app keeps in its own data folder (24z3 D6), so a master service opened on it knows it is This PC.
@@ -1435,7 +1568,7 @@ fn accept(listener: TcpListener, master: Arc<Master>, token: String) {
                 return;
             }
             if hello["stop"] == true {
-                master.end();
+                master.end_because(hello["why"].as_str().unwrap_or(""));
             }
             let out: Out = Arc::new(Mutex::new(Box::new(write_half)));
             handle_connection(master, reader, out);
@@ -1676,8 +1809,13 @@ fn follow_this_pc(dir: &Path, cmd: &str, go: impl Fn() -> bool, on: impl Fn(Valu
 
 /// Stops the running service, if any.
 pub fn stop_service(dir: &Path) -> bool {
+    stop_service_because(dir, "")
+}
+
+/// Stops the running service, saying why ("update", "quit", "restart"): its runs say so after the next start.
+pub fn stop_service_because(dir: &Path, why: &str) -> bool {
     if let Some((mut s, token)) = connect(dir) {
-        let _ = writeln!(s, "{}", json!({"token": token, "stop": true}));
+        let _ = writeln!(s, "{}", json!({"token": token, "stop": true, "why": why}));
         std::thread::sleep(Duration::from_millis(300));
         let _ = std::fs::remove_file(service_file(dir));
         return true;
@@ -2459,7 +2597,7 @@ mod tests {
     }
 
     #[test]
-    fn m4a_this_pcs_master_starting_leaves_the_apps_running_runs_alone() {
+    fn m5a_a_master_starting_stops_what_its_last_life_left_running() {
         let status = |dir: &Path| -> String {
             let db = Db::open(&dir.join("qanuvi.db")).unwrap();
             db.conn()
@@ -2480,9 +2618,9 @@ mod tests {
                 mark_app_data(data.path());
             }
             let _m = Master::open(data.path()).unwrap();
-            // The app's run goes on; a master on its own data cleans up what its own last life left running.
-            let want = if app_data { "running" } else { "stopped" };
-            assert_eq!(status(data.path()), want, "app data: {app_data}");
+            // M5a: This PC's runs are its master's too (no app core runs them any more), so either way what the last
+            // life left running is stopped.
+            assert_eq!(status(data.path()), "stopped", "app data: {app_data}");
         }
     }
 
@@ -3071,6 +3209,49 @@ mod tests {
         );
     }
 
+    /// M5a: what would stop is said in words, and a run stopped by an update (or Quit, a restart) says so after the
+    /// next master starts; This PC's own master marks its leftovers too (they are its own now).
+    #[test]
+    fn m5a_a_stop_says_why_and_what_it_stops() {
+        assert_eq!(work_text((0, 0)), None);
+        assert_eq!(work_text((1, 0)).unwrap(), "1 agent session");
+        assert_eq!(
+            work_text((2, 1)).unwrap(),
+            "2 agent sessions and 1 plan run"
+        );
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        mark_app_data(data.path());
+        let pid = {
+            let m = Master::open(data.path()).unwrap();
+            let p = call(
+                &m,
+                "projects_add",
+                json!({"path": project.path().to_string_lossy()}),
+            )
+            .unwrap();
+            let pid = p["id"].as_str().unwrap().to_string();
+            runs::save(
+                &m.db,
+                &pid,
+                "r1",
+                "T.md",
+                "running",
+                r#"{"status":"running"}"#,
+            )
+            .unwrap();
+            assert_eq!(m.work().1, 0, "a record is no live run");
+            pid
+        };
+        std::fs::write(stop_note_file(data.path()), "update").unwrap();
+        let m = Master::open(data.path()).unwrap();
+        assert!(m.app_data);
+        assert!(!stop_note_file(data.path()).exists(), "read once");
+        let r = runs::list(&m.db, &pid).unwrap().remove(0);
+        assert_eq!(r.status, "stopped");
+        assert!(r.data.contains(runs::stop_note("update").unwrap()));
+    }
+
     /// M5a: what the app's core did for This PC's windows, its master does: plan data told to every follower (a
     /// window's write and a run's), the one-time moves out of old window storage, and the chat's attachments.
     #[test]
@@ -3169,6 +3350,7 @@ mod tests {
         "notify_settings",
         "notify_take_start",
         "notify_test",
+        "notify_notice",
         "notify_item",
         // The window's part of a browser sign-in: this computer's browser and its loopback answer (M2).
         "account_wait",

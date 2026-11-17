@@ -61,6 +61,8 @@ mod desktop;
 #[cfg(feature = "desktop")]
 mod desktop_notify;
 #[cfg(feature = "desktop")]
+mod master_notify;
+#[cfg(feature = "desktop")]
 pub use desktop::*;
 
 use std::path::PathBuf;

@@ -95,6 +95,31 @@ pub fn list_all(db: &Db, limit: usize) -> Result<Vec<RunRecord>, String> {
 
 /// A run that was going when the app closed cannot go on by itself.
 pub fn mark_interrupted(db: &Db) {
+    mark_interrupted_because(db, None);
+}
+
+/// Why the last master stopped, as its runs say it ("Run stopped · Stopped by the update…", with Resume). M5a: an
+/// update, the tray's Quit and a restart say so; a crash or a power cut leaves none yet (M5b).
+pub fn stop_note(why: &str) -> Option<&'static str> {
+    match why {
+        "update" => {
+            Some("Stopped by the update to a new version of Qanuvi. Resume goes on from here.")
+        }
+        "quit" => Some("Stopped when Qanuvi was quit. Resume goes on from here."),
+        "restart" => Some("Stopped when Qanuvi restarted. Resume goes on from here."),
+        _ => None,
+    }
+}
+
+/// Marks the runs that were going as stopped, with why in their message when it is known.
+pub fn mark_interrupted_because(db: &Db, why: Option<&str>) {
+    if let Some(note) = why.and_then(stop_note) {
+        let _ = db.conn().execute(
+            "UPDATE plan_runs SET data = json_set(data, '$.message', ?1) \
+             WHERE status = 'running' AND json_valid(data)",
+            [note],
+        );
+    }
     let _ = db.conn().execute(
         "UPDATE plan_runs SET status = 'stopped' WHERE status = 'running'",
         [],
@@ -151,5 +176,57 @@ mod tests {
 
         crate::projects::remove(&db, &project.id).unwrap();
         assert!(list(&db, &project.id).unwrap().is_empty());
+    }
+
+    /// M5a: a run stopped by an update says so afterwards; one already finished keeps its own message.
+    #[test]
+    fn a_run_stopped_by_an_update_says_so() {
+        let db = Db::open_in_memory().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = crate::projects::add(&db, &dir.path().to_string_lossy()).unwrap();
+        save(
+            &db,
+            &project.id,
+            "r1",
+            "T.md",
+            "running",
+            r#"{"status":"running","message":"Step 2"}"#,
+        )
+        .unwrap();
+        save(
+            &db,
+            &project.id,
+            "r2",
+            "U.md",
+            "done",
+            r#"{"status":"done","message":"All done"}"#,
+        )
+        .unwrap();
+        mark_interrupted_because(&db, Some("update"));
+        let runs = list(&db, &project.id).unwrap();
+        let r1 = runs.iter().find(|r| r.id == "r1").unwrap();
+        assert_eq!(r1.status, "stopped");
+        let data: serde_json::Value = serde_json::from_str(&r1.data).unwrap();
+        assert_eq!(data["message"], stop_note("update").unwrap());
+        let r2 = runs.iter().find(|r| r.id == "r2").unwrap();
+        assert!(r2.data.contains("All done"));
+        // Unknown or no reason: stopped, its message as it was.
+        save(
+            &db,
+            &project.id,
+            "r3",
+            "V.md",
+            "running",
+            r#"{"message":"Step 1"}"#,
+        )
+        .unwrap();
+        mark_interrupted_because(&db, Some("nonsense"));
+        let r3 = list(&db, &project.id)
+            .unwrap()
+            .into_iter()
+            .find(|r| r.id == "r3")
+            .unwrap();
+        assert_eq!(r3.status, "stopped");
+        assert!(r3.data.contains("Step 1"));
     }
 }

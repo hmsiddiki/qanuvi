@@ -109,6 +109,7 @@ const WINDOW_ONLY = new Set([
   "notify_settings",
   "notify_take_start",
   "notify_test",
+  "notify_notice",
   "inspector_close",
   "inspector_page_text",
   "inspector_pick",

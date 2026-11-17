@@ -55,6 +55,9 @@ pub fn a_loop() -> String {
 
 /// A machine's key in the window: the server ids along its path joined with "/" ("vps1" is a server of this
 /// machine, "vps1/vps2" a server of vps1). Server ids are UUIDs, so "/" never appears inside one.
+/// The app's link to This PC's own master (migration M5a; remote.ts THIS_PC): every call about This PC goes on it.
+pub const THIS_PC: &str = "this-computer";
+
 pub fn split_path(key: &str) -> Result<Vec<String>, String> {
     let parts: Vec<String> = key.split('/').map(str::to_string).collect();
     if parts.iter().any(|p| p.trim().is_empty()) {
@@ -361,7 +364,20 @@ impl Remotes {
     /// The way to a machine by its key, starting here.
     pub fn link(&self, key: &str) -> Result<Arc<dyn crate::pipes::Link>, String> {
         let me = self.me.lock().unwrap_or_else(|e| e.into_inner()).clone();
-        let seen = if me.is_empty() { vec![] } else { vec![me] };
+        // The app's link to This PC's own master (M5a) is this machine, not a step away from it: the path starts
+        // there, so a way on that comes back here is still a loop. Any other link to this machine is one.
+        let own = split_path(key)
+            .ok()
+            .filter(|p| p[0] == THIS_PC)
+            .and_then(|p| self.get(&p[0]).ok())
+            .is_some_and(|c| {
+                c.info.lock().unwrap_or_else(|e| e.into_inner())["machineId"].as_str() == Some(&me)
+            });
+        let seen = if me.is_empty() || own {
+            vec![]
+        } else {
+            vec![me]
+        };
         Ok(Arc::new(self.route(key, seen)?))
     }
 
@@ -750,6 +766,11 @@ mod tests {
         assert!(remotes.link("new/x/y").is_ok());
         assert_eq!(remotes.link("new/x/y/z").err().unwrap(), too_deep());
         assert!(remotes.link("gone/x").is_err());
+        // M5a: the app's own link to This PC's master is no loop; a way on from there back here still is.
+        add(THIS_PC, json!({"machineId": "pc", "forwards": true}));
+        assert!(remotes.link(THIS_PC).is_ok());
+        assert!(remotes.link(&format!("{THIS_PC}/x")).is_ok());
+        assert_eq!(remotes.link("back").err().unwrap(), a_loop());
     }
 
     #[test]

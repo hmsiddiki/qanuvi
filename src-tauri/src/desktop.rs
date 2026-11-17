@@ -40,8 +40,7 @@ pub struct AppState {
 
 type Res<T> = Result<T, String>;
 
-/// The link id of This PC's own master (remote.ts THIS_PC): every call about This PC's work goes on it.
-const THIS_PC: &str = "this-computer";
+use crate::remote::THIS_PC;
 
 /// One connect at a time to This PC's master, so two windows asking at once never start two links.
 static THIS_PC_CONNECT: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -478,9 +477,13 @@ fn backups_default() -> std::path::PathBuf {
 }
 
 /// M4c: stops This PC's master before an update installs (Windows keeps its program file locked while it runs).
+/// M5a: its runs say afterwards that the update stopped them.
 #[tauri::command]
 fn this_pc_master_stop() -> Res<bool> {
-    Ok(crate::master::stop_service(&crate::paths::data_dir()))
+    Ok(crate::master::stop_service_because(
+        &crate::paths::data_dir(),
+        "update",
+    ))
 }
 
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
@@ -488,7 +491,7 @@ fn this_pc_master_stop() -> Res<bool> {
 fn app_restart(app: tauri::AppHandle) -> Res<()> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     // This PC's master has the data open: a move or a booked restore needs it closed. The new instance starts it again.
-    crate::master::stop_service(&crate::paths::data_dir());
+    crate::master::stop_service_because(&crate::paths::data_dir(), "restart");
     // The same project folder argument again (not the flags, not an older --after-pid).
     let keep: Vec<String> = std::env::args()
         .skip(1)
@@ -607,6 +610,12 @@ fn notify_take_start(
 #[tauri::command]
 fn notify_test(app: tauri::AppHandle) -> Res<()> {
     crate::desktop_notify::test(&app)
+}
+
+/// The window's own notice (M5a: the last window closed while This PC's work goes on, said once it is gone).
+#[tauri::command]
+fn notify_notice(app: tauri::AppHandle, title: String, text: String) -> Res<()> {
+    crate::desktop_notify::notice(&app, &title, &text)
 }
 
 // A new item in a connected master's Inbox (24z R2d part 3): every window that follows the master asks, it is shown once.
@@ -818,6 +827,7 @@ pub fn run() {
             notify_settings,
             notify_take_start,
             notify_test,
+            notify_notice,
             notify_item,
             app_info,
             browser_agent_shot,

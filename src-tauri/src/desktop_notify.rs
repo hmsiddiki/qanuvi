@@ -115,6 +115,17 @@ pub fn test(app: &AppHandle) -> Result<(), String> {
     show_now(app, &one)
 }
 
+/// A notice of the window's own (M5a: the last window closed while work goes on), shown even in quiet hours: the
+/// owner just did something and this is the answer to it. A click opens the Inbox.
+pub fn notice(app: &AppHandle, title: &str, text: &str) -> Result<(), String> {
+    let one = Shown {
+        title: title.into(),
+        text: text.into(),
+        id: None,
+    };
+    show_now(app, &one)
+}
+
 fn show(app: &AppHandle, one: &Shown) {
     if let Err(e) = show_now(app, one) {
         eprintln!("Desktop notification failed: {e}");
@@ -168,18 +179,9 @@ pub fn opened_url(app: &AppHandle, url: &str) {
     }
 }
 
-#[cfg(windows)]
-fn xml_text(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
 /// PowerShell's app id: Windows shows toasts sent under it from a program that has no Start-menu shortcut.
 #[cfg(windows)]
-const POWERSHELL_APP_ID: &str =
+pub(crate) const POWERSHELL_APP_ID: &str =
     "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
 
 #[cfg(windows)]
@@ -190,23 +192,7 @@ fn show_now(app: &AppHandle, one: &Shown) -> Result<(), String> {
     use windows::core::HSTRING;
 
     let own = installed();
-    let url = notify::link(one.id.as_deref());
-    // Installed: the click starts the qanuvi:// link (from the banner, the notification centre or with Qanuvi
-    // closed). Test build: the click is read here while the banner shows. "long" keeps the banner about 25 s.
-    let launch = if own {
-        format!(r#" activationType="protocol" launch="{}""#, xml_text(&url))
-    } else {
-        format!(r#" launch="{}""#, xml_text(&url))
-    };
-    let text = if one.text.is_empty() {
-        String::new()
-    } else {
-        format!("<text>{}</text>", xml_text(&one.text))
-    };
-    let xml = format!(
-        r#"<toast duration="long"{launch}><visual><binding template="ToastGeneric"><text>{}</text>{text}</binding></visual></toast>"#,
-        xml_text(&one.title)
-    );
+    let xml = notify::toast_xml(one, own);
     let err = |e: windows::core::Error| e.message().to_string();
     let doc = XmlDocument::new().map_err(err)?;
     doc.LoadXml(&HSTRING::from(xml)).map_err(err)?;
