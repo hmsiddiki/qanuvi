@@ -22,10 +22,15 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[path = "master_cli.rs"]
+mod cli;
 #[path = "master_inbox.rs"]
 mod inbox_cmds;
 #[path = "master_runs.rs"]
 mod plan_runs;
+#[path = "master_servers.rs"]
+mod server_cmds;
+pub use cli::{pair_cli, servers_cli};
 
 /// What a running master shares with its connections.
 pub struct Master {
@@ -51,6 +56,11 @@ pub struct Master {
     inbox_watchers: Arc<inbox_cmds::InboxWatchers>,
     /// Its Qanuvi account (migration M2), kept in its own store.
     accounts: crate::account::Accounts,
+    /// The servers this master connects to itself (migration M3b), the followers of their comings and goings, and
+    /// why each away one is away.
+    remotes: crate::remote::Remotes,
+    remote_watchers: inbox_cmds::InboxWatchers,
+    remote_errors: Mutex<std::collections::HashMap<String, String>>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -143,6 +153,9 @@ impl Master {
             runs: Arc::default(),
             watchers: Arc::default(),
             inbox_watchers: Arc::default(),
+            remotes: crate::remote::Remotes::default(),
+            remote_watchers: inbox_cmds::InboxWatchers::default(),
+            remote_errors: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
         })
@@ -969,6 +982,9 @@ impl Master {
             "runs_list_all" => to(runs::list_all(db, n(args, "limit").max(1) as usize)),
             c if c.starts_with("plan_run_") => self.plan_run(c, args, stream),
             c if c.starts_with("inbox_") => self.inbox(c, args, stream),
+            c if c.starts_with("servers_") || c.starts_with("remote_") => {
+                self.servers(c, args, stream)
+            }
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
     }
@@ -1102,6 +1118,16 @@ impl Master {
                 std::thread::sleep(crate::memory_disk::SYNC_EVERY);
             }
         });
+        // Its own servers (migration M3b): the ones marked to connect at start-up, now and again while away.
+        let me = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            loop {
+                let Some(m) = me.upgrade() else { return };
+                m.connect_away_servers();
+                drop(m);
+                std::thread::sleep(server_cmds::RECONNECT_EVERY);
+            }
+        });
     }
 
     /// Looks at this master's OmniRoute once; its Inbox changes go to the connections that follow the Inbox.
@@ -1133,6 +1159,7 @@ impl Master {
             me.agents.stop_all();
             me.terminals.kill_all();
             me.startup.stop_all();
+            me.remotes.disconnect_all();
             let _ = std::fs::remove_file(service_file(&dir));
             std::process::exit(0);
         });
@@ -1231,6 +1258,7 @@ pub fn serve(dir: &Path) -> Result<(), String> {
                 master.agents.stop_all();
                 master.terminals.kill_all();
                 master.startup.stop_all();
+                master.remotes.disconnect_all();
                 std::process::exit(0);
             }
             let out: Out = Arc::new(Mutex::new(Box::new(write_half)));
@@ -1405,6 +1433,110 @@ mod tests {
             call(&m, "drafts_list", json!({"projectId": id})).unwrap(),
             json!([])
         );
+    }
+
+    // Migration M3b: a master keeps its own server list and answers the window's servers_* and remote_* calls.
+    #[test]
+    fn keeps_its_own_server_list_and_answers_remote_calls() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let vps = json!({"id": "v1", "name": "VPS", "target": "root@203.0.113.5", "program": "qanuvi-master",
+            "identity": "", "autoConnect": false});
+        call(&m, "servers_save", json!({"server": vps})).unwrap();
+        let local = json!({"id": "l1", "name": "", "target": "local", "program": "", "identity": "",
+            "autoConnect": true});
+        call(&m, "servers_save", json!({"server": local})).unwrap();
+        let kept = call(&m, "servers_list", json!({})).unwrap();
+        assert_eq!(kept["servers"][0]["name"], "VPS");
+        assert_eq!(kept["servers"].as_array().unwrap().len(), 2);
+        // Nothing connected yet: every server is off, and calls to one say so.
+        let states = call(&m, "remote_states", json!({})).unwrap();
+        assert_eq!(states["v1"]["state"], "off");
+        assert_eq!(call(&m, "remote_list", json!({})).unwrap(), json!([]));
+        let e = call(
+            &m,
+            "remote_call",
+            json!({"master": "v1", "cmd": "hello", "args": {}}),
+        )
+        .unwrap_err();
+        assert!(e.contains("Not connected"), "{e}");
+        // A desktop's test master next to the app is not a machine a master reaches onward; why is kept.
+        let e = call(&m, "remote_connect", local.clone()).unwrap_err();
+        assert!(e.contains("over SSH or through the relay"), "{e}");
+        let states = call(&m, "remote_watch", json!({})).unwrap();
+        assert_eq!(states["l1"]["state"], "error");
+        // The start-up connect tries it too, and keeps it away with the same reason.
+        m.connect_away_servers();
+        assert_eq!(
+            call(&m, "remote_states", json!({})).unwrap()["l1"]["state"],
+            "error"
+        );
+        // A relay server without its pairing key here.
+        let paired = json!({"id": "p1", "name": "", "target": "relay", "autoConnect": false,
+            "relay": {"url": "wss://relay.example", "masterId": "m", "pairing": "abc123"}});
+        let e = call(&m, "remote_connect", paired).unwrap_err();
+        assert!(e.contains("pairing is missing"), "{e}");
+        assert!(call(&m, "remote_unpair", json!({"pairing": "../x"})).is_err());
+        // Removed: out of the list, and its reason with it.
+        assert_eq!(
+            call(&m, "servers_remove", json!({"id": "l1"})).unwrap(),
+            json!(true)
+        );
+        assert_eq!(
+            call(&m, "servers_remove", json!({"id": "l1"})).unwrap(),
+            json!(false)
+        );
+        let states = call(&m, "remote_states", json!({})).unwrap();
+        assert!(states.get("l1").is_none());
+        call(&m, "remote_disconnect", json!({"id": "v1"})).unwrap();
+        assert!(
+            call(&m, "remote_nothing", json!({}))
+                .unwrap_err()
+                .contains("does not know the command")
+        );
+    }
+
+    // Migration M3b: the terminal client reaches the running service with the window's own commands.
+    #[test]
+    fn the_terminal_lists_adds_and_removes_through_the_service() {
+        let data = tempfile::tempdir().unwrap();
+        let dir = data.path().to_path_buf();
+        let master = Master::open(&dir).unwrap().shared();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::fs::write(
+            service_file(&dir),
+            json!({"port": port, "token": "t", "pid": std::process::id()}).to_string(),
+        )
+        .unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let master = master.clone();
+                std::thread::spawn(move || {
+                    let w = stream.try_clone().unwrap();
+                    let mut r = BufReader::new(stream);
+                    let mut first = String::new();
+                    r.read_line(&mut first).unwrap();
+                    handle_connection(master, r, Arc::new(Mutex::new(Box::new(w))));
+                });
+            }
+        });
+        let save = json!({"server": {"id": "a", "name": "Shop", "target": "deploy@shop", "autoConnect": false}});
+        cli::call(&dir, "servers_save", save).unwrap();
+        servers_cli(&dir, &["list".to_string()]).unwrap();
+        let got = cli::call(&dir, "servers_list", json!({})).unwrap();
+        assert_eq!(got["servers"][0]["name"], "Shop");
+        // A name another machine has is refused before anything is kept.
+        let e = servers_cli(
+            &dir,
+            &["add", "root@other", "--name", "shop"].map(String::from),
+        )
+        .unwrap_err();
+        assert!(e.contains("already named"), "{e}");
+        servers_cli(&dir, &["remove".to_string(), "SHOP".to_string()]).unwrap();
+        let got = cli::call(&dir, "servers_list", json!({})).unwrap();
+        assert_eq!(got["servers"], json!([]));
+        assert!(servers_cli(&dir, &["remove".to_string(), "Shop".to_string()]).is_err());
     }
 
     // 24z3 step 3, f1: the window's "+" on a shown server picks a folder there through this master's folder list.
@@ -2466,12 +2598,6 @@ mod tests {
 
     /// Commands only the app answers today that move to the master, with the phase that moves them.
     const GAPS: &[(&str, &str)] = &[
-        ("remote_connect", "M3"),
-        ("remote_call", "M3"),
-        ("remote_disconnect", "M3"),
-        ("remote_list", "M3"),
-        ("remote_pair", "M3"),
-        ("remote_unpair", "M3"),
         ("core_decide", "M6"),
         ("knowledge_fetch", "M6"),
         ("attachment_page", "M6"),
@@ -2528,6 +2654,7 @@ mod tests {
         arms(include_str!("master.rs"), "pub fn dispatch(", &mut all);
         arms(include_str!("master_inbox.rs"), "fn inbox(", &mut all);
         arms(include_str!("master_runs.rs"), "fn plan_run(", &mut all);
+        arms(include_str!("master_servers.rs"), "fn servers(", &mut all);
         all
     }
 

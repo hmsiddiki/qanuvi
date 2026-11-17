@@ -2,7 +2,8 @@
   /**
    * Servers (Milestone 16): Qanuvi without a window on a Linux server or VPS, reached over SSH. Add a server,
    * connect, and add its folders as projects; they then work like this PC's projects. The sidebar lists one machine
-   * at a time (24z3 Part A2); the switcher at the top of the sidebar (Part B) picks it.
+   * at a time (24z3 Part A2); the switcher at the top of the sidebar (Part B) picks it. A shown master's own list
+   * (migration M3b: the servers it connects to itself) is MachineServersView.
    */
   import Server from "@lucide/svelte/icons/server";
   import Plug from "@lucide/svelte/icons/plug";
@@ -17,6 +18,8 @@
   import IconButton from "./IconButton.svelte";
   import RemoteAccessPanel from "./RemoteAccessPanel.svelte";
   import DataFolderPanel from "./DataFolderPanel.svelte";
+  import MachineServersView from "./MachineServersView.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
 
   let name = $state("");
   let target = $state("");
@@ -115,192 +118,198 @@
 
 <div class="servers">
   <h2><Server size={16} /> Servers</h2>
-  <p class="lead">
-    Qanuvi without a window on a Linux server or VPS. Picked in the switcher at the top of the sidebar, its projects
-    work like this PC's: files, git, search, terminals and agents run on the server, and agent sessions keep going when
-    this PC is off.
-  </p>
-  {#if masters.keepError}<p class="error">{masters.keepError}</p>{/if}
-
-  <DataFolderPanel />
-  <RemoteAccessPanel />
-
-  {#each masters.list as m (m.id)}
-    {@const st = masters.statusOf(m.id)}
-    <section class="card">
-      <header>
-        <span class="dot {st.state}"></span>
-        {#if m.color}<span class="swatch" style:background={m.color} title="Its colour"></span>{/if}
-        <strong>{displayName(m)}</strong>
-        {#if reachedBy(m)}<span class="muted">{reachedBy(m)}</span>{/if}
-        <span class="spacer"></span>
-        {#if st.state === "on"}
-          <IconButton label="Disconnect" onclick={() => masters.disconnect(m.id)}><Unplug size={14} /></IconButton>
-        {:else}
-          <IconButton label="Connect" disabled={st.state === "connecting"} onclick={() => masters.connect(m)}>
-            <Plug size={14} />
-          </IconButton>
-        {/if}
-        <IconButton label="Edit" onclick={() => startEdit(m)}><Pencil size={14} /></IconButton>
-        <IconButton label="Remove" onclick={() => remove(m)}><Trash2 size={14} /></IconButton>
-      </header>
-      {#if editing === m.id}
-        <form class="add" onsubmit={(e) => saveEdit(e, m.id)}>
-          <label>
-            Name (empty: the server's own computer name)
-            <input bind:value={draft.name} maxlength={NAME_MAX + 10} />
-          </label>
-          {#if !m.relay}
-            <label>
-              SSH address
-              <input bind:value={draft.target} spellcheck="false" />
-            </label>
-            <label>
-              Program on the server
-              <input bind:value={draft.program} placeholder="qanuvi-master" spellcheck="false" />
-            </label>
-            <label>
-              SSH key file (optional)
-              <input
-                bind:value={draft.identity}
-                placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults"
-                spellcheck="false"
-              />
-            </label>
-          {/if}
-          {#if editError}<p class="error">{editError}</p>{/if}
-          <div class="row">
-            <button type="submit" class="btn primary" disabled={saving}>{saving ? "Connecting…" : "Save"}</button>
-            <button type="button" class="btn" disabled={saving} onclick={() => (editing = null)}>Cancel</button>
-          </div>
-        </form>
-      {:else if nameIssue(m)}
-        <p class="error">{nameIssue(m)} Change the name so the two are never mixed up.</p>
-      {/if}
-      {#if st.state === "connecting"}<p class="muted">Connecting…</p>{/if}
-      {#if st.state === "error"}<p class="error">{st.error}</p>{/if}
-      {#if st.state === "on" && st.info}
-        <p class="muted">
-          {st.info.host || "server"} · {st.info.os}/{st.info.arch} · master {st.info.version} · {count(m.id)} project{count(
-            m.id,
-          ) === 1
-            ? ""
-            : "s"}
-        </p>
-        <form
-          class="row"
-          onsubmit={(e) => {
-            e.preventDefault();
-            addFolder(m);
-          }}
-        >
-          <input
-            value={folder[m.id] ?? ""}
-            oninput={(e) => (folder = { ...folder, [m.id]: e.currentTarget.value })}
-            placeholder="Folder on the server, for example /home/deploy/sites/shop"
-            spellcheck="false"
-          />
-          <button type="submit" class="btn"><FolderPlus size={14} /> Add as project</button>
-        </form>
-        {#if folderError[m.id]}<p class="error">{folderError[m.id]}</p>{/if}
-      {/if}
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={m.autoConnect}
-          onchange={(e) => masters.save({ ...m, autoConnect: e.currentTarget.checked })}
-        />
-        Connect when Qanuvi starts
-      </label>
-      <div class="colors" role="group" aria-label="Its colour">
-        <span class="muted">Colour</span>
-        {#each COLORS as c (c)}
-          <button
-            type="button"
-            class="color"
-            class:picked={m.color === c}
-            style:background={c}
-            aria-label="Colour {c}"
-            aria-pressed={m.color === c}
-            onclick={() => masters.setColor(m.id, c)}
-          ></button>
-        {/each}
-      </div>
-    </section>
+  {#if switcher.shown}
+    <DataFolderPanel />
+    <RemoteAccessPanel />
+    <MachineServersView machine={switcher.shown} />
   {:else}
-    <p class="muted">No servers yet.</p>
-  {/each}
+    <p class="lead">
+      Qanuvi without a window on a Linux server or VPS. Picked in the switcher at the top of the sidebar, its projects
+      work like this PC's: files, git, search, terminals and agents run on the server, and agent sessions keep going
+      when this PC is off.
+    </p>
+    {#if masters.keepError}<p class="error">{masters.keepError}</p>{/if}
 
-  <h3>Pair with a computer through the relay</h3>
-  <p class="muted">
-    On the other computer, turn on remote access and press "Pair a device"; type the code it shows here.
-  </p>
-  <form class="add" onsubmit={pairNow}>
-    <label>
-      Relay address
-      <input bind:value={pairRelay} placeholder="wss://relay.qanuvi.com" spellcheck="false" />
-    </label>
-    <label>
-      Pairing code
-      <input bind:value={pairCode} placeholder="K7QF-29MX-T4HD" spellcheck="false" />
-    </label>
-    <label>
-      This device's name (shown on the other computer)
-      <input bind:value={pairName} placeholder="My laptop" maxlength={NAME_MAX + 10} />
-    </label>
-    {#if pairError}<p class="error">{pairError}</p>{/if}
-    <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
-      {pairing ? "Pairing…" : "Pair and connect"}
-    </button>
-  </form>
+    <DataFolderPanel />
+    <RemoteAccessPanel />
 
-  <h3>Add a server</h3>
-  <form class="add" onsubmit={add}>
-    <label>
-      Name (empty: the server's own computer name)
-      <input bind:value={name} placeholder="My VPS" maxlength={NAME_MAX + 10} />
-    </label>
-    <label>
-      SSH address
-      <input bind:value={target} placeholder="deploy@203.0.113.5 or an alias from ~/.ssh/config" spellcheck="false" />
-    </label>
-    <label>
-      Program on the server
-      <input bind:value={program} spellcheck="false" />
-    </label>
-    <label>
-      SSH key file (optional)
-      <input bind:value={identity} placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults" spellcheck="false" />
-    </label>
-    <label class="check"><input type="checkbox" bind:checked={auto} /> Connect when Qanuvi starts</label>
-    {#if formError}<p class="error">{formError}</p>{/if}
-    <button type="submit" class="btn primary" disabled={adding}>{adding ? "Connecting…" : "Add and connect"}</button>
-  </form>
+    {#each masters.list as m (m.id)}
+      {@const st = masters.statusOf(m.id)}
+      <section class="card">
+        <header>
+          <span class="dot {st.state}"></span>
+          {#if m.color}<span class="swatch" style:background={m.color} title="Its colour"></span>{/if}
+          <strong>{displayName(m)}</strong>
+          {#if reachedBy(m)}<span class="muted">{reachedBy(m)}</span>{/if}
+          <span class="spacer"></span>
+          {#if st.state === "on"}
+            <IconButton label="Disconnect" onclick={() => masters.disconnect(m.id)}><Unplug size={14} /></IconButton>
+          {:else}
+            <IconButton label="Connect" disabled={st.state === "connecting"} onclick={() => masters.connect(m)}>
+              <Plug size={14} />
+            </IconButton>
+          {/if}
+          <IconButton label="Edit" onclick={() => startEdit(m)}><Pencil size={14} /></IconButton>
+          <IconButton label="Remove" onclick={() => remove(m)}><Trash2 size={14} /></IconButton>
+        </header>
+        {#if editing === m.id}
+          <form class="add" onsubmit={(e) => saveEdit(e, m.id)}>
+            <label>
+              Name (empty: the server's own computer name)
+              <input bind:value={draft.name} maxlength={NAME_MAX + 10} />
+            </label>
+            {#if !m.relay}
+              <label>
+                SSH address
+                <input bind:value={draft.target} spellcheck="false" />
+              </label>
+              <label>
+                Program on the server
+                <input bind:value={draft.program} placeholder="qanuvi-master" spellcheck="false" />
+              </label>
+              <label>
+                SSH key file (optional)
+                <input
+                  bind:value={draft.identity}
+                  placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults"
+                  spellcheck="false"
+                />
+              </label>
+            {/if}
+            {#if editError}<p class="error">{editError}</p>{/if}
+            <div class="row">
+              <button type="submit" class="btn primary" disabled={saving}>{saving ? "Connecting…" : "Save"}</button>
+              <button type="button" class="btn" disabled={saving} onclick={() => (editing = null)}>Cancel</button>
+            </div>
+          </form>
+        {:else if nameIssue(m)}
+          <p class="error">{nameIssue(m)} Change the name so the two are never mixed up.</p>
+        {/if}
+        {#if st.state === "connecting"}<p class="muted">Connecting…</p>{/if}
+        {#if st.state === "error"}<p class="error">{st.error}</p>{/if}
+        {#if st.state === "on" && st.info}
+          <p class="muted">
+            {st.info.host || "server"} · {st.info.os}/{st.info.arch} · master {st.info.version} · {count(m.id)} project{count(
+              m.id,
+            ) === 1
+              ? ""
+              : "s"}
+          </p>
+          <form
+            class="row"
+            onsubmit={(e) => {
+              e.preventDefault();
+              addFolder(m);
+            }}
+          >
+            <input
+              value={folder[m.id] ?? ""}
+              oninput={(e) => (folder = { ...folder, [m.id]: e.currentTarget.value })}
+              placeholder="Folder on the server, for example /home/deploy/sites/shop"
+              spellcheck="false"
+            />
+            <button type="submit" class="btn"><FolderPlus size={14} /> Add as project</button>
+          </form>
+          {#if folderError[m.id]}<p class="error">{folderError[m.id]}</p>{/if}
+        {/if}
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={m.autoConnect}
+            onchange={(e) => masters.save({ ...m, autoConnect: e.currentTarget.checked })}
+          />
+          Connect when Qanuvi starts
+        </label>
+        <div class="colors" role="group" aria-label="Its colour">
+          <span class="muted">Colour</span>
+          {#each COLORS as c (c)}
+            <button
+              type="button"
+              class="color"
+              class:picked={m.color === c}
+              style:background={c}
+              aria-label="Colour {c}"
+              aria-pressed={m.color === c}
+              onclick={() => masters.setColor(m.id, c)}
+            ></button>
+          {/each}
+        </div>
+      </section>
+    {:else}
+      <p class="muted">No servers yet.</p>
+    {/each}
 
-  <h3>Setting up a server</h3>
-  <ol class="help">
-    <li>
-      Copy the <code>qanuvi-master</code> program to the server (for example to <code>~/.local/bin</code>) and make it
-      runnable: <code>chmod +x ~/.local/bin/qanuvi-master</code>. Install <code>git</code>, and the agent (<code
-        >claude</code
-      >) if agents should run there.
-    </li>
-    <li>
-      Sign-in uses your SSH keys, never a password typed into Qanuvi: <code>ssh-copy-id deploy@your-server</code>, then
-      check that <code>ssh deploy@your-server</code> works without a password. For another port, add an alias in
-      <code>~/.ssh/config</code> and use the alias here.
-    </li>
-    <li>
-      That is all: Qanuvi starts the master's background service on first connect. To keep it running after the server
-      restarts, run it as a user service: <code>systemctl --user enable --now qanuvi-master</code> with a unit whose
-      <code>ExecStart</code> is <code>%h/.local/bin/qanuvi-master serve</code> (and
-      <code>loginctl enable-linger</code>).
-    </li>
-    <li>
-      To try it without a server, add a server with the SSH address <code>local</code>: the master program next to
-      Qanuvi runs on this PC with its own data.
-    </li>
-  </ol>
+    <h3>Pair with a computer through the relay</h3>
+    <p class="muted">
+      On the other computer, turn on remote access and press "Pair a device"; type the code it shows here.
+    </p>
+    <form class="add" onsubmit={pairNow}>
+      <label>
+        Relay address
+        <input bind:value={pairRelay} placeholder="wss://relay.qanuvi.com" spellcheck="false" />
+      </label>
+      <label>
+        Pairing code
+        <input bind:value={pairCode} placeholder="K7QF-29MX-T4HD" spellcheck="false" />
+      </label>
+      <label>
+        This device's name (shown on the other computer)
+        <input bind:value={pairName} placeholder="My laptop" maxlength={NAME_MAX + 10} />
+      </label>
+      {#if pairError}<p class="error">{pairError}</p>{/if}
+      <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
+        {pairing ? "Pairing…" : "Pair and connect"}
+      </button>
+    </form>
+
+    <h3>Add a server</h3>
+    <form class="add" onsubmit={add}>
+      <label>
+        Name (empty: the server's own computer name)
+        <input bind:value={name} placeholder="My VPS" maxlength={NAME_MAX + 10} />
+      </label>
+      <label>
+        SSH address
+        <input bind:value={target} placeholder="deploy@203.0.113.5 or an alias from ~/.ssh/config" spellcheck="false" />
+      </label>
+      <label>
+        Program on the server
+        <input bind:value={program} spellcheck="false" />
+      </label>
+      <label>
+        SSH key file (optional)
+        <input bind:value={identity} placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults" spellcheck="false" />
+      </label>
+      <label class="check"><input type="checkbox" bind:checked={auto} /> Connect when Qanuvi starts</label>
+      {#if formError}<p class="error">{formError}</p>{/if}
+      <button type="submit" class="btn primary" disabled={adding}>{adding ? "Connecting…" : "Add and connect"}</button>
+    </form>
+
+    <h3>Setting up a server</h3>
+    <ol class="help">
+      <li>
+        Copy the <code>qanuvi-master</code> program to the server (for example to <code>~/.local/bin</code>) and make it
+        runnable: <code>chmod +x ~/.local/bin/qanuvi-master</code>. Install <code>git</code>, and the agent (<code
+          >claude</code
+        >) if agents should run there.
+      </li>
+      <li>
+        Sign-in uses your SSH keys, never a password typed into Qanuvi: <code>ssh-copy-id deploy@your-server</code>,
+        then check that <code>ssh deploy@your-server</code> works without a password. For another port, add an alias in
+        <code>~/.ssh/config</code> and use the alias here.
+      </li>
+      <li>
+        That is all: Qanuvi starts the master's background service on first connect. To keep it running after the server
+        restarts, run it as a user service: <code>systemctl --user enable --now qanuvi-master</code> with a unit whose
+        <code>ExecStart</code> is <code>%h/.local/bin/qanuvi-master serve</code> (and
+        <code>loginctl enable-linger</code>).
+      </li>
+      <li>
+        To try it without a server, add a server with the SSH address <code>local</code>: the master program next to
+        Qanuvi runs on this PC with its own data.
+      </li>
+    </ol>
+  {/if}
 </div>
 
 <style>
@@ -311,176 +320,179 @@
     font-size: var(--qx-text-small);
   }
 
-  h2,
-  h3 {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: var(--qx-space-3) 0 var(--qx-space-2);
-  }
+  /* Shared with MachineServersView (a shown master's list), inside .servers only. */
+  .servers :global {
+    h2,
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: var(--qx-space-3) 0 var(--qx-space-2);
+    }
 
-  h2 {
-    font-size: 15px;
-  }
+    h2 {
+      font-size: 15px;
+    }
 
-  h3 {
-    font-size: 13px;
-  }
+    h3 {
+      font-size: 13px;
+    }
 
-  .lead,
-  .muted {
-    color: var(--qx-text-secondary);
-  }
+    .lead,
+    .muted {
+      color: var(--qx-text-secondary);
+    }
 
-  .muted {
-    margin: 4px 0;
-  }
+    .muted {
+      margin: 4px 0;
+    }
 
-  .card {
-    margin-bottom: var(--qx-space-2);
-    padding: var(--qx-space-2) var(--qx-space-3);
-    border: 1px solid var(--qx-border);
-    border-radius: var(--qx-radius-card);
-  }
+    .card {
+      margin-bottom: var(--qx-space-2);
+      padding: var(--qx-space-2) var(--qx-space-3);
+      border: 1px solid var(--qx-border);
+      border-radius: var(--qx-radius-card);
+    }
 
-  .card header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+    .card header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-  .spacer {
-    flex: 1;
-  }
+    .spacer {
+      flex: 1;
+    }
 
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--qx-text-muted);
-  }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--qx-text-muted);
+    }
 
-  .swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-  }
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
 
-  .colors {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 6px;
-  }
+    .colors {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 6px;
+    }
 
-  .color {
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: 2px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-  }
+    .color {
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
-  .color.picked {
-    border-color: var(--qx-text);
-  }
+    .color.picked {
+      border-color: var(--qx-text);
+    }
 
-  .dot.on {
-    background: #2ea043;
-  }
+    .dot.on {
+      background: #2ea043;
+    }
 
-  .dot.connecting {
-    background: #d29922;
-  }
+    .dot.connecting {
+      background: #d29922;
+    }
 
-  .dot.error {
-    background: #f85149;
-  }
+    .dot.error {
+      background: #f85149;
+    }
 
-  .error {
-    margin: 4px 0;
-    color: var(--qx-status-failed);
-  }
+    .error {
+      margin: 4px 0;
+      color: var(--qx-status-failed);
+    }
 
-  .row {
-    display: flex;
-    gap: 6px;
-    margin: 6px 0;
-  }
+    .row {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+    }
 
-  .add {
-    display: grid;
-    gap: 8px;
-    max-width: 520px;
-  }
+    .add {
+      display: grid;
+      gap: 8px;
+      max-width: 520px;
+    }
 
-  .add label:not(.check) {
-    display: grid;
-    gap: 3px;
-    color: var(--qx-text-secondary);
-  }
+    .add label:not(.check) {
+      display: grid;
+      gap: 3px;
+      color: var(--qx-text-secondary);
+    }
 
-  input:not([type]) {
-    flex: 1;
-    min-width: 0;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--qx-border);
-    border-radius: var(--qx-radius-button);
-    background: var(--qx-bg-window);
-    color: var(--qx-text);
-    font: inherit;
-    user-select: text;
-  }
+    input:not([type]) {
+      flex: 1;
+      min-width: 0;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid var(--qx-border);
+      border-radius: var(--qx-radius-button);
+      background: var(--qx-bg-window);
+      color: var(--qx-text);
+      font: inherit;
+      user-select: text;
+    }
 
-  input:focus {
-    outline: none;
-    border-color: var(--qx-accent);
-  }
+    input:focus {
+      outline: none;
+      border-color: var(--qx-accent);
+    }
 
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 4px;
-    color: var(--qx-text-secondary);
-  }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      color: var(--qx-text-secondary);
+    }
 
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--qx-border);
-    border-radius: var(--qx-radius-button);
-    background: var(--qx-bg-panel);
-    color: var(--qx-text);
-    font: inherit;
-    white-space: nowrap;
-    cursor: pointer;
-  }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--qx-border);
+      border-radius: var(--qx-radius-button);
+      background: var(--qx-bg-panel);
+      color: var(--qx-text);
+      font: inherit;
+      white-space: nowrap;
+      cursor: pointer;
+    }
 
-  .btn.primary {
-    justify-self: start;
-    background: var(--qx-accent);
-    border-color: var(--qx-accent);
-    color: #fff;
-  }
+    .btn.primary {
+      justify-self: start;
+      background: var(--qx-accent);
+      border-color: var(--qx-accent);
+      color: #fff;
+    }
 
-  .help {
-    max-width: 720px;
-    padding-left: 18px;
-    color: var(--qx-text-secondary);
-    line-height: 1.6;
-  }
+    .help {
+      max-width: 720px;
+      padding-left: 18px;
+      color: var(--qx-text-secondary);
+      line-height: 1.6;
+    }
 
-  code {
-    padding: 0 4px;
-    border-radius: 3px;
-    background: var(--qx-bg-window);
-    font-family: var(--qx-font-mono, monospace);
-    user-select: text;
+    code {
+      padding: 0 4px;
+      border-radius: 3px;
+      background: var(--qx-bg-window);
+      font-family: var(--qx-font-mono, monospace);
+      user-select: text;
+    }
   }
 </style>

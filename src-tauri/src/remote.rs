@@ -1,6 +1,7 @@
-//! The desktop's side of a master without a window (Milestones 16 and 20): connects to `qanuvi-master --stdio` through
-//! SSH, or to a paired computer through the relay, and passes the window's calls for that master's projects to it. "This PC" starts the master program next to the app,
-//! with its own data folder (for trying the feature without a server).
+//! One machine's connections to other masters (Milestones 16 and 20, migration M3b): connects to
+//! `qanuvi-master --stdio` through SSH, or to a paired computer through the relay, and passes calls to it. The desktop
+//! app uses it for This PC's servers ("local" starts the master program next to the app, with its own data folder, for
+//! trying the feature without a server); a master uses the same code for the servers it connects to itself.
 
 use crate::sink::Sink;
 use serde_json::{Value, json};
@@ -12,9 +13,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::Emitter;
 
 type Reply = Result<Value, String>;
+
+/// Told the id of a connection that ended by itself (network gone, the other master restarted).
+pub type OnEnd = Arc<dyn Fn(&str) + Send + Sync>;
 
 pub struct Connection {
     /// The SSH or local master process (none for a relay connection).
@@ -212,7 +215,7 @@ impl Connection {
         }
     }
 
-    fn ended(&self, app: &tauri::AppHandle, id: &str) {
+    fn ended(&self, on_end: &OnEnd, id: &str) {
         // What it streamed ends too (a language server there is told it stopped).
         self.streams
             .lock()
@@ -222,7 +225,10 @@ impl Connection {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clear();
-        let _ = app.emit("remote-closed", json!({"id": id}));
+        // Closed on purpose (disconnect, removed): nobody needs telling.
+        if !self.closed.load(Ordering::SeqCst) {
+            on_end(id);
+        }
     }
 }
 
@@ -267,14 +273,16 @@ impl Remotes {
     }
 
     /// Connects (or answers the existing connection) and returns the master's hello.
-    pub fn connect(&self, app: tauri::AppHandle, id: &str, transport: Transport) -> Reply {
+    pub fn connect(&self, on_end: OnEnd, id: &str, transport: Transport) -> Reply {
         if let Ok(c) = self.get(id) {
             return Ok(c.info.lock().unwrap_or_else(|e| e.into_inner()).clone());
         }
         let errors = Arc::new(Mutex::new(String::new()));
         let conn = match transport {
-            Transport::Process(command) => self.start_process(&app, id, command, errors.clone())?,
-            Transport::Relay(paired) => self.start_relay(&app, id, &paired)?,
+            Transport::Process(command) => {
+                self.start_process(&on_end, id, command, errors.clone())?
+            }
+            Transport::Relay(paired) => self.start_relay(&on_end, id, &paired)?,
         };
         self.map
             .lock()
@@ -310,7 +318,7 @@ impl Remotes {
 
     fn start_process(
         &self,
-        app: &tauri::AppHandle,
+        on_end: &OnEnd,
         id: &str,
         mut command: Command,
         errors: Arc<Mutex<String>>,
@@ -348,12 +356,12 @@ impl Remotes {
             let _ = stderr.read_to_string(&mut buf);
             *errors.lock().unwrap_or_else(|e| e.into_inner()) = buf;
         });
-        let (c, id, app) = (conn.clone(), id.to_string(), app.clone());
+        let (c, id, on_end) = (conn.clone(), id.to_string(), on_end.clone());
         std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
                 c.on_line(&line);
             }
-            c.ended(&app, &id);
+            c.ended(&on_end, &id);
         });
         Ok(conn)
     }
@@ -361,7 +369,7 @@ impl Remotes {
     /// A paired computer through the relay: an encrypted session carries the same lines as SSH.
     fn start_relay(
         &self,
-        app: &tauri::AppHandle,
+        on_end: &OnEnd,
         id: &str,
         paired: &crate::relay_client::Paired,
     ) -> Result<Arc<Connection>, String> {
@@ -379,7 +387,7 @@ impl Remotes {
             next: AtomicU64::new(0),
             info: Mutex::new(Value::Null),
         });
-        let (c, id, app) = (conn.clone(), id.to_string(), app.clone());
+        let (c, id, on_end) = (conn.clone(), id.to_string(), on_end.clone());
         std::thread::spawn(move || {
             'session: loop {
                 if c.closed.load(Ordering::SeqCst) {
@@ -406,7 +414,7 @@ impl Remotes {
                     }
                 }
             }
-            c.ended(&app, &id);
+            c.ended(&on_end, &id);
         });
         Ok(conn)
     }
@@ -430,6 +438,21 @@ impl Remotes {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .remove(&(id.to_string(), port));
+    }
+
+    /// What each connected master said when it answered (its hello), by id.
+    pub fn infos(&self) -> Vec<(String, Value)> {
+        self.map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(id, c)| {
+                (
+                    id.clone(),
+                    c.info.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+                )
+            })
+            .collect()
     }
 
     /// The masters connected now.

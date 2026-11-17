@@ -1174,8 +1174,7 @@ async fn remote_connect(
         // A paired computer through the relay; the pairing key comes from the credential store.
         "relay" => {
             let r = relay.ok_or("No relay details for this computer.")?;
-            let key = relay_key(&r.pairing)?
-                .get_password()
+            let key = crate::pairing_keys::get(&r.pairing)
                 .map_err(|_| "This device's pairing is missing; pair again.".to_string())?;
             crate::remote::Transport::Relay(crate::relay_client::Paired {
                 relay: r.url,
@@ -1200,7 +1199,11 @@ async fn remote_connect(
     let app2 = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = app2.state::<AppState>();
-        state.remotes.connect(app2.clone(), &id, transport)
+        let app3 = app2.clone();
+        let on_end: crate::remote::OnEnd = std::sync::Arc::new(move |id: &str| {
+            let _ = tauri::Emitter::emit(&app3, "remote-closed", serde_json::json!({"id": id}));
+        });
+        state.remotes.connect(on_end, &id, transport)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1630,18 +1633,12 @@ fn brain_records() -> crate::brain::Records {
     crate::brain::Records::load(&crate::paths::data_dir())
 }
 
-fn relay_key(pairing: &str) -> Res<keyring::Entry> {
-    keyring::Entry::new("Qanuvi", &format!("relay:{pairing}")).map_err(|e| e.to_string())
-}
-
 /// Pairs this device with a computer showing a pairing code; the key goes to the credential store.
 #[tauri::command]
 async fn remote_pair(relay: String, code: String, name: String) -> Res<serde_json::Value> {
     blocking(move || {
         let p = crate::relay_client::pair(&relay, &code, &name)?;
-        relay_key(&p.pairing)?
-            .set_password(&p.key)
-            .map_err(|e| format!("The pairing could not be kept: {e}"))?;
+        crate::pairing_keys::set(&p.pairing, &p.key)?;
         Ok(serde_json::json!({"relay": p.relay, "masterId": p.master_id, "masterName": p.master_name, "pairing": p.pairing}))
     })
     .await
@@ -1650,10 +1647,7 @@ async fn remote_pair(relay: String, code: String, name: String) -> Res<serde_jso
 /// Forgets a pairing on this device.
 #[tauri::command]
 fn remote_unpair(pairing: String) -> Res<()> {
-    match relay_key(&pairing)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    crate::pairing_keys::delete(&pairing)
 }
 
 /// Passes one of the window's calls to a master. With `streams`, events of what it starts (terminal output, agent

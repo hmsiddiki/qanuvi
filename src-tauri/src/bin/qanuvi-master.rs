@@ -8,6 +8,8 @@
 //! qanuvi-master login       sign this machine in to its Qanuvi account with an application password
 //!                           (--site <address>; --password-stdin reads the login name and password from stdin)
 //! qanuvi-master logout      forget this machine's sign-in
+//! qanuvi-master servers     the servers this machine connects to: list, add <ssh address>, remove <name>
+//! qanuvi-master pair        pair with a computer through the relay (--relay <address> --code <pairing code>)
 //! Options: --data <folder>  where its database and settings are (default ~/.local/share/qanuvi)
 
 use std::path::PathBuf;
@@ -86,9 +88,22 @@ fn main() {
             Some("logout") => {
                 qanuvi_lib::account::cli_logout(&qanuvi_lib::master::accounts_at(&data), site)
             }
+            Some(c @ ("servers" | "pair")) => {
+                let rest: Vec<String> = args
+                    .iter()
+                    .skip_while(|a| a.as_str() != c)
+                    .skip(1)
+                    .cloned()
+                    .collect();
+                if c == "servers" {
+                    qanuvi_lib::master::servers_cli(&data, &rest)
+                } else {
+                    qanuvi_lib::master::pair_cli(&data, &rest)
+                }
+            }
             _ => {
                 eprintln!(
-                    "Usage: qanuvi-master serve | --stdio | status | stop | login | logout  [--data <folder>] [--site <address>]"
+                    "Usage: qanuvi-master serve | --stdio | status | stop | login | logout | servers | pair  [--data <folder>] [--site <address>]"
                 );
                 std::process::exit(2);
             }

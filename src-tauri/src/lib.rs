@@ -33,6 +33,7 @@ pub mod memory_disk;
 pub mod model_keys;
 pub mod notify;
 pub mod omniroute;
+pub mod pairing_keys;
 pub mod paths;
 pub mod pipes;
 pub mod plan;
@@ -42,6 +43,7 @@ pub mod projects;
 pub mod relay;
 pub mod relay_client;
 pub mod relay_server;
+pub mod remote;
 pub mod runs;
 pub mod secrets;
 pub mod servers;
@@ -57,8 +59,6 @@ pub mod usage;
 mod desktop;
 #[cfg(feature = "desktop")]
 mod desktop_notify;
-#[cfg(feature = "desktop")]
-mod remote;
 #[cfg(feature = "desktop")]
 pub use desktop::*;
 
