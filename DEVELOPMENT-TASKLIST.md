@@ -384,7 +384,23 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-17 19:45, after 3fb5878): open items in order:
+    PICKUP POINT (fresh conversation starts here, 2026-11-17 20:15, after d57f56b): open items in order:
+    (1) M3c depth 3 + loop guard driven live when the owner provides another machine (unchanged, see below; the VPS
+    can now be a middle hop). (2) m2a seen live on a master's Account page (fix in, only checked by svelte-check).
+    State: test build of d57f56b in target/release; test window and local test master stopped. VPS basevm378 runs
+    the server build of d57f56b (cross-built 19:50, 9.9 MB, zigbuild -j 2), swapped into ~/.local/bin, the Nov 16
+    build kept as qanuvi-master.prev; serve started again with setsid (no service manager there). Drive scripts
+    ui.ps1/go.ps1/room.ps1/inwin.ps1 now also in the scratchpad of session 4ca626fb. Test project b1proj (that
+    scratchpad) has a seeded stopped-by-budget run in the test app's database.
+    b1 BUILT + DRIVEN LIVE (d57f56b, 2026-11-17; verify green 476 + 460): the run record keeps budgetReached when the
+    run stops on its own budget; the status line says "Stopped: budget $1.00 reached" (the message is not repeated);
+    a Raise budget button next to Resume opens the run's settings with the budget box focused and selected; the start
+    panel warns when the budget is below what a step usually costs on the first step's model (costs.ts usualStepCost:
+    same kind of job first, else every kind on that model; failed tries count in), "the run will likely stop after
+    step N". Driven with a seeded record ($1.16 Opus step, $1.00 budget): line, button, focus, warning shown with
+    Opus for every step, gone at $2. Rust scenario b1_a_run_stopped_by_its_budget_says_so_on_the_record.
+    m2a FIXED (d57f56b): explicit space after "password." before the master-only sentence on the Account page.
+    PICKUP POINT (before, 2026-11-17 19:45, after 3fb5878): open items in order:
     (1) M3c depth 3 + loop guard driven live when the owner provides another machine (window -> local test master ->
     VPS -> new machine, and a path back to a machine already passed). Not driven yet either: a master disconnected on
     purpose while one under it is shown, unpair (removed) live, a language server on a nested machine (unit-tested;
