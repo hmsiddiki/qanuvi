@@ -213,6 +213,9 @@ Owner decisions (2026-11-17):
   change); M3b `remote_*` on the master + pairing from a master (desktop-build master and server build); M3c forwarding
   along the path, loop and depth guard, nested dropdown.
 - The VPS gets a new server build (with M2) before M3 is driven there (owner yes).
+- M3b BUILT + DRIVEN LIVE 2026-11-17 (024d1da): a master answers servers_* and remote_* from its own list and store;
+  its Servers screen in the window is that machine's list; `qanuvi-master servers` / `pair` in its terminal. A master
+  refuses "local"/"self" as its servers (only the app has them).
 
 ### M4. This PC runs its own master
 

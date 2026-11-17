@@ -13,6 +13,13 @@ use std::sync::Arc;
 /// How long a master waits before it tries its away servers again.
 pub const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// Why "local" (a desktop's test master next to the app) and "self" (the desktop itself) are not servers of a master.
+fn app_only(target: &str) -> String {
+    format!(
+        "A master reaches other machines over SSH or through the relay; \"{target}\" works only in the app."
+    )
+}
+
 /// What a server entry or a remote_connect call says about how to reach it.
 fn transport_for(server: &Value) -> Result<Transport, String> {
     let target = server["target"].as_str().unwrap_or("").trim();
@@ -31,9 +38,7 @@ fn transport_for(server: &Value) -> Result<Transport, String> {
         }
         // "local" is a desktop's test master next to the app; "self" is the desktop itself. Neither is a machine a
         // master can reach onward.
-        "local" | "self" => Err(format!(
-            "A master reaches other machines over SSH or through the relay; \"{target}\" works only in the app."
-        )),
+        "local" | "self" => Err(app_only(target)),
         t => {
             let program = server["program"].as_str().unwrap_or("").trim();
             let identity = server["identity"].as_str();
@@ -164,7 +169,14 @@ impl Master {
                 let old = args["servers"].as_array().cloned().unwrap_or_default();
                 to(crate::servers::import(db, &old))
             }
-            "servers_save" => to(crate::servers::save(db, &args["server"])),
+            "servers_save" => {
+                // Refused before it is kept (finding s1): kept, it would be tried again every minute.
+                let target = args["server"]["target"].as_str().unwrap_or("").trim();
+                if matches!(target, "local" | "self") {
+                    return Err(app_only(target));
+                }
+                to(crate::servers::save(db, &args["server"]))
+            }
             "servers_remove" => {
                 // Unpaired at once: its connection closes now, and whoever follows this master is told.
                 let id = s(args, "id");

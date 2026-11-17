@@ -1445,7 +1445,8 @@ mod tests {
         call(&m, "servers_save", json!({"server": vps})).unwrap();
         let local = json!({"id": "l1", "name": "", "target": "local", "program": "", "identity": "",
             "autoConnect": true});
-        call(&m, "servers_save", json!({"server": local})).unwrap();
+        // Kept before the master refused it (an older build, or This PC's list copied in).
+        crate::servers::save(&m.db, &local).unwrap();
         let kept = call(&m, "servers_list", json!({})).unwrap();
         assert_eq!(kept["servers"][0]["name"], "VPS");
         assert_eq!(kept["servers"].as_array().unwrap().len(), 2);
@@ -1460,7 +1461,15 @@ mod tests {
         )
         .unwrap_err();
         assert!(e.contains("Not connected"), "{e}");
-        // A desktop's test master next to the app is not a machine a master reaches onward; why is kept.
+        // A desktop's test master next to the app is not a machine a master reaches onward: not kept (finding s1),
+        // and one kept before is refused with why.
+        let e = call(
+            &m,
+            "servers_save",
+            json!({"server": {"id": "l2", "target": "local"}}),
+        )
+        .unwrap_err();
+        assert!(e.contains("works only in the app"), "{e}");
         let e = call(&m, "remote_connect", local.clone()).unwrap_err();
         assert!(e.contains("over SSH or through the relay"), "{e}");
         let states = call(&m, "remote_watch", json!({})).unwrap();

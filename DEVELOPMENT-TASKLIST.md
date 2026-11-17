@@ -384,6 +384,24 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    M3b DRIVEN LIVE (2026-11-17, test build of 024d1da; window -> local test master -> VPS basevm378 over SSH with
+    ~/.ssh/vps_key, the VPS binary unchanged): terminal `qanuvi-master servers add root@165.99.219.195 --name VPS
+    --program ~/.local/bin/qanuvi-master --key ~/.ssh/vps_key` connected (basevm378, master 0.1.23), duplicate name
+    refused, list shows connected; the local test master shown in the window lists its OWN servers (This PC's list
+    stays on This PC's screen); Disconnect/Connect from the window seen by the terminal; rename to empty = its
+    computer name; colour + lasting id kept on the master; service stopped -> new service connected the VPS by itself
+    and the window followed the new connection; Remove ended the master's own ssh link at once; Add form connected
+    and named it basevm378. Finding s1 (a "local" server was kept and retried every minute) FIXED: servers_save on a
+    master refuses "local"/"self", driven live. Next: M3c (forwarding along the path, loop and depth guard, nested
+    dropdown); the VPS server build swap (owner yes, plan) comes before M3c is driven there.
+    M3b BUILT (2026-11-17, 024d1da + s1 fix): remote.rs shared by app and master (end callback instead of window
+    events; a deliberate close no longer reports itself ended); pairing_keys.rs (credential store on desktop builds,
+    0600 pairing-keys.json on the server build); master_servers.rs answers servers_* and remote_* plus remote_states
+    and remote_watch, removing a server ends its connection at once, refuses this machine itself, connects its
+    start-up servers at start and every minute; master_cli.rs: `qanuvi-master servers list|add|remove` and
+    `qanuvi-master pair` (thin clients of the service, window's name rules); Servers screen of a shown master =
+    MachineServersView (machineServers store). Parity test was red since M3a (servers_* missing on the master), green
+    again; remote_* gaps closed.
     M3a DRIVEN LIVE (2026-11-17, test build of f2e193a on the source data folder): store v12 -> v13; the window's
     2 servers (local test master, basevm378) moved in once, same order and fields, flag set; both connected (2/2),
     switcher shows them; a colour change on the Servers screen reached the servers table; after a restart the list
