@@ -202,6 +202,18 @@ This PC is untouched in M1.
 - Loops are refused: a machine never forwards to a path that already holds its own lasting id.
 - The switcher shows the nested dropdown, made visually clear.
 
+Owner decisions (2026-11-17):
+- Depth: at most 3 levels below the window (a path holds at most 3 machines). A longer path is refused with a plain
+  message, as a loop is.
+- Unpairing: when a master drops a server, every machine reaching it through that master loses it at once (open
+  connections through it close, the switcher removes it and says why).
+- Pairing a server onto a master works both ways: from the window (the window drives it, the master stores the server
+  and its key) and from that master's own terminal (`qanuvi-master`).
+- Built in three parts, each driven live before the next: M3a server table + one-time import on This PC (no visible
+  change); M3b `remote_*` on the master + pairing from a master (desktop-build master and server build); M3c forwarding
+  along the path, loop and depth guard, nested dropdown.
+- The VPS gets a new server build (with M2) before M3 is driven there (owner yes).
+
 ### M4. This PC runs its own master
 
 - At launch, the app starts or attaches to This PC's master on the app's own data folder.
