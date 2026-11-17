@@ -347,3 +347,12 @@ export function errorOf(response: {
   }
   return response.message || "The debugger answered with an error.";
 }
+
+/**
+ * The example in the Xdebug file box, in the shown machine's own form: a .so path on Linux and macOS, a .dll on
+ * Windows. PHP's path tells which; without one, `windowsHere` (the shown machine is a Windows This PC) decides.
+ */
+export function xdebugExample(phpPath: string | undefined, windowsHere: boolean): string {
+  const windows = phpPath ? /^[A-Za-z]:[\\/]/.test(phpPath) || phpPath.startsWith("\\\\") : windowsHere;
+  return windows ? "e.g. C:\\tools\\php_xdebug-3.5.3-8.2-nts-vs16-x86_64.dll" : "e.g. /usr/lib/php/20220829/xdebug.so";
+}

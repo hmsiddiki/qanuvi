@@ -14,6 +14,7 @@ import {
   substitute,
   toggleLine,
   unsupported,
+  xdebugExample,
 } from "./protocol";
 
 const ctx = {
@@ -208,5 +209,16 @@ describe("breakpoints", () => {
       "Cannot find a.js",
     );
     expect(errorOf({ message: "nope" })).toBe("nope");
+  });
+});
+
+describe("Xdebug file example", () => {
+  it("follows the shown machine's PHP path", () => {
+    expect(xdebugExample("/usr/bin/php", true)).toBe("e.g. /usr/lib/php/20220829/xdebug.so");
+    expect(xdebugExample("C:\\php\\php.exe", false)).toMatch(/\.dll$/);
+  });
+  it("falls back to whether the shown machine is a Windows This PC", () => {
+    expect(xdebugExample(undefined, true)).toMatch(/\.dll$/);
+    expect(xdebugExample("", false)).toMatch(/\.so$/);
   });
 });

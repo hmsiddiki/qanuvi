@@ -9,7 +9,8 @@
   import { lsp } from "$lib/stores/lsp.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import type { ServerId } from "$lib/lsp/protocol";
-  import type { PhpInfo } from "$lib/dap/protocol";
+  import { xdebugExample, type PhpInfo } from "$lib/dap/protocol";
+  import { platform } from "$lib/platform.svelte";
   import { dap } from "$lib/stores/dap.svelte";
 
   let l = $derived(settings.value.languages);
@@ -138,7 +139,8 @@
         <span class="muted"
           >{s.installed ? `Installed by Qanuvi${s.version ? ` · ${s.version}` : ""}` : "Not installed"}</span
         >
-        {#if !s.installed}<span class="muted small">{s.install || s.missing}</span>{/if}
+        {#if !s.installed}<span class="muted small">{s.install || s.missing}</span>
+        {:else if s.missing}<span class="muted small">{s.missing}</span>{/if}
       </div>
       {#if !s.installed && s.install}
         <button type="button" disabled={dap.installing} onclick={() => dap.install(s.id)}
@@ -163,7 +165,7 @@
           <input
             type="text"
             spellcheck="false"
-            placeholder="e.g. C:\tools\php_xdebug-3.5.3-8.2-nts-vs16-x86_64.dll"
+            placeholder={xdebugExample(dap.php?.php, !switcher.shown && platform.os === "windows")}
             bind:value={xdebugDraft}
             onkeydown={(e) => e.key === "Enter" && saveXdebug()}
           />

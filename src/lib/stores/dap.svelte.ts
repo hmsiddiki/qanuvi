@@ -125,6 +125,8 @@ class DapStore {
     machine: string | null;
   } | null>(null);
   lastError = $state("");
+  /** The machine shown when the last start began: its error goes when that machine leaves the screen. */
+  #errorMachine: string | null = null;
   threads = $state<{ id: number; name: string }[]>([]);
   stopped = $state<{ conn: number; threadId: number; reason: string; label: string; text: string } | null>(null);
   frames = $state<Frame[]>([]);
@@ -298,6 +300,7 @@ class DapStore {
   /** Starts debugging a configuration in a project (stops a session that runs first). */
   async start(projectId: string, config: LaunchConfig): Promise<void> {
     this.lastError = "";
+    this.#errorMachine = switcher.shown;
     const why = unsupported(config);
     if (why) {
       this.lastError = why;
@@ -690,6 +693,7 @@ class DapStore {
   stopMachine(machine: string | null): void {
     if (this.session && this.session.machine === machine) void this.stop();
     if (this.offer && this.#offerMachine === machine) this.offer = null;
+    if (this.lastError && this.#errorMachine === machine) this.lastError = "";
   }
 
   /** Ends the session: the debuggee too (disconnect with terminateDebuggee), then the debugger itself. */

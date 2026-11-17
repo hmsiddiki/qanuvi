@@ -379,7 +379,24 @@ runs on or off; with it off nothing is sent anywhere.
     old usage-limit scenario only passed through the runner's own echo). Tests: limit_notice cases, scenario "a step
     about a rate limit is not the agent's usage limit"; 427 Rust lib tests. The installed 0.1.22 window runner keeps
     the old check until the next published update (owner's yes).
-    RESUME HERE (newest, 2026-11-17 06:00): M1d DRIVEN ON THE VPS (owner's yes for the server build and for PHP with
+    RESUME HERE (newest, 2026-11-17 06:20): q1 + q2 FIXED (owner: "yes to both") and DRIVEN LIVE (release test
+    build 06:15; the local test master still runs its 05:17 build, its exe was in use; nothing master-side changed).
+    q1: each debugger spec has `min_node` (js-debug 20, PHP Debug 0); dap.rs `usable_node` asks the machine's
+    `node --version` through `host.run` and refuses with "This debugger needs Node.js 20 or newer; that machine has
+    18.20.4. Install a newer Node.js from nodejs.org on that machine first." in the status (Languages shows it also
+    for an installed debugger), Install, and both starts. A master's adapter that ends before naming its port now
+    says "<label> ended before it was ready. It said: <its error line>" (`adapter_said`). Driven: basevm378 Languages
+    shows the line under js-debug v1.140.1; F5 on app.js shows it and starts nothing on the VPS; This PC (Node 24)
+    unchanged. q2: `xdebugExample` (dap/protocol.ts): .so example when the shown machine's PHP path is a Linux/macOS
+    one; driven (VPS ".so", This PC keeps its .dll). Found while driving, fixed: a start error stayed in the Run and
+    debug sidebar after switching to another machine; dap store keeps its machine and `stopMachine` clears it
+    (driven: gone on This PC; the Debug console keeps its history lines, as before). Checks: clippy clean, 442 Rust
+    lib tests, 449 vitest (new dap.svelte.test.ts), svelte-check 0, prettier.
+    Node 20+ on the VPS: NOT DONE. The install (nodejs.org v26.13.1 LTS, SHA256 checked, /opt + links in
+    /usr/local/bin ahead of Debian's 18) was blocked by the session's permission check; it changes `node` for the
+    whole hosting server, so it waits for the owner (run it themselves, or allow it). Then js-debug on the VPS
+    (breakpoint app.js:3), then M2.
+    RESUME HERE (before, 2026-11-17 06:00): M1d DRIVEN ON THE VPS (owner's yes for the server build and for PHP with
     Xdebug). Server build cross-built from c57122a (zigbuild -j 1, 9.6 MB, 5m 51s), swapped into ~/.local/bin on
     basevm378 (old one kept as qanuvi-master.prev, old serve ended with pkill -x, window reconnected by itself).
     VPS note: basevm378 is a hosting server (nginx, php-fpm 5.6 to 8.5 all running). `apt install php-xdebug` went

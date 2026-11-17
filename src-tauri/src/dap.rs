@@ -69,6 +69,8 @@ pub struct Spec {
     pub entry: &'static str,
     pub transport: Transport,
     pub need_gb: f64,
+    /// The oldest Node.js major version it runs on; 0 when any does (no check).
+    pub min_node: u32,
 }
 
 pub const SPECS: &[Spec] = &[
@@ -83,6 +85,8 @@ pub const SPECS: &[Spec] = &[
         entry: "js-debug/src/dapDebugServer.js",
         transport: Transport::Server,
         need_gb: 0.3,
+        // Its releases use JavaScript that Node.js 18 cannot read (a RegExp `v` flag): it stops at once there.
+        min_node: 20,
     },
     // The adapter of VS Code's "PHP Debug" extension, made by the Xdebug project. It speaks to Xdebug inside PHP.
     Spec {
@@ -96,6 +100,7 @@ pub const SPECS: &[Spec] = &[
         entry: "extension/out/phpDebug.js",
         transport: Transport::Stdio,
         need_gb: 0.15,
+        min_node: 0,
     },
 ];
 
@@ -127,6 +132,68 @@ fn needs_node(place: &str) -> String {
     }
 }
 
+fn node_too_old(spec: &Spec, place: &str, version: &str) -> String {
+    let there = if place == "this computer" {
+        String::new()
+    } else {
+        format!(" on {place}")
+    };
+    format!(
+        "This debugger needs Node.js {} or newer; {place} has {version}. Install a newer Node.js from nodejs.org{there} \
+         first.",
+        spec.min_node
+    )
+}
+
+/// `node --version`'s answer ("v18.20.4") as its major number and the version without the "v".
+fn parse_node_version(text: &str) -> Option<(u32, String)> {
+    let line = text.lines().map(str::trim).find(|l| l.starts_with('v'))?;
+    let full = line.trim_start_matches('v');
+    let major = full.split('.').next()?.parse().ok()?;
+    Some((major, full.to_string()))
+}
+
+/// Node.js's version on that machine; None when it does not answer (then nothing is refused).
+fn node_version(host: &dyn Host, node: &str) -> Option<(u32, String)> {
+    let said = Arc::new(Mutex::new(String::new()));
+    let s = said.clone();
+    let live = Sink::new(move |line: String| {
+        let mut t = s.lock().unwrap();
+        t.push_str(&line);
+        t.push('\n');
+        true
+    });
+    host.run(node, &["--version".to_string()], None, 30, Some(live))
+        .ok()?;
+    parse_node_version(&said.lock().unwrap())
+}
+
+/// The Node.js that runs this debugger on that machine, or why there is none (missing, or older than it needs).
+fn usable_node(host: &dyn Host, spec: &Spec) -> Result<String, String> {
+    let node = host.find("node").ok_or_else(|| needs_node(host.place()))?;
+    if spec.min_node > 0
+        && let Some((major, full)) = node_version(host, &node)
+        && major < spec.min_node
+    {
+        return Err(node_too_old(spec, host.place(), &full));
+    }
+    Ok(node)
+}
+
+/// What an adapter that ended too soon said: its error line (Node's "SyntaxError: ..."), else its last line.
+/// Minified source lines that Node prints around an error are left out.
+fn adapter_said(lines: &[String]) -> Option<String> {
+    let kept: Vec<&str> = lines
+        .iter()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty() && l.len() <= 300 && !l.starts_with("at "))
+        .collect();
+    kept.iter()
+        .find(|l| l.contains("Error"))
+        .or_else(|| kept.last())
+        .map(|l| l.to_string())
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Status {
     pub id: &'static str,
@@ -148,7 +215,7 @@ pub fn status(host: &dyn Host, spec: &'static Spec) -> Status {
         .read_small(&format!("{}/version.txt", own_rel(spec)))
         .map(|v| v.trim().to_string())
         .unwrap_or_default();
-    let node = host.find("node").is_some();
+    let problem = usable_node(host, spec).err();
     let place = host.place();
     Status {
         id: spec.id,
@@ -156,7 +223,7 @@ pub fn status(host: &dyn Host, spec: &'static Spec) -> Status {
         types: spec.types,
         installed,
         version,
-        install: if node {
+        install: if problem.is_none() {
             format!(
                 "Downloads its latest release from GitHub (github.com/{}, {}) into Qanuvi's data folder on {place}; \
                  nothing is installed for the whole machine.",
@@ -165,11 +232,7 @@ pub fn status(host: &dyn Host, spec: &'static Spec) -> Status {
         } else {
             String::new()
         },
-        missing: if node {
-            String::new()
-        } else {
-            needs_node(place)
-        },
+        missing: problem.unwrap_or_default(),
     }
 }
 
@@ -245,9 +308,7 @@ fn latest(spec: &Spec) -> Result<(String, String, String), String> {
 /// Installs an adapter on that machine (blocking; the download takes a few seconds). Only called after the user said
 /// yes. The release is looked up from here; the machine downloads and unpacks it into its own data folder.
 pub fn install(host: &dyn Host, spec: &'static Spec) -> Result<Status, String> {
-    if host.find("node").is_none() {
-        return Err(needs_node(host.place()));
-    }
+    usable_node(host, spec)?;
     let (tag, name, url) = latest(spec)?;
     host.fetch(&url, spec.archive.name(), &own_rel(spec), spec.entry, &tag)
         .map_err(|e| format!("Installing {name} failed: {e}"))?;
@@ -536,7 +597,7 @@ impl Adapters {
         let here = crate::lsp::Here;
         let entry =
             own_entry(&here, spec).ok_or_else(|| format!("{} is not installed.", spec.label))?;
-        let node = crate::local_servers::find("node").ok_or_else(|| needs_node(here.place()))?;
+        let node = usable_node(&here, spec)?;
         crate::machine::check(spec.label, spec.need_gb)?;
         let port = match spec.transport {
             Transport::Server => Some(free_port()?),
@@ -651,7 +712,7 @@ impl Adapters {
         let host = On::new(link.clone())?;
         let entry = own_entry(&host, spec)
             .ok_or_else(|| format!("{} is not installed on that machine.", spec.label))?;
-        let node = host.find("node").ok_or_else(|| needs_node(host.place()))?;
+        let node = usable_node(&host, spec)?;
         if let Some(room) = host.room() {
             crate::machine::fits(spec.label, spec.need_gb, room)
                 .map_err(|e| format!("On that machine: {e}"))?;
@@ -671,6 +732,15 @@ impl Adapters {
         let (port_tx, port_rx) = mpsc::channel::<u16>();
         let port_tx = Mutex::new(Some(port_tx));
         let lines = Mutex::new(Lines::default());
+        // Its last output lines: when it ends before it is ready, the message says why (finding q1).
+        let said = Arc::new(Mutex::new(Vec::<String>::new()));
+        let heard = said.clone();
+        let keep = move |text: &str| {
+            let mut h = heard.lock().unwrap();
+            h.extend(text.lines().map(String::from));
+            let over = h.len().saturating_sub(60);
+            h.drain(..over);
+        };
         let (log, map, k) = (sink.clone(), self.map.clone(), key.clone());
         let events = Sink::new(move |e: Value| match e["kind"].as_str() {
             Some("out") => {
@@ -690,15 +760,16 @@ impl Adapters {
                     {
                         let _ = t.send(p);
                     }
+                    keep(&line);
                     let _ = log.send(DapEvent::Log { text: line });
                 });
                 true
             }
-            Some("err") => log
-                .send(DapEvent::Log {
-                    text: e["text"].as_str().unwrap_or("").to_string(),
-                })
-                .is_ok(),
+            Some("err") => {
+                let text = e["text"].as_str().unwrap_or("").to_string();
+                keep(&text);
+                log.send(DapEvent::Log { text }).is_ok()
+            }
             Some("exit") => {
                 tx.lock().unwrap().take();
                 port_tx.lock().unwrap().take();
@@ -727,12 +798,20 @@ impl Adapters {
         ) = if server {
             let remote = match port_rx.recv_timeout(Duration::from_secs(20)) {
                 Ok(p) => p,
-                Err(_) => {
+                Err(why) => {
                     stop_pipe(&link);
-                    return Err(format!(
-                        "{} did not say which port it listens on.",
-                        spec.label
-                    ));
+                    let first = match why {
+                        mpsc::RecvTimeoutError::Disconnected => {
+                            format!("{} ended before it was ready.", spec.label)
+                        }
+                        mpsc::RecvTimeoutError::Timeout => {
+                            format!("{} did not say which port it listens on.", spec.label)
+                        }
+                    };
+                    return Err(match adapter_said(&said.lock().unwrap()) {
+                        Some(s) => format!("{first} It said: {s}"),
+                        None => first,
+                    });
                 }
             };
             let fwd = match crate::pipes::forward(link.clone(), remote) {
@@ -997,6 +1076,56 @@ mod tests {
             got,
             vec!["Debug server listening at 127.0.0.1:5000".to_string()]
         );
+    }
+
+    #[test]
+    fn knows_a_node_too_old_for_a_debugger() {
+        assert_eq!(
+            parse_node_version("v18.20.4\n"),
+            Some((18, "18.20.4".to_string()))
+        );
+        assert_eq!(
+            parse_node_version("v22.11.0"),
+            Some((22, "22.11.0".to_string()))
+        );
+        assert_eq!(parse_node_version("node: not found"), None);
+        let js = spec("node").unwrap();
+        assert_eq!(js.min_node, 20);
+        assert_eq!(spec("php").unwrap().min_node, 0);
+        assert_eq!(
+            node_too_old(js, "basevm378", "18.20.4"),
+            "This debugger needs Node.js 20 or newer; basevm378 has 18.20.4. Install a newer Node.js from \
+             nodejs.org on basevm378 first."
+        );
+        assert!(node_too_old(js, "this computer", "18.0.0").ends_with("from nodejs.org first."));
+    }
+
+    #[test]
+    fn says_why_an_adapter_ended_too_soon() {
+        // What Node 18 printed when js-debug 1.140 stopped at once (its minified source line shortened here).
+        let long = "x".repeat(400);
+        let out: Vec<String> = [
+            "/root/.local/share/qanuvi/debug-adapters/node/js-debug/src/dapDebugServer.js:91",
+            long.as_str(),
+            "",
+            "SyntaxError: Option 'input': Invalid flags supplied to RegExp constructor 'v'",
+            "    at new RegExp (<anonymous>)",
+            "    at Re (/root/js-debug/src/dapDebugServer.js:87:13113)",
+            "",
+            "Node.js v18.20.4",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert_eq!(
+            adapter_said(&out).as_deref(),
+            Some("SyntaxError: Option 'input': Invalid flags supplied to RegExp constructor 'v'")
+        );
+        assert_eq!(
+            adapter_said(&["listening soon".into(), "bye".into()]).as_deref(),
+            Some("bye")
+        );
+        assert_eq!(adapter_said(&[]), None);
     }
 
     #[test]
