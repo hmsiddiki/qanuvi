@@ -1,7 +1,8 @@
 /**
  * User preferences (24z3 Part A3): the Settings page is the shown machine's, kept in that machine's database
- * (settings_get / settings_set, one value per top-level key). The window keeps its own things (its list of masters,
- * its sign-in) and a copy of This PC's settings in local storage, so it starts at once with them.
+ * (settings_get / settings_set, one value per top-level key). The window keeps its own things (its sign-in, and a
+ * copy of This PC's server list, which This PC keeps in its database since M3a: masters.svelte.ts) and a copy of This
+ * PC's settings in local storage, so it starts at once with them.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { callMaster, shownMachine } from "$lib/remote";
@@ -11,7 +12,10 @@ import { own } from "$lib/agents/ownModels.svelte";
 
 const KEY = "qanuvi.settings.v1";
 
-/** Settings that stay with the window, never kept by a machine (settings.rs refuses them too). */
+/**
+ * Settings that stay with the window, never kept among a machine's settings (settings.rs refuses them too). The server
+ * list is kept by This PC in its own table (servers.rs), not with its settings.
+ */
 export const WINDOW_KEYS = ["masters", "account"] as const;
 const isWindowKey = (k: string) => (WINDOW_KEYS as readonly string[]).includes(k);
 

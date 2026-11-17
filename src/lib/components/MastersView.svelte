@@ -120,6 +120,7 @@
     work like this PC's: files, git, search, terminals and agents run on the server, and agent sessions keep going when
     this PC is off.
   </p>
+  {#if masters.keepError}<p class="error">{masters.keepError}</p>{/if}
 
   <DataFolderPanel />
   <RemoteAccessPanel />

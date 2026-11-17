@@ -59,11 +59,58 @@ class MastersStore {
   status = $state<Record<string, MasterStatus>>({});
   /** How many projects each connected master has (the Servers screen), whichever machine is shown. */
   projectCount = $state<Record<string, number>>({});
+  /** This PC's server list could not be read or kept (said on the Servers screen). */
+  keepError = $state("");
   #listening = false;
+  /** Changes to the kept list go to This PC one after another, in the order they were made. */
+  #keeping: Promise<unknown> = Promise.resolve();
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   get list(): MasterSettings[] {
     return settings.value.masters;
+  }
+
+  /**
+   * Reads This PC's server list from its database (migration M3a). The first start moves the window's old list in,
+   * once only; until it answers (or when it cannot), the window's copy is used.
+   */
+  async load(): Promise<void> {
+    try {
+      const kept = await invoke<{ imported: boolean; servers: MasterSettings[] }>("servers_list");
+      const list = kept.imported
+        ? kept.servers
+        : await invoke<MasterSettings[]>("servers_import", { servers: settings.value.masters });
+      settings.set("masters", list);
+      this.keepError = "";
+    } catch (e) {
+      this.keepError = `This PC's server list could not be read: ${errorText(e)}`;
+    }
+  }
+
+  /** Sends one change of the list to This PC's database. */
+  #keep(cmd: "servers_save" | "servers_remove", args: Record<string, unknown>): void {
+    this.#keeping = this.#keeping
+      .then(() => invoke(cmd, args))
+      .then(() => {
+        this.keepError = "";
+      })
+      .catch((e) => {
+        this.keepError = `This PC could not keep the change to its server list: ${errorText(e)}`;
+      });
+  }
+
+  /** Waits until the list changes made so far reached This PC (tests). */
+  kept(): Promise<unknown> {
+    return this.#keeping;
+  }
+
+  /** Takes a machine out of the kept list (the window's and This PC's). */
+  #drop(id: string): void {
+    settings.set(
+      "masters",
+      this.list.filter((x) => x.id !== id),
+    );
+    this.#keep("servers_remove", { id });
   }
 
   statusOf(id: string): MasterStatus {
@@ -265,10 +312,7 @@ class MastersStore {
     this.#dropped(m.id);
     const { [m.id]: _gone, ...rest } = this.status;
     this.status = rest;
-    settings.set(
-      "masters",
-      this.list.filter((x) => x.id !== m.id),
-    );
+    this.#drop(m.id);
   }
 
   /** Stops trying a held machine; the next screen shown replaces its cover. */
@@ -397,6 +441,9 @@ class MastersStore {
   save(m: MasterSettings): void {
     const known = this.list.some((x) => x.id === m.id);
     settings.set("masters", known ? this.list.map((x) => (x.id === m.id ? m : x)) : [...this.list, m]);
+    // The cleaned copy the window now holds is the one kept.
+    const clean = this.list.find((x) => x.id === m.id);
+    if (clean) this.#keep("servers_save", { server: clean });
   }
 
   /** Pairs with a computer showing a pairing code (through the relay) and connects to it. */
@@ -433,10 +480,7 @@ class MastersStore {
     await this.disconnect(id);
     // Its Inbox items were kept as "not connected"; a removed machine's leave (they stay on the machine).
     inbox.forgetMaster(id);
-    settings.set(
-      "masters",
-      this.list.filter((x) => x.id !== id),
-    );
+    this.#drop(id);
   }
 
   /** Adds a folder on the server as a project; it opens when that machine is on screen. */

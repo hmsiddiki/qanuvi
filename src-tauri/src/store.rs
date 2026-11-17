@@ -262,6 +262,27 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 13 {
+        // A machine's own server list (migration M3a), once only in the window's localStorage: one row per server it
+        // connects to, in the order shown. Pairing keys stay in the machine's secret store. `flags` notes one-time
+        // moves, so the window's old list is moved in only once.
+        conn.execute_batch(
+            "BEGIN;
+             CREATE TABLE servers (
+                 id TEXT PRIMARY KEY,
+                 position INTEGER NOT NULL,
+                 value TEXT NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
+             CREATE TABLE flags (
+                 key TEXT PRIMARY KEY,
+                 value TEXT NOT NULL,
+                 updated_at INTEGER NOT NULL
+             );
+             PRAGMA user_version = 13;
+             COMMIT;",
+        )?;
+    }
     Ok(())
 }
 
@@ -284,7 +305,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 12);
+        assert_eq!(version, 13);
         migrate(&conn).unwrap();
         let tables: i64 = conn
             .query_row(

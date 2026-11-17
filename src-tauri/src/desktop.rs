@@ -1940,6 +1940,33 @@ fn settings_set(
     crate::settings::set_many(&state.db, &values)
 }
 
+// This PC's own server list (migration M3a), once only in the window's localStorage.
+#[tauri::command]
+fn servers_list(state: State<AppState>) -> Res<serde_json::Value> {
+    Ok(serde_json::json!({
+        "imported": crate::servers::imported(&state.db)?,
+        "servers": crate::servers::list(&state.db)?,
+    }))
+}
+
+#[tauri::command]
+fn servers_import(
+    state: State<AppState>,
+    servers: Vec<serde_json::Value>,
+) -> Res<Vec<serde_json::Value>> {
+    crate::servers::import(&state.db, &servers)
+}
+
+#[tauri::command]
+fn servers_save(state: State<AppState>, server: serde_json::Value) -> Res<()> {
+    crate::servers::save(&state.db, &server)
+}
+
+#[tauri::command]
+fn servers_remove(state: State<AppState>, id: String) -> Res<bool> {
+    crate::servers::remove(&state.db, &id)
+}
+
 #[tauri::command]
 fn plan_data_list(state: State<AppState>) -> Res<Vec<crate::plan_data::Entry>> {
     crate::plan_data::list(&state.db)
@@ -2455,6 +2482,10 @@ pub fn run() {
             inbox_import,
             settings_get,
             settings_set,
+            servers_list,
+            servers_import,
+            servers_save,
+            servers_remove,
             plan_data_list,
             plan_data_set,
             plan_data_import,

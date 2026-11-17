@@ -1,7 +1,7 @@
 //! A machine's settings (24z3 Part A3): what the Settings page shows, kept in this machine's database so a window
 //! showing the machine (This PC, or a master over the connection) reads and changes the machine's own. One JSON value
 //! per top-level key, so a change to one key never overwrites another window's change to a different one. The
-//! window's own things (its list of masters, its sign-in) are never sent here.
+//! window's own things (its sign-in; the server list, which has its own table in servers.rs) are never sent here.
 
 use crate::store::{Db, now};
 use rusqlite::params;

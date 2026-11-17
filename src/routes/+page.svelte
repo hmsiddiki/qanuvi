@@ -75,6 +75,7 @@
     // server's project shows that server). The main window then shows the machine picked last, when it is connected.
     projects
       .load()
+      .then(() => masters.load())
       .then(() => masters.autoConnect())
       .then(async () => {
         if (machineStart !== undefined) return openOn(machineStart);

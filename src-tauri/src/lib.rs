@@ -44,6 +44,7 @@ pub mod relay_client;
 pub mod relay_server;
 pub mod runs;
 pub mod secrets;
+pub mod servers;
 pub mod settings;
 pub mod sink;
 pub mod snapshots;
