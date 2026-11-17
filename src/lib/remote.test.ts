@@ -63,7 +63,7 @@ describe("the machine on screen (24z3 A1)", () => {
 
   it("never gets calls about this window or install", () => {
     showMachine("vps");
-    for (const cmd of ["app_restart", "account_me", "remote_connect", "notify_test", "attachment_file"]) {
+    for (const cmd of ["app_restart", "account_wait", "remote_connect", "notify_test", "attachment_file"]) {
       expect(windowOnly(cmd)).toBe(true);
       expect(machineFor(cmd)).toBeNull();
     }

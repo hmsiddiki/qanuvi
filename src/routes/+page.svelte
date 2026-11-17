@@ -92,7 +92,6 @@
     working.start();
     // The memory disk syncs at start-up (in the main window only: one sync per machine is enough).
     if (!extra) memoryDisk.init();
-    account.init();
     if (!extra) remoteAccess.init();
     terminals.loadShells();
     agent.loadInfo();
@@ -138,6 +137,12 @@
     if (masters.statusOf(machine).state === "on") await pick(machine, false);
     else await masters.showUnreachable(machine);
   }
+
+  // The shown machine's Qanuvi account (migration M2: each machine keeps its own).
+  $effect(() => {
+    const shown = switcher.shown;
+    untrack(() => void account.load(shown));
+  });
 
   // The other windows know which machine this one shows (picking it there brings this window forward).
   $effect(() => {

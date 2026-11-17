@@ -1,12 +1,22 @@
 <script lang="ts">
-  /** The central Qanuvi account (Milestone 19). Optional; Qanuvi works fully without it. */
+  /**
+   * The central Qanuvi account (Milestone 19), the shown machine's (migration M2: each machine keeps its own sign-in).
+   * Optional; Qanuvi works fully without it.
+   */
   import UserRound from "@lucide/svelte/icons/user-round";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import { account } from "$lib/stores/account.svelte";
+  import { shownPlace, shownPlaceTitle } from "$lib/remote";
+  import { switcher } from "$lib/stores/switcher.svelte";
+
+  let place = $derived((void switcher.shown, shownPlace()));
+  let master = $derived(switcher.shown !== null);
 </script>
 
 <div class="account">
-  <h2><UserRound size={16} /> Qanuvi account</h2>
+  <h2>
+    <UserRound size={16} /> Qanuvi account{#if master}: {shownPlaceTitle()}{/if}
+  </h2>
 
   {#if account.account}
     <div class="card">
@@ -15,7 +25,14 @@
         {#if account.account.email}<span class="muted">{account.account.email}</span>{/if}
       </p>
       <button type="button" class="btn" onclick={() => account.signOut()}>Sign out</button>
-      <p class="muted small">Signing out also ends this computer's sign-in at qanuvi.com.</p>
+      {#if account.account.via === "password"}
+        <p class="muted small">
+          Signed in on {place} with an application password (qanuvi-master login). Signing out forgets it there; the password
+          itself stays on qanuvi.com until you remove it under Machine passwords.
+        </p>
+      {:else}
+        <p class="muted small">Signing out also ends the sign-in of {place} at qanuvi.com.</p>
+      {/if}
     </div>
   {:else}
     <p class="lead">
@@ -27,8 +44,15 @@
     </button>
     <p class="muted small">
       qanuvi.com opens in your browser, where you sign in with Google, Microsoft or GitHub. Qanuvi never sees your
-      password.
+      password.{#if master}
+        The browser opens on this computer; the sign-in is kept on {place}, not here.{/if}
     </p>
+    {#if master}
+      <p class="muted small">
+        On a server you can also sign in from its terminal: <code>qanuvi-master login</code>, with an application
+        password made on qanuvi.com under Machine passwords.
+      </p>
+    {/if}
   {/if}
   {#if account.error}<p class="error">{account.error}</p>{/if}
 </div>

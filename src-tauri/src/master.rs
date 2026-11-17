@@ -49,6 +49,8 @@ pub struct Master {
     watchers: Arc<plan_runs::Watchers>,
     /// The connections that follow this master's Inbox (24z R2d part 3).
     inbox_watchers: Arc<inbox_cmds::InboxWatchers>,
+    /// Its Qanuvi account (migration M2), kept in its own store.
+    accounts: crate::account::Accounts,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -126,8 +128,10 @@ impl Master {
         let machine_id = crate::machine::lasting_id(dir);
         agent::mark_interrupted(&db);
         runs::mark_interrupted(&db);
+        let accounts = accounts_for(dir, &machine_id, app_data);
         Ok(Self {
             dir: dir.to_path_buf(),
+            accounts,
             machine_id,
             app_data,
             db,
@@ -317,6 +321,21 @@ impl Master {
             )),
             // A project's secrets (24z3 A3): names only, never values. A server build reads them from its
             // environment (QANUVI_SECRET_<NAME>) and says where to set them; a desktop master uses its credential store.
+            // The machine's own Qanuvi account (migration M2): a browser sign-in begins and finishes here; the window
+            // in between only opens the page and passes the one-time code on.
+            "account_begin" => {
+                let (site, client) = crate::account::home();
+                to(self.accounts.begin(&site, &client))
+            }
+            "account_finish" => to(self.accounts.finish(&s(args, "state"), &s(args, "code"))),
+            "account_me" => {
+                let (site, client) = crate::account::home();
+                to(self.accounts.me_at(&site, &client))
+            }
+            "account_sign_out" => {
+                let (site, client) = crate::account::home();
+                to(self.accounts.sign_out(&site, &client))
+            }
             "secrets_store" => Ok(json!(crate::secrets::kind())),
             "secrets_names" => {
                 let id = s(args, "projectId");
@@ -1125,6 +1144,21 @@ impl Master {
 const APP_MARK: &str = "qanuvi-app.mark";
 
 /// Called by the desktop app at start-up on its data folder.
+/// The account store of a master on a data folder: This PC's own names on the desktop app's data, else its own.
+fn accounts_for(dir: &Path, machine_id: &str, app_data: bool) -> crate::account::Accounts {
+    if app_data {
+        crate::account::Accounts::this_pc(dir)
+    } else {
+        crate::account::Accounts::master(dir, machine_id)
+    }
+}
+
+/// The account of the master on a data folder, for `qanuvi-master login` and `logout`.
+pub fn accounts_at(dir: &Path) -> crate::account::Accounts {
+    let _ = std::fs::create_dir_all(dir);
+    accounts_for(dir, &crate::machine::lasting_id(dir), on_app_data(dir))
+}
+
 pub fn mark_app_data(dir: &Path) {
     let file = dir.join(APP_MARK);
     if !file.is_file() {
@@ -2390,6 +2424,9 @@ mod tests {
         "notify_take_start",
         "notify_test",
         "notify_item",
+        // The window's part of a browser sign-in: this computer's browser and its loopback answer (M2).
+        "account_wait",
+        "account_cancel",
         "app_info",
         "app_restart",
         "startup_path",
@@ -2429,10 +2466,6 @@ mod tests {
 
     /// Commands only the app answers today that move to the master, with the phase that moves them.
     const GAPS: &[(&str, &str)] = &[
-        ("account_sign_in", "M2"),
-        ("account_cancel", "M2"),
-        ("account_me", "M2"),
-        ("account_sign_out", "M2"),
         ("remote_connect", "M3"),
         ("remote_call", "M3"),
         ("remote_disconnect", "M3"),

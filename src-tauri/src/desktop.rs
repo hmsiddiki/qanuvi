@@ -1028,20 +1028,48 @@ fn memory_search(
 
 // Signing in with a Qlopy site account (Milestone 19).
 
-/// Signs in to the central Qanuvi account: qanuvi.com's sign-in page opens in the browser (Google, Microsoft or
-/// GitHub there); this waits up to 5 minutes for it.
+/// Begins a browser sign-in for This PC's account (migration M2: a master's begins on the master); the window opens
+/// the address with `account_wait` and ends it with `account_finish`.
 #[tauri::command]
-async fn account_sign_in(app: tauri::AppHandle) -> Res<crate::account::Account> {
+fn account_begin(state: State<AppState>) -> Res<crate::account::Begun> {
+    let (site, client) = crate::account::home();
+    state.accounts.begin(&site, &client)
+}
+
+/// The window's part of any machine's browser sign-in: qanuvi.com's sign-in page opens in this computer's browser
+/// (Google, Microsoft or GitHub there); this waits up to 5 minutes for its answer and gives back the one-time code.
+#[tauri::command]
+async fn account_wait(app: tauri::AppHandle, url: String, state: String) -> Res<String> {
     let app2 = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_opener::OpenerExt;
-        let (site, client) = crate::account::home();
-        let state = app2.state::<AppState>();
-        state.accounts.sign_in(&site, &client, |url| {
+        if !url.starts_with("https://")
+            && !url.starts_with("http://localhost")
+            && !url.starts_with("http://127.0.0.1")
+        {
+            return Err("That is not a sign-in address.".to_string());
+        }
+        let st = app2.state::<AppState>();
+        st.accounts.catch_code(&url, &state, |u| {
             app2.opener()
-                .open_url(url, None::<&str>)
+                .open_url(u, None::<&str>)
                 .map_err(|e| format!("The browser could not be opened: {e}"))
         })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Ends This PC's browser sign-in with the code the window caught.
+#[tauri::command]
+async fn account_finish(
+    app: tauri::AppHandle,
+    state: String,
+    code: String,
+) -> Res<crate::account::Account> {
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app2.state::<AppState>().accounts.finish(&state, &code)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -2137,7 +2165,7 @@ pub fn run() {
                 indexes: index::Indexes::default(),
                 inspector: preview::Inspector::default(),
                 remotes: crate::remote::Remotes::default(),
-                accounts: crate::account::Accounts::default(),
+                accounts: crate::account::Accounts::this_pc(&dir),
                 startup: crate::startup::Startup::default(),
                 runs: std::sync::Arc::default(),
             });
@@ -2329,8 +2357,10 @@ pub fn run() {
             memory_slice,
             memory_search,
             memory_disk_device,
+            account_begin,
+            account_wait,
+            account_finish,
             account_cancel,
-            account_sign_in,
             account_me,
             account_sign_out,
             memory_disk_passphrase_set,

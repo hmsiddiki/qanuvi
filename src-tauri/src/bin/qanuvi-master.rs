@@ -5,6 +5,9 @@
 //! qanuvi-master --stdio     what the desktop app starts through SSH (starts the service when needed)
 //! qanuvi-master status      is the service running?
 //! qanuvi-master stop        stop the service
+//! qanuvi-master login       sign this machine in to its Qanuvi account with an application password
+//!                           (--site <address>; --password-stdin reads the login name and password from stdin)
+//! qanuvi-master logout      forget this machine's sign-in
 //! Options: --data <folder>  where its database and settings are (default ~/.local/share/qanuvi)
 
 use std::path::PathBuf;
@@ -31,6 +34,8 @@ fn main() {
         return;
     }
     let data_at = args.iter().position(|a| a == "--data");
+    let site_at = args.iter().position(|a| a == "--site");
+    let site = site_at.and_then(|i| args.get(i + 1)).map(String::as_str);
     let data = data_at
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from)
@@ -40,7 +45,11 @@ fn main() {
         .iter()
         .enumerate()
         .skip(1)
-        .find(|(i, a)| !a.starts_with("--") && Some(*i) != data_at.map(|d| d + 1))
+        .find(|(i, a)| {
+            !a.starts_with("--")
+                && Some(*i) != data_at.map(|d| d + 1)
+                && Some(*i) != site_at.map(|d| d + 1)
+        })
         .map(|(_, a)| a.as_str());
     let result = if args.iter().any(|a| a == "--stdio") {
         qanuvi_lib::master::stdio_bridge(&data)
@@ -69,9 +78,17 @@ fn main() {
                 }
                 Ok(())
             }
+            Some("login") => qanuvi_lib::account::cli_login(
+                &qanuvi_lib::master::accounts_at(&data),
+                site,
+                args.iter().any(|a| a == "--password-stdin"),
+            ),
+            Some("logout") => {
+                qanuvi_lib::account::cli_logout(&qanuvi_lib::master::accounts_at(&data), site)
+            }
             _ => {
                 eprintln!(
-                    "Usage: qanuvi-master serve | --stdio | status | stop  [--data <folder>]"
+                    "Usage: qanuvi-master serve | --stdio | status | stop | login | logout  [--data <folder>] [--site <address>]"
                 );
                 std::process::exit(2);
             }

@@ -88,10 +88,9 @@ const WINDOW_ONLY = new Set([
   "remote_list",
   "remote_pair",
   "remote_unpair",
+  // The browser half of a sign-in; the machine's own account_* calls go to it (migration M2).
+  "account_wait",
   "account_cancel",
-  "account_me",
-  "account_sign_in",
-  "account_sign_out",
   "notify_item",
   "notify_settings",
   "notify_take_start",

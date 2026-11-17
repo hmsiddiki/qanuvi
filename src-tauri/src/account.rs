@@ -1,15 +1,24 @@
 //! Signing in to Qanuvi with the central Qanuvi account at qanuvi.com (Milestone 19; the site runs on Qlopy and offers
 //! Google, Microsoft or GitHub sign-in there): OAuth 2.0 authorization code with PKCE, the way an app
 //! on a computer should (RFC 8252). The site's own sign-in page opens in the user's browser (with its two-factor step,
-//! if the site has one); Qanuvi never sees the password. The answer comes back to a one-time listener on 127.0.0.1;
-//! the refresh token is kept in the system's credential store; the short-lived access token only in memory.
+//! if the site has one); Qanuvi never sees the password. The short-lived access token lives only in memory.
+//!
+//! Each machine has its own account (migration M2): the sign-in is kept by the machine it belongs to, in that
+//! machine's store (the system's credential store in a desktop build; in a server build, `account-sign-in.json` in its
+//! data folder, readable by its own user only, never copied into backups). A browser sign-in for a master is split in
+//! three: the master makes the PKCE verifier and the sign-in address (`begin`), the window opens the address in the
+//! browser on its own computer and catches the answer on 127.0.0.1 (`catch_code`), and hands the one-time code to the
+//! master, which alone trades it for tokens (`finish`). A server can also sign in with an application password made
+//! on the site (`qanuvi-master login`), sent as HTTP Basic, the way the site's REST API takes them.
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -20,6 +29,8 @@ pub const REDIRECT: &str = "http://127.0.0.1:47213/callback";
 /// The central account site and Qanuvi's app id registered there.
 pub const HOME_SITE: &str = "https://qanuvi.com";
 pub const CLIENT_ID: &str = "qanuvi-desktop";
+/// A server build's kept sign-ins, in its data folder.
+pub const KEPT_FILE: &str = "account-sign-in.json";
 
 /// The account site and app id: qanuvi.com, or a test site given in QANUVI_ACCOUNT_SITE (and QANUVI_ACCOUNT_CLIENT),
 /// for trying the sign-in against a local copy of the site.
@@ -145,26 +156,170 @@ struct Tokens {
     refresh_token: String,
 }
 
-/// Who is signed in (shown in the app).
+/// Who is signed in (shown in the app), and how: "browser" (the site's sign-in page) or "password" (an application
+/// password given to `qanuvi-master login`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Account {
     pub site: String,
     pub user_id: String,
     pub name: String,
     pub email: String,
+    pub via: String,
+}
+
+/// A browser sign-in begun on this machine: the address the window opens, and the state its answer must carry.
+#[derive(Debug, Clone, Serialize)]
+pub struct Begun {
+    pub url: String,
+    pub state: String,
+}
+
+/// A kept sign-in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum Kept {
+    /// From the browser: the one-use refresh token.
+    Browser { refresh: String },
+    /// An application password made on the site, with the login name it belongs to.
+    Password { login: String, password: String },
+}
+
+impl Kept {
+    /// A kept text: JSON, or a bare refresh token (how This PC kept it before M2).
+    #[cfg_attr(not(any(feature = "desktop", test)), allow(dead_code))]
+    fn read(text: &str) -> Option<Kept> {
+        let t = text.trim();
+        if t.is_empty() {
+            return None;
+        }
+        serde_json::from_str(t).ok().or_else(|| {
+            (!t.starts_with('{')).then(|| Kept::Browser {
+                refresh: t.to_string(),
+            })
+        })
+    }
+
+    fn via(&self) -> &'static str {
+        match self {
+            Kept::Browser { .. } => "browser",
+            Kept::Password { .. } => "password",
+        }
+    }
+}
+
+/// Where a machine keeps its sign-in.
+enum Keep {
+    /// The system's credential store, under `<prefix><site>`.
+    #[cfg(feature = "desktop")]
+    Store(String),
+    /// A file of the machine's own, readable by its user only (a server build; a desktop build only in tests).
+    #[cfg_attr(all(feature = "desktop", not(test)), allow(dead_code))]
+    File(PathBuf),
+}
+
+impl Keep {
+    #[cfg(feature = "desktop")]
+    fn entry(prefix: &str, site: &str) -> Result<keyring::Entry, String> {
+        keyring::Entry::new("Qanuvi", &format!("{prefix}{site}")).map_err(|e| e.to_string())
+    }
+
+    fn all(file: &Path) -> BTreeMap<String, Kept> {
+        std::fs::read_to_string(file)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default()
+    }
+
+    fn save_all(file: &Path, all: &BTreeMap<String, Kept>) -> Result<(), String> {
+        if all.is_empty() {
+            return match std::fs::remove_file(file) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+                _ => Ok(()),
+            };
+        }
+        let text = serde_json::to_string_pretty(all).map_err(|e| e.to_string())?;
+        let tmp = file.with_extension("json.new");
+        let _ = std::fs::remove_file(&tmp);
+        let mut o = std::fs::OpenOptions::new();
+        o.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            o.mode(0o600);
+        }
+        let mut f = o.open(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(text.as_bytes())
+            .and_then(|_| f.sync_all())
+            .map_err(|e| e.to_string())?;
+        drop(f);
+        std::fs::rename(&tmp, file).map_err(|e| e.to_string())
+    }
+
+    fn read(&self, site: &str) -> Option<Kept> {
+        match self {
+            #[cfg(feature = "desktop")]
+            Keep::Store(prefix) => {
+                Kept::read(&Self::entry(prefix, site).ok()?.get_password().ok()?)
+            }
+            Keep::File(file) => Self::all(file).remove(site),
+        }
+    }
+
+    fn write(&self, site: &str, kept: &Kept) -> Result<(), String> {
+        match self {
+            #[cfg(feature = "desktop")]
+            Keep::Store(prefix) => Self::entry(prefix, site)?
+                .set_password(&serde_json::to_string(kept).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string()),
+            Keep::File(file) => {
+                let mut all = Self::all(file);
+                all.insert(site.to_string(), kept.clone());
+                Self::save_all(file, &all)
+            }
+        }
+    }
+
+    fn forget(&self, site: &str) -> Result<(), String> {
+        match self {
+            #[cfg(feature = "desktop")]
+            Keep::Store(prefix) => match Self::entry(prefix, site)?.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                Err(e) => Err(e.to_string()),
+            },
+            Keep::File(file) => {
+                let mut all = Self::all(file);
+                if all.remove(site).is_none() {
+                    return Ok(());
+                }
+                Self::save_all(file, &all)
+            }
+        }
+    }
 }
 
 struct Session {
     site: String,
-    client_id: String,
+    /// The refresh token kept with it: when the kept sign-in changes (signed out, or `qanuvi-master login` while the
+    /// service runs), this session is not used any more.
+    refresh: String,
     access: String,
     expires: Instant,
 }
 
-#[derive(Default)]
+/// A browser sign-in waiting for its code.
+struct Pending {
+    site: String,
+    client_id: String,
+    state: String,
+    verifier: String,
+    at: Instant,
+}
+
 pub struct Accounts {
+    keep: Keep,
     session: Mutex<Option<Session>>,
-    /// Set to stop waiting for a sign-in (the user pressed Cancel).
+    pending: Mutex<Option<Pending>>,
+    /// Set to stop waiting for a sign-in (the user pressed Cancel; the window's own wait).
     cancel: std::sync::atomic::AtomicBool,
 }
 
@@ -196,8 +351,12 @@ fn token_error(v: &Value) -> String {
     e.to_string()
 }
 
-fn keyring_entry(site: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new("Qanuvi", &format!("account:{site}")).map_err(|e| e.to_string())
+/// The HTTP Basic header for an application password.
+fn basic(login: &str, password: &str) -> String {
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD.encode(format!("{login}:{password}"))
+    )
 }
 
 /// Waits for the browser to come back to the loopback address with the code (checks the state).
@@ -266,44 +425,114 @@ fn wait_for_code(
 }
 
 impl Accounts {
-    /// Signs in: opens the site's sign-in page with `open`, waits for the answer, exchanges the code and reads who
-    /// signed in. The refresh token goes to the credential store.
-    pub fn sign_in(
-        &self,
-        site: &str,
-        client_id: &str,
-        open: impl FnOnce(&str) -> Result<(), String>,
-    ) -> Result<Account, String> {
+    fn with(keep: Keep) -> Self {
+        Self {
+            keep,
+            session: Mutex::default(),
+            pending: Mutex::default(),
+            cancel: Default::default(),
+        }
+    }
+
+    /// This PC's account: the credential store under the names it always had (`account:<site>`).
+    pub fn this_pc(dir: &Path) -> Self {
+        #[cfg(feature = "desktop")]
+        {
+            let _ = dir;
+            Self::with(Keep::Store("account:".into()))
+        }
+        #[cfg(not(feature = "desktop"))]
+        Self::with(Keep::File(dir.join(KEPT_FILE)))
+    }
+
+    /// A master's own account: in a desktop build the credential store under names of its own
+    /// (`master-account:<machine id>:<site>`, so a master on the same computer never shares This PC's sign-in); in a
+    /// server build its own file.
+    pub fn master(dir: &Path, machine_id: &str) -> Self {
+        #[cfg(feature = "desktop")]
+        {
+            let _ = dir;
+            Self::with(Keep::Store(format!("master-account:{machine_id}:")))
+        }
+        #[cfg(not(feature = "desktop"))]
+        {
+            let _ = machine_id;
+            Self::with(Keep::File(dir.join(KEPT_FILE)))
+        }
+    }
+
+    /// An account kept in a given file (tests).
+    #[cfg(test)]
+    fn in_file(file: PathBuf) -> Self {
+        Self::with(Keep::File(file))
+    }
+
+    /// Begins a browser sign-in on this machine: the verifier stays here; the window opens the address.
+    pub fn begin(&self, site: &str, client_id: &str) -> Result<Begun, String> {
         let site = site_url(site)?;
         let client_id = client_id.trim();
         if client_id.is_empty() || client_id.len() > 60 {
             return Err("Give the app's client id from the site (Settings > API > Apps).".into());
         }
+        let verifier = random(64)?;
+        let state = random(24)?;
+        let url = authorize_url(&site, client_id, &state, &challenge(&verifier));
+        *self.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(Pending {
+            site,
+            client_id: client_id.to_string(),
+            state: state.clone(),
+            verifier,
+            at: Instant::now(),
+        });
+        Ok(Begun { url, state })
+    }
+
+    /// The window's part of a browser sign-in: opens the address with `open` and waits on this computer's loopback
+    /// address for the site's answer; gives back the one-time code.
+    pub fn catch_code(
+        &self,
+        url: &str,
+        state: &str,
+        open: impl FnOnce(&str) -> Result<(), String>,
+    ) -> Result<String, String> {
         let listener = TcpListener::bind(("127.0.0.1", REDIRECT_PORT)).map_err(|_| {
             format!(
                 "Port {REDIRECT_PORT} on this computer is in use; close what uses it and try again."
             )
         })?;
-        let verifier = random(64)?;
-        let state = random(24)?;
-        open(&authorize_url(
-            &site,
-            client_id,
-            &state,
-            &challenge(&verifier),
-        ))?;
         self.cancel
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        let code = wait_for_code(&listener, &state, &self.cancel)?;
-        drop(listener);
+        open(url)?;
+        wait_for_code(&listener, state, &self.cancel)
+    }
+
+    /// Ends a browser sign-in begun here: trades the code for tokens and keeps the sign-in.
+    pub fn finish(&self, state: &str, code: &str) -> Result<Account, String> {
+        let p = {
+            let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+            match pending.take() {
+                Some(p) if p.state == state && p.at.elapsed() < WAIT + Duration::from_secs(30) => p,
+                other => {
+                    *pending = other;
+                    return Err(
+                        "This sign-in was not started on this machine, or it is too old. Sign in again."
+                            .into(),
+                    );
+                }
+            }
+        };
+        let code = code.trim();
+        if code.is_empty() || code.len() > 2000 {
+            return Err("The site sent no code.".into());
+        }
         let (status, v) = post_form(
-            &format!("{site}/api/qlopy/v1/oauth/token"),
+            &format!("{}/api/qlopy/v1/oauth/token", p.site),
             &[
                 ("grant_type", "authorization_code"),
-                ("code", &code),
+                ("code", code),
                 ("redirect_uri", REDIRECT),
-                ("client_id", client_id),
-                ("code_verifier", &verifier),
+                ("client_id", &p.client_id),
+                ("code_verifier", &p.verifier),
             ],
         )?;
         if status != 200 {
@@ -311,95 +540,107 @@ impl Accounts {
         }
         let tokens: Tokens = serde_json::from_value(v)
             .map_err(|_| "The site's answer was not understood.".to_string())?;
-        keyring_entry(&site)?
-            .set_password(&tokens.refresh_token)
+        self.keep
+            .write(
+                &p.site,
+                &Kept::Browser {
+                    refresh: tokens.refresh_token.clone(),
+                },
+            )
             .map_err(|e| format!("The sign-in could not be kept: {e}"))?;
+        self.set_session(&p.site, &tokens);
+        self.me_at(&p.site, &p.client_id)
+    }
+
+    /// Signs in with an application password made on the site: checked against the site first, then kept.
+    pub fn login(&self, site: &str, login: &str, password: &str) -> Result<Account, String> {
+        let site = site_url(site)?;
+        let (login, password) = (login.trim(), password.trim());
+        if login.is_empty() || password.is_empty() {
+            return Err("Give the login name and the application password.".into());
+        }
+        if login.contains(':') || login.len() > 200 || password.len() > 500 {
+            return Err("That login name or application password is not valid.".into());
+        }
+        let who = self.ask_me(&site, &basic(login, password), "password")?;
+        self.keep
+            .write(
+                &site,
+                &Kept::Password {
+                    login: login.into(),
+                    password: password.into(),
+                },
+            )
+            .map_err(|e| format!("The sign-in could not be kept: {e}"))?;
+        *self.session.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        Ok(who)
+    }
+
+    fn set_session(&self, site: &str, tokens: &Tokens) {
         *self.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(Session {
-            site: site.clone(),
-            client_id: client_id.to_string(),
-            access: tokens.access_token,
+            site: site.to_string(),
+            refresh: tokens.refresh_token.clone(),
+            access: tokens.access_token.clone(),
             expires: Instant::now()
                 + Duration::from_secs(tokens.expires_in.saturating_sub(30).max(30)),
         });
-        self.me()
     }
 
-    /// A valid access token: the current one, or a new one from the refresh token (which is one-use, so the new refresh
-    /// token replaces it).
-    fn access(&self, site: &str, client_id: &str) -> Result<String, String> {
+    /// A valid access token for a browser sign-in: the current one, or a new one from the refresh token (which is
+    /// one-use, so the new refresh token replaces it).
+    fn access(&self, site: &str, client_id: &str, refresh: &str) -> Result<String, String> {
         {
             let s = self.session.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(s) = s.as_ref()
                 && s.site == site
+                && s.refresh == refresh
                 && s.expires > Instant::now()
             {
                 return Ok(s.access.clone());
             }
         }
-        let entry = keyring_entry(site)?;
-        let refresh = entry
-            .get_password()
-            .map_err(|_| "Not signed in.".to_string())?;
         let (status, v) = post_form(
             &format!("{site}/api/qlopy/v1/oauth/token"),
             &[
                 ("grant_type", "refresh_token"),
-                ("refresh_token", &refresh),
+                ("refresh_token", refresh),
                 ("client_id", client_id),
             ],
         )?;
         if status != 200 {
             // The site no longer accepts this sign-in (revoked, password changed, expired).
-            let _ = entry.delete_credential();
+            let _ = self.keep.forget(site);
             return Err(format!("Signed out by the site: {}", token_error(&v)));
         }
         let tokens: Tokens = serde_json::from_value(v)
             .map_err(|_| "The site's answer was not understood.".to_string())?;
-        entry
-            .set_password(&tokens.refresh_token)
-            .map_err(|e| e.to_string())?;
-        *self.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(Session {
-            site: site.to_string(),
-            client_id: client_id.to_string(),
-            access: tokens.access_token.clone(),
-            expires: Instant::now()
-                + Duration::from_secs(tokens.expires_in.saturating_sub(30).max(30)),
-        });
+        self.keep.write(
+            site,
+            &Kept::Browser {
+                refresh: tokens.refresh_token.clone(),
+            },
+        )?;
+        self.set_session(site, &tokens);
         Ok(tokens.access_token)
     }
 
-    fn current(&self) -> Result<(String, String), String> {
-        let s = self.session.lock().unwrap_or_else(|e| e.into_inner());
-        s.as_ref()
-            .map(|s| (s.site.clone(), s.client_id.clone()))
-            .ok_or_else(|| "Not signed in.".to_string())
-    }
-
-    /// Stops waiting for a sign-in in the browser.
-    pub fn cancel(&self) {
-        self.cancel.store(true, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Who is signed in, asked from the site.
-    pub fn me(&self) -> Result<Account, String> {
-        let (site, client) = self.current()?;
-        self.me_at(&site, &client)
-    }
-
-    /// Who is signed in at a site (also after a restart, from the kept sign-in).
-    pub fn me_at(&self, site: &str, client_id: &str) -> Result<Account, String> {
-        let site = site_url(site)?;
-        let token = self.access(&site, client_id.trim())?;
+    /// Asks the site who an authorization header belongs to.
+    fn ask_me(&self, site: &str, authorization: &str, via: &str) -> Result<Account, String> {
         let mut res = agent()
             .get(&format!("{site}/api/qlopy/v1/users/me"))
-            .header("Authorization", &format!("Bearer {token}"))
+            .header("Authorization", authorization)
             .call()
             .map_err(|e| format!("The site could not be reached: {e}"))?;
         let status = res.status().as_u16();
         let text = res.body_mut().read_to_string().unwrap_or_default();
         let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
         if status != 200 {
-            return Err(token_error(&v));
+            let why = token_error(&v);
+            return Err(if status == 401 && via == "password" {
+                format!("The site did not accept this login name and application password: {why}")
+            } else {
+                why
+            });
         }
         let s = |k: &str| v[k].as_str().map(String::from).unwrap_or_default();
         let name = [s("name"), s("display_name"), s("username"), s("slug")]
@@ -407,30 +648,234 @@ impl Accounts {
             .find(|x| !x.is_empty())
             .unwrap_or_default();
         Ok(Account {
-            site,
+            site: site.to_string(),
             user_id: v["id"]
                 .as_i64()
                 .map(|i| i.to_string())
                 .unwrap_or_else(|| s("id")),
             name,
             email: s("email"),
+            via: via.to_string(),
         })
     }
 
-    /// Signs out: the site forgets the sign-in (the refresh token is revoked), and so does this computer.
+    /// Stops waiting for a sign-in in the browser.
+    pub fn cancel(&self) {
+        self.cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Who is signed in at a site (also after a restart, from the kept sign-in).
+    pub fn me_at(&self, site: &str, client_id: &str) -> Result<Account, String> {
+        let site = site_url(site)?;
+        match self.keep.read(&site) {
+            None => Err("Not signed in.".into()),
+            Some(Kept::Browser { refresh }) => {
+                let token = self.access(&site, client_id.trim(), &refresh)?;
+                self.ask_me(&site, &format!("Bearer {token}"), "browser")
+            }
+            Some(Kept::Password { login, password }) => {
+                match self.ask_me(&site, &basic(&login, &password), "password") {
+                    // The site no longer takes this application password (removed there).
+                    Err(e) if e.starts_with("The site did not accept") => {
+                        let _ = self.keep.forget(&site);
+                        Err(format!("Signed out by the site: {e}"))
+                    }
+                    r => r,
+                }
+            }
+        }
+    }
+
+    /// Signs out: a browser sign-in is revoked at the site; an application password stays on the site until it is
+    /// removed there. Either way this machine forgets it.
     pub fn sign_out(&self, site: &str, client_id: &str) -> Result<(), String> {
         let site = site_url(site)?;
-        let entry = keyring_entry(&site)?;
-        if let Ok(refresh) = entry.get_password() {
+        if let Some(Kept::Browser { refresh }) = self.keep.read(&site) {
             let _ = post_form(
                 &format!("{site}/api/qlopy/v1/oauth/revoke"),
                 &[("token", &refresh), ("client_id", client_id.trim())],
             );
         }
-        let _ = entry.delete_credential();
         *self.session.lock().unwrap_or_else(|e| e.into_inner()) = None;
-        Ok(())
+        self.keep.forget(&site)
     }
+
+    /// How the kept sign-in at a site was made, without asking the site ("" when none is kept).
+    pub fn kept_via(&self, site: &str) -> &'static str {
+        site_url(site)
+            .ok()
+            .and_then(|s| self.keep.read(&s))
+            .map(|k| k.via())
+            .unwrap_or("")
+    }
+}
+
+/// Reads a line from the terminal without showing it (an application password).
+pub fn read_hidden(prompt: &str) -> Result<String, String> {
+    eprint!("{prompt}");
+    let _ = std::io::stderr().flush();
+    let quiet = hidden::Quiet::start();
+    let mut line = String::new();
+    let r = std::io::stdin().read_line(&mut line);
+    drop(quiet);
+    eprintln!();
+    r.map_err(|e| e.to_string())?;
+    Ok(line.trim_end_matches(['\r', '\n']).to_string())
+}
+
+#[cfg(unix)]
+mod hidden {
+    /// Turns the terminal's echo off while it lives (nothing happens when the input is not a terminal).
+    pub struct Quiet(bool);
+
+    impl Quiet {
+        pub fn start() -> Self {
+            let tty = std::process::Command::new("stty")
+                .arg("-echo")
+                .stdin(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            Self(tty)
+        }
+    }
+
+    impl Drop for Quiet {
+        fn drop(&mut self) {
+            if self.0 {
+                let _ = std::process::Command::new("stty")
+                    .arg("echo")
+                    .stdin(std::process::Stdio::inherit())
+                    .status();
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+mod hidden {
+    use std::ffi::c_void;
+
+    const STD_INPUT_HANDLE: u32 = -10i32 as u32;
+    const ENABLE_ECHO_INPUT: u32 = 0x0004;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetStdHandle(which: u32) -> *mut c_void;
+        fn GetConsoleMode(handle: *mut c_void, mode: *mut u32) -> i32;
+        fn SetConsoleMode(handle: *mut c_void, mode: u32) -> i32;
+    }
+
+    /// Turns the console's echo off while it lives (nothing happens when the input is not a console).
+    pub struct Quiet(Option<(*mut c_void, u32)>);
+
+    impl Quiet {
+        pub fn start() -> Self {
+            // SAFETY: the standard input handle of this process, read and set with the console's own calls.
+            unsafe {
+                let h = GetStdHandle(STD_INPUT_HANDLE);
+                let mut mode = 0u32;
+                if h.is_null() || GetConsoleMode(h, &mut mode) == 0 {
+                    return Self(None);
+                }
+                if SetConsoleMode(h, mode & !ENABLE_ECHO_INPUT) == 0 {
+                    return Self(None);
+                }
+                Self(Some((h, mode)))
+            }
+        }
+    }
+
+    impl Drop for Quiet {
+        fn drop(&mut self) {
+            if let Some((h, mode)) = self.0 {
+                // SAFETY: puts back the mode read in `start` on the same handle.
+                unsafe {
+                    SetConsoleMode(h, mode);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+mod hidden {
+    pub struct Quiet;
+
+    impl Quiet {
+        pub fn start() -> Self {
+            Quiet
+        }
+    }
+}
+
+/// `qanuvi-master login`: signs a master in with an application password. Reads the login name and the password from
+/// the terminal (the password not shown), or the password from standard input with `--password-stdin`.
+pub fn cli_login(
+    accounts: &Accounts,
+    site: Option<&str>,
+    password_stdin: bool,
+) -> Result<(), String> {
+    let (home_site, _) = home();
+    let site = site_url(site.unwrap_or(&home_site))?;
+    eprintln!(
+        "Sign this machine in to {site} with an application password (make one on the site under Machine passwords)."
+    );
+    eprint!("Login name: ");
+    let _ = std::io::stderr().flush();
+    let mut login = String::new();
+    let password = if password_stdin {
+        // The login name comes first on its own line, then the password.
+        std::io::stdin()
+            .read_line(&mut login)
+            .map_err(|e| e.to_string())?;
+        eprintln!();
+        let mut p = String::new();
+        std::io::stdin()
+            .read_line(&mut p)
+            .map_err(|e| e.to_string())?;
+        p
+    } else {
+        std::io::stdin()
+            .read_line(&mut login)
+            .map_err(|e| e.to_string())?;
+        read_hidden("Application password: ")?
+    };
+    let who = accounts.login(&site, login.trim(), password.trim())?;
+    println!(
+        "Signed in as {}{} on {site}.",
+        if who.name.is_empty() {
+            "this account"
+        } else {
+            &who.name
+        },
+        if who.email.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", who.email)
+        }
+    );
+    Ok(())
+}
+
+/// `qanuvi-master logout`: forgets the master's sign-in (a browser sign-in is revoked at the site too).
+pub fn cli_logout(accounts: &Accounts, site: Option<&str>) -> Result<(), String> {
+    let (home_site, client) = home();
+    let site = site_url(site.unwrap_or(&home_site))?;
+    let via = accounts.kept_via(&site);
+    accounts.sign_out(&site, &client)?;
+    println!(
+        "{}",
+        match via {
+            "" => format!("Not signed in to {site}."),
+            "password" => format!(
+                "Signed out of {site}. The application password stays on the site until you remove it there."
+            ),
+            _ => format!("Signed out of {site}."),
+        }
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -599,7 +1044,10 @@ mod tests {
                         (400, r#"{"error":"invalid_grant","error_description":"The code is not valid."}"#.to_string())
                     }
                 } else if line.starts_with("GET /api/qlopy/v1/users/me") {
-                    if req.contains("Bearer a1") || req.contains("Bearer a2") {
+                    if req.contains("Bearer a1")
+                        || req.contains("Bearer a2")
+                        || req.contains(&basic("owner", "good-pw"))
+                    {
                         (
                             200,
                             r#"{"id":7,"name":"Test Owner","email":"owner@example.com"}"#
@@ -628,73 +1076,154 @@ mod tests {
         challenge(verifier) == expected
     }
 
-    /// Signs in against the stand-in site, reads who signed in, refreshes, signs out. Uses the real loopback port
-    /// and the system credential store, so it runs only with QANUVI_TEST_KEYRING=1.
+    /// The browser sign-in in its three parts against the stand-in site, kept in a file (a server's store): reads who
+    /// signed in, refreshes, signs out.
     #[test]
     fn signs_in_refreshes_and_signs_out_against_a_test_site() {
-        if std::env::var("QANUVI_TEST_KEYRING").is_err() {
-            return;
-        }
         let (site, log) = fake_site();
-        let accounts = Accounts::default();
-        let site_for_browser = site.clone();
-        let who = accounts
-            .sign_in(&site, "qanuvi-test", move |url| {
-                // The "browser": the user signs in on the site, which sends them back with a code.
-                let q = query_of(&format!(
-                    "GET {} HTTP/1.1",
-                    &url[url.find("/api").unwrap()..]
-                ));
-                let get = |k: &str| {
-                    q.iter()
-                        .find(|(n, _)| n == k)
-                        .map(|(_, v)| v.clone())
-                        .unwrap()
-                };
-                assert_eq!(get("code_challenge_method"), "S256");
-                assert_eq!(get("redirect_uri"), REDIRECT);
-                let mut s =
-                    std::net::TcpStream::connect(site_for_browser.trim_start_matches("http://"))
-                        .unwrap();
-                write!(s, "SETCHALLENGE {}\r\n\r\n", get("code_challenge")).unwrap();
-                drop(s);
-                std::thread::sleep(Duration::from_millis(100));
-                let state = get("state");
-                std::thread::spawn(move || {
-                    use std::io::Read;
-                    let mut c = std::net::TcpStream::connect(("127.0.0.1", REDIRECT_PORT)).unwrap();
-                    write!(
-                        c,
-                        "GET /callback?code=good-code&state={state} HTTP/1.1\r\n\r\n"
-                    )
-                    .unwrap();
-                    let mut page = String::new();
-                    let _ = c.read_to_string(&mut page);
-                });
-                Ok(())
-            })
-            .unwrap();
-        assert_eq!(
-            (who.name.as_str(), who.email.as_str(), who.user_id.as_str()),
-            ("Test Owner", "owner@example.com", "7")
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(KEPT_FILE);
+        // The master's part: it makes the address; the window (here: this test) opens it and catches the code.
+        let master = Accounts::in_file(file.clone());
+        let begun = master.begin(&site, "qanuvi-test").unwrap();
+        let q = query_of(&format!(
+            "GET {} HTTP/1.1",
+            &begun.url[begun.url.find("/api").unwrap()..]
+        ));
+        let get = |k: &str| {
+            q.iter()
+                .find(|(n, _)| n == k)
+                .map(|(_, v)| v.clone())
+                .unwrap()
+        };
+        assert_eq!(get("code_challenge_method"), "S256");
+        assert_eq!(get("redirect_uri"), REDIRECT);
+        assert_eq!(get("state"), begun.state);
+        let mut s = std::net::TcpStream::connect(site.trim_start_matches("http://")).unwrap();
+        write!(s, "SETCHALLENGE {}\r\n\r\n", get("code_challenge")).unwrap();
+        drop(s);
+        std::thread::sleep(Duration::from_millis(100));
+
+        // A code with another sign-in's state is refused, and the real one still finishes afterwards.
+        assert!(master.finish("forged", "good-code").is_err());
+        assert!(
+            Accounts::in_file(file.clone())
+                .finish(&begun.state, "good-code")
+                .is_err(),
+            "only the machine that began it can finish it"
         );
+        let who = master.finish(&begun.state, "good-code").unwrap();
+        assert_eq!(
+            (
+                who.name.as_str(),
+                who.email.as_str(),
+                who.user_id.as_str(),
+                who.via.as_str()
+            ),
+            ("Test Owner", "owner@example.com", "7", "browser")
+        );
+        assert!(
+            master.finish(&begun.state, "good-code").is_err(),
+            "a sign-in finishes once"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
         // The first access token was short-lived: the next question refreshes it (one-use refresh token).
         std::thread::sleep(Duration::from_millis(1100));
-        let fresh = Accounts::default();
+        let fresh = Accounts::in_file(file.clone());
         assert_eq!(
             fresh.me_at(&site, "qanuvi-test").unwrap().name,
             "Test Owner",
             "after a restart, from the kept sign-in"
         );
-        accounts.sign_out(&site, "qanuvi-test").unwrap();
+        // Signing out revokes the newest refresh token, read from the file.
+        master.sign_out(&site, "qanuvi-test").unwrap();
         let calls = log.lock().unwrap().clone();
         assert_eq!(
             calls,
             vec!["authorization_code", "refresh_token", "revoke r2"]
         );
-        assert!(
-            keyring_entry(&site).unwrap().get_password().is_err(),
-            "nothing kept after signing out"
+        assert!(!file.exists(), "nothing kept after signing out");
+        assert_eq!(
+            fresh.me_at(&site, "qanuvi-test").unwrap_err(),
+            "Not signed in."
         );
+    }
+
+    /// `qanuvi-master login`: an application password is checked at the site before it is kept, sent as HTTP Basic,
+    /// and signing out forgets it here without a revoke (it stays on the site until removed there).
+    #[test]
+    fn an_application_password_signs_a_master_in() {
+        let (site, log) = fake_site();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(KEPT_FILE);
+        let a = Accounts::in_file(file.clone());
+        let e = a.login(&site, "owner", "wrong").unwrap_err();
+        assert!(e.starts_with("The site did not accept"), "{e}");
+        assert!(!file.exists(), "a refused password is not kept");
+        assert!(a.login(&site, "own:er", "x").is_err());
+        let who = a.login(&site, "owner", " good-pw ").unwrap();
+        assert_eq!(
+            (who.name.as_str(), who.via.as_str()),
+            ("Test Owner", "password")
+        );
+        assert_eq!(a.kept_via(&site), "password");
+        assert_eq!(
+            Accounts::in_file(file.clone())
+                .me_at(&site, "x")
+                .unwrap()
+                .via,
+            "password",
+            "after a restart"
+        );
+        a.sign_out(&site, "x").unwrap();
+        assert!(!file.exists());
+        assert!(
+            !log.lock().unwrap().iter().any(|c| c.starts_with("revoke")),
+            "an application password is not revoked from here"
+        );
+    }
+
+    #[test]
+    fn a_bare_refresh_token_from_before_reads_as_a_browser_sign_in() {
+        assert_eq!(
+            Kept::read("r-old"),
+            Some(Kept::Browser {
+                refresh: "r-old".into()
+            })
+        );
+        let k = Kept::Password {
+            login: "a".into(),
+            password: "b".into(),
+        };
+        assert_eq!(Kept::read(&serde_json::to_string(&k).unwrap()), Some(k));
+        assert_eq!(Kept::read("{broken"), None);
+        assert_eq!(Kept::read("  "), None);
+    }
+
+    #[test]
+    fn the_kept_file_holds_one_sign_in_per_site() {
+        let dir = tempfile::tempdir().unwrap();
+        let keep = Keep::File(dir.path().join(KEPT_FILE));
+        let a = Kept::Browser {
+            refresh: "r".into(),
+        };
+        let b = Kept::Password {
+            login: "o".into(),
+            password: "p".into(),
+        };
+        keep.write("https://a.example", &a).unwrap();
+        keep.write("https://b.example", &b).unwrap();
+        assert_eq!(keep.read("https://a.example"), Some(a));
+        keep.forget("https://a.example").unwrap();
+        keep.forget("https://a.example").unwrap();
+        assert_eq!(keep.read("https://a.example"), None);
+        assert_eq!(keep.read("https://b.example"), Some(b));
     }
 }

@@ -1,6 +1,7 @@
 //! Qanuvi core: projects, files, git, the code index, checks, agent sessions, terminals and the test browser. The
 //! desktop app (feature `desktop`, desktop.rs) and the master without a window (master.rs, Milestone 16) both use it.
 
+pub mod account;
 pub mod agent;
 pub mod agent_config;
 pub mod agent_tools;
@@ -51,8 +52,6 @@ pub mod store;
 pub mod terminal;
 pub mod usage;
 
-#[cfg(feature = "desktop")]
-mod account;
 #[cfg(feature = "desktop")]
 mod desktop;
 #[cfg(feature = "desktop")]
