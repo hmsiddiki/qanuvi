@@ -150,6 +150,12 @@
     </div>
   {/each}
   {#if dap.installError}<p class="error">{dap.installError}</p>{/if}
+  {#if dap.statusError}
+    <p class="error stale">
+      Could not check {shownPlace()} again: {dap.statusError}. The list above is from the last check.
+      <button type="button" onclick={() => dap.loadStatuses(switcher.shown)}>Check again</button>
+    </p>
+  {/if}
 
   <div class="row">
     <div class="what">
@@ -299,6 +305,9 @@
     margin-top: 26px;
   }
 
+  .stale button {
+    margin-left: 6px;
+  }
   .error {
     color: var(--qx-danger, #e5534b);
     white-space: pre-wrap;

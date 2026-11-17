@@ -102,6 +102,8 @@ const machineKey = (machine: string | null) => machine ?? "";
 
 class DapStore {
   #statuses = $state<Record<string, DapStatus[]>>({});
+  /** Why the last reload of a machine's statuses failed ("" when it worked): the old list stays, and says so (r1). */
+  #statusErrors = $state<Record<string, string>>({});
   /** A debugger the chosen configuration needs, not installed yet (for the machine in #offerMachine). */
   offer = $state<DapStatus | null>(null);
   #offerMachine: string | null = null;
@@ -178,10 +180,25 @@ class DapStore {
     return this.#statuses[machineKey(machine)] ?? [];
   }
 
+  /** Why the shown machine's statuses could not be read again ("" when the last reload worked). */
+  get statusError(): string {
+    return this.#statusErrors[machineKey(switcher.shown)] ?? "";
+  }
+
+  statusErrorOn(machine: string | null): string {
+    return this.#statusErrors[machineKey(machine)] ?? "";
+  }
+
+  /** Reads a machine's statuses again; on a failure the last list stays and the error is kept to be shown with it. */
   async loadStatuses(machine: string | null = switcher.shown): Promise<void> {
     const k = machineKey(machine);
-    const list = await api.dap.statuses(machine).catch(() => this.#statuses[k] ?? []);
-    this.#statuses = { ...this.#statuses, [k]: list };
+    try {
+      const list = await api.dap.statuses(machine);
+      this.#statuses = { ...this.#statuses, [k]: list };
+      this.#statusErrors = { ...this.#statusErrors, [k]: "" };
+    } catch (e) {
+      this.#statusErrors = { ...this.#statusErrors, [k]: errorText(e) || "no answer" };
+    }
   }
 
   /**

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 // Migration M1d: a start error belongs to the machine that was shown; it goes when that machine leaves the screen,
 // so another machine's sidebar never shows it.
-vi.mock("$lib/api", () => ({ api: { dap: { stopWindow: vi.fn(async () => {}) } }, errorText: String }));
+const statuses = vi.fn();
+vi.mock("$lib/api", () => ({ api: { dap: { stopWindow: vi.fn(async () => {}), statuses } }, errorText: String }));
 vi.mock("$lib/dap/client", () => ({ DapClient: class {} }));
 vi.mock("./editor.svelte", () => ({ editor: { active: null } }));
 vi.mock("./projects.svelte", () => ({ projects: { list: [] } }));
@@ -20,5 +21,24 @@ describe("start error per machine", () => {
     expect(dap.lastError).not.toBe("");
     dap.stopMachine("vps");
     expect(dap.lastError).toBe("");
+  });
+});
+
+// r1: a failed reload keeps the last list but says so, per machine, until a reload works.
+describe("statuses reload", () => {
+  it("keeps the old list on a failure, says why, and clears once a reload works", async () => {
+    const old = [{ id: "js-debug", missing: "needs Node.js 20" }];
+    statuses.mockResolvedValueOnce(old);
+    await dap.loadStatuses("vps");
+    expect(dap.statusErrorOn("vps")).toBe("");
+    statuses.mockRejectedValueOnce("the machine did not answer");
+    await dap.loadStatuses("vps");
+    expect(dap.statusesOn("vps")).toEqual(old);
+    expect(dap.statusError).toBe("the machine did not answer");
+    expect(dap.statusErrorOn(null)).toBe("");
+    statuses.mockResolvedValueOnce([{ id: "js-debug", missing: "" }]);
+    await dap.loadStatuses("vps");
+    expect(dap.statusError).toBe("");
+    expect(dap.statusesOn("vps")[0]).toMatchObject({ missing: "" });
   });
 });
