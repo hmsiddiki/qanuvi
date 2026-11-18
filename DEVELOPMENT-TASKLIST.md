@@ -384,7 +384,25 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:55): M5c PART 2 DRIVEN LIVE (release test build of
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 10:15): M5c PART 2 DONE. w1-w6 FIXED ff2ef72 (owner: fix
+    all, in the order proposed) and DRIVEN LIVE on the VPS (release test build), except w3, unit-tested only (no
+    failure line to show in the drive). Verify: Rust 487 + 2 ignored, clippy clean, fmt clean, web 496, svelte-check
+    0, prettier clean (StartupSettings.svelte formatting from 29c8e38 fixed on the way). Next: keep an eye out for v3;
+    then t1, b1/m2a.
+    w1-w6 FIXED (2026-11-18):
+    - w2: Remotes::answered waits for a link still being made (STILL_STARTING, 35 s) in link's This PC branch and in
+      route; "too old" only for a hello without forwards. Test a_link_still_being_made_is_waited_for. Driven: This
+      PC's core killed with a VPS file open: intelephense came back by itself (ready, diagnostics).
+    - w3: language server error lines kept per machine (#lastErrors), the shown machine's shown; a server ready again
+      clears its line. Test in lsp.svelte.test.ts.
+    - w4: clientFor waits for a start of the same project and server under way (#opening). Test fails on the old
+      code. Driven: the second window started one intelephense.
+    - w1: Held.why, set by #lose; the overlay shows it under the title. Test in masters.thispc.test.ts. Driven.
+    - w5: "Remove basevm378 from Qanuvi on this computer? It leaves every window. Nothing on the server is changed."
+      Driven.
+    - w6: a machine window's title follows its shown machine (windows.titleFor, +page effect). Driven: "This PC ·
+      Qanuvi" after the fall-back.
+    PICKUP POINT (before, 2026-11-18 09:55): M5c PART 2 DRIVEN LIVE (release test build of
     ee63f3b, This PC -> VPS basevm378 over SSH, owner's yes for the VPS; VPS kept its 2026-11-17 server build). All
     six drive checks pass; findings w1-w6 below wait for the owner's word. Next: owner's word on w1-w6, fix, drive w2
     again (kill This PC's core with a VPS file open); keep an eye out for v3; then t1, b1/m2a.
