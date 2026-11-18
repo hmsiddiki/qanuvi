@@ -481,7 +481,21 @@ runs on or off; with it off nothing is sent anywhere.
     tells). The master's hourly look puts the update in by itself when that is on (master_update::auto_wanted), still
     waiting for running work. This PC keeps the app's own updater until M8d. Rust 518, vitest 501 (+2 Rust, +5 vitest),
     svelte-check and clippy clean.
-    PICKUP POINT (2026-11-18, after M8c built): next drive M8c live: release window build + a Windows scratch master on
+    M8c DRIVEN LIVE on Windows (2026-11-18, test build f53e625: release window + the local test master
+    DESKTOP-R8G3PAK, a localhost test channel, the same code as 0.1.23 and 0.9.0, throwaway test key; scripts in the
+    m8c/ scratch of session 3ea80958). All pass: Settings, Updates shows the shown master's 0.1.23 and "Download updates
+    by themselves" off by default; Check now -> "Qanuvi 0.9.0 is available" + status bar "Update to 0.9.0"; clicked ->
+    "Downloading 0.9.0" -> "Restart to update" (Checking too quick to catch), `<exe>.new` held, program untouched; with
+    a terminal plan run working, Restart to update -> "Update waits for running work" (page: 1 agent session and 1 plan
+    run working) + the Inbox note; run stopped -> "Restarting to update", swapped (.prev 0.1.23), new serve + core from
+    the installed path (--after-pid), the window connected back by itself and shows 0.9.0, note gone, run "Stopped by
+    you"; the tick saved on the shown master only (This PC's stays off); with it on and 0.1.23 put back, the master's
+    first look (2 minutes after its start, 17:31:42) put 0.9.0 in by itself and the window followed. No findings.
+    Drive note: the window's link restarts a stopped local test master at once and This PC's master runs from the same
+    target/release program, so a program in use is renamed aside, never copied over.
+    PICKUP POINT (2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
+    then M8d (This PC's whole app).
+    PICKUP POINT (before, 2026-11-18, after M8c built): next drive M8c live: release window build + a Windows scratch master on
     a localhost test channel (the M8b way: this code as 0.1.23 and 0.9.0, throwaway test key, scripts in the m8b/
     scratch of session f4b4a43e): Update to x -> progress -> Restart to update; with a plan run working -> waits + Inbox
     note, then restarts and the window connects back on 0.9.0; auto-update on -> it goes in by itself; off by default.
