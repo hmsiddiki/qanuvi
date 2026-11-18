@@ -120,8 +120,10 @@ pub fn added_steps<'a>(now: &'a [Step], known: &HashSet<String>) -> Vec<&'a Step
         .collect()
 }
 
-/// Steps the run already passed (blocked, failed or skipped) that are open in the plan again: the owner asked to go
-/// back to them. Each comes back at most once per run.
+/// Steps the run already passed (blocked or skipped) that are open in the plan again: the owner asked to go back to
+/// them. Each comes back at most once per run. A failed step is not one of them: the run leaves no mark on it in the
+/// plan, so it is always open there and would run a second time on its own (y2); it comes back through its Inbox
+/// question instead.
 pub fn reopened_steps<'a>(
     run_steps: &[StepRun],
     now: &'a [Step],
@@ -135,7 +137,7 @@ pub fn reopened_steps<'a>(
             .collect()
     };
     use RunStepStatus::*;
-    let passed = keys(&|s| matches!(s, Blocked | Failed | Skipped));
+    let passed = keys(&|s| matches!(s, Blocked | Skipped));
     let skipped = keys(&|s| s == Skipped);
     let waiting = keys(&|s| s == Waiting);
     // A step the run skipped stays open in the plan with its "Skipped:" note: back only once the note is gone.

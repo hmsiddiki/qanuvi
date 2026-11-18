@@ -403,10 +403,12 @@ runs on or off; with it off nothing is sent anywhere.
     Claude Code, step 1 failed and waited for an answer, then started again by itself and asked a second time, and
     plan list counted 2 steps for a 1-step plan. y2 CHECKED (owner, 2026-11-18): (1) FIXED: a run whose agent is not on the machine is refused at its start
     (agent::missing, RunEnv::agent_missing; master plan_run_start/finish say it at once), no model ladder; scenario
-    test y2_an_agent_…; driven with PATH without claude (refused, nothing tried) and with it (run done). (2) OPEN,
-    owner to decide: a step that failed on every model runs a second time in the same run (guidance::reopened_steps
+    test y2_an_agent_…; driven with PATH without claude (refused, nothing tried) and with it (run done). (2) FIXED (owner yes): a step that failed on every model ran a second time in the same run (guidance::reopened_steps
     counts Failed as passed, but a failed step leaves no mark in the plan, so it always looks sent back); the retry
-    setting (tries per model, window default 2) is not the cause. Next: owner on (2), then the CI fixes, then M8.
+    setting (tries per model, window default 2) is not the cause and still climbs models inside the step. Now only
+    blocked and skipped steps come back (both leave a mark in the plan); a failed one comes back through its Inbox
+    answer. Scenario test y2_a_step_that_failed_on_every_model_runs_once_and_asks_once (fails without the fix); driven
+    live (Haiku-only, FAIL.md: one copy, one question, step 2 done). Rust 505. Next: the CI fixes, then M8.
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.

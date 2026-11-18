@@ -211,6 +211,67 @@ fn runs_a_plain_plan_to_the_end() {
 }
 
 #[test]
+fn y2_a_step_that_failed_on_every_model_runs_once_and_asks_once() {
+    let env = world("# Plan\n\n- [ ] **1. Hard**\n  - do it\n- [ ] **2. Easy**\n  - then this\n");
+    let hard = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let h = hard.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if step_of(c.prompt, &["1", "2"]) == "1" {
+            // Never finishes: step 1 stays open on every model.
+            h.lock().unwrap().push(c.model.to_string());
+        } else {
+            c.env.mark(FILE, "2", 'x');
+        }
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            stronger_on_fail: Some(true),
+            ..options()
+        },
+        stop.clone(),
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while running.waiting_answers() == 0 || step(&running.now(), "2").status != RunStepStatus::Done
+    {
+        assert!(std::time::Instant::now() < until, "the run never asked");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // Time for a wrong second copy of step 1 to start.
+    std::thread::sleep(Duration::from_millis(300));
+    let now = running.now();
+    let copies = now
+        .steps
+        .iter()
+        .filter(|s| s.number.as_deref() == Some("1"))
+        .count();
+    let tries = hard.lock().unwrap().clone();
+    stop.press();
+    stop.press();
+    let _ = running.wait();
+    assert_eq!(copies, 1, "step 1 is in the run once");
+    assert_eq!(running_questions(&env), 1, "one question about step 1");
+    let mut seen = tries.clone();
+    seen.dedup();
+    assert_eq!(
+        seen.len(),
+        tries.len(),
+        "each model tried once, no second ladder: {tries:?}"
+    );
+}
+
+fn running_questions(env: &FakeEnv) -> usize {
+    env.inbox().iter().filter(|i| i.kind_of == "answer").count()
+}
+
+#[test]
 fn y2_an_agent_that_is_not_on_this_machine_stops_the_run_before_any_step_tries_its_models() {
     let env = world("# Plan\n\n- [ ] **1. First**\n  - do it\n");
     *env.missing_agent.lock().unwrap() = Some("The agent is not on this machine.".into());
