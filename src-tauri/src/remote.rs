@@ -63,6 +63,9 @@ pub fn a_loop() -> String {
 /// The app's link to This PC's own master (migration M5a; remote.ts THIS_PC): every call about This PC goes on it.
 pub const THIS_PC: &str = "this-computer";
 
+/// How long a call waits for a connection still being made (its hello is in within 30 s, or it fails).
+const STILL_STARTING: Duration = Duration::from_secs(35);
+
 pub fn split_path(key: &str) -> Result<Vec<String>, String> {
     let parts: Vec<String> = key.split('/').map(str::to_string).collect();
     if parts.iter().any(|p| p.trim().is_empty()) {
@@ -341,8 +344,7 @@ impl Remotes {
     pub fn route(&self, key: &str, seen: Vec<String>) -> Result<Routed, String> {
         let mut rest = split_path(key)?;
         let first = rest.remove(0);
-        let conn = self.get(&first)?;
-        let info = conn.info.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let (conn, info) = self.answered(&first)?;
         if let Some(id) = info["machineId"].as_str()
             && seen.iter().any(|s| s == id)
         {
@@ -355,6 +357,27 @@ impl Remotes {
             );
         }
         Ok(Routed { conn, rest, seen })
+    }
+
+    /// A connection and its master's hello. One still being connected (its hello not in yet) is waited for, as
+    /// connect waits: a call made in that gap (finding w2: a language server started again just as This PC's link
+    /// was made again after its master restarted) would read the missing hello as a master too old to pass calls on.
+    fn answered(&self, id: &str) -> Result<(Arc<Connection>, Value), String> {
+        let since = std::time::Instant::now();
+        while self
+            .starting
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(id)
+        {
+            if since.elapsed() > STILL_STARTING {
+                return Err("It is still being connected; try again in a moment.".into());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let conn = self.get(id)?;
+        let info = conn.info.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        Ok((conn, info))
     }
 
     /// A connection that sends nothing, with the hello given (tests: a connection still waiting has `Null`).
@@ -392,8 +415,8 @@ impl Remotes {
         // starts there with nothing passed yet, as on the window's own link to it.
         if let Some(through) = self.through_for(key) {
             let rest = split_path(key)?;
-            let conn = self.get(&through)?;
-            if conn.info.lock().unwrap_or_else(|e| e.into_inner())["forwards"] != true {
+            let (conn, info) = self.answered(&through)?;
+            if info["forwards"] != true {
                 return Err(
                     "This computer's background part is too old to reach its servers. Restart Qanuvi.".into(),
                 );
@@ -447,7 +470,7 @@ impl Remotes {
                     break;
                 }
             }
-            if since.elapsed() > Duration::from_secs(35) {
+            if since.elapsed() > STILL_STARTING {
                 return Err("It is still being connected; try again in a moment.".into());
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -875,6 +898,36 @@ mod tests {
         );
         assert!(remotes.link("vps/x/y").is_ok());
         assert_eq!(remotes.link("vps/x/y/z").err().unwrap(), too_deep());
+    }
+
+    // Finding w2: This PC's link made again (its master restarted) is in the map before its hello; a call in that
+    // gap waits for the hello instead of reading the missing one as a master too old to pass calls on.
+    #[test]
+    fn a_link_still_being_made_is_waited_for() {
+        let remotes = Arc::new(Remotes::default());
+        remotes.set_me("pc");
+        remotes.set_through(THIS_PC);
+        let conn = idle_connection(Value::Null);
+        remotes
+            .map
+            .lock()
+            .unwrap()
+            .insert(THIS_PC.into(), conn.clone());
+        remotes.starting.lock().unwrap().insert(THIS_PC.into());
+        let hello = {
+            let remotes = remotes.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                *conn.info.lock().unwrap() = json!({"machineId": "pc", "forwards": true});
+                remotes.starting.lock().unwrap().remove(THIS_PC);
+            })
+        };
+        assert!(remotes.link("vps").is_ok());
+        assert!(remotes.link(&format!("{THIS_PC}/vps")).is_ok());
+        hello.join().unwrap();
+        // A hello without forwards is still refused.
+        remotes.add_idle(THIS_PC, json!({"machineId": "pc"}));
+        assert!(remotes.link("vps").err().unwrap().contains("too old"));
     }
 
     #[test]

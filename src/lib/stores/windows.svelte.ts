@@ -109,6 +109,21 @@ class WindowsStore {
     });
   }
 
+  /**
+   * A machine window's title follows the machine it shows (finding w6: one that fell back to This PC, its server
+   * removed, still had the server's name). The main window and project windows keep theirs.
+   */
+  titleFor(name: string): void {
+    if (!this.label.startsWith("machine-")) return;
+    try {
+      void getCurrentWebviewWindow()
+        .setTitle(`${name} · Qanuvi`)
+        .catch(() => {});
+    } catch {
+      // not running inside the app (tests)
+    }
+  }
+
   announceMachine(machine: string | null): void {
     emit("qanuvi-window-machine", { label: this.label, machine: machine ?? "" }).catch(() => {});
   }

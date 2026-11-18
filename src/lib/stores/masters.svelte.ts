@@ -392,7 +392,7 @@ class MastersStore {
    * "not connected" with Reconnect.
    */
   #lose(id: string, error: string): void {
-    switcher.held = { id, mode: "lost", error: "", tries: 0, nextAt: 0, since: Date.now() };
+    switcher.held = { id, mode: "lost", error: "", why: error, tries: 0, nextAt: 0, since: Date.now() };
     // Nothing typed goes into a screen that cannot save it.
     (document.activeElement as HTMLElement | null)?.blur?.();
     this.#dropped(id, error);

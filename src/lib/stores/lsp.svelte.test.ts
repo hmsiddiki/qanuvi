@@ -79,6 +79,17 @@ describe("language servers per machine", () => {
     expect(lsp.statuses[0].found, "the Languages page shows the shown machine's").toBe("qanuvi");
   });
 
+  it("starts one server for two files of a project opened at once (finding w4)", async () => {
+    switcher.shown = "vps";
+    const [a, b] = await Promise.all([
+      lsp.clientFor({ key: "w4a", projectId: "there", path: "index.php" }),
+      lsp.clientFor({ key: "w4b", projectId: "there", path: "cart.php" }),
+    ]);
+    expect(started).toHaveLength(1);
+    expect(a?.client).toBe(b?.client);
+    expect(b?.uri).toBe("file:///root/shop/cart.php");
+  });
+
   it("offers the install on the machine whose file it is", async () => {
     switcher.shown = null;
     expect(await lsp.clientFor({ key: "t2", projectId: "here", path: "a.php" })).toBeNull();
@@ -160,6 +171,10 @@ describe("a server that ended by itself (M5c)", () => {
       started[started.length - 1].exit("it crashed");
       expect(lsp.state["there::php"]).toBe("stopped");
       expect(lsp.lastError).toContain("it crashed");
+      // Finding w3: the line is the VPS's; This PC's screen does not show it.
+      switcher.shown = null;
+      expect(lsp.lastError).toBe("");
+      switcher.shown = "vps";
       await vi.advanceTimersByTimeAsync(RESTART_WAIT_MS);
       expect(started.length).toBe(RESTARTS + 1);
     } finally {

@@ -99,7 +99,7 @@
 
   async function remove(m: MasterSettings) {
     const ok = await ask(
-      `Remove ${displayName(m)} from Qanuvi? Nothing on the server is changed; it just leaves this window.`,
+      `Remove ${displayName(m)} from Qanuvi on this computer? It leaves every window. Nothing on the server is changed.`,
       { title: "Remove server", okLabel: "Remove", cancelLabel: "Keep" },
     );
     if (ok) await masters.remove(m.id);

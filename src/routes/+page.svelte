@@ -158,6 +158,12 @@
     untrack(() => windows.announceMachine(shown));
   });
 
+  // A machine window's title names the machine it shows.
+  $effect(() => {
+    const name = switcher.shown ? machineName(switcher.shown) : "This PC";
+    untrack(() => windows.titleFor(name));
+  });
+
   // A different project: its tabs, sessions and terminals.
   $effect(() => {
     const id = projects.currentId;

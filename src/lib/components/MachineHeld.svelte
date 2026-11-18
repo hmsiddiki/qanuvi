@@ -45,6 +45,7 @@
           Its screen stays as it was and cannot be used until it is back. Work on it goes on.
           {#if trying}Trying now…{:else if wait > 0}Next try in {wait} s.{/if}
         </p>
+        {#if held.why}<p class="why">{held.why}</p>{/if}
         {#if held.error}<p class="why">Last try: {held.error}</p>{/if}
       {:else}
         <h2><Unplug size={16} /> {name} is not connected</h2>

@@ -151,6 +151,21 @@ describe("This PC's servers are held by This PC's master", () => {
     switcher.held = null;
   });
 
+  it("This PC's own master stopped: the cover over its shown server says so (finding w1)", async () => {
+    await masters.followThisPc();
+    await masters.connect(vps);
+    showMachine("vps");
+    switcher.shown = "vps";
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      for (const fn of handlers["remote-closed"] ?? []) fn({ payload: { id: "this-computer" } });
+      expect(switcher.held).toMatchObject({ id: "vps", mode: "lost", why: THIS_PC_STOPPED });
+    } finally {
+      vi.useRealTimers();
+    }
+    switcher.held = null;
+  });
+
   it("taken out from another window: it goes here too", async () => {
     await masters.followThisPc();
     await masters.connect(vps);

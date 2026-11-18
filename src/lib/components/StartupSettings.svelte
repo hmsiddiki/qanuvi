@@ -133,12 +133,12 @@
         checked={atSignIn === true}
         disabled={atSignIn === null}
         onchange={(e) => void setAtSignIn(e.currentTarget.checked)}
-      /> {startSettingLabel()}</label
+      />
+      {startSettingLabel()}</label
     >
     <p class="muted small">
-      Qanuvi starts in the background with no window, its icon in the tray: these commands, its daily backup and
-      remote access run from then on, and plan runs a shutdown cut off go on by themselves. Open Qanuvi there shows
-      the window.
+      Qanuvi starts in the background with no window, its icon in the tray: these commands, its daily backup and remote
+      access run from then on, and plan runs a shutdown cut off go on by themselves. Open Qanuvi there shows the window.
     </p>
     {#if atSignInError}<p class="note bad">{atSignInError}</p>{/if}
   </div>

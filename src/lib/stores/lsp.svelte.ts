@@ -72,7 +72,15 @@ class LspStore {
   installLog = $state<string[]>([]);
   /** Server state per project and language, for the status bar. */
   state = $state<Record<string, "starting" | "restarting" | "ready" | "stopped" | "failed">>({});
-  lastError = $state("");
+  /** Why a server last stopped or failed, per machine (finding w3: one machine's line showed on another's screen). */
+  #lastErrors = $state<Record<string, string>>({});
+  /** The shown machine's line. */
+  get lastError(): string {
+    return this.#lastErrors[machineKey(switcher.shown)] ?? "";
+  }
+  #noteError(machine: string | null, text: string): void {
+    this.#lastErrors = { ...this.#lastErrors, [machineKey(machine)]: text };
+  }
   /** Bumps when coding tools or one server are switched on again: open editors attach their file once more (m2). */
   switchedOn = $state(0);
   references = $state<{ title: string; places: Place[] } | null>(null);
@@ -94,6 +102,8 @@ class LspStore {
   #statusAt = new Map<string, number>();
   /** The machine of each running client. */
   #machineOf = new Map<string, string | null>();
+  /** Clients being started, so a second call for the same one waits (finding w4). */
+  #opening = new Map<string, Promise<unknown>>();
   #idle: ReturnType<typeof setInterval> | undefined;
 
   constructor() {
@@ -166,6 +176,22 @@ class LspStore {
   /** The client for a file, started if needed; null when there is none (no server, off, not installed). */
   async clientFor(doc: Doc): Promise<{ client: LspClient; uri: string } | null> {
     const server = serverFor(doc.path);
+    if (!server) return null;
+    // Finding w4: two files of one project opened at once (a window opening on a machine) each started the server
+    // while the other was still asking which servers the machine has. The second waits for the first.
+    const key = clientKey(doc.projectId, server);
+    const going = this.#opening.get(key);
+    if (going) await going.catch(() => null);
+    const run = this.#clientFor(doc);
+    if (!going && !this.#clients.has(key)) {
+      this.#opening.set(key, run);
+      void run.catch(() => null).finally(() => this.#opening.get(key) === run && this.#opening.delete(key));
+    }
+    return run;
+  }
+
+  async #clientFor(doc: Doc): Promise<{ client: LspClient; uri: string } | null> {
+    const server = serverFor(doc.path);
     const place = this.#place(doc.projectId);
     if (!server || !place || !this.enabled(server)) return null;
     const { root, machine } = place;
@@ -204,7 +230,7 @@ class LspStore {
             return;
           }
           this.state = { ...this.state, [key]: "stopped" };
-          if (why) this.lastError = `${st.label} stopped: ${why}`;
+          if (why) this.#noteError(machine, `${st.label} stopped: ${why}`);
         },
         machine,
       );
@@ -215,11 +241,16 @@ class LspStore {
       c.applyEdit = (edit) => this.editApplier(doc.projectId, edit);
       c.on("textDocument/publishDiagnostics", (p) => this.#diagnostics(doc.projectId, root, p));
       c.ready.then(
-        () => this.#clients.get(key) === c && (this.state = { ...this.state, [key]: "ready" }),
+        () => {
+          if (this.#clients.get(key) !== c) return;
+          this.state = { ...this.state, [key]: "ready" };
+          // Working again (it came back after its machine's link was made again): an old failure line goes.
+          if (this.#lastErrors[machineKey(machine)]?.startsWith(st.label)) this.#noteError(machine, "");
+        },
         (e) => {
           this.#clients.delete(key);
           this.state = { ...this.state, [key]: "failed" };
-          this.lastError = `${st.label}: ${errorText(e)}`;
+          this.#noteError(machine, `${st.label}: ${errorText(e)}`);
           c.stop();
         },
       );

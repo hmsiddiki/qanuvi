@@ -16,6 +16,8 @@ export interface Held {
   mode: "lost" | "offline";
   /** Why the last try failed (empty before the first one). */
   error: string;
+  /** Why it was lost, when known (finding w1: This PC's own master stopped, so its servers' connections ended). */
+  why?: string;
   /** Tries made since it was lost. */
   tries: number;
   /** When the next try starts (ms; 0: none planned, or one is under way). */
