@@ -2,6 +2,11 @@
  * Servers running Qanuvi without a window (Milestone 16): connecting over SSH or the relay, and what happens when a
  * connection ends. The calls themselves are routed in remote.ts; the sidebar lists only the machine on screen
  * (24z3 Part A2), so a master's projects show once it is shown.
+ *
+ * M5c part 2: This PC's master holds This PC's server connections (it connects the ones marked to connect at start
+ * itself, window or not); the window asks it to connect, follows its `remote_watch` stream for their comings and
+ * goings, and its calls to them go through it (remote.rs `through`). Their keys stay their ids. Only the test master
+ * next to the app ("local") and remote access ("self") stay the window's own links.
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -12,6 +17,7 @@ import {
   callThisPc,
   disown,
   forgetMaster,
+  linkEnded,
   machineName,
   nameMachines,
   own,
@@ -95,6 +101,18 @@ export interface TreeRow {
   m: MasterSettings;
   depth: number;
 }
+
+/**
+ * A machine the window links to itself (M5c part 2): the test master next to the app and remote access. Every other
+ * of This PC's servers is held by This PC's master.
+ */
+export function appHeld(m: Pick<MasterSettings, "target" | "relay">): boolean {
+  return !m.relay && (m.target.trim() === "local" || m.target.trim() === "self");
+}
+
+/** What a server's line says when This PC's master, which held its connection, stopped. */
+export const THIS_PC_STOPPED =
+  "Qanuvi's background part on this computer stopped, and this connection ended with it. It connects again when it is back.";
 
 /** A machine's name for the screen: as typed, or until it has said its computer name, its address. */
 export function displayName(m: MasterSettings): string {
@@ -323,8 +341,10 @@ class MastersStore {
     // A connection that ended by itself (network gone, server restarted).
     await listen<{ id: string }>("remote-closed", (e) => {
       const id = e.payload.id;
-      // This PC's own link: the app makes it again on the next call.
-      if (id === THIS_PC || this.statusOf(id).state !== "on") return;
+      // This PC's own link: the app makes it again on the next call. The server connections its master held ended
+      // with it (M5c part 2).
+      if (id === THIS_PC) return this.#thisPcEnded();
+      if (this.statusOf(id).state !== "on") return;
       invoke("remote_disconnect", { id }).catch(() => {});
       const said = "The connection ended. Work on the server goes on; connect again to see it.";
       // The machine on screen: it stays, read-only, while it reconnects (24z3 Part E).
@@ -347,8 +367,11 @@ class MastersStore {
       else if (!this.status[k].twin) this.#set(k, { state: "off" });
     }
     this.#following.delete(id);
-    // A nested machine's connection is its master's; This PC only lets go of its port links to it.
-    if (id.includes("/")) invoke("remote_disconnect", { id }).catch(() => {});
+    // A nested machine's connection is its master's, and one of This PC's servers is This PC's master's (M5c part 2);
+    // the app only lets go of its port links to it.
+    if (!this.#heldHere(id)) invoke("remote_disconnect", { id }).catch(() => {});
+    // Its link ended by itself: whatever waits on it (a terminal's shell) is told, as the app tells of its own.
+    if (error && !this.#heldHere(id)) linkEnded(id);
     // A machine held on screen (lost or not connected, Part E) stays shown; its calls fail, never run on This PC.
     const held = switcher.held?.id === id;
     forgetMaster(id, held);
@@ -474,17 +497,24 @@ class MastersStore {
     if (parentOf(m.id)) return this.#connectNested(m);
     this.#set(m.id, { state: "connecting" });
     try {
-      const info = await invoke<MasterInfo>("remote_connect", {
-        id: m.id,
-        target: m.relay ? "relay" : m.target,
-        program: m.program,
-        identity: m.identity || null,
-        relay: m.relay ?? null,
-      });
+      const target = m.relay ? "relay" : m.target;
+      // M5c part 2: This PC's master connects (or answers the connection it holds); only "local" and "self" are the
+      // app's own links.
+      const info = appHeld(m)
+        ? await invoke<MasterInfo>("remote_connect", {
+            id: m.id,
+            target,
+            program: m.program,
+            identity: m.identity || null,
+            relay: m.relay ?? null,
+          })
+        : await callThisPc<MasterInfo | null>("remote_connect", { ...m, target });
+      // Its hello is not in yet (an older master answering a connect under way): it comes on through the follow.
+      if (!info) return "";
       // The same computer added twice (another address, or paired as well as reached over SSH).
       const twin = this.twinOf(m.id, info.machineId);
       if (twin) {
-        await invoke("remote_disconnect", { id: m.id }).catch(() => {});
+        await this.#letConnectionGo(m.id);
         const said = `This is the same computer as ${displayName(twin)}.`;
         if (fresh) {
           await this.#forget(m);
@@ -499,10 +529,112 @@ class MastersStore {
       await this.#arrived(m.id, info);
       return "";
     } catch (e) {
-      invoke("remote_disconnect", { id: m.id }).catch(() => {});
+      void this.#letConnectionGo(m.id);
       this.#dropped(m.id, errorText(e));
       return "";
     }
+  }
+
+  /** Whether the app holds the link to this machine itself ("local", "self"; M5c part 2). */
+  #heldHere(id: string): boolean {
+    if (parentOf(id)) return false;
+    const m = this.list.find((x) => x.id === id);
+    return !!m && appHeld(m);
+  }
+
+  /** The follow of This PC's master's server connections under way (one at a time). */
+  #followingThisPc: Promise<void> | null = null;
+
+  /**
+   * Follows This PC's master's connections to This PC's servers (M5c part 2): how each stands now, then each coming
+   * and going. Asked again after This PC's own link ended (its master restarted), a few times until it answers.
+   */
+  followThisPc(): Promise<void> {
+    if (this.#followingThisPc) return this.#followingThisPc;
+    const run = (async () => {
+      for (let tries = 0; tries < 6; tries++) {
+        try {
+          const ch = new Channel<WatchEvent>();
+          ch.onmessage = (e) => void this.#thisPcWatched(e);
+          const states = await callThisPc<Record<string, MasterStatus>>("remote_watch", { onEvent: ch });
+          await Promise.all(Object.entries(states).map(([id, st]) => this.#thisPcState(id, st)));
+          return;
+        } catch {
+          // Its master is starting again (or an older one without servers): asked again shortly.
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    })().finally(() => {
+      this.#followingThisPc = null;
+    });
+    this.#followingThisPc = run;
+    return run;
+  }
+
+  /** How one of This PC's servers stands, as This PC's master says (its follow just started). */
+  async #thisPcState(id: string, st: MasterStatus): Promise<void> {
+    const m = this.list.find((x) => x.id === id);
+    if (!m || appHeld(m)) return;
+    const now = this.statusOf(id).state;
+    if ((st.state === "on" || st.state === "connecting") && now !== "on" && now !== "connecting") {
+      // Connected by it already (at its start, or for another window): this window joins it.
+      await this.connect(m);
+    } else if (st.state === "error" && now !== "on" && now !== "connecting" && !switcher.held) {
+      this.#set(id, { state: "error", error: st.error });
+    }
+  }
+
+  /** One of This PC's servers came or went, as This PC's master says. */
+  async #thisPcWatched(e: WatchEvent): Promise<void> {
+    const id = e.connected ?? e.closed;
+    if (!id) return;
+    let m = this.list.find((x) => x.id === id);
+    if (!m && e.connected) {
+      // Added from another window: the list is read again.
+      await this.load();
+      m = this.list.find((x) => x.id === id);
+    }
+    if (!m || appHeld(m)) return;
+    const now = this.statusOf(id);
+    if (e.connected) {
+      if (now.state !== "on" && now.state !== "connecting") await this.connect(m);
+      return;
+    }
+    if (e.removed) {
+      // Taken out from another window: it goes here too.
+      settings.set(
+        "masters",
+        this.list.filter((x) => x.id !== id),
+      );
+      if (switcher.held?.id === id) this.#letGo();
+      this.#dropped(id);
+      inbox.forgetMaster(id);
+      const { [id]: _gone, ...rest } = this.status;
+      this.status = rest;
+      return;
+    }
+    if (!e.error) {
+      // Disconnected on purpose (here or from another window): it is off.
+      if (now.state === "on") this.#dropped(id);
+      else if (now.state !== "connecting") this.#set(id, { state: "off" });
+    } else if (now.state === "on" && shownMachine() === id && !switcher.held) this.#lose(id, e.error);
+    else if (now.state === "on") this.#dropped(id, e.error);
+    else if (now.state !== "connecting") this.#set(id, { state: "error", error: e.error });
+  }
+
+  /**
+   * This PC's own link ended (its master stopped or restarted, M5c part 2): the server connections it held ended
+   * with it. A shown one is held and tried again; the others say why. The follow is asked for again.
+   */
+  #thisPcEnded(): void {
+    for (const m of this.list) {
+      if (appHeld(m)) continue;
+      const st = this.statusOf(m.id).state;
+      if (st !== "on" && st !== "connecting") continue;
+      if (st === "on" && shownMachine() === m.id && !switcher.held) this.#lose(m.id, THIS_PC_STOPPED);
+      else this.#dropped(m.id, THIS_PC_STOPPED);
+    }
+    setTimeout(() => void this.followThisPc(), 1000);
   }
 
   /**
@@ -717,10 +849,14 @@ class MastersStore {
     return this.statusOf(id).error ?? `No answer from ${displayName(m)} after the restart.`;
   }
 
-  /** Ends the connection to a machine: This PC's own, or for a nested one its master's. */
+  /**
+   * Ends the connection to a machine: for a nested one its master's, for one of This PC's servers This PC's
+   * master's (M5c part 2), else the app's own; the app's port links to it go in every case.
+   */
   async #letConnectionGo(id: string): Promise<void> {
     const parent = parentOf(id);
     if (parent) await callMaster(parent, "remote_disconnect", { id: serverIdOf(id) }).catch(() => {});
+    else if (!this.#heldHere(id)) await callThisPc("remote_disconnect", { id }).catch(() => {});
     await invoke("remote_disconnect", { id }).catch(() => {});
   }
 
@@ -736,8 +872,16 @@ class MastersStore {
    * joins the connections of the others). Resolves when all have answered.
    */
   async autoConnect(): Promise<void> {
-    const open = await invoke<string[]>("remote_list").catch(() => [] as string[]);
+    await this.#listen();
+    // M5c part 2: This PC's master holds This PC's server connections; the app only its own ("local", "self").
+    const [mine, held] = await Promise.all([
+      invoke<string[]>("remote_list").catch(() => [] as string[]),
+      callThisPc<string[]>("remote_list").catch(() => [] as string[]),
+    ]);
+    const open = [...mine, ...held];
     await Promise.all(this.list.filter((m) => m.autoConnect || open.includes(m.id)).map((m) => this.connect(m)));
+    // Then each coming and going of the ones its master holds.
+    void this.followThisPc();
   }
 
   /** Keeps a machine's settings; a machine already in the list keeps its place in it. */

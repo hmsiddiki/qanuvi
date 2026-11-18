@@ -20,6 +20,29 @@ fn app_only(target: &str) -> String {
     )
 }
 
+/// Commands whose answer is the id of something that ends with the connection that opened it.
+const OPENS: [&str; 3] = ["term_spawn", "pipe_start", "port_open"];
+
+/// How a terminal, pipe or port opened on another machine through this one is noted with the asking connection's
+/// own (M5c part 2): the machine's path and its id there.
+fn forwarded_entry(key: &str, id: &str) -> String {
+    format!("forwarded\t{key}\t{id}")
+}
+
+/// The machine's path and the id there of an entry noted by `note_forwarded`; none for this machine's own.
+pub(super) fn forwarded(entry: &str) -> Option<(&str, &str)> {
+    let rest = entry.strip_prefix("forwarded\t")?;
+    rest.split_once('\t')
+}
+
+/// A server the window reaches itself, not this master: "local" or "self" (kept in This PC's list, M5c part 2).
+fn app_held(server: &Value) -> bool {
+    matches!(
+        server["target"].as_str().unwrap_or("").trim(),
+        "local" | "self"
+    )
+}
+
 /// What a server entry or a remote_connect call says about how to reach it.
 fn transport_for(server: &Value) -> Result<Transport, String> {
     let target = server["target"].as_str().unwrap_or("").trim();
@@ -148,6 +171,10 @@ impl Master {
         let on = self.remotes.connected();
         for server in list {
             let id = server["id"].as_str().unwrap_or("");
+            // This PC's test master and remote access stay the window's (M5c part 2): never tried here.
+            if self.app_data && app_held(&server) {
+                continue;
+            }
             if server["autoConnect"] == true && !on.iter().any(|c| c == id) {
                 let _ = self.connect_server(&server);
             }
@@ -189,6 +216,49 @@ impl Master {
         self.remotes.route(&key, seen)
     }
 
+    /// A call passed on that opened a terminal, pipe or port there (M5c part 2): it belongs to the connection here
+    /// that asked, not to this machine's own lasting connection there, so it is noted with that one and closed when
+    /// it ends (a window's terminals and language servers on This PC's servers end when the window goes).
+    pub(super) fn note_forwarded(
+        &self,
+        args: &Value,
+        out: &Value,
+        opened: &std::sync::Mutex<std::collections::HashSet<String>>,
+    ) {
+        let (Some(id), true) = (out.as_str(), OPENS.contains(&s(args, "cmd").as_str())) else {
+            return;
+        };
+        let via: Vec<String> = args["via"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let key = std::iter::once(s(args, "master"))
+            .chain(via)
+            .collect::<Vec<_>>()
+            .join("/");
+        opened
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(forwarded_entry(&key, id));
+    }
+
+    /// Closes a terminal, pipe or port opened along `key` for a connection that ended (one already gone is no harm).
+    pub(super) fn close_forwarded(&self, key: &str, id: &str) {
+        let Ok(route) = self.remotes.route(key, vec![self.machine_id.clone()]) else {
+            return;
+        };
+        let cmd = if crate::pipes::is_pipe(id) {
+            "pipe_stop"
+        } else {
+            "term_kill"
+        };
+        crate::pipes::Link::tell(&route, cmd, json!({"id": id}));
+    }
+
     /// The `servers_*` and `remote_*` commands.
     pub(super) fn servers(
         &self,
@@ -207,9 +277,10 @@ impl Master {
                 to(crate::servers::import(db, &old))
             }
             "servers_save" => {
-                // Refused before it is kept (finding s1): kept, it would be tried again every minute.
+                // Refused before it is kept (finding s1): kept, it would be tried again every minute. This PC's own
+                // list keeps them for the window, which reaches them itself (M5c part 2); they are never tried here.
                 let target = args["server"]["target"].as_str().unwrap_or("").trim();
-                if matches!(target, "local" | "self") {
+                if !self.app_data && app_held(&args["server"]) {
                     return Err(app_only(target));
                 }
                 to(crate::servers::save(db, &args["server"]))

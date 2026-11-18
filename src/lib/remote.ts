@@ -193,14 +193,35 @@ export async function onThisPcLinkEnd(fn: () => void): Promise<void> {
  */
 export async function onLinkEnd(machine: string | null, fn: () => void): Promise<() => void> {
   const link = machine ?? THIS_PC;
+  // A link the app does not hold itself (one of This PC's servers, held by its master: M5c part 2) is told ended
+  // by the window (linkEnded).
+  const fns = linkEnds.get(link) ?? new Set<() => void>();
+  linkEnds.set(link, fns);
+  fns.add(fn);
+  const stopHere = () => {
+    fns.delete(fn);
+    if (!fns.size && linkEnds.get(link) === fns) linkEnds.delete(link);
+  };
   try {
-    return await listen<{ id: string }>("remote-closed", (e) => {
+    const stop = await listen<{ id: string }>("remote-closed", (e) => {
       if (e.payload?.id === link) fn();
     });
+    return () => {
+      stop();
+      stopHere();
+    };
   } catch {
     // No app events (tests, a browser preview).
-    return () => {};
+    return stopHere;
   }
+}
+
+/** Who waits for the end of a link the app does not hold itself, by machine key. */
+const linkEnds = new Map<string, Set<() => void>>();
+
+/** The link to a machine held by This PC's master ended (its master said so, or This PC's own link ended). */
+export function linkEnded(machine: string): void {
+  for (const fn of [...(linkEnds.get(machine) ?? [])]) fn();
 }
 
 /** The sentence a terminal shows when its link ended (finding j1): the shell ended with it. */

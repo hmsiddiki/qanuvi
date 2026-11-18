@@ -46,6 +46,10 @@ beforeEach(() => {
     }
     if (cmd === "remote_unpair") unpaired.push((args as { pairing: string }).pairing);
     if (cmd === "remote_pair") return { relay: "wss://r", masterId: "m1", masterName: "", pairing: "p1" };
+    // M5c part 2: This PC's master connects This PC's servers; shown here as the app's own connect was.
+    const a = args as { master?: string; cmd?: string; args?: Record<string, unknown> } | undefined;
+    if (cmd === "remote_call" && a?.master === "this-computer" && /^remote_(connect|disconnect)$/.test(a.cmd ?? ""))
+      return invoke(a.cmd!, a.args);
     if (cmd === "remote_call") {
       const c = (args as { cmd: string }).cmd;
       return /list|sessions|status|runs|active/.test(c) ? [] : null;

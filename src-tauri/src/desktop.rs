@@ -77,7 +77,7 @@ fn startup_path() -> Option<String> {
 /// M5c: the window starts no program itself; This PC's go through the same pipes as every machine's).
 fn tools_host(app: &tauri::AppHandle, master: &Option<String>) -> Res<crate::lsp::On> {
     match master.as_deref().filter(|m| !m.is_empty()) {
-        Some(m) => crate::lsp::On::new(app.state::<AppState>().remotes.link(m)?),
+        Some(m) => crate::lsp::On::new(link_for(app, m)?),
         None => crate::lsp::On::this_pc(link_for(app, THIS_PC)?),
     }
 }
@@ -388,7 +388,12 @@ fn link_for(app: &tauri::AppHandle, master: &str) -> Res<std::sync::Arc<dyn crat
     let state = app.state::<AppState>();
     match state.remotes.link(master) {
         Ok(l) => Ok(l),
-        Err(_) if master == THIS_PC => {
+        // M5c part 2: so is the way to one of This PC's servers, which goes through it.
+        Err(_)
+            if master == THIS_PC
+                || (state.remotes.through_for(master).is_some()
+                    && state.remotes.get(THIS_PC).is_err()) =>
+        {
             connect_link(app, THIS_PC, this_pc_transport()?)?;
             state.remotes.link(master)
         }
@@ -533,8 +538,13 @@ fn remote_disconnect(state: State<AppState>, id: String) {
 /// A free local port that reaches `port` on a connected master's localhost (migration M1: the preview of a shown
 /// master's dev server). It ends when that master is disconnected.
 #[tauri::command]
-fn port_forward(state: State<AppState>, master: String, port: u16) -> Res<u16> {
-    state.remotes.forward(&master, port)
+async fn port_forward(app: tauri::AppHandle, master: String, port: u16) -> Res<u16> {
+    // The link first (This PC's own is made again after its master restarted), then the port on it.
+    blocking(move || {
+        link_for(&app, &master)?;
+        app.state::<AppState>().remotes.forward(&master, port)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -704,6 +714,8 @@ pub fn run() {
                     // This PC starts every path its calls take (migration M3c: the loop guard).
                     let r = crate::remote::Remotes::default();
                     r.set_me(&crate::machine::lasting_id(&crate::paths::data_dir()));
+                    // M5c part 2: This PC's servers are held by This PC's master; their calls go through it.
+                    r.set_through(THIS_PC);
                     r
                 },
                 accounts: crate::account::Accounts::this_pc(&dir),

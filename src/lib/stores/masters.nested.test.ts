@@ -88,6 +88,8 @@ beforeEach(async () => {
       return id === "direct" ? hello("m-box", "box", false) : hello("m-vps", "vps");
     }
     if (cmd !== "remote_call" || !a) return null;
+    // M5c part 2: This PC's master connects This PC's servers; shown here as the app's own connect was.
+    if (a.master === "this-computer" && /^remote_(connect|disconnect)$/.test(a.cmd)) return invoke(a.cmd, a.args);
     calls.push(a);
     if (a.cmd === "servers_list") return { imported: true, servers: lists[a.master] ?? [] };
     if (a.cmd === "remote_watch") {

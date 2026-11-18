@@ -384,7 +384,40 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below), v1 and
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:40): M5c PART 2 BUILT, NOT DRIVEN LIVE (map below).
+    Next: release test build + drive of part 2 (needs a server This PC reaches over SSH or the relay: a "local" test
+    master stays the window's own, so it does not take the new way); keep an eye out for v3; then t1, b1/m2a.
+    M5c PART 2 BUILT (2026-11-18; verify: Rust 486, clippy clean, server build check clean, web 501, svelte-check 0):
+    - This PC's master holds This PC's server connections: it connects the ones marked to connect at start, at its
+      start and every minute while away, window or not (master.rs: the app_data early return is gone). Its list keeps
+      "local" and "self" entries for the window (servers_save takes them on the app's data) and never tries them.
+    - Keys unchanged: the switcher keys of This PC's servers stay their ids, so no one-time move of open state. The
+      app's Remotes has a `through` link (THIS_PC): a path whose first machine is not connected in the app goes
+      through This PC's master, the whole path passed on with nothing seen yet (that master is this machine; depth
+      and the loop guard count as before). link_for makes This PC's link first when needed; coding tools and
+      port_forward use link_for.
+    - The window (masters.svelte.ts): connect asks This PC's master (callThisPc remote_connect) except for appHeld
+      ("local", "self"); disconnect lets This PC's master's connection go; followThisPc follows its remote_watch
+      (joins a connection held already, a server ended / back / removed from another window); This PC's own link
+      ended: its servers drop with "Qanuvi's background part on this computer stopped, ..." (a shown one held and
+      tried again) and the follow is asked for again (up to 6 tries 2 s apart). autoConnect joins the app's and This
+      PC's master's open connections.
+    - remote.ts linkEnded: a link the app does not hold (one of This PC's servers, or a nested machine) tells its
+      terminals it ended (j1 text), as the app's remote-closed does for its own.
+    - Found on the way, fixed: (1) two connects to one machine at once (the window's and the master's start-up
+      connect) answered the second with an empty hello, which the window would have taken as a failure and dropped
+      the master's connection; Remotes::connect now waits for a connect under way (no second connection either).
+      (2) A terminal, pipe or port opened through a master (on one of its servers) belonged to that master's lasting
+      connection there, so it outlived the window that opened it (also true for nested machines since M3c); the
+      passing master now notes it with the asking connection and closes it along the same path when that ends
+      (master_servers.rs note_forwarded / close_forwarded).
+    Drive next (release test build, scratch project only): a server marked to connect at start is connected by This
+    PC's master with no window open (tray: master running, window closed; open the window: it is on at once); a
+    terminal and a language server on it through This PC (they run under the server's master, reached through This
+    PC's master's connection); close the window: that terminal and language server end on the server; kill This
+    PC's core: the server's line says the background part stopped, then it comes back on; a second window joins the
+    connection; remove the server in one window: it goes from the other.
+    PICKUP POINT (before, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below), v1 and
     v2 fixed (aa39649) and DRIVEN LIVE. Next: build M5c part 2 (owner decisions below); keep an eye out for v3; then
     t1, b1/m2a as listed.
     v1 + v2 DRIVEN LIVE (2026-11-18, release test build of aa39649): the window offered Install for the TypeScript

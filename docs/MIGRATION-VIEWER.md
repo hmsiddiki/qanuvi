@@ -337,6 +337,11 @@ Owner decisions (2026-11-18):
   master holds This PC's server connections and the window reaches them through it (M5c part 2, to build); the
   booked restore stays in the app (done). Details in
   DEVELOPMENT-TASKLIST.md.
+- M5c PART 2 BUILT (2026-11-18): This PC's master holds This PC's server connections (connects them at start,
+  window or not); the window asks it to connect, follows its watch, and its calls go through it. Switcher keys are
+  unchanged (no move of open state); "local" and "self" stay the window's. Also: one connect at a time per machine,
+  and what a window opened through a master ends when that window goes. Live drive pending; details in
+  DEVELOPMENT-TASKLIST.md.
 
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 

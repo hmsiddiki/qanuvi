@@ -1108,7 +1108,11 @@ impl Master {
             c if c.starts_with("plan_run_") => self.plan_run(c, args, stream),
             c if c.starts_with("inbox_") => self.inbox(c, args, stream),
             c if c.starts_with("servers_") || c.starts_with("remote_") => {
-                self.servers(c, args, stream)
+                let out = self.servers(c, args, stream)?;
+                if c == "remote_call" {
+                    self.note_forwarded(args, &out, opened_terminals);
+                }
+                Ok(out)
             }
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
@@ -1161,7 +1165,9 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
     // tray's Open then started no app).
     *out.lock().unwrap_or_else(|e| e.into_inner()) = Box::new(Gone);
     for id in terminals.lock().unwrap_or_else(|e| e.into_inner()).iter() {
-        if crate::pipes::is_pipe(id) {
+        if let Some((key, id)) = server_cmds::forwarded(id) {
+            master.close_forwarded(key, id);
+        } else if crate::pipes::is_pipe(id) {
             master.pipes.stop(id);
         } else {
             master.terminals.kill(id);
@@ -1310,10 +1316,7 @@ impl Master {
             }
         });
         // Its own servers (migration M3b): the ones marked to connect at start-up, now and again while away. On the
-        // app's own data the window still holds This PC's server connections until M5.
-        if self.app_data {
-            return;
-        }
+        // app's own data too (M5c part 2): This PC's master holds This PC's server connections, window or not.
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {
             loop {
@@ -2174,6 +2177,41 @@ mod tests {
         assert!(!held(data.path()));
     }
 
+    // M5c part 2: a terminal, pipe or port opened on a server through this master is noted with the connection that
+    // asked (by the server's path and its id there), so it is closed there when that connection ends; anything else
+    // passed on is not noted.
+    #[test]
+    fn what_a_passed_on_call_opened_is_noted_with_the_asking_connection() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let opened = Mutex::new(HashSet::new());
+        let call = |cmd: &str| json!({"master": "vps", "via": ["box"], "cmd": cmd, "args": {}});
+        m.note_forwarded(&call("term_spawn"), &json!("t-1"), &opened);
+        m.note_forwarded(&call("pipe_start"), &json!("pipe-2"), &opened);
+        m.note_forwarded(&call("projects_list"), &json!("x"), &opened);
+        m.note_forwarded(&call("term_spawn"), &json!(null), &opened);
+        let mut got: Vec<(String, String)> = opened
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|e| server_cmds::forwarded(e).map(|(k, i)| (k.to_string(), i.to_string())))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                ("vps/box".to_string(), "pipe-2".to_string()),
+                ("vps/box".to_string(), "t-1".to_string())
+            ]
+        );
+        assert!(server_cmds::forwarded("t-1").is_none());
+        // Closing one whose way is gone, or along a connection still there, is no harm.
+        m.close_forwarded("vps/box", "t-1");
+        m.remotes
+            .add_idle("vps", json!({"machineId": "v", "forwards": true}));
+        m.close_forwarded("vps/box", "pipe-2");
+    }
+
     // Migration M3b: a master keeps its own server list and answers the window's servers_* and remote_* calls.
     #[test]
     fn keeps_its_own_server_list_and_answers_remote_calls() {
@@ -2741,6 +2779,18 @@ mod tests {
         let st = call(&m, "startup_status", json!({})).unwrap();
         assert_eq!(st[0]["id"], "proxy", "{st}");
         m.startup.stop_all();
+        // M5c part 2: This PC's list keeps the window's own test master and remote access ("local", "self"), and
+        // its start-up connect never tries them (the window reaches them itself); its other servers it does.
+        let local = json!({"id": "l1", "name": "", "target": "local", "program": "", "identity": "",
+            "autoConnect": true});
+        call(&m, "servers_save", json!({"server": local})).unwrap();
+        let vps = json!({"id": "v1", "name": "", "target": "relay", "autoConnect": true,
+            "relay": {"url": "wss://relay.example", "masterId": "m", "pairing": "m5c-part2-missing"}});
+        call(&m, "servers_save", json!({"server": vps})).unwrap();
+        m.connect_away_servers();
+        let states = call(&m, "remote_states", json!({})).unwrap();
+        assert_eq!(states["l1"]["state"], "off", "{states}");
+        assert_eq!(states["v1"]["state"], "error", "{states}");
         // Its backups are the app's: the app's folder (not the master's own), as the app made them before M4b.
         let (_, folder) = backup_place(data.path(), true);
         assert_eq!(

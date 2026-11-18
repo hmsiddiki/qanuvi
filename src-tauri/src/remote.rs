@@ -38,6 +38,11 @@ pub struct Remotes {
     forwards: Mutex<HashMap<(String, u16), crate::pipes::Forward>>,
     /// This machine's lasting id: the first entry of every path's `seen` list (migration M3c).
     me: Mutex<String>,
+    /// The connection a path goes through when its first machine is not connected here (M5c part 2: the app's
+    /// link to This PC's master, which holds This PC's server connections).
+    through: Mutex<Option<String>>,
+    /// The machines a connect is under way to (their hello not in yet).
+    starting: Mutex<std::collections::HashSet<String>>,
 }
 
 /// How many machines a path may hold below the window (owner, M3: at most 3 levels).
@@ -361,8 +366,44 @@ impl Remotes {
             .insert(id.to_string(), tests::idle_connection(info));
     }
 
+    /// Paths whose first machine is not connected here go through the connection `id` (M5c part 2).
+    pub fn set_through(&self, id: &str) {
+        *self.through.lock().unwrap_or_else(|e| e.into_inner()) = Some(id.to_string());
+    }
+
+    /// The connection a key's path goes through (connected yet or not) when its first machine is not connected
+    /// here; none when it starts here.
+    pub fn through_for(&self, key: &str) -> Option<String> {
+        let through = self
+            .through
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()?;
+        let first = key.split('/').next().unwrap_or("");
+        if first == through || self.get(first).is_ok() {
+            return None;
+        }
+        Some(through)
+    }
+
     /// The way to a machine by its key, starting here.
     pub fn link(&self, key: &str) -> Result<Arc<dyn crate::pipes::Link>, String> {
+        // M5c part 2: one of This PC's servers, held by This PC's master. That master is this machine, so the path
+        // starts there with nothing passed yet, as on the window's own link to it.
+        if let Some(through) = self.through_for(key) {
+            let rest = split_path(key)?;
+            let conn = self.get(&through)?;
+            if conn.info.lock().unwrap_or_else(|e| e.into_inner())["forwards"] != true {
+                return Err(
+                    "This computer's background part is too old to reach its servers. Restart Qanuvi.".into(),
+                );
+            }
+            return Ok(Arc::new(Routed {
+                conn,
+                rest,
+                seen: vec![],
+            }));
+        }
         let me = self.me.lock().unwrap_or_else(|e| e.into_inner()).clone();
         // The app's link to This PC's own master (M5a) is this machine, not a step away from it: the path starts
         // there, so a way on that comes back here is still a loop. Any other link to this machine is one.
@@ -390,11 +431,36 @@ impl Remotes {
             .ok_or_else(|| "Not connected to this master.".into())
     }
 
-    /// Connects (or answers the existing connection) and returns the master's hello.
+    /// Connects (or answers the existing connection) and returns the master's hello. A connect to a machine that is
+    /// being connected already waits for that one (M5c part 2: the window asks This PC's master while its start-up
+    /// connect is under way), so it never answers before the hello is in, nor makes a second connection.
     pub fn connect(&self, on_end: OnEnd, id: &str, transport: Transport) -> Reply {
-        if let Ok(c) = self.get(id) {
-            return Ok(c.info.lock().unwrap_or_else(|e| e.into_inner()).clone());
+        let since = std::time::Instant::now();
+        loop {
+            {
+                let mut starting = self.starting.lock().unwrap_or_else(|e| e.into_inner());
+                if !starting.contains(id) {
+                    if let Ok(c) = self.get(id) {
+                        return Ok(c.info.lock().unwrap_or_else(|e| e.into_inner()).clone());
+                    }
+                    starting.insert(id.to_string());
+                    break;
+                }
+            }
+            if since.elapsed() > Duration::from_secs(35) {
+                return Err("It is still being connected; try again in a moment.".into());
+            }
+            std::thread::sleep(Duration::from_millis(100));
         }
+        let result = self.connect_new(on_end, id, transport);
+        self.starting
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(id);
+        result
+    }
+
+    fn connect_new(&self, on_end: OnEnd, id: &str, transport: Transport) -> Reply {
         let errors = Arc::new(Mutex::new(String::new()));
         let conn = match transport {
             Transport::Process(command) => {
@@ -771,6 +837,44 @@ mod tests {
         assert!(remotes.link(THIS_PC).is_ok());
         assert!(remotes.link(&format!("{THIS_PC}/x")).is_ok());
         assert_eq!(remotes.link("back").err().unwrap(), a_loop());
+    }
+
+    // M5c part 2: a path whose first machine is not connected here goes through This PC's master, the whole path
+    // passed on to it with nothing seen yet; one connected here (the test master next to the app) stays direct.
+    #[test]
+    fn this_pcs_servers_go_through_its_master() {
+        let remotes = Remotes::default();
+        remotes.set_me("pc");
+        assert!(remotes.through_for("vps").is_none());
+        remotes.set_through(THIS_PC);
+        assert_eq!(remotes.through_for("vps/x").as_deref(), Some(THIS_PC));
+        assert!(remotes.through_for(THIS_PC).is_none());
+        // Not connected to This PC's master yet: the caller makes that link first.
+        assert!(remotes.link("vps").is_err());
+        let add = |id: &str, info: Value| {
+            remotes
+                .map
+                .lock()
+                .unwrap()
+                .insert(id.to_string(), idle_connection(info));
+        };
+        add(THIS_PC, json!({"machineId": "pc", "forwards": true}));
+        add("local", json!({"machineId": "t", "forwards": true}));
+        assert!(remotes.through_for("local/x").is_none());
+        let via = Routed {
+            conn: remotes.get(THIS_PC).unwrap(),
+            rest: split_path("vps/x/y").unwrap(),
+            seen: vec![],
+        };
+        assert_eq!(
+            via.wrap("hello", json!({}), false),
+            (
+                "remote_call".into(),
+                json!({"master": "vps", "via": ["x", "y"], "seen": [], "cmd": "hello", "args": {}, "streams": false})
+            )
+        );
+        assert!(remotes.link("vps/x/y").is_ok());
+        assert_eq!(remotes.link("vps/x/y/z").err().unwrap(), too_deep());
     }
 
     #[test]

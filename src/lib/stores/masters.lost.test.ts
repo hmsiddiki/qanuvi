@@ -43,6 +43,10 @@ beforeEach(async () => {
       if (!reachable) throw "Connection refused.";
       return { name: "Qanuvi master", version: "0", os: "linux", arch: "x86_64", host: "vps", dataDir: "/d" };
     }
+    // M5c part 2: This PC's master connects This PC's servers; shown here as the app's own connect was.
+    const a = args as { master?: string; cmd?: string; args?: Record<string, unknown> } | undefined;
+    if (cmd === "remote_call" && a?.master === "this-computer" && /^remote_(connect|disconnect)$/.test(a.cmd ?? ""))
+      return invoke(a.cmd!, a.args);
     if (cmd === "remote_call")
       return /list|sessions|status|runs|active/.test((args as { cmd: string }).cmd) ? [] : null;
     return null;
