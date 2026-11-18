@@ -41,7 +41,7 @@ pub mod watch;
 pub use cli::{pair_cli, servers_cli};
 pub use cli_inbox::inbox_cli;
 pub use cli_plan::plan_cli;
-pub use cli_status::{projects_cli, status_cli, update_notice};
+pub use cli_status::{projects_cli, status_cli, update_cli, update_notice};
 pub use watch::Watch;
 
 /// What a running master shares with its connections.
@@ -86,7 +86,7 @@ pub struct Master {
     /// after a computer restart when Qanuvi starts with Windows.
     cut_off: Mutex<(String, Vec<String>)>,
     /// M8a: what its own look on the update channel found.
-    updates: crate::master_update::Updates,
+    updates: Arc<crate::master_update::Updates>,
 }
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
@@ -230,7 +230,7 @@ impl Master {
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
             cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
-            updates: crate::master_update::Updates::default(),
+            updates: Arc::default(),
         })
     }
 
@@ -771,6 +771,8 @@ impl Master {
             // M8a: what this master's own look on the update channel found, and a look now.
             "update_status" => to(Ok(self.updates.state())),
             "update_check" => to(Ok(self.updates.check(self.app_data))),
+            // M8b: put the update in (download, signature, start test, wait for work, swap, restart from it).
+            "update_install" => to(self.update_install()),
             // How many agents work here now (the window's machine switcher shows it, 24z3 step 4).
             "agents_working" => Ok(json!(crate::agent::working_count(&self.db))),
             "master_restart" => {
@@ -1495,21 +1497,88 @@ impl Master {
     /// Starts a new service that waits for this one to end, then ends this one: its agent sessions and terminals
     /// stop, a booked restore is applied by the new one before its database opens. The answer goes out first.
     fn restart(&self, dir: &Path) -> Result<(), String> {
+        self.restart_from(dir, None)
+    }
+
+    /// M8b: puts the update the last look found in. This PC's master installs the whole app instead (M8d).
+    fn update_install(&self) -> Result<crate::master_update::UpdateState, String> {
+        if self.app_data {
+            return Err("This PC's master is updated with the whole app (that comes later); use Update in the app for now.".into());
+        }
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let me = self.me.get().cloned().ok_or("The master is not ready.")?;
+        const KEY: &str = "master-update-waits";
+        let (busy_me, wait_me, waited_me, dir) =
+            (me.clone(), me.clone(), me.clone(), self.dir.clone());
+        let hooks = crate::master_update::InstallHooks {
+            busy: Box::new(move || {
+                let m = busy_me.upgrade()?;
+                work_text((crate::agent::working_count(&m.db), m.runs.active().len()))
+            }),
+            waits: Box::new(move |version, what| {
+                let Some(m) = wait_me.upgrade() else { return };
+                let item = crate::inbox::NewItem {
+                    kind_of: "info".into(),
+                    kind: "update".into(),
+                    title: format!("Update to {version} waits for running work"),
+                    text: format!(
+                        "{} working. The update goes in as soon as it ends; nothing is cut off.",
+                        crate::master_update::is_or_are(what)
+                    ),
+                    key: Some(KEY.into()),
+                    open: None,
+                    form: None,
+                    source: None,
+                };
+                if let Ok((added, new)) = crate::inbox::add_new(&m.db, &item) {
+                    (m.inbox_teller())(&json!({"change": "add", "item": added, "new": new}));
+                }
+            }),
+            waited: Box::new(move || {
+                let Some(m) = waited_me.upgrade() else { return };
+                if crate::inbox::resolve(&m.db, KEY).unwrap_or(false) {
+                    (m.inbox_teller())(&json!({"change": "remove", "item": null}));
+                }
+            }),
+            restart: Box::new(move |exe| match me.upgrade() {
+                Some(m) => m.restart_from(&dir, Some(exe)),
+                None => Err("The master ended before the update went in.".into()),
+            }),
+        };
+        self.updates.install(exe, hooks)
+    }
+
+    /// A restart, or (M8b, `updated`: the program now in place) the end of an update: the service is started again
+    /// from that program, as a watched core's watcher would otherwise start the old one it runs from.
+    fn restart_from(&self, dir: &Path, updated: Option<&Path>) -> Result<(), String> {
         let me = self
             .me
             .get()
             .and_then(|w| w.upgrade())
             .ok_or("The master is not ready.")?;
         std::fs::write(restart_mark(dir), b"").map_err(|e| e.to_string())?;
-        let _ = std::fs::write(stop_note_file(dir), "restart");
+        let _ = std::fs::write(
+            stop_note_file(dir),
+            if updated.is_some() {
+                "update"
+            } else {
+                "restart"
+            },
+        );
         // M5b: a core its watcher started asks the watcher to start it again (its exit code); else a new service is
         // started that waits for this one to end.
         let watched = watch::watched();
-        if !watched && let Err(e) = start_service(dir, Some(std::process::id())) {
+        let started = match updated {
+            Some(exe) if !watched => spawn_service(exe, dir, Some(std::process::id())),
+            _ if !watched => start_service(dir, Some(std::process::id())),
+            _ => Ok(()),
+        };
+        if let Err(e) = started {
             let _ = std::fs::remove_file(restart_mark(dir));
             return Err(e);
         }
         let dir = dir.to_path_buf();
+        let updated = updated.is_some();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(400));
             me.agents.stop_all();
@@ -1518,7 +1587,11 @@ impl Master {
             me.remotes.disconnect_all();
             let _ = std::fs::remove_file(service_file(&dir));
             let _ = std::fs::remove_file(watch::state_file(&dir));
-            std::process::exit(if watched { watch::RESTART_CODE } else { 0 });
+            std::process::exit(match (watched, updated) {
+                (true, true) => watch::UPDATED_CODE,
+                (true, false) => watch::RESTART_CODE,
+                _ => 0,
+            });
         });
         Ok(())
     }

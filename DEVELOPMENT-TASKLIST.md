@@ -437,9 +437,35 @@ runs on or off; with it off nothing is sent anywhere.
     driven on throwaway data (real channel and a localhost test channel, as on Windows), then swapped into
     ~/.local/bin with the 00:42 build kept as .prev; the service restarted idle. publish-update.mjs now builds
     the .2.36 target with zig on its PATH (QANUVI_ZIG_DIR).
-    PICKUP POINT (2026-11-18, after M8a): next build M8b, `qanuvi-master update` (download, verify() against the
-    signature, swap with .prev, service restart; waits on master_busy, says so in the terminal and as an Inbox note).
-    Linux check first on the laptop (git pull, ~/src/verify.sh); VPS drives need the owner's yes.
+    (Pickup point before M8b.)
+    M8b BUILT + DRIVEN LIVE (2026-11-18, a Windows scratch master and the Linux laptop; not on the VPS yet):
+    `qanuvi-master update`. The running master does the work (new `update_install`, followed through `update_status`'s
+    new `install` part: stage downloading / checking / waiting / restarting / failed, bytes, what it waits for, the
+    program path), so M8c's button can use the same command. Steps: download beside the program (`<exe>.new`, 300 MB
+    at most), verify() against the signature, start the new build once with the new `qanuvi-master version` (it must
+    start on this machine and say the channel's version), wait while agents work or plan runs run (agent::working_count
+    + runs.active, looked at every 5 s; an Inbox note "Update to x waits for running work" while it waits, removed when
+    it ends; never cuts a run off), swap (program -> `.prev`, the one before goes; new -> program; undone if the second
+    rename fails), restart. Restart: the running program's own path names `.prev` after the swap (Linux /proc/self/exe),
+    so a watched core ends with UPDATED_CODE (76) and its watcher, which kept its path from its start, starts a new
+    service from the installed program (--after-pid) and ends; an unwatched one starts it itself. Stop note "update".
+    With no service running, the terminal puts it in by itself and says `qanuvi-master serve` starts it. This PC's
+    master refuses (whole app, M8d). Test channels: QANUVI_UPDATE_TEST_KEY is trusted only for a QANUVI_UPDATES_URL at
+    localhost / 127.0.0.1; any other channel is always checked against the app's key. Driven (throwaway test key,
+    localhost channel, the same code built as 0.1.23 and 0.9.0): Windows: wrong signature refused, nothing changed;
+    "no build for this machine yet"; a plan run working -> "Waiting: 1 agent session and 1 plan run are working" +
+    the Inbox note, Ctrl+C left with the update still waiting; run stopped by the owner -> swapped and restarted on
+    its own, 0.9.0 serve + core from the installed path, .prev says 0.1.23, note gone, run "Stopped by you"; no service
+    -> put in from the terminal. Linux laptop: a 413 MB debug build refused by the size limit (nothing changed), then
+    stripped builds: swapped, new watcher + core from the installed path (/proc/<pid>/exe), .prev 0.1.23. Found and
+    fixed in the drive: f1 the last line named `.prev.prev` on Linux (it took the terminal's own path; now the
+    service's program path), f2 the "Downloading" line was skipped when the download was quick. Rust 516 (Linux 514), vitest 496: 6 new
+    (master_update) + 1 watcher. Note: the test plan's step was slow because its agent's foreground `sleep 60` was
+    blocked; not an M8b matter.
+    PICKUP POINT (2026-11-18, after M8b): M8b on the VPS (owner yes needed: cross-build, swap in the M8b server build by
+    hand once, then drive `update` there from a localhost test channel), then M8c (the screen for the shown master:
+    status bar button with progress from `update_install` / `update_status.install`, "Restart to update", the
+    per-master auto-update setting, off by default for a master set up from a terminal).
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.

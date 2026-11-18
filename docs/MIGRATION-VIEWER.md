@@ -405,7 +405,11 @@ The rule: the master does everything the app does today, updates included.
   - M8d: This PC's master updates the whole install with one installer and one button; the screen's own updater
     goes.
   - M8a BUILT + DRIVEN LIVE (2026-11-18) on Windows scratch masters, a Linux laptop and the VPS (its service runs
-    the M8a server build). Details in DEVELOPMENT-TASKLIST.md. Next build: M8b.
+    the M8a server build). Details in DEVELOPMENT-TASKLIST.md.
+  - M8b BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the Linux laptop: the running master puts
+    the update in (`update_install`, progress in `update_status`), waits for running work with an Inbox note, keeps
+    `.prev`, and restarts from the new program through its watcher. The VPS drive waits for the owner's yes. Next:
+    M8b on the VPS, then M8c.
 
 ### M9. Release
 

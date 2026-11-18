@@ -156,6 +156,157 @@ pub fn update_notice(dir: &Path) {
     }
 }
 
+/// M8b: `qanuvi-master update`. A running master puts the update in itself (this follows it; Ctrl+C leaves, and the
+/// master goes on); with none running, it is put in here. This PC's master is updated with the whole app.
+pub fn update_cli(dir: &Path) -> Result<(), String> {
+    use crate::master_update as mu;
+    if super::on_app_data(dir) {
+        return Err(
+            "This PC's master is updated with the whole app (that comes later); use Update in the app for now.".into(),
+        );
+    }
+    if !super::is_running(dir) {
+        return update_here();
+    }
+    let state = call(dir, "update_check", json!({}))?;
+    let under_way = state["install"]["stage"]
+        .as_str()
+        .is_some_and(|s| matches!(s, "downloading" | "checking" | "waiting" | "restarting"));
+    if !under_way && mu::notice(&state).is_none() {
+        println!("{}", mu::status_line(&state));
+        return if state["error"].as_str().unwrap_or("").is_empty() {
+            Ok(())
+        } else {
+            Err("Nothing was changed.".into())
+        };
+    }
+    let started = call(dir, "update_install", json!({}))?;
+    follow_update(dir, &started["install"])
+}
+
+/// Prints the update's stages until the service runs the new version (or says why it failed).
+fn follow_update(dir: &Path, started: &Value) -> Result<(), String> {
+    use crate::master_update as mu;
+    use std::io::{IsTerminal, Write};
+    use std::time::{Duration, Instant};
+    let version = started["version"].as_str().unwrap_or("");
+    // The service's own program (on Linux this terminal's path names the kept one once the swap is done).
+    let prev = Path::new(started["program"].as_str().unwrap_or("qanuvi-master"));
+    let prev = mu::prev_path(prev).display().to_string();
+    let live = std::io::stdout().is_terminal();
+    let (mut said, mut quarter, mut on_line) = (String::new(), 0u64, false);
+    if let Some(line) = mu::install_line(started) {
+        println!("{line}");
+        said = line;
+    }
+    let mut gone_at: Option<Instant> = None;
+    loop {
+        std::thread::sleep(Duration::from_millis(400));
+        let Ok(state) = call(dir, "update_status", json!({})) else {
+            // The old service has ended: wait for the new one.
+            let since = *gone_at.get_or_insert_with(Instant::now);
+            if since.elapsed() > Duration::from_secs(90) {
+                return Err(format!(
+                    "The service has not come back after the update to {version} yet; `qanuvi-master status` shows when it does."
+                ));
+            }
+            continue;
+        };
+        let install = &state["install"];
+        if state["current"] == version {
+            if on_line {
+                println!();
+            }
+            println!(
+                "Updated to {version}: the service runs it. The program before is kept as {prev}."
+            );
+            return Ok(());
+        }
+        if install["stage"] == "failed" {
+            if on_line {
+                println!();
+            }
+            return Err(format!(
+                "The update failed: {} Nothing was changed.",
+                install["error"].as_str().unwrap_or("no reason given.")
+            ));
+        }
+        if let Some(line) = mu::install_line(install)
+            && line != said
+        {
+            if on_line {
+                println!();
+                on_line = false;
+            }
+            println!("{line}");
+            said = line;
+        }
+        if install["stage"] == "downloading" {
+            let (done, total) = (
+                install["done"].as_u64().unwrap_or(0),
+                install["total"].as_u64().unwrap_or(0),
+            );
+            if live {
+                print!("\r  {}   ", mu::progress_text(done, total));
+                let _ = std::io::stdout().flush();
+                on_line = true;
+            } else if total > 0 && done * 4 / total > quarter {
+                quarter = done * 4 / total;
+                println!("  {}", mu::progress_text(done, total));
+            }
+        }
+    }
+}
+
+/// No service runs: the update is put in by this terminal (nothing works, so nothing waits).
+fn update_here() -> Result<(), String> {
+    use crate::master_update as mu;
+    use std::io::{IsTerminal, Write};
+    let state = mu::Updates::default().check(false);
+    let found = match &state.available {
+        Some(f) if !f.url.is_empty() => f.clone(),
+        _ => {
+            println!(
+                "{}",
+                mu::status_line(&serde_json::to_value(&state).unwrap_or(Value::Null))
+            );
+            return if state.error.is_empty() {
+                Ok(())
+            } else {
+                Err("Nothing was changed.".into())
+            };
+        }
+    };
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    println!("Downloading {}.", found.version);
+    let live = std::io::stdout().is_terminal();
+    let new = mu::prepare(
+        &found,
+        &exe,
+        &mu::trusted_key(),
+        |done, total| {
+            if live {
+                print!("\r  {}   ", mu::progress_text(done, total));
+                let _ = std::io::stdout().flush();
+            }
+        },
+        || {
+            if live {
+                println!();
+            }
+            println!("Checking its signature, and that it starts on this machine.");
+        },
+    )
+    .map_err(|e| format!("The update failed: {e} Nothing was changed."))?;
+    mu::swap_in(&exe, &new).map_err(|e| format!("The update failed: {e} Nothing was changed."))?;
+    println!(
+        "Updated to {}. The program before is kept as {}. The service does not run; `qanuvi-master serve` starts it.",
+        found.version,
+        mu::prev_path(&exe).display()
+    );
+    Ok(())
+}
+
 /// The project a typed word means: its id, its folder, or its name (letter case aside; a name two projects share
 /// asks for the folder or id instead).
 pub fn find_project<'a>(list: &'a [Value], which: &str) -> Result<&'a Value, String> {

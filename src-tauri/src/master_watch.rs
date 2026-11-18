@@ -6,7 +6,8 @@
 // owner says to start again. The count starts again after a clean Quit or an hour's clean run.
 //
 // The core's exit code says what happened: 0 a clean end (the watcher ends too), RESTART_CODE a restart asked for
-// (started again at once), anything else a crash.
+// (started again at once), UPDATED_CODE an update swapped the program (M8b: a new service is started from the
+// program now in place and this watcher ends, as it runs the old one), anything else a crash.
 
 use super::{connect, lock_file, on_app_data, restart_mark, service_file, stop_note_file};
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// The core's exit code that asks its watcher to start it again at once (Settings' restart, a booked restore).
 pub const RESTART_CODE: i32 = 75;
+/// The core's exit code after an update put a new program in place (M8b).
+pub const UPDATED_CODE: i32 = 76;
 /// On this crash in a row the watcher stops restarting and looks into why.
 pub const CRASH_LIMIT: u32 = 3;
 /// A core that ran this long before it crashed starts the count again.
@@ -325,6 +328,8 @@ pub fn report_text(list: &[Crash], why: &str, model: Option<&str>, done: &str) -
 type CoreCommand = Box<dyn Fn(&Path, bool) -> Command + Send + Sync>;
 type Tell = Box<dyn Fn(&Path, &str, &str) + Send + Sync>;
 type AskModel = Box<dyn Fn(&Path, &[Crash]) -> Option<String> + Send + Sync>;
+/// Starts the service again from the updated program (M8b), told the data folder.
+type Updated = Box<dyn Fn(&Path) -> Result<(), String> + Send + Sync>;
 
 #[derive(Default)]
 struct Flags {
@@ -343,6 +348,7 @@ pub struct Watch {
     waits: [Duration; 2],
     tell: Tell,
     ask_model: AskModel,
+    updated: Updated,
 }
 
 impl Watch {
@@ -355,6 +361,7 @@ impl Watch {
             waits: [Duration::from_secs(2), Duration::from_secs(5)],
             tell: Box::new(tell_owner),
             ask_model: Box::new(ask_local_model),
+            updated: Box::new(start_updated(std::env::current_exe().ok())),
         }
     }
 
@@ -446,6 +453,15 @@ impl Watch {
                     without_startup = false;
                     continue;
                 }
+                // The new service waits for this watcher to end before it opens the data.
+                Some(UPDATED_CODE) => match (self.updated)(&dir) {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        eprintln!("The updated program could not start: {e}");
+                        without_startup = false;
+                        continue;
+                    }
+                },
                 _ => {}
             }
             let lines: Vec<String> = tail
@@ -525,6 +541,15 @@ impl Watch {
             json!({"title": title, "text": text}).to_string(),
         );
         (self.tell)(&self.dir, title, &short);
+    }
+}
+
+/// The watcher's own start after an update: `exe` is the program's path as it was when this watcher started (the
+/// running one is `.prev` by now, under the same name as before the swap the new one lives).
+fn start_updated(exe: Option<PathBuf>) -> impl Fn(&Path) -> Result<(), String> + Send + Sync {
+    move |dir| {
+        let exe = exe.as_ref().ok_or("The program's own path is not known.")?;
+        super::spawn_service(exe, dir, Some(std::process::id()))
     }
 }
 
@@ -728,6 +753,7 @@ mod tests {
                 told.lock().unwrap().push(format!("{title}: {text}"))
             }),
             ask_model: Box::new(|_, _| None),
+            updated: Box::new(|_| Err("no updated program in this test".into())),
         }
     }
 
@@ -826,6 +852,40 @@ mod tests {
         assert_eq!(*n.lock().unwrap(), 2);
         assert!(!crashes_file(d.path()).exists());
         assert!(!stop_note_file(d.path()).exists());
+    }
+
+    #[test]
+    fn after_an_update_a_new_service_takes_over_and_this_watcher_ends() {
+        let d = tempfile::tempdir().unwrap();
+        let n = Arc::new(Mutex::new(0));
+        let n2 = n.clone();
+        let core: CoreCommand = Box::new(move |dir: &Path, without: bool| {
+            *n2.lock().unwrap() += 1;
+            fake_core(UPDATED_CODE)(dir, without)
+        });
+        let started = Arc::new(Mutex::new(Vec::new()));
+        let mut w = watch(d.path(), core, Arc::default());
+        let s2 = started.clone();
+        w.updated = Box::new(move |dir| {
+            s2.lock().unwrap().push(dir.to_path_buf());
+            Ok(())
+        });
+        w.run().unwrap();
+        assert_eq!(*n.lock().unwrap(), 1);
+        assert_eq!(*started.lock().unwrap(), vec![d.path().to_path_buf()]);
+        assert!(!crashes_file(d.path()).exists());
+
+        // The new program does not start: the core starts again here (from what this watcher runs), no crash.
+        let n = Arc::new(Mutex::new(0));
+        let n2 = n.clone();
+        let core: CoreCommand = Box::new(move |dir: &Path, without: bool| {
+            let mut k = n2.lock().unwrap();
+            *k += 1;
+            fake_core(if *k == 1 { UPDATED_CODE } else { 0 })(dir, without)
+        });
+        watch(d.path(), core, Arc::default()).run().unwrap();
+        assert_eq!(*n.lock().unwrap(), 2);
+        assert!(!crashes_file(d.path()).exists());
     }
 
     #[test]

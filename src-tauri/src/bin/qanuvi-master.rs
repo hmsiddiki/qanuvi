@@ -14,6 +14,8 @@
 //! qanuvi-master pair        pair with a computer through the relay (--relay <address> --code <pairing code>)
 //! qanuvi-master projects    the projects this master works on: list, add <folder>, remove <name>
 //! qanuvi-master inbox       questions and notes: list, show <number>, answer <number> <choice> [text]
+//! qanuvi-master update      put a newer version in (the running service does it and restarts from it)
+//! qanuvi-master version     this program's version
 //! qanuvi-master plan        plan runs: run <plan file> (follows it; Ctrl+C leaves, the run goes on), follow, list, stop
 //! Options: --data <folder>  where its database and settings are (default ~/.local/share/qanuvi)
 
@@ -101,6 +103,11 @@ fn main() {
                 Ok(())
             }
             Some("status") => qanuvi_lib::master::status_cli(&data),
+            Some("update") => qanuvi_lib::master::update_cli(&data),
+            Some("version") => {
+                println!("{}", env!("CARGO_PKG_VERSION"));
+                Ok(())
+            }
             Some("login") => qanuvi_lib::account::cli_login(
                 &qanuvi_lib::master::accounts_at(&data),
                 site,
@@ -126,7 +133,7 @@ fn main() {
             }
             _ => {
                 eprintln!(
-                    "Usage: qanuvi-master serve | core | --stdio | status | stop | login | logout | servers | pair | projects | inbox | plan  [--data <folder>] [--site <address>]"
+                    "Usage: qanuvi-master serve | core | --stdio | status | stop | update | version | login | logout | servers | pair | projects | inbox | plan  [--data <folder>] [--site <address>]"
                 );
                 std::process::exit(2);
             }
