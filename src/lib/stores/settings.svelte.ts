@@ -70,6 +70,8 @@ export interface Settings {
   agents: Record<string, AgentSettings>;
   /** Monthly limit for all agent work, in US dollars; 0 means none. */
   monthlyBudgetUsd: number;
+  /** M5b: "Don't ask again" on the offer to start Qanuvi with the computer after a shutdown cut a run off. */
+  startOfferOff: boolean;
   /** Per project: job type -> model to start steps of that kind on. */
   rules: Record<string, Record<string, string>>;
   /** Give agents the relevant part of the user's memory with their work (Milestone 17). */
@@ -247,6 +249,7 @@ const DEFAULTS: Settings = {
   agent: PROVIDERS[0].id,
   agents: {},
   monthlyBudgetUsd: 0,
+  startOfferOff: false,
   rules: {},
   masters: [],
   memoryContext: true,
@@ -405,6 +408,7 @@ export function parseSettings(json: string | null): Settings {
           : {}),
       });
     }
+  if (typeof raw.startOfferOff === "boolean") s.startOfferOff = raw.startOfferOff;
   if (typeof raw.monthlyBudgetUsd === "number" && Number.isFinite(raw.monthlyBudgetUsd))
     s.monthlyBudgetUsd = Math.min(100000, Math.max(0, raw.monthlyBudgetUsd));
   if (raw.rules && typeof raw.rules === "object")

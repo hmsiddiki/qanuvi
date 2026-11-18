@@ -1,5 +1,5 @@
-//! "Start Qanuvi in the background when I sign in" (migration M4c), off by default. When on, signing in to this
-//! computer runs `qanuvi --background`: the app starts This PC's master on its own data folder and ends without a
+//! "Start Qanuvi when Windows starts" (migration M4c; renamed in M5b from "...when I sign in"), off by default.
+//! When on, signing in to this computer runs `qanuvi --background`: the app starts This PC's master on its own data folder and ends without a
 //! window, so the master's background jobs run and its tray icon shows. The entry itself is the setting (nothing
 //! else is kept): Windows has it under the user's Run key, Linux in ~/.config/autostart, macOS in
 //! ~/Library/LaunchAgents. A test build has its own entry beside the installed copy's.

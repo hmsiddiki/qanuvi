@@ -99,7 +99,8 @@ pub fn mark_interrupted(db: &Db) {
 }
 
 /// Why the last master stopped, as its runs say it ("Run stopped · Stopped by the update…", with Resume). M5a: an
-/// update, the tray's Quit and a restart say so; a crash or a power cut leaves none yet (M5b).
+/// update, the tray's Quit and a restart say so; M5b: a crash (its watcher says), a shutdown (the computer started
+/// again after the master's last state note), or an end some other way.
 pub fn stop_note(why: &str) -> Option<&'static str> {
     match why {
         "update" => {
@@ -107,23 +108,38 @@ pub fn stop_note(why: &str) -> Option<&'static str> {
         }
         "quit" => Some("Stopped when Qanuvi was quit. Resume goes on from here."),
         "restart" => Some("Stopped when Qanuvi restarted. Resume goes on from here."),
+        "crash" => Some("Stopped when Qanuvi's background part crashed. Resume goes on from here."),
+        "shutdown" => Some("Stopped when the computer shut down. Resume goes on from here."),
+        "ended" => Some(
+            "Stopped when Qanuvi's background part ended unexpectedly. Resume goes on from here.",
+        ),
         _ => None,
     }
 }
 
-/// Marks the runs that were going as stopped, with why in their message when it is known.
-pub fn mark_interrupted_because(db: &Db, why: Option<&str>) {
-    if let Some(note) = why.and_then(stop_note) {
+/// Marks the runs that were going as stopped, with why in their message (and `stoppedBy`) when it is known.
+/// Answers the projects whose run was going.
+pub fn mark_interrupted_because(db: &Db, why: Option<&str>) -> Vec<String> {
+    let projects: Vec<String> = db
+        .conn()
+        .prepare("SELECT DISTINCT project_id FROM plan_runs WHERE status = 'running'")
+        .and_then(|mut q| {
+            q.query_map([], |r| r.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .unwrap_or_default();
+    if let Some((why, note)) = why.and_then(|w| stop_note(w).map(|n| (w, n))) {
         let _ = db.conn().execute(
-            "UPDATE plan_runs SET data = json_set(data, '$.message', ?1) \
+            "UPDATE plan_runs SET data = json_set(data, '$.message', ?1, '$.stoppedBy', ?2) \
              WHERE status = 'running' AND json_valid(data)",
-            [note],
+            [note, why],
         );
     }
     let _ = db.conn().execute(
         "UPDATE plan_runs SET status = 'stopped' WHERE status = 'running'",
         [],
     );
+    projects
 }
 
 #[cfg(test)]
@@ -202,12 +218,15 @@ mod tests {
             r#"{"status":"done","message":"All done"}"#,
         )
         .unwrap();
-        mark_interrupted_because(&db, Some("update"));
+        // M5b: the projects whose run was going come back (an auto-resume after a shutdown needs them).
+        let cut = mark_interrupted_because(&db, Some("update"));
+        assert_eq!(cut, vec![project.id.clone()]);
         let runs = list(&db, &project.id).unwrap();
         let r1 = runs.iter().find(|r| r.id == "r1").unwrap();
         assert_eq!(r1.status, "stopped");
         let data: serde_json::Value = serde_json::from_str(&r1.data).unwrap();
         assert_eq!(data["message"], stop_note("update").unwrap());
+        assert_eq!(data["stoppedBy"], "update");
         let r2 = runs.iter().find(|r| r.id == "r2").unwrap();
         assert!(r2.data.contains("All done"));
         // Unknown or no reason: stopped, its message as it was.

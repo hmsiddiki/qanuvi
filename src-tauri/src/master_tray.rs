@@ -1,10 +1,11 @@
 //! This PC's master's tray icon (migration M4c): shown whenever the master runs, so it is never a hidden process.
 //! "Open Qanuvi" (or a click on the icon) shows the app's window, starting the app when none runs; "Quit Qanuvi"
-//! closes the windows and stops the master. The icon needs the main thread (macOS asks so), so `serve` takes the
+//! closes the windows and stops the master. M5b: the icon is the watcher's, so it stays while a crashed core starts
+//! again; after the crash limit "Start Qanuvi's background part again" is the owner's yes. The icon needs the main thread (macOS asks so), so `serve` takes the
 //! connections on another thread while this runs. Part of the `qanuvi-master` program only, so the library and
 //! its tests never link the tray.
 
-use qanuvi_lib::master::Master;
+use qanuvi_lib::master::Watch;
 use std::sync::Arc;
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
@@ -25,11 +26,16 @@ pub fn can_show() -> bool {
     }
 }
 
-fn tooltip() -> &'static str {
-    if qanuvi_lib::data_location::from_source() {
+fn tooltip(stopped: bool) -> String {
+    let name = if qanuvi_lib::data_location::from_source() {
         "Qanuvi (test build)"
     } else {
         "Qanuvi"
+    };
+    if stopped {
+        format!("{name}: the background part stopped after crashing")
+    } else {
+        name.to_string()
     }
 }
 
@@ -54,7 +60,7 @@ fn icon() -> Option<tray_icon::Icon> {
 }
 
 /// Shows the tray icon and answers it until the master ends.
-pub fn run(master: Arc<Master>) -> ! {
+pub fn run(master: Arc<Watch>) -> ! {
     let event_loop = EventLoopBuilder::<Ev>::with_user_event().build();
     #[cfg(target_os = "macos")]
     let mut event_loop = event_loop;
@@ -73,19 +79,31 @@ pub fn run(master: Arc<Master>) -> ! {
         let _ = proxy.send_event(Ev::Tray(e));
     }));
     let open = MenuItem::new("Open Qanuvi", true, None);
+    let again = MenuItem::new("Start Qanuvi's background part again", false, None);
     let quit = MenuItem::new("Quit Qanuvi", true, None);
     let menu = Menu::new();
-    let _ = menu.append_items(&[&open, &quit]);
-    let mut tray = None;
+    let _ = menu.append_items(&[&open, &again, &quit]);
+    let mut tray: Option<tray_icon::TrayIcon> = None;
+    let mut shown_stopped = false;
     event_loop.run(move |event, _, flow| {
-        *flow = ControlFlow::Wait;
+        // Looked at every second: the watcher may have stopped at the crash limit.
+        *flow =
+            ControlFlow::WaitUntil(std::time::Instant::now() + std::time::Duration::from_secs(1));
+        let stopped = master.stopped();
+        if stopped != shown_stopped {
+            shown_stopped = stopped;
+            again.set_enabled(stopped);
+            if let Some(t) = tray.as_ref() {
+                let _ = t.set_tooltip(Some(tooltip(stopped)));
+            }
+        }
         match event {
             // Made once the loop runs (Linux needs it so).
             Event::NewEvents(StartCause::Init) => {
                 let mut b = TrayIconBuilder::new()
                     .with_menu(Box::new(menu.clone()))
                     .with_menu_on_left_click(false)
-                    .with_tooltip(tooltip());
+                    .with_tooltip(tooltip(false));
                 if let Some(i) = icon() {
                     b = b.with_icon(i);
                 }
@@ -98,9 +116,10 @@ pub fn run(master: Arc<Master>) -> ! {
                 let m = master.clone();
                 std::thread::spawn(move || m.open_app());
             }
+            Event::UserEvent(Ev::Menu(e)) if e.id == *again.id() => master.start_again(),
             Event::UserEvent(Ev::Menu(e)) if e.id == *quit.id() => {
                 let m = master.clone();
-                std::thread::spawn(move || m.quit_all());
+                std::thread::spawn(move || m.quit());
             }
             Event::UserEvent(Ev::Tray(TrayIconEvent::Click {
                 button: MouseButton::Left,

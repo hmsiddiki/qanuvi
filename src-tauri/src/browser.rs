@@ -176,6 +176,113 @@ fn http_get(port: u16, path: &str) -> Result<String, String> {
         .unwrap_or_default())
 }
 
+/// The profile folder prefix (`qanuvi-browser-<pid>-<uuid>` in the temp folder).
+const PROFILE_PREFIX: &str = "qanuvi-browser-";
+
+/// Whether a process with this id runs now.
+fn pid_alive(pid: u32) -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+        use windows_sys::Win32::System::Threading::{
+            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        // SAFETY: plain calls; the handle is checked and closed.
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            if h.is_null() {
+                // Gone, or not ours to look at (then it is left alone).
+                return std::io::Error::last_os_error().raw_os_error() == Some(5);
+            }
+            let mut code = 0u32;
+            let ok = GetExitCodeProcess(h, &mut code) != 0;
+            CloseHandle(h);
+            !ok || code == STILL_ACTIVE as u32
+        }
+    }
+    #[cfg(unix)]
+    {
+        // SAFETY: signal 0 only checks that the process exists.
+        unsafe {
+            libc::kill(pid as libc::pid_t, 0) == 0
+                || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+        }
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        let _ = pid;
+        true
+    }
+}
+
+/// The process a profile folder's name belongs to.
+fn profile_pid(name: &str) -> Option<u32> {
+    name.strip_prefix(PROFILE_PREFIX)?
+        .split('-')
+        .next()?
+        .parse()
+        .ok()
+}
+
+/// M5b: removes the headless browsers' profiles a process left behind (it crashed, or was ended before its own
+/// cleanup): those of processes no longer running, and with `also_mine` this process's own (it is ending). A
+/// running process's profile is never touched.
+pub fn sweep_profiles(also_mine: bool) -> usize {
+    sweep_profiles_in(&std::env::temp_dir(), also_mine)
+}
+
+fn sweep_profiles_in(temp: &Path, also_mine: bool) -> usize {
+    let me = std::process::id();
+    let Ok(list) = std::fs::read_dir(temp) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for e in list.flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        let Some(pid) = profile_pid(&name) else {
+            continue;
+        };
+        let gone = if pid == me {
+            also_mine
+        } else {
+            !pid_alive(pid)
+        };
+        if gone && e.path().is_dir() && std::fs::remove_dir_all(e.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
+/// M5b: removes the folders the updater leaves in the temp folder (`Qanuvi-0.1.x-updater-…`, one per update, never
+/// removed by it), once their update has installed: any older than ten minutes (an install takes less).
+pub fn sweep_updater_folders() -> usize {
+    sweep_updater_in(&std::env::temp_dir(), Duration::from_secs(600))
+}
+
+fn sweep_updater_in(temp: &Path, older_than: Duration) -> usize {
+    let Ok(list) = std::fs::read_dir(temp) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for e in list.flatten() {
+        let name = e.file_name().to_string_lossy().to_lowercase();
+        if !(name.starts_with("qanuvi-") && name.contains("-updater-")) || !e.path().is_dir() {
+            continue;
+        }
+        let old = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age >= older_than);
+        if old && std::fs::remove_dir_all(e.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
 impl Browser {
     /// Starts a headless browser with a new empty profile and connects to its page.
     pub fn launch() -> Result<Self, String> {
@@ -752,6 +859,52 @@ pub fn save_jpeg(base64_data: &str, file: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // M5b: leftovers of gone processes go; a running process's profile stays; the ending process's own go too.
+    #[test]
+    fn sweeps_profiles_of_gone_processes_only() {
+        let temp = tempfile::tempdir().unwrap();
+        let me = std::process::id();
+        // A process id that is not running: a child that has ended.
+        let mut c = if cfg!(windows) {
+            Command::new("cmd").args(["/C", "exit 0"]).spawn().unwrap()
+        } else {
+            Command::new("true").spawn().unwrap()
+        };
+        let gone = c.id();
+        c.wait().unwrap();
+        for n in [
+            format!("qanuvi-browser-{gone}-a1"),
+            format!("qanuvi-browser-{me}-b2"),
+            "qanuvi-browser-x-c3".to_string(),
+            "other-folder".to_string(),
+        ] {
+            std::fs::create_dir_all(temp.path().join(n).join("Default")).unwrap();
+        }
+        assert_eq!(sweep_profiles_in(temp.path(), false), 1);
+        assert!(
+            !temp
+                .path()
+                .join(format!("qanuvi-browser-{gone}-a1"))
+                .exists()
+        );
+        assert!(temp.path().join(format!("qanuvi-browser-{me}-b2")).exists());
+        assert_eq!(sweep_profiles_in(temp.path(), true), 1);
+        assert!(temp.path().join("qanuvi-browser-x-c3").exists());
+        assert!(temp.path().join("other-folder").exists());
+    }
+
+    #[test]
+    fn sweeps_old_updater_folders() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("Qanuvi-0.1.24-updater-AbC")).unwrap();
+        std::fs::create_dir_all(temp.path().join("vscode-updater-x")).unwrap();
+        // Younger than the limit: left (an install may be using it).
+        assert_eq!(sweep_updater_in(temp.path(), Duration::from_secs(600)), 0);
+        assert_eq!(sweep_updater_in(temp.path(), Duration::ZERO), 1);
+        assert!(!temp.path().join("Qanuvi-0.1.24-updater-AbC").exists());
+        assert!(temp.path().join("vscode-updater-x").exists());
+    }
 
     #[test]
     fn problems_keep_the_newest_and_skip_repeats() {

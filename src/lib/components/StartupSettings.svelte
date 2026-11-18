@@ -4,6 +4,7 @@
   import { errorText } from "$lib/api";
   import { settings, type StartupItem } from "$lib/stores/settings.svelte";
   import { startup } from "$lib/stores/startup.svelte";
+  import { startSettingLabel } from "$lib/startWithComputer";
 
   let items = $derived(settings.value.startup);
   let name = $state("");
@@ -16,7 +17,8 @@
   /** The machine this page shows (null: This PC), and its name for sentences. */
   let machine = $state<string | null>(null);
   let place = $state("this computer");
-  /** M4c: signing in to this computer starts Qanuvi in the background (This PC only; off until turned on). */
+  /** M4c: starting this computer starts Qanuvi in the background (This PC only; off until turned on). M5b: named
+   * "Start Qanuvi when Windows starts", never read as the Qanuvi account. */
   let atSignIn = $state<boolean | null>(null);
   let atSignInError = $state("");
 
@@ -131,11 +133,12 @@
         checked={atSignIn === true}
         disabled={atSignIn === null}
         onchange={(e) => void setAtSignIn(e.currentTarget.checked)}
-      /> Start Qanuvi in the background when I sign in</label
+      /> {startSettingLabel()}</label
     >
     <p class="muted small">
-      Qanuvi starts with no window, its icon in the tray: these commands, its daily backup and remote access run from
-      then on. Open Qanuvi there shows the window.
+      Qanuvi starts in the background with no window, its icon in the tray: these commands, its daily backup and
+      remote access run from then on, and plan runs a shutdown cut off go on by themselves. Open Qanuvi there shows
+      the window.
     </p>
     {#if atSignInError}<p class="note bad">{atSignInError}</p>{/if}
   </div>

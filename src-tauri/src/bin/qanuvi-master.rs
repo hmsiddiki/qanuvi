@@ -1,7 +1,9 @@
 //! `qanuvi-master`: Qanuvi without a window, for a Linux server or VPS (Milestone 16). The desktop app reaches it over
 //! SSH; see master.rs.
 //!
-//! qanuvi-master serve       run the background service (also as a systemd user service)
+//! qanuvi-master serve       run the background service (also as a systemd user service): a small watcher that
+//!                           starts the core, restarts it after a crash and (This PC) shows the tray icon
+//! qanuvi-master core        the core itself (started by the watcher)
 //! qanuvi-master --stdio     what the desktop app starts through SSH (starts the service when needed)
 //! qanuvi-master status      is the service running?
 //! qanuvi-master stop        stop the service
@@ -18,7 +20,7 @@ use std::path::PathBuf;
 #[path = "../master_tray.rs"]
 mod master_tray;
 
-/// This PC's master shows a tray icon where there is a desktop to show it on (migration M4c).
+/// This PC's master shows a tray icon where there is a desktop to show it on (migration M4c; the watcher's, M5b).
 fn tray() -> Option<qanuvi_lib::master::Tray> {
     #[cfg(feature = "desktop")]
     if master_tray::can_show() {
@@ -80,6 +82,7 @@ fn main() {
                 }
                 qanuvi_lib::master::serve(&data, tray())
             }
+            Some("core") => qanuvi_lib::master::serve_core(&data),
             Some("stop") => {
                 let stopped = qanuvi_lib::master::stop_service(&data);
                 println!("{}", if stopped { "Stopped." } else { "Not running." });
@@ -116,7 +119,7 @@ fn main() {
             }
             _ => {
                 eprintln!(
-                    "Usage: qanuvi-master serve | --stdio | status | stop | login | logout | servers | pair  [--data <folder>] [--site <address>]"
+                    "Usage: qanuvi-master serve | core | --stdio | status | stop | login | logout | servers | pair  [--data <folder>] [--site <address>]"
                 );
                 std::process::exit(2);
             }

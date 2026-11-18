@@ -297,6 +297,10 @@ pub struct PlanRun {
     /// The run stopped because it reached its own budget (this many USD): the plan says so and offers Raise budget.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget_reached: Option<f64>,
+    /// Why a run that was going stopped with its master (M5b: "shutdown", "crash", "update", ...); after a shutdown
+    /// the window offers starting Qanuvi with Windows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped_by: Option<String>,
     pub started_at: f64,
     pub ended_at: Option<f64>,
     /// Paused in the middle of a step: its session, so Resume goes on in it (also after a restart).

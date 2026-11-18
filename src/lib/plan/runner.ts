@@ -151,6 +151,8 @@ export interface PlanRun {
   message: string;
   /** The run stopped because it reached its own budget (this many USD): the plan says so and offers Raise budget. */
   budgetReached?: number;
+  /** Why a run that was going stopped with its master (M5b): "shutdown", "crash", "update", "quit", ... */
+  stoppedBy?: string;
   startedAt: number;
   endedAt: number | null;
   /** Paused in the middle of a step: its session, so Resume goes on in it (also after a restart). */

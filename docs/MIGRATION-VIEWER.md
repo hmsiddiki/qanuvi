@@ -326,6 +326,11 @@ Owner decisions (2026-11-18):
 - M5a DRIVEN LIVE (2026-11-18): s1 one master per data folder (master.lock), s2 it/they wording, s3 an open note
   seen again is not told again, s4 no "keeps working" notice on tray Quit, s5 the detached service inherits no
   handles (Windows); details in DEVELOPMENT-TASKLIST.md.
+- M5b BUILT (2026-11-18): `serve` is the watcher (tray, restarts, master.log), `core` does the work; crash limit 3
+  with known causes, a local model's reading and one safe fix (a start without the start-up list); runs say
+  shutdown / crash / ended with Resume and resume on their own after a restart when Qanuvi starts with Windows (else
+  the Run panel offers the setting); the setting is "Start Qanuvi when Windows starts"; browser profiles and updater
+  folders are cleaned up. Details in DEVELOPMENT-TASKLIST.md.
 
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 

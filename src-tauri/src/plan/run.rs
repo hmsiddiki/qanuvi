@@ -473,6 +473,7 @@ impl<'a> Loop<'a> {
                 String::new()
             },
             budget_reached: None,
+            stopped_by: None,
             started_at: now as f64,
             ended_at: steps.is_empty().then_some(now as f64),
             paused_session: None,

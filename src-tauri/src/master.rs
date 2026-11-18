@@ -30,7 +30,10 @@ mod inbox_cmds;
 mod plan_runs;
 #[path = "master_servers.rs"]
 mod server_cmds;
+#[path = "master_watch.rs"]
+pub mod watch;
 pub use cli::{pair_cli, servers_cli};
+pub use watch::Watch;
 
 /// What a running master shares with its connections.
 pub struct Master {
@@ -70,6 +73,9 @@ pub struct Master {
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
     me: std::sync::OnceLock<std::sync::Weak<Master>>,
+    /// M5b: the plan runs the last master left going (their projects), and why it ended; resumed on their own
+    /// after a computer restart when Qanuvi starts with Windows.
+    cut_off: Mutex<(String, Vec<String>)>,
 }
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
@@ -149,7 +155,45 @@ impl Master {
         agent::mark_interrupted(&db);
         let why = std::fs::read_to_string(stop_note_file(dir)).ok();
         let _ = std::fs::remove_file(stop_note_file(dir));
-        runs::mark_interrupted_because(&db, why.as_deref().map(str::trim));
+        // M5b: a master that left no note ended by a shutdown (the computer started again after its last state
+        // note) or some other way; one that ended cleanly removed its state note.
+        let state_at = std::fs::read_to_string(watch::state_file(dir))
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+            .and_then(|v| v["at"].as_u64());
+        let _ = std::fs::remove_file(watch::state_file(dir));
+        let why = why
+            .map(|w| w.trim().to_string())
+            .filter(|w| !w.is_empty())
+            .or_else(|| watch::unclean_why(state_at, watch::boot_time()).map(String::from));
+        let cut_off = runs::mark_interrupted_because(&db, why.as_deref());
+        // The watcher's crash report goes into the Inbox (the window shows it, and tells it).
+        if let Ok(t) = std::fs::read_to_string(watch::report_file(dir)) {
+            let _ = std::fs::remove_file(watch::report_file(dir));
+            if let Ok(r) = serde_json::from_str::<Value>(&t) {
+                let _ = crate::inbox::add(
+                    &db,
+                    &crate::inbox::NewItem {
+                        kind_of: "problem".into(),
+                        kind: "master-crash".into(),
+                        title: r["title"]
+                            .as_str()
+                            .unwrap_or("Qanuvi's background part crashed")
+                            .into(),
+                        text: r["text"]
+                            .as_str()
+                            .unwrap_or("")
+                            .chars()
+                            .take(6000)
+                            .collect(),
+                        key: None,
+                        open: None,
+                        form: None,
+                        source: None,
+                    },
+                );
+            }
+        }
         let accounts = accounts_for(dir, &machine_id, app_data);
         let remotes = crate::remote::Remotes::default();
         remotes.set_me(&machine_id);
@@ -174,6 +218,7 @@ impl Master {
             remote_errors: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
+            cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
         })
     }
 
@@ -229,7 +274,7 @@ impl Master {
                 }
                 Ok(json!({"tray": self.app_data}))
             }
-            // "Start Qanuvi in the background when I sign in" (M4c): only This PC's master starts at sign-in.
+            // "Start Qanuvi when Windows starts" (M4c, renamed in M5b): only This PC's master starts at sign-in.
             "sign_in_start" => to(if self.app_data {
                 crate::sign_in_start::is_on()
             } else {
@@ -1189,22 +1234,12 @@ fn lock_file(dir: &Path) -> PathBuf {
 
 /// Takes the data folder's master lock; `None` when another master holds it.
 fn take_lock(dir: &Path) -> Result<Option<std::fs::File>, String> {
-    let f = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(lock_file(dir))
-        .map_err(|e| e.to_string())?;
-    match f.try_lock() {
-        Ok(()) => Ok(Some(f)),
-        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
-        Err(std::fs::TryLockError::Error(e)) => Err(e.to_string()),
-    }
+    watch::take_lock_at(&lock_file(dir))
 }
 
-/// A master holds this folder (it may still be starting and not yet have written its address).
+/// A watcher or a core holds this folder (M5b; it may still be starting and not yet have written its address).
 fn held(dir: &Path) -> bool {
-    matches!(take_lock(dir), Ok(None))
+    watch::held(dir)
 }
 
 /// A restart mark younger than half a minute.
@@ -1223,8 +1258,24 @@ impl Master {
     /// jobs in the app's place; the app no longer runs them, so nothing runs twice.
     pub fn start_own(self: &Arc<Self>) {
         let settings = crate::settings::get_all(&self.db).unwrap_or_default();
-        self.startup
-            .start_all(&crate::startup::items_from_settings(&settings));
+        // M5b: started once without its start-up list after crashes at start (its watcher's safe fix).
+        if watch::skip_startup() {
+            eprintln!("Started without the start-up list (after crashes at start).");
+        } else {
+            self.startup
+                .start_all(&crate::startup::items_from_settings(&settings));
+        }
+        // M5b: Qanuvi cleans up after itself: test browser profiles left by a process that ended without its own
+        // cleanup, and (This PC) the updater's folders of updates already installed.
+        std::thread::spawn({
+            let app_data = self.app_data;
+            move || {
+                crate::browser::sweep_profiles(false);
+                if app_data {
+                    crate::browser::sweep_updater_folders();
+                }
+            }
+        });
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(20));
@@ -1289,6 +1340,9 @@ impl Master {
         self.startup.stop_all();
         self.remotes.disconnect_all();
         let _ = std::fs::remove_file(service_file(&self.dir));
+        // A clean end: no state note left to read as a crash or a shutdown (M5b), no browser profile left behind.
+        let _ = std::fs::remove_file(watch::state_file(&self.dir));
+        crate::browser::sweep_profiles(true);
         std::process::exit(0);
     }
 
@@ -1302,23 +1356,7 @@ impl Master {
         if self.app_links.reach(&json!({"do": "show"})) > 0 {
             return;
         }
-        match crate::sign_in_start::app_exe() {
-            Ok(exe) => {
-                let mut c = std::process::Command::new(exe);
-                if item.is_some() {
-                    c.arg(crate::notify::link(item.as_deref()));
-                }
-                let started = c
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
-                if let Err(e) = started {
-                    eprintln!("Qanuvi could not start: {e}");
-                }
-            }
-            Err(e) => eprintln!("{e}"),
-        }
+        start_app(item);
     }
 
     /// M4c, the tray's "Quit Qanuvi": the app's windows close first, as when closed by hand, then this master ends.
@@ -1327,7 +1365,11 @@ impl Master {
         // M5a: work going on here stops with it; said first, and nothing stops without a yes.
         let (agents, runs) = self.work();
         // s2: one thing is "it", more are "they".
-        let they = if agents.max(0) as usize + runs == 1 { "It" } else { "They" };
+        let they = if agents.max(0) as usize + runs == 1 {
+            "It"
+        } else {
+            "They"
+        };
         if let Some(what) = work_text((agents, runs))
             && !confirm_quit(&format!(
                 "Quitting Qanuvi stops {what} on this computer. {they} can be resumed afterwards.\n\nQuit anyway?"
@@ -1429,7 +1471,10 @@ impl Master {
             .ok_or("The master is not ready.")?;
         std::fs::write(restart_mark(dir), b"").map_err(|e| e.to_string())?;
         let _ = std::fs::write(stop_note_file(dir), "restart");
-        if let Err(e) = start_service(dir, Some(std::process::id())) {
+        // M5b: a core its watcher started asks the watcher to start it again (its exit code); else a new service is
+        // started that waits for this one to end.
+        let watched = watch::watched();
+        if !watched && let Err(e) = start_service(dir, Some(std::process::id())) {
             let _ = std::fs::remove_file(restart_mark(dir));
             return Err(e);
         }
@@ -1441,9 +1486,31 @@ impl Master {
             me.startup.stop_all();
             me.remotes.disconnect_all();
             let _ = std::fs::remove_file(service_file(&dir));
-            std::process::exit(0);
+            let _ = std::fs::remove_file(watch::state_file(&dir));
+            std::process::exit(if watched { watch::RESTART_CODE } else { 0 });
         });
         Ok(())
+    }
+}
+
+/// Starts the app beside this master (for a notification's item, its Inbox opens there).
+fn start_app(item: Option<String>) {
+    match crate::sign_in_start::app_exe() {
+        Ok(exe) => {
+            let mut c = std::process::Command::new(exe);
+            if item.is_some() {
+                c.arg(crate::notify::link(item.as_deref()));
+            }
+            let started = c
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+            if let Err(e) = started {
+                eprintln!("Qanuvi could not start: {e}");
+            }
+        }
+        Err(e) => eprintln!("{e}"),
     }
 }
 
@@ -1526,19 +1593,75 @@ fn on_app_data(dir: &Path) -> bool {
 }
 
 /// What shows This PC's master's tray icon and answers it until the master ends (migration M4c). Only the desktop
-/// build's `qanuvi-master` program has one (it links the tray; the library and its tests do not).
-pub type Tray = fn(Arc<Master>) -> !;
+/// build's `qanuvi-master` program has one (it links the tray; the library and its tests do not). M5b: the tray
+/// belongs to the watcher, so it stays while a crashed core starts again.
+pub type Tray = fn(Arc<Watch>) -> !;
 
-/// Runs the background service until it is stopped. `tray`: shown when this master is This PC's.
+/// `qanuvi-master serve` (M5b): the watcher of this data folder's core, until the core ends cleanly. `tray`: shown
+/// when this master is This PC's. One watcher per data folder; a second one leaves it to the first.
 pub fn serve(dir: &Path, tray: Option<Tray>) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let Some(_lock) = watch::take_lock_at(&watch::watcher_lock(dir))? else {
+        return Ok(());
+    };
+    let w = Arc::new(Watch::new(dir));
+    // The icon needs the main thread, so the watching goes on in another one; its end ends the program.
+    if let Some(tray) = tray.filter(|_| w.app_data()) {
+        let w2 = w.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = w2.run() {
+                eprintln!("{e}");
+            }
+            std::process::exit(0);
+        });
+        tray(w);
+    }
+    w.run()
+}
+
+/// What this core does now, noted for its watcher (read after a crash) and for the next core (its age tells a
+/// shutdown from a crash). A clean end removes it.
+fn note_state(m: &Master) {
+    let settings = crate::settings::get_all(&m.db).unwrap_or_default();
+    let startup = if watch::skip_startup() {
+        0
+    } else {
+        crate::startup::items_from_settings(&settings).len()
+    };
+    let (agents, runs) = m.work();
+    let v = json!({
+        "pid": std::process::id(),
+        "at": watch::now_secs(),
+        "agents": agents,
+        "runs": runs,
+        "startup": startup,
+    });
+    let _ = std::fs::write(watch::state_file(&m.dir), v.to_string());
+}
+
+/// `qanuvi-master core`: the master that does the work, until it is stopped (started by its watcher, M5b).
+pub fn serve_core(dir: &Path) -> Result<(), String> {
     // One master per data folder (s1): the app's launch and its first This PC call could each start one. The lock
     // is held until this process ends; a second master finds it taken and leaves the folder to the first.
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let Some(_lock) = take_lock(dir)? else {
         return Ok(());
     };
+    // Its standard error is the watcher's log pipe: children it starts get none of it (as in k1).
+    #[cfg(windows)]
+    keep_own_stdio_from_children();
     let master = Master::open(dir)?.shared();
+    note_state(&master);
     master.start_own();
+    let me = Arc::downgrade(&master);
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(20));
+            let Some(m) = me.upgrade() else { return };
+            note_state(&m);
+        }
+    });
+    master.resume_cut_off();
     // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour. On the app's
     // own data (M4b) these are This PC's backups: the app's folder, with its window storage, as the app made them.
     let backup_dir = dir.to_path_buf();
@@ -1572,13 +1695,6 @@ pub fn serve(dir: &Path, tray: Option<Tray>) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &file).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(restart_mark(dir));
-    // M4c: This PC's master shows its tray icon while it runs (never a hidden process); the icon needs the main
-    // thread, so the connections are taken on another one.
-    if let Some(tray) = tray.filter(|_| master.app_data) {
-        let m = master.clone();
-        std::thread::spawn(move || accept(listener, m, token));
-        tray(master);
-    }
     accept(listener, master, token);
     Ok(())
 }
@@ -1603,6 +1719,17 @@ fn accept(listener: TcpListener, master: Arc<Master>, token: String) {
             }
             if hello["stop"] == true {
                 master.end_because(hello["why"].as_str().unwrap_or(""));
+            }
+            // M5b: the watcher's tray asks the core (the app's links and the work are here).
+            match hello["tray"].as_str() {
+                Some("open") => return master.open_app(),
+                Some("quit") => return master.quit_all(),
+                _ => {}
+            }
+            // A test build's own crash, to drive the watcher live (never in an installed copy).
+            if hello["crash"] == true && crate::data_location::from_source() {
+                eprintln!("Crashing on purpose (test build).");
+                std::process::abort();
             }
             let out: Out = Arc::new(Mutex::new(Box::new(write_half)));
             handle_connection(master, reader, out);
@@ -1724,7 +1851,11 @@ fn quote_arg(a: &std::ffi::OsStr) -> Vec<u16> {
             continue;
         }
         // Backslashes before a quote are doubled, and the quote escaped.
-        let n = if c == '"' as u16 { slashes * 2 + 1 } else { slashes };
+        let n = if c == '"' as u16 {
+            slashes * 2 + 1
+        } else {
+            slashes
+        };
         out.extend(std::iter::repeat_n('\\' as u16, n));
         slashes = 0;
         out.push(c);
@@ -1823,6 +1954,12 @@ pub fn ensure_service(dir: &Path) -> Result<(TcpStream, String), String> {
             return Ok(c);
         }
     }
+    // M5b: its watcher stopped at the crash limit and waits for the owner: said at once, nothing started.
+    if held(dir)
+        && let Some(text) = watch::stopped_text(dir)
+    {
+        return Err(text);
+    }
     // A master that holds the folder is starting: wait for its address instead of starting another (s1).
     if !held(dir) {
         let _ = std::fs::remove_file(service_file(dir));
@@ -1865,7 +2002,8 @@ fn this_pc_link(dir: &Path) -> Result<(TcpStream, BufReader<TcpStream>), String>
             break c;
         }
         if Instant::now() >= deadline {
-            return Err("This PC's master is not running.".into());
+            return Err(watch::stopped_text(dir)
+                .unwrap_or_else(|| "This PC's master is not running.".into()));
         }
         std::thread::sleep(Duration::from_millis(200));
     };
@@ -2005,7 +2143,10 @@ mod tests {
     fn the_service_command_line_reads_back_as_given() {
         let q = |s: &str| String::from_utf16(&quote_arg(std::ffi::OsStr::new(s))).unwrap();
         assert_eq!(q("serve"), "serve");
-        assert_eq!(q(r"C:\Program Files\Qanuvi\qanuvi-master.exe"), r#""C:\Program Files\Qanuvi\qanuvi-master.exe""#);
+        assert_eq!(
+            q(r"C:\Program Files\Qanuvi\qanuvi-master.exe"),
+            r#""C:\Program Files\Qanuvi\qanuvi-master.exe""#
+        );
         assert_eq!(q(r"C:\My Data\"), r#""C:\My Data\\""#);
         assert_eq!(q(r#"a "b""#), r#""a \"b\"""#);
         assert_eq!(q(""), r#""""#);
@@ -2020,7 +2161,7 @@ mod tests {
         assert!(held(data.path()));
         std::fs::write(service_file(data.path()), "first").unwrap();
         // The second ends at once, without opening the data or writing its own address.
-        serve(data.path(), None).unwrap();
+        serve_core(data.path()).unwrap();
         assert_eq!(
             std::fs::read_to_string(service_file(data.path())).unwrap(),
             "first"
@@ -2670,27 +2811,18 @@ mod tests {
         assert_eq!(got["change"], "add");
     }
 
-    static TRAY_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-    fn test_tray(_: Arc<Master>) -> ! {
-        TRAY_SHOWN.store(true, std::sync::atomic::Ordering::SeqCst);
-        loop {
-            std::thread::sleep(Duration::from_secs(3600));
-        }
-    }
-
     #[test]
-    fn m4c_this_pcs_master_shows_its_tray_and_reaches_the_apps_windows() {
-        // A master on the app's data hands its thread to the tray and still answers on another one.
+    fn m4c_this_pcs_master_reaches_the_apps_windows() {
+        // M5b: the tray is the watcher's (it starts the core as its own program, so it is driven live, not here); the
+        // core on the app's data answers.
         let data = tempfile::tempdir().unwrap();
         mark_app_data(data.path());
         let dir = data.path().to_path_buf();
         std::thread::spawn(move || {
-            let _ = serve(&dir, Some(test_tray));
+            let _ = serve_core(&dir);
         });
         let hello = this_pc_call(data.path(), "hello", json!({})).unwrap();
         assert_eq!(hello["name"], "Qanuvi master");
-        assert!(TRAY_SHOWN.load(std::sync::atomic::Ordering::SeqCst));
         // The app's link hears the tray's "Open Qanuvi" (a running app shows its window, no second app starts).
         let m = Master::open(data.path()).unwrap().shared();
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
@@ -2932,7 +3064,7 @@ mod tests {
         let dir = data.path().to_path_buf();
         let d2 = dir.clone();
         std::thread::spawn(move || {
-            let _ = serve(&d2, None);
+            let _ = serve_core(&d2);
         });
         let deadline = Instant::now() + Duration::from_secs(10);
         while !is_running(&dir) {
@@ -3417,6 +3549,83 @@ mod tests {
         let r = runs::list(&m.db, &pid).unwrap().remove(0);
         assert_eq!(r.status, "stopped");
         assert!(r.data.contains(runs::stop_note("update").unwrap()));
+    }
+
+    /// M5b: a master that left no stop note but a state note from before the computer last started was cut off by
+    /// a shutdown; its runs say so (stoppedBy for the window's offer) and are kept for a resume. The watcher's crash
+    /// report goes into the Inbox once.
+    #[test]
+    fn m5b_a_shutdown_and_a_crash_report_are_told_at_the_next_start() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        mark_app_data(data.path());
+        let pid = {
+            let m = Master::open(data.path()).unwrap();
+            let p = call(
+                &m,
+                "projects_add",
+                json!({"path": project.path().to_string_lossy()}),
+            )
+            .unwrap();
+            let pid = p["id"].as_str().unwrap().to_string();
+            runs::save(
+                &m.db,
+                &pid,
+                "r1",
+                "T.md",
+                "running",
+                r#"{"status":"running"}"#,
+            )
+            .unwrap();
+            m.keep_start(&pid, &json!({"file": "T.md"}));
+            assert!(
+                data.path()
+                    .join("run-starts")
+                    .join(format!("{pid}.json"))
+                    .exists()
+            );
+            pid
+        };
+        // Its last state note is older than the computer's start.
+        std::fs::write(watch::state_file(data.path()), json!({"at": 1}).to_string()).unwrap();
+        std::fs::write(
+            watch::report_file(data.path()),
+            json!({"title": "Qanuvi's background part crashed 3 times", "text": "Report"})
+                .to_string(),
+        )
+        .unwrap();
+        let m = Master::open(data.path()).unwrap();
+        assert!(!watch::state_file(data.path()).exists(), "read once");
+        let r = runs::list(&m.db, &pid).unwrap().remove(0);
+        let d: Value = serde_json::from_str(&r.data).unwrap();
+        assert_eq!(d["stoppedBy"], "shutdown");
+        assert_eq!(d["message"], runs::stop_note("shutdown").unwrap());
+        assert_eq!(
+            *m.cut_off.lock().unwrap(),
+            ("shutdown".to_string(), vec![pid.clone()])
+        );
+        let inbox = crate::inbox::list(&m.db).unwrap();
+        assert!(inbox.iter().any(|i| i.title.contains("crashed 3 times")));
+        assert!(!watch::report_file(data.path()).exists());
+        // A resume that cannot start says so in the Inbox, naming the cut-off run's plan (a start that is not valid
+        // here, so no run starts in a test).
+        m.keep_start(&pid, &json!({"file": 5}));
+        m.resume_one(&pid);
+        let inbox = crate::inbox::list(&m.db).unwrap();
+        let note = inbox
+            .iter()
+            .find(|i| i.title.starts_with("Plan run not resumed"))
+            .unwrap();
+        assert!(
+            note.text.contains("The run of T.md was cut off"),
+            "{}",
+            note.text
+        );
+        assert!(note.text.contains(". Open the plan and choose Resume."));
+        // A clean end leaves no state note: the next start finds nothing to tell.
+        drop(m);
+        let m = Master::open(data.path()).unwrap();
+        assert_eq!(m.cut_off.lock().unwrap().0, "");
     }
 
     /// M5a: what the app's core did for This PC's windows, its master does: plan data told to every follower (a

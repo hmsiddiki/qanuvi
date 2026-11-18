@@ -8,6 +8,8 @@
   import { addOrderNeeds, setStepModel, type Plan } from "$lib/plan/tasklist";
   import { modelLabel, providerById, PROVIDERS } from "$lib/agents/providers";
   import { api, errorText } from "$lib/api";
+  import { callThisPc, shownMachine } from "$lib/remote";
+  import { offerStartWithComputer, startSettingLabel } from "$lib/startWithComputer";
   import { formatCost, formatTokens } from "$lib/agent/events";
   import { runner } from "$lib/stores/runner.svelte";
   import { settings } from "$lib/stores/settings.svelte";
@@ -555,6 +557,29 @@
   }
 
   let run = $derived(runner.run && runner.run.projectId === project.id && runner.run.file === file ? runner.run : null);
+  /**
+   * M5b: a run This PC's shutdown cut off, while "Start Qanuvi when Windows starts" is off: offered each time it would
+   * have helped (the run would have gone on by itself), until "Don't ask again".
+   */
+  let startOn = $state<boolean | null>(null);
+  let startError = $state("");
+  $effect(() => {
+    if (run?.stoppedBy !== "shutdown" || shownMachine() !== null || settings.value.startOfferOff) return;
+    callThisPc<boolean>("sign_in_start")
+      .then((on) => (startOn = on))
+      .catch(() => {});
+  });
+  let startOffer = $derived(
+    shownMachine() === null && offerStartWithComputer(run?.stoppedBy, startOn, settings.value.startOfferOff),
+  );
+  async function turnOnStart() {
+    startError = "";
+    try {
+      startOn = await callThisPc<boolean>("sign_in_start_set", { on: true });
+    } catch (e) {
+      startError = errorText(e);
+    }
+  }
   let totals = $derived(runner.totals);
   /** This plan's earlier runs, to compare the cost per finished step (the aim: Qanuvi spends less). */
   let history = $state<ReturnType<typeof planHistory> | null>(null);
@@ -1007,6 +1032,19 @@
         </span>
       {/if}
     </div>
+    {#if startOffer}
+      <div class="start-offer">
+        <span
+          >This run was cut off when the computer shut down. With <strong>{startSettingLabel()}</strong> on, Qanuvi starts
+          in the background with the computer and runs like this go on by themselves.</span
+        >
+        <div class="row">
+          <button type="button" class="primary" onclick={() => void turnOnStart()}>Turn it on</button>
+          <button type="button" onclick={() => settings.set("startOfferOff", true)}>Don't ask again</button>
+        </div>
+        {#if startError}<span class="bad">{startError}</span>{/if}
+      </div>
+    {/if}
     {#if heldSteps.length}
       <!-- Set aside for an answer (24u): answer while the run goes on; it goes back to them after the step in hand. -->
       <div class="asks">
@@ -1212,6 +1250,18 @@
 {/if}
 
 <style>
+  .start-offer {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .start-offer .bad {
+    color: var(--qx-status-failed);
+  }
   .asks {
     margin-top: 6px;
     padding: 6px 8px;

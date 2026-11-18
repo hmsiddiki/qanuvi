@@ -403,6 +403,13 @@ fn connect_link(
     let state = app.state::<AppState>();
     let app2 = app.clone();
     let on_end: crate::remote::OnEnd = std::sync::Arc::new(move |id: &str| {
+        // M5b u1: This PC's ended link is let go, so the next call makes it again (its master was restarted by its
+        // watcher after a crash, or by Settings). Kept, every call went on the dead link: "The connection to the
+        // master has ended". Until one is made again no other can be: the entry is still the ended one.
+        if id == THIS_PC {
+            let _one = THIS_PC_CONNECT.lock().unwrap_or_else(|e| e.into_inner());
+            app2.state::<AppState>().remotes.disconnect(THIS_PC);
+        }
         let _ = tauri::Emitter::emit(&app2, "remote-closed", serde_json::json!({"id": id}));
     });
     if id == THIS_PC {
@@ -668,8 +675,8 @@ pub fn run() {
     ) {
         eprintln!("{note}");
     }
-    // M4c: started at sign-in ("Start Qanuvi in the background when I sign in"): This PC's master starts on the
-    // app's data with its tray icon, and the app ends without a window.
+    // M4c: started at sign-in ("Start Qanuvi when Windows starts"; "...when I sign in" before M5b): This PC's
+    // master starts on the app's data with its tray icon, and the app ends without a window.
     if std::env::args().any(|a| a == crate::sign_in_start::FLAG) {
         crate::master::mark_app_data(&data);
         if let Err(e) = crate::master::start_this_pc(&data) {

@@ -61,7 +61,101 @@ fn start_of(args: &Value) -> Result<RunStart, String> {
     Ok(start)
 }
 
+/// Where a project's last run start is kept (M5b).
+fn start_file(dir: &std::path::Path, project_id: &str) -> Option<std::path::PathBuf> {
+    let plain = !project_id.is_empty()
+        && project_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    plain.then(|| dir.join("run-starts").join(format!("{project_id}.json")))
+}
+
 impl Master {
+    pub(super) fn keep_start(&self, project_id: &str, start: &Value) {
+        if let Some(f) = start_file(&self.dir, project_id) {
+            let _ = std::fs::create_dir_all(f.parent().unwrap_or(&self.dir));
+            let _ = std::fs::write(f, start.to_string());
+        }
+    }
+
+    /// M5b: after a shutdown, with "Start Qanuvi when Windows starts" on, This PC's runs that were cut off go on by
+    /// themselves (half a minute after start, so its start-up commands answer first), each said in the Inbox. With
+    /// the setting off, the window shows the stop with Resume and offers the setting.
+    pub fn resume_cut_off(self: &Arc<Self>) {
+        let (why, projects) =
+            std::mem::take(&mut *self.cut_off.lock().unwrap_or_else(|e| e.into_inner()));
+        if why != "shutdown" || projects.is_empty() || !self.app_data {
+            return;
+        }
+        if !crate::sign_in_start::is_on().unwrap_or(false) {
+            return;
+        }
+        let me = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+            let Some(m) = me.upgrade() else { return };
+            for pid in projects {
+                m.resume_one(&pid);
+            }
+        });
+    }
+
+    /// Starts a cut-off run again with its kept start and says so in the Inbox.
+    pub(super) fn resume_one(&self, project_id: &str) {
+        let name = projects::get(&self.db, project_id)
+            .map(|p| p.name)
+            .unwrap_or_else(|_| "a project".into());
+        let Some(mut start) = start_file(&self.dir, project_id)
+            .and_then(|f| std::fs::read_to_string(f).ok())
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        else {
+            return;
+        };
+        // A new start on the plan: its done steps stay done; a step that was cut off starts again.
+        start["resume"] = Value::Null;
+        // Named by the run that was cut off (its kept start may not say).
+        let file = runs::list(&self.db, project_id)
+            .ok()
+            .and_then(|l| l.into_iter().next())
+            .map(|r| r.file)
+            .filter(|f| !f.is_empty())
+            .unwrap_or_else(|| "its plan".into());
+        let no_stream = |_: &str| Sink::new(|_: Value| true);
+        let args = json!({"projectId": project_id, "start": start});
+        let (title, text, kind_of) = match self.plan_run("plan_run_start", &args, &no_stream) {
+            Ok(_) => (
+                format!("Plan run resumed on its own: {name}"),
+                format!(
+                    "The run of {file} was cut off when the computer shut down. Qanuvi started with the computer and \
+                     the run goes on from where it stopped."
+                ),
+                "info",
+            ),
+            Err(e) => (
+                format!("Plan run not resumed: {name}"),
+                format!(
+                    "The run of {file} was cut off when the computer shut down and could not go on by itself: {}. \
+                     Open the plan and choose Resume.",
+                    e.trim_end_matches('.')
+                ),
+                "problem",
+            ),
+        };
+        let item = crate::inbox::NewItem {
+            kind_of: kind_of.into(),
+            kind: "run-resumed".into(),
+            title,
+            text,
+            key: None,
+            open: None,
+            form: None,
+            source: None,
+        };
+        if let Ok((added, new)) = crate::inbox::add_new(&self.db, &item) {
+            (self.inbox_teller())(&json!({"change": "add", "item": added, "new": new}));
+        }
+    }
+
     fn me(&self) -> Result<Arc<Master>, String> {
         self.me
             .get()
@@ -117,6 +211,8 @@ impl Master {
             "plan_run_start" => {
                 projects::get(&self.db, &pid)?;
                 let setup = start_of(args)?.setup();
+                // M5b: kept so a run cut off by a shutdown can go on by itself after the restart (no keys in it).
+                self.keep_start(&pid, &args["start"]);
                 self.watch(&pid, args, stream);
                 let me = self.me()?;
                 let p = pid.clone();

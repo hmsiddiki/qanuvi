@@ -384,6 +384,62 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    M5b BUILT (2026-11-18; verify: clippy clean, fmt clean, Rust 481, web 481, svelte-check 0). Map:
+    - Watcher + core (master_watch.rs): `qanuvi-master serve` is the watcher (watcher.lock, one per data folder; the
+      tray icon is its own, so it stays while a crashed core starts again). It starts `qanuvi-master core` (the old
+      serve: master.lock, master.json) with QANUVI_WATCHED, in a job object (the core and what it started end with
+      the watcher), its stderr kept in master.log (1 MB, then master.log.old; before M5b it went nowhere). Exit 0 =
+      clean end (watcher ends, count cleared); 75 = restart asked (Settings, Backups: started again at once, no count);
+      anything else = crash: record (exit code, time up, last 40 log lines, its last state note) in
+      master-crashes.json, stop note "crash" for its runs, started again after 2 s, then 5 s.
+    - Crash limit by count: on the 3rd in a row the watcher checks the known causes (out of memory, database, a
+      taken port, crashes within 90 s while the start-up list started) and, with local models on in the brain, asks
+      one to read the notes. Safe fix on its own: one start without the start-up list (QANUVI_SKIP_STARTUP), told.
+      Anything else: notification + master-crash-report.txt (a click opens it), restarting stops; the tray's "Start
+      Qanuvi's background part again" (enabled only then) is the yes; a window's call says so instead of waiting.
+      The next core puts the report in the Inbox (problem). Count reset: clean end, a crash after an hour's run, or
+      a new watcher (Quit, then open).
+    - Stop reasons: the core notes its state every 20 s (master-state.json: at, agents, runs, start-up count); a clean
+      end and a restart remove it. A next start with no stop note but a state note: the computer started after it
+      ("shutdown": boot time from GetTickCount64, /proc/stat btime, kern.boottime) or not ("ended"). Runs get
+      "Stopped when the computer shut down." / "...background part crashed." / "...ended unexpectedly.", each with
+      Resume, and stoppedBy in the run.
+    - Resume after a restart: plan_run_start keeps its start (no keys) in run-starts/<project>.json. After a
+      shutdown, with "Start Qanuvi when Windows starts" on, This PC's master starts the cut-off runs again 30 s after
+      start and says so in the Inbox ("Plan run resumed on its own", or "not resumed" with why). With it off, the
+      Run panel of a run a shutdown cut off offers the setting (Turn it on / Don't ask again: startOfferOff).
+    - The setting is named "Start Qanuvi when Windows starts" ("...when this computer starts" elsewhere).
+    - Cleanup (browser.rs): at the master's start, qanuvi-browser-<pid>-* profiles of processes no longer running are
+      removed (never a running one's); at its end, also its own; This PC's master removes Qanuvi-*-updater-* folders
+      older than 10 minutes.
+    - Test build only: hello {"crash": true} aborts the core (scratchpad crash.js), to drive the watcher.
+    u1 (found driving M5b, fixed): after the core crashed and was started again, every This PC call of the open
+    window said "The connection to the master has ended": the app kept its ended "this-computer" link in its list,
+    so link_for never made it again (M5a's "made again after it ended" never ran; no M5a drive restarted the master
+    under an open window). Fix (desktop.rs connect_link): when This PC's link ends, the app lets it go (under the
+    This PC connect lock), so the next call makes a new one.
+    M5b DRIVEN LIVE (2026-11-18, release test build, scratch project m5a-proj with a PLAN.md): app -> watcher (serve)
+    -> core for This PC and the local test master; a fake leftover qanuvi-browser-3999999-* profile was removed at
+    start; crash 1 (crash.js): record with the log line and state note, the run said "...background part crashed.",
+    the core was started again in 2 s and the window went on (after the u1 fix: a new link, no "Sync problem");
+    crashes 2 and 3: restarting stopped, notification "Qanuvi's background part crashed 3 times" with the report,
+    tray tooltip "...stopped after crashing", "Start Qanuvi's background part again" enabled only then; choosing it
+    started a core, cleared the count and put the report in the Inbox (problem); tray Quit ended app, watcher and
+    core, wrote "quit", left no state note. Killing the watcher ended its core (job object). Shutdown (watcher
+    killed, state note set before boot): the run said "Stopped when the computer shut down." with stoppedBy; the Run
+    panel offered the setting (Turn it on wrote the test build's own Run entry); with it on, the next shutdown made
+    the master try the kept start 30 s after start and say in the Inbox (and a notification) why it could not go on
+    (a start that is not valid was kept on purpose, so no paid run started). Setting turned off again; drive data
+    removed; all test processes stopped. Fixed after the drive (unit-tested, not in the driven build): exit codes in
+    hex (0xC0000409), and the not-resumed note names the cut-off run's plan with a full stop before "Open the plan".
+    Notes: a test build's toasts show as "Windows PowerShell" (no registered app id; as before). The tray's menu is
+    not seen by UI Automation, so the drive clicked it by position.
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 07:35): M5b BUILT + DRIVEN LIVE (u1 fixed). Next: M5c
+    (This PC's coding tools through the pipes, booked restore and server connections on its master, i1 drafts, j1
+    ended terminal, "earlier output trimmed", "checking…" for a restarting language server). Later: t1 (Qanuvi-styled
+    Quit question), b1/m2a as listed. Not driven: a real plan run resumed after a real Windows restart.
+    Left: a real plan run resumed after a real Windows restart is not driven (the resume path is, with a kept start);
+    freeing a taken port is not automatic (the program holding it may be the owner's): it goes to the owner.
     PICKUP POINT (fresh conversation starts here, 2026-11-18 06:30): M5a DRIVEN LIVE, s1-s5 found and fixed (notes
     below; each fix driven on a release test build; verify: clippy clean, Rust 470 + quoting test, web 479,
     svelte-check 0). Next: M5b (watcher + core split, crash limit, runs resume after a Windows restart, self-cleanup).
