@@ -416,6 +416,17 @@ The rule: the master does everything the app does today, updates included.
     switched on); when on, its hourly look puts the update in by itself. DRIVEN LIVE on Windows the same day (a local
     test master on a localhost test channel; all checks pass, no findings), then its master side on the Linux laptop and
     the VPS (throwaway data; all pass; the VPS service runs the M8c server build). M8c DONE. Next: M8d.
+  - M8d BUILT (2026-11-18), not driven live yet: This PC's master updates the whole install. Its build is the app's
+    signed installer (`windows-x86_64`), kept in the data folder's `updates` folder (signature checked; an installer is
+    never started to ask its version). "Restart to update" waits for running work as on any master, then closes the
+    windows as the tray's Quit does (drafts kept), starts a helper that waits for the app and the master to end, and
+    ends; the helper runs the installer quietly (`/S /UPDATE /R`, plus `/ARGS --background` when no window was open),
+    which starts Qanuvi again. A window that does not close in 20 s stops the update. With "Download updates by
+    themselves" on, This PC only downloads and holds while a window is open, and puts it in at a look with none open.
+    An installer hook stops an installed qanuvi-master.exe that still runs (by its path, Restart Manager), also for an
+    installer started by hand. The app's own updater (tauri-plugin-updater) is gone; the status bar and Settings,
+    Updates show the shown master's update for This PC too. `qanuvi-master update` on This PC goes through its running
+    service.
 
 ### M9. Release
 

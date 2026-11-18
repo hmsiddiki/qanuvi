@@ -5,9 +5,10 @@
  * work on that master and says so; it never cuts a run off. "Download updates by themselves" is that master's own
  * setting (Settings, Updates, while it is shown), off unless switched on.
  *
- * This PC keeps the app's own updater (updates.svelte.ts) until its master updates the whole install (M8d).
+ * M8d: This PC too. Its master updates the whole install: the build is the app's signed installer, and "Restart to
+ * update" closes the windows (unsaved text kept as drafts) once nothing works there; the installer starts Qanuvi again.
  */
-import { callMaster, shownMachine } from "$lib/remote";
+import { callMaster, shownMachine, THIS_PC } from "$lib/remote";
 import { errorText } from "$lib/api";
 import { masters } from "./masters.svelte";
 
@@ -82,6 +83,20 @@ export function viewOf(s: MasterUpdateState | null): {
   return { ...out, state: s.checkedAt ? "none" : "idle" };
 }
 
+/** Nothing being put in. */
+const NO_INSTALL: MasterUpdateState["install"] = {
+  stage: "",
+  version: "",
+  done: 0,
+  total: 0,
+  waitingFor: "",
+  error: "",
+  program: "",
+};
+
+/** The machine on screen as a link: This PC's own master, or a paired one. */
+const here = (): string => shownMachine() ?? THIS_PC;
+
 /** How often the shown master is asked while its update goes on, and otherwise (it looks on its own every hour). */
 const WHILE_UNDER_WAY = 1000;
 const OTHERWISE = 5 * 60 * 1000;
@@ -122,6 +137,10 @@ class MasterUpdateStore {
   get waitingFor(): string {
     return this.raw?.install.waitingFor ?? "";
   }
+  /** This PC is shown: its update is the whole install's. */
+  get thisPc(): boolean {
+    return this.machine === THIS_PC;
+  }
   get percent(): number {
     const i = this.raw?.install;
     return i?.total ? Math.min(100, Math.round((i.done / i.total) * 100)) : 0;
@@ -129,7 +148,7 @@ class MasterUpdateStore {
 
   /** Another machine is shown: its own facts are read (none of the machine before's show meanwhile). */
   switched(): void {
-    const machine = shownMachine();
+    const machine = here();
     if (machine === this.machine) return;
     this.machine = machine;
     this.raw = null;
@@ -141,8 +160,7 @@ class MasterUpdateStore {
   async read(): Promise<void> {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
-    const machine = shownMachine();
-    if (!machine) return;
+    const machine = here();
     let got: MasterUpdateState | null = null;
     try {
       got = await callMaster<MasterUpdateState>(machine, "update_status", {});
@@ -150,13 +168,16 @@ class MasterUpdateStore {
       // Its connection ended while it restarts for the update: the window connects again.
       if (this.#restartFor?.machine === machine) return this.#backAfterRestart(machine);
     }
-    if (machine !== shownMachine()) return;
+    if (machine !== here()) return;
+    // A master from before M8b answers without its install part (and a wrong answer has none either).
+    if (got && typeof got === "object") got = { ...got, install: { ...NO_INSTALL, ...got.install } };
     if (got) {
       this.raw = got;
       if (this.#restartFor?.machine === machine && got.current === this.#restartFor.version) {
         this.#restartFor = null;
         this.note = "";
-      } else if (got.install.stage === "restarting") {
+      } else if (got.install.stage === "restarting" && machine !== THIS_PC) {
+        // (This PC's windows close for its update; the installer opens Qanuvi again.)
         this.#restartFor = { machine, version: got.install.version };
       }
     }
@@ -166,14 +187,13 @@ class MasterUpdateStore {
 
   /** "Check now" in Settings: the master looks on the channel at once. */
   async check(): Promise<void> {
-    const machine = shownMachine();
-    if (!machine) return;
+    const machine = here();
     this.note = "";
     try {
       const got = await callMaster<MasterUpdateState>(machine, "update_check", {});
-      if (machine === shownMachine()) this.raw = got;
+      if (machine === here()) this.raw = got;
     } catch (e) {
-      if (machine === shownMachine()) this.note = errorText(e);
+      if (machine === here()) this.note = errorText(e);
     }
   }
 
@@ -188,15 +208,14 @@ class MasterUpdateStore {
   }
 
   async #install(hold: boolean): Promise<void> {
-    const machine = shownMachine();
-    if (!machine) return;
+    const machine = here();
     this.note = "";
     try {
       const got = await callMaster<MasterUpdateState>(machine, "update_install", { hold });
-      if (!hold) this.#restartFor = { machine, version: got.install.version };
-      if (machine === shownMachine()) this.raw = got;
+      if (!hold && machine !== THIS_PC) this.#restartFor = { machine, version: got.install.version };
+      if (machine === here()) this.raw = got;
     } catch (e) {
-      if (machine === shownMachine()) this.note = errorText(e);
+      if (machine === here()) this.note = errorText(e);
       return;
     }
     void this.read();
@@ -204,8 +223,8 @@ class MasterUpdateStore {
 
   /** The master ended for its update: connect again (the new one may take a while to start), then read it. */
   async #backAfterRestart(machine: string): Promise<void> {
-    const failed = await masters.backAfterRestart(machine, shownMachine() === machine, 10);
-    if (machine !== shownMachine()) return;
+    const failed = await masters.backAfterRestart(machine, here() === machine, 10);
+    if (machine !== here()) return;
     if (failed) {
       this.#restartFor = null;
       this.note = failed;

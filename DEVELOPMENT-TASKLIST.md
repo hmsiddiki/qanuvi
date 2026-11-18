@@ -502,6 +502,21 @@ runs on or off; with it off nothing is sent anywhere.
     look put 0.9.0 in by itself at 2:02 (laptop) / 2:00 (VPS). The window side was driven on Windows only. The VPS's real
     service was untouched during it; afterwards the M8c server build was swapped into ~/.local/bin (idle first; the M8b
     build kept as .prev) and serve restarted with setsid: 2 projects and its Inbox item back.
+    M8d BUILT (2026-11-18; NOT DRIVEN LIVE yet): This PC's master updates the whole install (docs/MIGRATION-VIEWER.md
+    M8). master_update Target::Installer: the channel's windows-x86_64 installer, downloaded to <data>/updates/
+    Qanuvi_<v>_setup.exe (older ones there go), signature checked, held as "ready" like M8c. Restart to update: waits
+    for running work (Inbox note), then install_whole_app: the windows close as for the tray's Quit (20 s, else the
+    update stops with a reason), a hidden PowerShell helper (spawn_alone) waits up to a minute for the installed
+    qanuvi-master.exe and qanuvi.exe to end and starts the installer /S /UPDATE /R (/ARGS --background with no window
+    open), and the master ends with stop note "update". Auto-update on This PC: held while a window is open, put in at a
+    look with none. installer/hooks.nsh (installerHooks): PREINSTALL/PREUNINSTALL stop $INSTDIRqanuvi-master.exe
+    through Restart Manager. The app's updater plugin, its capability, this_pc_master_stop and the close-time install
+    are gone; updates.svelte.ts keeps reload/restart/close notice only; masterUpdate covers This PC (THIS_PC link;
+    an answer without its install part reads as nothing under way). Terminal: `qanuvi-master update` on This PC goes
+    through its service ("Start Qanuvi" when none runs). Rust 521 (+3), vitest 502 (+1), svelte-check, clippy and fmt
+    clean. Next: drive live on Windows (a real NSIS build of this code as
+    0.1.23 and 0.9.0, signed with the throwaway key, on a localhost test channel; an installed copy, not the real one,
+    so it needs a scratch install folder) - ask the owner first, since it installs over Qanuvi.
     PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
     master updates the whole install with one installer and one button; the screen's own updater goes).
     PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),

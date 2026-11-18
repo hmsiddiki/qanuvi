@@ -452,16 +452,6 @@ fn backups_default() -> std::path::PathBuf {
     crate::backups::default_dir(crate::data_location::from_source())
 }
 
-/// M4c: stops This PC's master before an update installs (Windows keeps its program file locked while it runs).
-/// M5a: its runs say afterwards that the update stopped them.
-#[tauri::command]
-fn this_pc_master_stop() -> Res<bool> {
-    Ok(crate::master::stop_service_because(
-        &crate::paths::data_dir(),
-        "update",
-    ))
-}
-
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
 #[tauri::command]
 fn app_restart(app: tauri::AppHandle) -> Res<()> {
@@ -680,7 +670,6 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             let dir = data.clone();
@@ -820,7 +809,6 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            this_pc_master_stop,
             notify_settings,
             notify_take_start,
             notify_test,

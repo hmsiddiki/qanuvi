@@ -56,3 +56,23 @@ describe("a master's update on screen (M8c)", () => {
     expect(viewOf({ ...base(), error: "no answer" })).toMatchObject({ state: "error", error: "no answer" });
   });
 });
+
+describe("This PC's update (M8d)", () => {
+  it("is read from This PC's own master, and an answer without its install part still reads", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const { masterUpdate } = await import("./masterUpdate.svelte");
+    const { THIS_PC } = await import("$lib/remote");
+    const asked: unknown[] = [];
+    vi.mocked(invoke).mockImplementation(async (cmd, args) => {
+      asked.push([cmd, (args as { master: string }).master, (args as { cmd: string }).cmd]);
+      // An older master: no install part.
+      return { current: "0.1.25", checking: false, checkedAt: 1, available: null, error: "" };
+    });
+    masterUpdate.switched();
+    await vi.waitFor(() => expect(masterUpdate.raw).not.toBeNull());
+    expect(asked[0]).toEqual(["remote_call", THIS_PC, "update_status"]);
+    expect(masterUpdate.thisPc).toBe(true);
+    expect(masterUpdate.state).toBe("none");
+    expect(masterUpdate.raw?.install.stage).toBe("");
+  });
+});

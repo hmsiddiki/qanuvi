@@ -1,5 +1,6 @@
 <script lang="ts">
   import { updates } from "$lib/stores/updates.svelte";
+  import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
   import { startup } from "$lib/stores/startup.svelte";
   import { claudeUpdate } from "$lib/stores/claudeUpdate.svelte";
   import { usage } from "$lib/stores/usage.svelte";
@@ -119,6 +120,8 @@
     inbox.start().catch(() => {});
     startNotifications().catch(() => {});
     updates.start();
+    // M8d: the status bar's update button is the shown machine's own update, This PC's whole install too.
+    masterUpdate.switched();
     startup.start().catch(() => {});
     claudeUpdate.start();
     usage.start();

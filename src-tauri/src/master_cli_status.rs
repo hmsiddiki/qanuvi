@@ -157,15 +157,18 @@ pub fn update_notice(dir: &Path) {
 }
 
 /// M8b: `qanuvi-master update`. A running master puts the update in itself (this follows it; Ctrl+C leaves, and the
-/// master goes on); with none running, it is put in here. This PC's master is updated with the whole app.
+/// master goes on); with none running, it is put in here. M8d: This PC's master puts the whole app in, through its
+/// running service only (the installer replaces the app and the master, and starts Qanuvi again).
 pub fn update_cli(dir: &Path) -> Result<(), String> {
     use crate::master_update as mu;
-    if super::on_app_data(dir) {
-        return Err(
-            "This PC's master is updated with the whole app (that comes later); use Update in the app for now.".into(),
-        );
-    }
+    let whole = super::on_app_data(dir);
     if !super::is_running(dir) {
+        if whole {
+            return Err(
+                "This PC's Qanuvi is not running. Start Qanuvi, then run this again (its update goes in through it)."
+                    .into(),
+            );
+        }
         return update_here();
     }
     let state = call(dir, "update_check", json!({}))?;
@@ -184,11 +187,12 @@ pub fn update_cli(dir: &Path) -> Result<(), String> {
         };
     }
     let started = call(dir, "update_install", json!({}))?;
-    follow_update(dir, &started["install"])
+    follow_update(dir, &started["install"], whole)
 }
 
-/// Prints the update's stages until the service runs the new version (or says why it failed).
-fn follow_update(dir: &Path, started: &Value) -> Result<(), String> {
+/// Prints the update's stages until the service runs the new version (or says why it failed). `whole`: This PC's
+/// whole install (M8d), which keeps no `.prev`.
+fn follow_update(dir: &Path, started: &Value, whole: bool) -> Result<(), String> {
     use crate::master_update as mu;
     use std::io::{IsTerminal, Write};
     use std::time::{Duration, Instant};
@@ -220,9 +224,13 @@ fn follow_update(dir: &Path, started: &Value) -> Result<(), String> {
             if on_line {
                 println!();
             }
-            println!(
-                "Updated to {version}: the service runs it. The program before is kept as {prev}."
-            );
+            if whole {
+                println!("Updated to {version}: Qanuvi and its background part run it.");
+            } else {
+                println!(
+                    "Updated to {version}: the service runs it. The program before is kept as {prev}."
+                );
+            }
             return Ok(());
         }
         if install["stage"] == "failed" {

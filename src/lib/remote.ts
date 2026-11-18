@@ -94,7 +94,6 @@ const WINDOW_ONLY = new Set([
   "data_location_move",
   "data_location_cancel",
   "data_location_remove_old",
-  "this_pc_master_stop",
   "browser_agent_shot",
   "remote_call",
   "remote_connect",

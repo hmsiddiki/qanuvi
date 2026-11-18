@@ -10,6 +10,11 @@
 //! Part two (M8b): `qanuvi-master update` asks the running master to put the update in ([`Install`]): it downloads the
 //! build beside the program, checks its signature, starts it once to ask its version, waits while work runs (and
 //! says so), swaps it in with the old one kept as `.prev`, and restarts the service from the new one.
+//!
+//! Part four (M8d): This PC's master updates the whole install. Its build is the app's signed installer, kept in the
+//! data folder's `updates` folder ([`Target::Installer`]); after the same wait for running work, the master closes the
+//! app's windows (their unsaved text kept as drafts), ends, and the installer puts the app and the master in and
+//! starts Qanuvi again. The app has no updater of its own any more.
 
 use crate::claude_update::is_newer;
 use base64::Engine;
@@ -256,24 +261,28 @@ impl Updates {
     /// M8c: with `hold` (the window's "Update to x"), it stops once the build is downloaded and checked: stage "ready",
     /// and the window shows "Restart to update". Asked again without `hold` (that button, the terminal's `update` or the
     /// master's own auto-update), a ready build goes on from there: wait for running work, swap, restart.
+    ///
+    /// M8d: This PC's master puts the whole app in instead ([`Target::Installer`]): the build is the app's signed
+    /// installer, kept in its data folder; after the wait, `restart` runs it (it replaces the app and the master).
     pub fn install(
         self: &std::sync::Arc<Self>,
-        exe: PathBuf,
+        target: impl Into<Target>,
         hooks: InstallHooks,
         hold: bool,
     ) -> Result<UpdateState, String> {
+        let target = target.into();
         let job = {
             let mut s = self.0.lock().unwrap();
             if s.install.stage == "ready" {
                 if hold {
                     return Ok(s.clone());
                 }
-                let new = new_path(&exe);
+                let new = target.checked(&s.install.version);
                 if !new.exists() {
                     // The checked build went (removed by hand): download it again.
                     s.install = Install::default();
                     drop(s);
-                    return self.install(exe, hooks, hold);
+                    return self.install(target, hooks, hold);
                 }
                 s.install.stage = "waiting".into();
                 Job::Finish(s.install.version.clone(), new)
@@ -292,7 +301,7 @@ impl Updates {
                 s.install = Install {
                     stage: "downloading".into(),
                     version: found.version.clone(),
-                    program: exe.display().to_string(),
+                    program: target.program().display().to_string(),
                     ..Install::default()
                 };
                 Job::Download(found)
@@ -301,15 +310,15 @@ impl Updates {
         let me = self.clone();
         std::thread::spawn(move || {
             let result = match job {
-                Job::Download(found) => me.fetch_build(&found, &exe).and_then(|new| {
+                Job::Download(found) => me.fetch_build(&found, &target).and_then(|new| {
                     if hold {
                         me.set_install(|i| i.stage = "ready".into());
                         Ok(())
                     } else {
-                        me.finish(&found.version, &exe, &new, hooks)
+                        me.finish(&found.version, &target, &new, hooks)
                     }
                 }),
-                Job::Finish(version, new) => me.finish(&version, &exe, &new, hooks),
+                Job::Finish(version, new) => me.finish(&version, &target, &new, hooks),
             };
             if let Err(e) = result {
                 me.set_install(|i| {
@@ -322,27 +331,29 @@ impl Updates {
         Ok(self.state())
     }
 
-    /// Downloads and checks the build beside the program (`<exe>.new`).
-    fn fetch_build(&self, found: &Found, exe: &Path) -> Result<PathBuf, String> {
-        prepare(
-            found,
-            exe,
-            &trusted_key(),
-            |done, total| {
-                self.set_install(|i| {
-                    i.done = done;
-                    i.total = total;
-                })
-            },
-            || self.set_install(|i| i.stage = "checking".into()),
-        )
+    /// Downloads and checks the build: beside the program (`<exe>.new`), or (M8d) the app's installer in its folder.
+    fn fetch_build(&self, found: &Found, target: &Target) -> Result<PathBuf, String> {
+        let progress = |done, total| {
+            self.set_install(|i| {
+                i.done = done;
+                i.total = total;
+            })
+        };
+        let checking = || self.set_install(|i| i.stage = "checking".into());
+        match target {
+            Target::Program(exe) => prepare(found, exe, &trusted_key(), progress, checking),
+            Target::Installer { folder, .. } => {
+                prepare_installer(found, folder, &trusted_key(), progress, checking)
+            }
+        }
     }
 
     /// Waits for running work (never cutting it off), swaps the checked build in and restarts the service from it.
+    /// M8d: an installer is not swapped in; `restart` runs it once nothing works.
     fn finish(
         &self,
         version: &str,
-        exe: &Path,
+        target: &Target,
         new: &Path,
         hooks: InstallHooks,
     ) -> Result<(), String> {
@@ -366,11 +377,49 @@ impl Updates {
             i.stage = "restarting".into();
             i.waiting_for.clear();
         });
-        swap_in(exe, new)?;
-        (hooks.restart)(exe).inspect_err(|_| {
-            // The service could not start again from the new one: the old one goes back, so a later start finds it.
-            let _ = swap_back(exe);
-        })
+        match target {
+            Target::Installer { .. } => (hooks.restart)(new),
+            Target::Program(exe) => {
+                swap_in(exe, new)?;
+                (hooks.restart)(exe).inspect_err(|_| {
+                    // The service could not start again from the new one: the old one goes back, so a later start
+                    // finds it.
+                    let _ = swap_back(exe);
+                })
+            }
+        }
+    }
+}
+
+/// What an update replaces.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Target {
+    /// A master's own program (M8b): the new build is swapped in beside it, the old one kept as `.prev`.
+    Program(PathBuf),
+    /// M8d: This PC's whole install (the app and its master), through the app's signed installer. `folder` keeps the
+    /// downloaded installer; `program` is the master's own program, said in the update's state.
+    Installer { folder: PathBuf, program: PathBuf },
+}
+
+impl From<PathBuf> for Target {
+    fn from(exe: PathBuf) -> Self {
+        Target::Program(exe)
+    }
+}
+
+impl Target {
+    /// Where a checked build of `version` is kept until it goes in.
+    pub fn checked(&self, version: &str) -> PathBuf {
+        match self {
+            Target::Program(exe) => new_path(exe),
+            Target::Installer { folder, .. } => installer_path(folder, version),
+        }
+    }
+
+    fn program(&self) -> &Path {
+        match self {
+            Target::Program(exe) | Target::Installer { program: exe, .. } => exe,
+        }
     }
 }
 
@@ -378,6 +427,45 @@ impl Updates {
 enum Job {
     Download(Found),
     Finish(String, PathBuf),
+}
+
+/// M8d: the app installer of `version` in This PC's update folder.
+pub fn installer_path(folder: &Path, version: &str) -> PathBuf {
+    folder.join(format!("Qanuvi_{version}_setup.exe"))
+}
+
+/// M8d: downloads the app's installer into `folder` (the installers of older versions there go), checks its signature
+/// against `key` and answers its path. An installer cannot be started to ask its version (that would install it), so
+/// the signature and the channel's version are what it is taken on. On any failure nothing is left behind.
+pub fn prepare_installer(
+    found: &Found,
+    folder: &Path,
+    key: &str,
+    progress: impl FnMut(u64, u64),
+    checking: impl FnOnce(),
+) -> Result<PathBuf, String> {
+    let file = installer_path(folder, &found.version);
+    let result = (|| {
+        let bytes = download(&found.url, progress)?;
+        checking();
+        verify(&bytes, &found.signature, key)?;
+        std::fs::create_dir_all(folder)
+            .map_err(|e| format!("The update folder could not be made: {e}"))?;
+        if let Ok(old) = std::fs::read_dir(folder) {
+            for f in old.flatten() {
+                let name = f.file_name().to_string_lossy().to_string();
+                if name.starts_with("Qanuvi_") && name.ends_with("_setup.exe") {
+                    let _ = std::fs::remove_file(f.path());
+                }
+            }
+        }
+        std::fs::write(&file, &bytes).map_err(|e| format!("The update could not be saved: {e}"))?;
+        Ok(file.clone())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&file);
+    }
+    result
 }
 
 /// The new build's place while it is checked (beside the program, so the swap is one rename on the same disk).
@@ -1011,6 +1099,76 @@ mod tests {
         assert!(*restarted.lock().unwrap());
         assert_eq!(std::fs::read_to_string(&exe).unwrap(), "checked 0.9.0");
         assert_eq!(std::fs::read_to_string(prev_path(&exe)).unwrap(), "running");
+    }
+
+    #[test]
+    fn this_pcs_installer_is_kept_in_its_folder_when_signed_and_older_ones_go() {
+        let d = tempfile::tempdir().unwrap();
+        let folder = d.path().join("updates");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(installer_path(&folder, "0.8.0"), "older").unwrap();
+        std::fs::write(folder.join("notes.txt"), "kept").unwrap();
+        let found = Found {
+            version: "0.9.0".into(),
+            notes: String::new(),
+            url: serve(TEST_FILE),
+            signature: TEST_SIG.into(),
+        };
+        // Signed by another key: refused, nothing saved, the older installer untouched.
+        let e = prepare_installer(&found, &folder, &public_key(), |_, _| {}, || {}).unwrap_err();
+        assert!(e.contains("signature is wrong"), "{e}");
+        assert!(!installer_path(&folder, "0.9.0").exists());
+        assert!(installer_path(&folder, "0.8.0").exists());
+        // Signed by the trusted key: kept under its version; it is never started to ask (that would install it).
+        let file = prepare_installer(&found, &folder, TEST_KEY, |_, _| {}, || {}).unwrap();
+        assert_eq!(file, installer_path(&folder, "0.9.0"));
+        assert_eq!(std::fs::read(&file).unwrap(), TEST_FILE);
+        assert!(!installer_path(&folder, "0.8.0").exists());
+        assert!(folder.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn a_ready_installer_is_run_by_the_restart_and_nothing_is_swapped() {
+        let d = tempfile::tempdir().unwrap();
+        let folder = d.path().join("updates");
+        let program = d.path().join("qanuvi-master.exe");
+        std::fs::write(&program, "running").unwrap();
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(installer_path(&folder, "0.9.0"), "installer 0.9.0").unwrap();
+        let target = Target::Installer {
+            folder: folder.clone(),
+            program: program.clone(),
+        };
+        let u = std::sync::Arc::new(Updates::default());
+        u.0.lock().unwrap().install = Install {
+            stage: "ready".into(),
+            version: "0.9.0".into(),
+            program: program.display().to_string(),
+            ..Install::default()
+        };
+        let ran = std::sync::Arc::new(Mutex::new(None::<PathBuf>));
+        let r2 = ran.clone();
+        let hooks = InstallHooks {
+            busy: Box::new(|| None),
+            waits: Box::new(|_, _| {}),
+            waited: Box::new(|| {}),
+            restart: Box::new(move |p| {
+                *r2.lock().unwrap() = Some(p.to_path_buf());
+                Ok(())
+            }),
+        };
+        u.install(target, hooks, false).unwrap();
+        let started = Instant::now();
+        while ran.lock().unwrap().is_none() && started.elapsed() < Duration::from_secs(20) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(
+            ran.lock().unwrap().clone(),
+            Some(installer_path(&folder, "0.9.0"))
+        );
+        assert_eq!(std::fs::read_to_string(&program).unwrap(), "running");
+        assert!(!prev_path(&program).exists());
+        assert_eq!(u.state().install.stage, "restarting");
     }
 
     #[test]

@@ -1319,15 +1319,17 @@ impl Master {
                     let Some(m) = me.upgrade() else { return };
                     let state = m.updates.check(m.app_data);
                     // M8c: "Download updates by themselves" on this master: it puts the update in itself, still
-                    // waiting for running work. This PC's is updated with the whole app (M8d).
-                    if !m.app_data
-                        && crate::master_update::auto_wanted(
-                            &crate::settings::get_all(&m.db).unwrap_or_default(),
-                            &state,
-                        )
-                        && let Err(e) = m.update_install(false)
-                    {
-                        eprintln!("The update did not start by itself: {e}");
+                    // waiting for running work. M8d: This PC's whole install closes Qanuvi's windows, so while one is
+                    // open its update is only downloaded and held ("Restart to update"); it goes in at a look with
+                    // no window open.
+                    if crate::master_update::auto_wanted(
+                        &crate::settings::get_all(&m.db).unwrap_or_default(),
+                        &state,
+                    ) {
+                        let hold = m.app_data && m.app_links.reach(&json!({"do": "wait"})) > 0;
+                        if let Err(e) = m.update_install(hold) {
+                            eprintln!("The update did not start by itself: {e}");
+                        }
                     }
                     drop(m);
                     std::thread::sleep(crate::master_update::CHECK_EVERY);
@@ -1512,12 +1514,18 @@ impl Master {
         self.restart_from(dir, None)
     }
 
-    /// M8b: puts the update the last look found in. This PC's master installs the whole app instead (M8d).
+    /// M8b: puts the update the last look found in. M8d: This PC's master installs the whole app instead (the app's
+    /// signed installer, kept in its data folder), and ends for it once nothing works.
     fn update_install(&self, hold: bool) -> Result<crate::master_update::UpdateState, String> {
-        if self.app_data {
-            return Err("This PC's master is updated with the whole app (that comes later); use Update in the app for now.".into());
-        }
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let target = if self.app_data {
+            crate::master_update::Target::Installer {
+                folder: self.dir.join("updates"),
+                program: exe,
+            }
+        } else {
+            crate::master_update::Target::Program(exe)
+        };
         let me = self.me.get().cloned().ok_or("The master is not ready.")?;
         const KEY: &str = "master-update-waits";
         let (busy_me, wait_me, waited_me, dir) =
@@ -1552,12 +1560,40 @@ impl Master {
                     (m.inbox_teller())(&json!({"change": "remove", "item": null}));
                 }
             }),
-            restart: Box::new(move |exe| match me.upgrade() {
-                Some(m) => m.restart_from(&dir, Some(exe)),
+            restart: Box::new(move |path| match me.upgrade() {
+                Some(m) if m.app_data => m.install_whole_app(path),
+                Some(m) => m.restart_from(&dir, Some(path)),
                 None => Err("The master ended before the update went in.".into()),
             }),
         };
-        self.updates.install(exe, hooks, hold)
+        self.updates.install(target, hooks, hold)
+    }
+
+    /// M8d: puts This PC's whole install in from the checked `installer`. The app's windows close first, as for the
+    /// tray's Quit (their unsaved text is kept as drafts); then a helper waits for the app and this master to end and
+    /// runs the installer quietly, which replaces both and starts Qanuvi again (in the background when no window was
+    /// open). A window that does not close stops the update; nothing changes then.
+    fn install_whole_app(&self, installer: &Path) -> Result<(), String> {
+        if !cfg!(windows) {
+            return Err(
+                "This PC's whole install updates through its installer on Windows only so far."
+                    .into(),
+            );
+        }
+        let had_window = self.app_links.reach(&json!({"do": "wait"})) > 0;
+        if had_window && self.app_links.reach(&json!({"do": "quit"})) > 0 {
+            let deadline = Instant::now() + Duration::from_secs(20);
+            while self.app_links.reach(&json!({"do": "wait"})) > 0 {
+                if Instant::now() >= deadline {
+                    return Err("A Qanuvi window did not close, so the update did not go in. Close it, then choose Restart to update again.".into());
+                }
+                std::thread::sleep(Duration::from_millis(300));
+            }
+        }
+        let master = std::env::current_exe().map_err(|e| e.to_string())?;
+        let app = crate::sign_in_start::app_exe()?;
+        run_installer_after(&[&master, &app], installer, !had_window)?;
+        self.end_because("update")
     }
 
     /// A restart, or (M8b, `updated`: the program now in place) the end of an update: the service is started again
@@ -1627,6 +1663,53 @@ fn start_app(item: Option<String>) {
             }
         }
         Err(e) => eprintln!("{e}"),
+    }
+}
+
+/// M8d: the PowerShell line that waits (a minute at most) for every process running one of `programs` to end, then
+/// starts `installer` quietly as an update that starts Qanuvi again (`background`: without a window).
+pub fn installer_script(programs: &[&Path], installer: &Path, background: bool) -> String {
+    let q = |p: &Path| format!("'{}'", p.display().to_string().replace('\'', "''"));
+    let list: Vec<String> = programs.iter().map(|p| q(p)).collect();
+    let mut args = vec!["'/S'", "'/UPDATE'", "'/R'"];
+    if background {
+        args.extend(["'/ARGS'", "'--background'"]);
+    }
+    format!(
+        "$p = @({}); Get-Process | Where-Object {{ $p -contains $_.Path }} | Wait-Process -Timeout 60 -ErrorAction SilentlyContinue; Start-Process -FilePath {} -ArgumentList @({})",
+        list.join(", "),
+        q(installer),
+        args.join(", ")
+    )
+}
+
+/// M8d: starts the helper that runs the installer once `programs` have ended (it outlives this master).
+fn run_installer_after(
+    programs: &[&Path],
+    installer: &Path,
+    background: bool,
+) -> Result<(), String> {
+    let script = installer_script(programs, installer, background);
+    #[cfg(windows)]
+    {
+        let args: Vec<std::ffi::OsString> = [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &script,
+        ]
+        .iter()
+        .map(|a| a.into())
+        .collect();
+        spawn_alone(&args).map_err(|e| e.replace("The master service", "The update's installer"))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = script;
+        Err("This PC's whole install updates through its installer on Windows only so far.".into())
     }
 }
 
@@ -2250,6 +2333,33 @@ mod tests {
         assert_eq!(
             call(&m, "drafts_list", json!({"projectId": id})).unwrap(),
             json!([])
+        );
+    }
+
+    // M8d: the helper waits for the app and This PC's master to end, then runs the installer quietly as an update.
+    #[test]
+    fn the_installer_helper_waits_for_both_programs_then_runs_the_update_quietly() {
+        let master = Path::new(r"C:\Users\O'Neil\AppData\Local\Qanuvi\qanuvi-master.exe");
+        let app = Path::new(r"C:\Users\O'Neil\AppData\Local\Qanuvi\qanuvi.exe");
+        let setup = Path::new(r"C:\Data\updates\Qanuvi_0.9.0_setup.exe");
+        let s = installer_script(&[master, app], setup, false);
+        assert!(
+            s.starts_with(
+                r"$p = @('C:\Users\O''Neil\AppData\Local\Qanuvi\qanuvi-master.exe', 'C:\Users\O''Neil\AppData\Local\Qanuvi\qanuvi.exe');"
+            ),
+            "{s}"
+        );
+        assert!(s.contains("Wait-Process -Timeout 60"), "{s}");
+        assert!(
+            s.ends_with(
+                r"Start-Process -FilePath 'C:\Data\updates\Qanuvi_0.9.0_setup.exe' -ArgumentList @('/S', '/UPDATE', '/R')"
+            ),
+            "{s}"
+        );
+        // No window was open: Qanuvi comes back in the background.
+        assert!(
+            installer_script(&[master], setup, true)
+                .ends_with("@('/S', '/UPDATE', '/R', '/ARGS', '--background')")
         );
     }
 
@@ -3928,7 +4038,6 @@ mod tests {
         "inspector_close",
         "browser_agent_shot",
         // The app's own lifecycle (M4c): it stops This PC's master before an update installs.
-        "this_pc_master_stop",
     ];
 
     /// The command names of the app's `generate_handler!` list.

@@ -1,8 +1,9 @@
 <script lang="ts">
   /**
-   * Settings → Updates (1b): the version, the update channel, a manual check, reload and restart. M8c: with a master
-   * shown, its own update: the master looks, downloads and restarts itself; this page asks it and shows where it is,
-   * and "Download updates by themselves" is that master's own setting.
+   * Settings → Updates (1b): the version, the update channel, a manual check, reload and restart. M8c: the shown
+   * master's own update: the master looks, downloads and restarts itself; this page asks it and shows where it is, and
+   * "Download updates by themselves" is that master's own setting. M8d: This PC's too, which is the whole install (the
+   * app has no updater of its own any more).
    */
   import { updates } from "$lib/stores/updates.svelte";
   import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
@@ -11,73 +12,60 @@
   import { ago } from "$lib/stores/git.svelte";
   import { settings } from "$lib/stores/settings.svelte";
 
-  const onMaster = $derived(!!switcher.shown);
-  const up = $derived(onMaster ? masterUpdate : updates);
+  const up = masterUpdate;
+  const pc = $derived(!switcher.shown);
   const where = $derived(switcher.shown ? shownPlace() : "this computer");
 
   const status = $derived.by(() => {
-    if (onMaster) {
-      const m = masterUpdate;
-      switch (m.state) {
-        case "checking":
-          return "Looking for a newer version…";
-        case "none":
-          return m.noBuild || "Qanuvi is up to date there.";
-        case "available":
-          return `Qanuvi ${m.version} is available.${m.error ? ` ${m.error}` : ""}`;
-        case "downloading":
-          return `Downloading ${m.version}… ${m.percent}%`;
-        case "verifying":
-          return `Checking ${m.version}: its signature, and that it starts there.`;
-        case "ready":
-          return `${m.version} is ready. Restart to use it; the restart waits for work running there.`;
-        case "waiting":
-          return `Update to ${m.version} waits: ${m.waitingFor} working. It goes in as soon as that ends; nothing is cut off.`;
-        case "restarting":
-          return `Restarting with ${m.version}…`;
-        case "error":
-          return `The update check failed: ${m.error}`;
-        default:
-          return "It looks for a newer version two minutes after its start, then every hour.";
-      }
-    }
-    switch (updates.state) {
+    switch (up.state) {
       case "checking":
         return "Looking for a newer version…";
       case "none":
-        return "Qanuvi is up to date.";
+        return up.noBuild || (pc ? "Qanuvi is up to date." : "Qanuvi is up to date there.");
       case "available":
-        return `Qanuvi ${updates.version} is available.`;
+        return `Qanuvi ${up.version} is available.${up.error ? ` ${up.error}` : ""}`;
       case "downloading":
-        return `Downloading ${updates.version}… ${updates.percent}%`;
+        return `Downloading ${up.version}… ${up.percent}%`;
+      case "verifying":
+        return pc
+          ? `Checking ${up.version}: its signature.`
+          : `Checking ${up.version}: its signature, and that it starts there.`;
       case "ready":
-        return `${updates.version} is ready. Restart to use it, or it installs when you close Qanuvi.`;
+        return pc
+          ? `${up.version} is ready. Restart to update: once no agent or plan run works here, Qanuvi closes (unsaved text is kept), installs it and opens again.`
+          : `${up.version} is ready. Restart to use it; the restart waits for work running there.`;
+      case "waiting":
+        return `Update to ${up.version} waits: ${up.waitingFor} working. It goes in as soon as that ends; nothing is cut off.`;
+      case "restarting":
+        return pc ? `Closing to install ${up.version}…` : `Restarting with ${up.version}…`;
       case "error":
-        return `The update check failed: ${updates.error}`;
+        return `The update check failed: ${up.error}`;
       default:
-        return "Qanuvi looks for a newer version at start, every hour and when you come back to it.";
+        return pc
+          ? "Qanuvi looks for a newer version two minutes after it starts, then every hour."
+          : "It looks for a newer version two minutes after its start, then every hour.";
     }
   });
 
   const working = $derived(["checking", "downloading", "verifying", "waiting", "restarting"].includes(up.state));
-  const failed = $derived(up.state === "error" || (onMaster && !!masterUpdate.error && up.state === "available"));
+  const failed = $derived(up.state === "error" || (!!up.error && up.state === "available"));
 </script>
 
 <h2>Updates</h2>
 <p class="intro">
   New versions come from the <strong>dev</strong> channel, signed by the Qanuvi team; a version with a wrong signature
   is refused.
-  {#if onMaster}
+  {#if pc}
+    A newer version shows as a button in the status bar: click it to download, then restart to install. The restart
+    waits for agents and plan runs working on this computer; nothing is cut off.
+  {:else}
     These are {where}'s own updates: it looks for them itself, and does the download and the restart. A newer version
     shows as a button in the status bar while it is shown: click it to download, then restart to install.
-  {:else}
-    A newer version shows as a button in the status bar: click it to download, then restart (or close Qanuvi) to
-    install.
   {/if}
 </p>
 
 <div class="card">
-  <div class="row"><span class="muted">This version</span><strong>{up.current || "…"}</strong></div>
+  <div class="row"><span class="muted">This version</span><strong>{up.current || updates.current || "…"}</strong></div>
   <div class="row"><span class="muted">Channel</span><span>dev</span></div>
   {#if up.checkedAt}
     <div class="row">
@@ -100,8 +88,8 @@
       <button type="button" class="btn" disabled={working} onclick={() => up.check()}>Check now</button>
     {/if}
   </div>
-  {#if onMaster && masterUpdate.note && !["available", "error"].includes(up.state)}
-    <p class="status error">{masterUpdate.note}</p>
+  {#if up.note && !["available", "error"].includes(up.state)}
+    <p class="status error">{up.note}</p>
   {/if}
 </div>
 
@@ -113,13 +101,16 @@
   />
   <span>
     <strong>Download updates by themselves</strong>
-    {#if onMaster}
+    {#if pc}
+      <span class="muted"
+        >On: a new version downloads by itself and waits for Restart to update; with no Qanuvi window open, it goes in
+        by itself once no agent or plan run is working. Off: it waits for your click in the status bar.</span
+      >
+    {:else}
       <span class="muted"
         >On: {where} puts a new version in by itself, once no agent or plan run is working there. Off: it only tells, here
         and in its terminal.</span
       >
-    {:else}
-      <span class="muted">Off: a new version waits for your click in the status bar before it downloads.</span>
     {/if}
   </span>
 </label>

@@ -1,50 +1,34 @@
 /**
- * Updates (1b): Qanuvi looks for a newer version at its update address (signed; a wrong signature is refused). A
- * slim "Update to x" button shows in the status bar; clicking it downloads (the button shows the progress), then it
- * becomes "Restart to update". Not restarted, the update installs quietly when Qanuvi closes, so the next start is the
- * new version. With "Download updates by themselves" on, the download starts without the click. Also: reload the
- * window, restart Qanuvi.
+ * The window's own part of Settings, Updates (1b): reload the window, restart Qanuvi, and what the last window says
+ * when it closes while work goes on.
+ *
+ * Migration M8d: the app has no updater of its own any more. This PC's master looks for, downloads and puts in a new
+ * version of the whole install (masterUpdate.svelte.ts shows it, as for any shown master); for that it closes the
+ * windows itself, as the tray's Quit does.
  */
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { ask } from "$lib/stores/confirm.svelte";
-import { api, errorText } from "$lib/api";
-import { settings } from "./settings.svelte";
+import { api } from "$lib/api";
 import { terminals } from "./terminals.svelte";
 import { itOrThem, keepVerb, thisPcWork, workText } from "./thisPcWork";
 import { windowGoing } from "./closing";
 
-/** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
-const EVERY = 60 * 60 * 1000;
-const ON_RETURN = 15 * 60 * 1000;
-
 class UpdatesStore {
-  state = $state<"idle" | "checking" | "none" | "available" | "downloading" | "ready" | "error">("idle");
+  /** The app's own version (the screen's). */
   current = $state("");
-  version = $state("");
-  notes = $state("");
-  got = $state(0);
-  total = $state(0);
-  error = $state("");
-  checkedAt = $state<number | null>(null);
-  #update: Update | null = null;
-  #timer: ReturnType<typeof setInterval> | null = null;
+  #started = false;
 
-  get percent(): number {
-    return this.total ? Math.min(100, Math.round((this.got / this.total) * 100)) : 0;
-  }
-
-  /** Starts the regular checks (once per window); development builds only check when asked. */
+  /** Once per window: its version, and what its closing says. */
   start(): void {
     getVersion()
       .then((v) => (this.current = v))
       .catch(() => {});
-    if (this.#timer) return;
-    // M5a: the window is a viewer. Its closing never stops This PC's work; the last window says what goes on, and a
-    // downloaded update installs on close only when nothing works (installing stops This PC's master).
+    if (this.#started) return;
+    this.#started = true;
+    // M5a: the window is a viewer. Its closing never stops This PC's work; the last window says what goes on.
     getCurrentWindow()
       .onCloseRequested(async () => {
         // i1: unsaved text is kept as drafts on its machine before anything else.
@@ -52,10 +36,7 @@ class UpdatesStore {
         const last = (await getAllWebviewWindows().catch(() => [])).length <= 1;
         const work = await thisPcWork().catch(() => null);
         const what = work ? workText(work) : null;
-        if (this.state === "ready" && this.#update && !what) {
-          await stopThisPcsMaster();
-          await this.#update.install().catch(() => {});
-        } else if (last && work && what && !(await invoke<boolean>("app_quitting").catch(() => false))) {
+        if (last && work && what && !(await invoke<boolean>("app_quitting").catch(() => false))) {
           await invoke("notify_notice", {
             title: "Qanuvi keeps working",
             text: `${what} ${keepVerb(work)} going on this computer. Quit Qanuvi from the tray icon to stop ${itOrThem(work)}.`,
@@ -63,77 +44,13 @@ class UpdatesStore {
         }
       })
       .catch(() => {});
-    if (import.meta.env.DEV) return;
-    setTimeout(() => this.check().catch(() => {}), 15_000);
-    this.#timer = setInterval(() => this.check().catch(() => {}), EVERY);
-    // Back at the window after a while: a quick look, so a new release shows within minutes.
-    window.addEventListener("focus", () => {
-      if (!this.checkedAt || Date.now() - this.checkedAt > ON_RETURN) this.check().catch(() => {});
-    });
-  }
-
-  /** Looks for a newer version; one that is found waits for a click (or downloads at once, when set so). */
-  async check(): Promise<void> {
-    if (["checking", "downloading", "ready"].includes(this.state)) return;
-    this.state = "checking";
-    this.error = "";
-    try {
-      const update = await check();
-      this.checkedAt = Date.now();
-      if (!update) {
-        this.state = "none";
-        return;
-      }
-      this.#update = update;
-      this.version = update.version;
-      this.notes = update.body ?? "";
-      this.state = "available";
-      if (settings.value.updates.autoDownload) await this.download();
-    } catch (e) {
-      this.state = "error";
-      this.error = errorText(e);
-    }
-  }
-
-  /** Downloads the version that was found; the status bar button shows the progress, then "Restart to update". */
-  async download(): Promise<void> {
-    const update = this.#update;
-    if (!update || this.state !== "available") return;
-    this.got = 0;
-    this.total = 0;
-    this.state = "downloading";
-    try {
-      await update.download((e) => {
-        if (e.event === "Started") this.total = e.data.contentLength ?? 0;
-        else if (e.event === "Progress") this.got += e.data.chunkLength;
-      });
-      this.state = "ready";
-    } catch (e) {
-      this.state = "error";
-      this.error = errorText(e);
-    }
-  }
-
-  /** Installs the downloaded version quietly and opens Qanuvi again. */
-  async restartToUpdate(): Promise<void> {
-    if (!this.#update || this.state !== "ready") return;
-    if (!(await this.#okToStop(true))) return;
-    try {
-      await windowGoing();
-      await stopThisPcsMaster();
-      await this.#update.install();
-      await restartQanuvi();
-    } catch (e) {
-      this.state = "error";
-      this.error = errorText(e);
-    }
   }
 
   /** A full restart of Qanuvi. */
   async restart(): Promise<void> {
     if (!(await this.#okToStop())) return;
     await windowGoing();
-    await restartQanuvi();
+    await invoke("app_restart");
   }
 
   /**
@@ -151,35 +68,18 @@ class UpdatesStore {
   }
 
   /** M5a: says first what This PC's master stops (agent sessions and plan runs); nothing stops without a yes. */
-  async #okToStop(update = false): Promise<boolean> {
+  async #okToStop(): Promise<boolean> {
     const work = await thisPcWork().catch(() => null);
     const what = work ? workText(work) : null;
     if (!what || !work) return true;
     const they = itOrThem(work) === "it" ? "It" : "They";
-    return ask(
-      `${update ? "Installing the update" : "Restarting Qanuvi"} stops ${what} on this computer. ${they} can be resumed afterwards.`,
-      {
-        title: update ? "Install the update" : "Restart Qanuvi",
-        kind: "warning",
-        okLabel: update ? "Install" : "Restart",
-        cancelLabel: "Wait",
-      },
-    );
+    return ask(`Restarting Qanuvi stops ${what} on this computer. ${they} can be resumed afterwards.`, {
+      title: "Restart Qanuvi",
+      kind: "warning",
+      okLabel: "Restart",
+      cancelLabel: "Wait",
+    });
   }
 }
 
 export const updates = new UpdatesStore();
-
-/**
- * Starts Qanuvi again through its own restart: the new instance waits until this one has closed, so the
- * single-instance lock (one installed Qanuvi at a time) is free when it starts. A plain relaunch would start it while
- * this one still runs, and it would hand over to this one and quit.
- */
-/** M4c: This PC's master runs from a file beside Qanuvi's, which Windows keeps locked while it runs; it stops first. */
-function stopThisPcsMaster(): Promise<unknown> {
-  return invoke("this_pc_master_stop").catch(() => {});
-}
-
-function restartQanuvi(): Promise<void> {
-  return invoke("app_restart");
-}

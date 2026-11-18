@@ -41,6 +41,7 @@
         "displayLanguageSelector": false,
         "startMenuFolder": "Qanuvi",
         "uninstallerHeaderImage": "icons/installer-header.bmp",
+        "installerHooks": "installer/hooks.nsh",
         "customLanguageFiles": {
           "English": "installer/English.nsh"
         }

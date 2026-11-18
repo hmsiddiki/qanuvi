@@ -3,9 +3,7 @@
    * The thin bar along the bottom of the window, as in VS Code: the account (with its popup), the current project's
    * git branch, servers, the memory disk, agents at work and this month's agent cost. Each item opens its page.
    */
-  import { updates } from "$lib/stores/updates.svelte";
   import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
-  import { switcher } from "$lib/stores/switcher.svelte";
   import { startup } from "$lib/stores/startup.svelte";
   import { bytes, usage } from "$lib/stores/usage.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
@@ -256,27 +254,32 @@
     </button>
   {/each}
 
-  <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. M8c: with a master shown, its
-       own update (the master does the work; the window asks it and shows its progress). -->
-  {#if switcher.shown}
+  <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. M8c: the shown master's own
+       update (the master does the work; the window asks it and shows its progress). M8d: This PC's too, which is the
+       whole install: its restart closes Qanuvi's windows, and the installer opens Qanuvi again. -->
+  {#if masterUpdate.machine}
     {@const where = shownPlace()}
+    {@const pc = masterUpdate.thisPc}
     {#if masterUpdate.state === "available"}
       <button
         type="button"
         class="item update-btn"
-        title={`Qanuvi ${masterUpdate.version} is available for ${where}${masterUpdate.notes ? `: ${masterUpdate.notes}` : ""}. Click to download it there.`}
+        title={`Qanuvi ${masterUpdate.version} is available${pc ? "" : ` for ${where}`}${masterUpdate.notes ? `: ${masterUpdate.notes}` : ""}. Click to download it${pc ? "" : " there"}.`}
         onclick={() => masterUpdate.download()}
       >
         <ArrowDownToLine size={12} />
         <span>Update to {masterUpdate.version}</span>
       </button>
     {:else if masterUpdate.state === "downloading"}
-      <span class="item static update" title="Downloading Qanuvi {masterUpdate.version} on {where}">
+      <span class="item static update" title="Downloading Qanuvi {masterUpdate.version}{pc ? '' : ` on ${where}`}">
         <span>Downloading {masterUpdate.version}</span>
         <span class="progress"><span style:width="{masterUpdate.percent}%"></span></span>
       </span>
     {:else if masterUpdate.state === "verifying"}
-      <span class="item static" title="Checking its signature, and that it starts on {where}">
+      <span
+        class="item static"
+        title={pc ? "Checking its signature" : `Checking its signature, and that it starts on ${where}`}
+      >
         <LoaderCircle size={12} class="spin" />
         <span>Checking {masterUpdate.version}</span>
       </span>
@@ -284,7 +287,9 @@
       <button
         type="button"
         class="item update-btn"
-        title="Qanuvi {masterUpdate.version} is downloaded on {where}. Restart to use it; the restart waits for work running there."
+        title={pc
+          ? `Qanuvi ${masterUpdate.version} is downloaded. Restart to update: once no agent or plan run works on this computer, Qanuvi closes (unsaved text is kept), installs it and opens again.`
+          : `Qanuvi ${masterUpdate.version} is downloaded on ${where}. Restart to use it; the restart waits for work running there.`}
         onclick={() => masterUpdate.restartToUpdate()}
       >
         <RotateCw size={12} />
@@ -299,36 +304,16 @@
         <span>Update waits for running work</span>
       </span>
     {:else if masterUpdate.state === "restarting"}
-      <span class="item static" title="{where} restarts with Qanuvi {masterUpdate.version}">
+      <span
+        class="item static"
+        title={pc
+          ? `Qanuvi closes to install ${masterUpdate.version}, then opens again`
+          : `${where} restarts with Qanuvi ${masterUpdate.version}`}
+      >
         <LoaderCircle size={12} class="spin" />
         <span>Restarting to update</span>
       </span>
     {/if}
-  {:else if updates.state === "available"}
-    <button
-      type="button"
-      class="item update-btn"
-      title={`Qanuvi ${updates.version} is available${updates.notes ? `: ${updates.notes}` : ""}. Click to download it.`}
-      onclick={() => updates.download()}
-    >
-      <ArrowDownToLine size={12} />
-      <span>Update to {updates.version}</span>
-    </button>
-  {:else if updates.state === "downloading"}
-    <span class="item static update" title="Downloading Qanuvi {updates.version}">
-      <span>Downloading {updates.version}</span>
-      <span class="progress"><span style:width="{updates.percent}%"></span></span>
-    </span>
-  {:else if updates.state === "ready"}
-    <button
-      type="button"
-      class="item update-btn"
-      title="Qanuvi {updates.version} is downloaded. Restart to use it (it also installs when you close Qanuvi)."
-      onclick={() => updates.restartToUpdate()}
-    >
-      <RotateCw size={12} />
-      <span>Restart to update</span>
-    </button>
   {/if}
 
   {#if settings.value.ai}
