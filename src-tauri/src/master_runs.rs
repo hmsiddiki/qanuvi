@@ -211,6 +211,10 @@ impl Master {
             "plan_run_start" => {
                 projects::get(&self.db, &pid)?;
                 let setup = start_of(args)?.setup();
+                // Said to the caller at once (the window or terminal), not as a run that ends straight away.
+                if let Some(why) = crate::agent::missing(&setup.provider) {
+                    return Err(why);
+                }
                 // M5b: kept so a run cut off by a shutdown can go on by itself after the restart (no keys in it).
                 self.keep_start(&pid, &args["start"]);
                 self.watch(&pid, args, stream);
@@ -222,6 +226,9 @@ impl Master {
             }
             "plan_run_finish" => {
                 let start = start_of(args)?;
+                if let Some(why) = crate::agent::missing(&start.provider) {
+                    return Err(why);
+                }
                 let level: FinishLevel =
                     serde_json::from_value(args["level"].clone()).map_err(|e| e.to_string())?;
                 let run = match sh().run().filter(|r| r.project_id == pid) {

@@ -260,6 +260,18 @@ fn find_claude() -> Option<std::path::PathBuf> {
     crate::terminal::find_on_path("claude")
 }
 
+/// Why a run on `provider` cannot work on this machine: its program is not installed. Qanuvi's own agent is
+/// Qanuvi itself, so it is never missing. Checked before a run starts, so a run never tries the models of an agent
+/// that is not there.
+pub fn missing(provider: &str) -> Option<String> {
+    let paid = provider.is_empty() || provider == "claude-code";
+    (paid && find_claude().is_none()).then(|| {
+        "Claude Code (the `claude` command) is not on this machine, so the run did not start. Install Claude Code, \
+         or choose another agent for the run (for example Qanuvi agent with free models)."
+            .to_string()
+    })
+}
+
 pub fn info() -> AgentInfo {
     match find_claude() {
         None => AgentInfo {

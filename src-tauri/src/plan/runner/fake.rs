@@ -91,6 +91,8 @@ pub struct FakeEnv {
     pub git_blind: Mutex<Vec<String>>,
     /// What the memory slice answers (None: nothing applies).
     pub memory: Mutex<Option<String>>,
+    /// Why the agent cannot work here (None: it is installed).
+    pub missing_agent: Mutex<Option<String>>,
     /// The free models' answers to a decision (by its prompt); none: no free models.
     decide: Mutex<Option<DecideScript>>,
     /// Called each quiet second of a turn (the owner acting while the agent works or waits).
@@ -115,6 +117,7 @@ impl FakeEnv {
             checks: Mutex::new(Arc::new(|_| (true, String::new()))),
             blind_diff: Mutex::new(false),
             git_blind: Mutex::new(Vec::new()),
+            missing_agent: Mutex::new(None),
             memory: Mutex::new(None),
             decide: Mutex::new(None),
             on_tick: Mutex::new(None),
@@ -282,6 +285,10 @@ impl FakeEnv {
 impl RunEnv for FakeEnv {
     fn project_id(&self) -> &str {
         "p1"
+    }
+
+    fn agent_missing(&self, _provider: &str) -> Option<String> {
+        self.missing_agent.lock().unwrap().clone()
     }
 
     fn now_ms(&self) -> i64 {

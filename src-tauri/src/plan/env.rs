@@ -132,6 +132,10 @@ pub fn final_text(result: String, last_assistant: &str) -> String {
 
 pub trait RunEnv: Send + Sync {
     fn project_id(&self) -> &str;
+    /// Why the run's agent cannot work on this machine (its program is not installed), or None.
+    fn agent_missing(&self, _provider: &str) -> Option<String> {
+        None
+    }
     /// Milliseconds since 1970.
     fn now_ms(&self) -> i64;
     fn sleep(&self, d: Duration);
@@ -328,6 +332,10 @@ impl CoreEnv<'_> {
 impl RunEnv for CoreEnv<'_> {
     fn project_id(&self) -> &str {
         &self.project.id
+    }
+
+    fn agent_missing(&self, provider: &str) -> Option<String> {
+        crate::agent::missing(provider)
     }
 
     fn now_ms(&self) -> i64 {

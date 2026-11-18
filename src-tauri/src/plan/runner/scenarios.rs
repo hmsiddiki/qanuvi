@@ -211,6 +211,24 @@ fn runs_a_plain_plan_to_the_end() {
 }
 
 #[test]
+fn y2_an_agent_that_is_not_on_this_machine_stops_the_run_before_any_step_tries_its_models() {
+    let env = world("# Plan\n\n- [ ] **1. First**\n  - do it\n");
+    *env.missing_agent.lock().unwrap() = Some("The agent is not on this machine.".into());
+    let tried = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let t = tried.clone();
+    env.set_agent(move |_| {
+        t.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let got = run_plan(&*env, &stop.0, test_setup(FILE, options()));
+    assert_eq!(got.unwrap_err(), "The agent is not on this machine.");
+    assert_eq!(tried.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(questions(&env), 0);
+    assert!(env.text(FILE).contains("- [ ] **1. First**"));
+}
+
+#[test]
 fn b1_a_run_stopped_by_its_budget_says_so_on_the_record() {
     let env =
         world("# Plan\n\n- [ ] **1. First**\n  - do it\n- [ ] **2. Second**\n  - then this\n");

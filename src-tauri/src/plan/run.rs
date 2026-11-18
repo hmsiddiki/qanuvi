@@ -397,6 +397,10 @@ pub fn run_plan(env: &dyn RunEnv, sh: &Shared, setup: RunSetup) -> Result<PlanRu
 
 impl<'a> Loop<'a> {
     fn start(env: &'a dyn RunEnv, sh: &'a Shared, mut s: RunSetup) -> Result<Loop<'a>, String> {
+        // An agent that is not on this machine: no step tries its models one after another, the run says why.
+        if let Some(why) = env.agent_missing(&s.provider) {
+            return Err(why);
+        }
         if let Some(m) = s.options.message_wait_minutes.filter(|m| *m > 0.0) {
             s.turns.message_wait_ms = (m * 60_000.0) as i64;
         }
