@@ -384,9 +384,34 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:30): M5c PART 1 BUILT, NOT DRIVEN LIVE. Verify:
-    clippy clean, fmt clean, Rust 482, web 487, svelte-check 0. Next: a release test build and a live drive on a
-    scratch project (below), then the two open M5c questions for the owner (below), then t1, b1/m2a as listed.
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below). Next:
+    the owner's word on v1 and v2, then build M5c part 2 (owner decisions below), then t1, b1/m2a as listed.
+    M5c PART 1 DRIVEN LIVE (2026-11-18, release test build of e54df14, scratch project m5c-proj):
+    - Intelephense started as a child of This PC's master core (not the app), "ready", flagged an undefined function.
+    - Core crashed (crash.js): the open terminal said "Qanuvi's background part on this computer stopped, and this
+      shell ended with it."; the watcher started a new core and Intelephense came back under it within about 2 s; a
+      second crash, seen in quick screenshots: "Intelephense: restarting", then "starting", with "Checking…" in the
+      Problems list instead of "No problems found".
+    - Two unsaved files, window closed by its X: This PC's master stayed; on the next start both files came back with
+      their text, tab names in italics, and This PC's Inbox had the drafts note.
+    - Trimmed note: a terminal with about 400 KB of 200-character lines, This PC hidden by the switcher (local test
+      master shown) and shown again: "[Earlier output was trimmed; the most recent part follows.]" at the top.
+    - Node debugger on run.js: paused on its breakpoint with variables and call stack; the adapter (dapDebugServer)
+      ran under This PC's master core; Stop ended it and the program.
+    Found (not fixed, owner's word first):
+    - v1: the TypeScript language server never starts: "Could not find a valid TypeScript installation". Its install
+      took typescript 7.0.2 (the native one, no tsserver), which typescript-language-server 6.1 cannot use; the same
+      when started by hand, so not M5c. Cause: lsp.rs npm lists name "typescript" with no version (typescript and
+      svelte servers). Proposal: pin typescript@5 there and re-install a server folder that holds typescript 7.
+    - v2: with short lines the trimmed note is never seen: the master keeps 256 KB (about 5,450 lines of 47
+      characters) but the window's terminal holds about 5,000 lines, so the note at the start falls out of view.
+      Proposal: keep the master's kept part within the window's line limit too (by lines as well as bytes), or say
+      it again in the window's own first line.
+    - Drive note: terminals end when the window that opened them goes (by design); only the switcher re-attaches.
+    Drive tools (scratchpad of session d500cea7): ui.ps1 `text` sends literal text in 8-character pieces and stops
+    if focus leaves the test window (plain `keys` sends % as Alt: "% {" opened the window menu and the rest typed
+    into another window); restore.ps1 brings back a minimized test window; wheel.ps1 scrolls; burst.ps1 + stack.ps1
+    take quick Problems-panel screenshots; pickdir.ps1 fills a folder picker.
     M5c PART 1 BUILT (2026-11-18):
     - Coding tools through the pipes: This PC's language servers and debuggers start on This PC's master through
       its program pipe, as every machine's (desktop.rs tools_host: no `master` = the "this-computer" link, On::this_pc
