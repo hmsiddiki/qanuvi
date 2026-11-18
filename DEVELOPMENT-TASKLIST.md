@@ -542,6 +542,25 @@ runs on or off; with it off nothing is sent anywhere.
     M9a DONE locally (2026-11-18, 298a21f + docs): cargo fmt clean, cargo test 522 + 1 pass (2 ignored), clippy
     --all-targets -D warnings clean, vitest 502 pass (77 files), svelte-check 0 errors 0 warnings, prettier clean.
     CI: 9604344 green; 298a21f was still running. Next: M9b.
+    M9b NESTED DEPTH 3 DRIVEN LIVE (2026-11-19, release test build of aa6b088): window on This PC -> local test master
+    -> Linux laptop (debug master build of aa6b088 on throwaway data ~/src/m9/data, started over SSH through the
+    wrapper ~/src/m9/qm1) -> VPS basevm378 (its M8c service, unchanged). The laptop reaches the VPS with a test key
+    ~/.ssh/m9_test_key (comment qanuvi-m9-test, also in the VPS's and the laptop's authorized_keys; remove after M9).
+    The direct basevm378 links (This PC's and the test master's) have autoConnect turned OFF for the drive (test data;
+    put back after). Pass: the dropdown shows Laptop under the test master and VPS / Self / Second under the laptop,
+    nothing under Second (depth 3 stops there); picking VPS shows "DESKTOP-R8G3PAK (test) > Laptop > VPS", its project
+    m1b-vps loads, a terminal there opens on root@basevm378 (This PC holds one ssh only, to the laptop; the VPS's two
+    --stdio both come from the laptop). Master calls along the path: depth 2 and 3 answer; Laptop > Second > VPS
+    refused "more than 3 steps away"; a call that already passed the test master refused as a loop; the laptop adding
+    itself (127.0.0.1, same data) is refused at connect ("That is this machine itself"). Middle hop's ssh killed while
+    the VPS is shown: "VPS: connection lost, reconnecting" + "The connection to Laptop ended", back on the VPS within
+    6 s by itself. Middle hop disconnected on purpose: the window shows This PC.
+    Findings (not fixed, owner decides): z1 the VPS terminal tab opened at depth 3 was gone after the middle hop came
+    back, with no "ended" line (j1 says a terminal whose shell ended says so). z2 Disconnect does not stick on a
+    master: the window's Disconnect only calls remote_disconnect, and the master's connect_away_servers connects every
+    autoConnect server again within a minute (seen for the test master's Laptop and basevm378, and This PC's
+    basevm378). Drive note: Input Leap on This PC (laptop as client) eats simulated mouse clicks and keys; drive the
+    window with UI Automation (expand, item select, invoke) instead.
     PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
     master updates the whole install with one installer and one button; the screen's own updater goes).
     PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
