@@ -4,7 +4,9 @@
 
 use crate::notify::Shown;
 
-/// The desktop app's identifier (tauri.conf.json), under which an installed Qanuvi's notifications show.
+/// The desktop app's identifier (tauri.conf.json), under which an installed Qanuvi's notifications show. Only the
+/// Windows banners use it; elsewhere only its test does.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub const APP_ID: &str = "dev.qanuvi.desktop";
 
 #[cfg(windows)]
