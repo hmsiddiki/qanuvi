@@ -53,11 +53,17 @@ struct Outlet {
     recent: String,
     /// The shell ended (with its exit code when known).
     ended: Option<Option<u32>>,
+    /// The oldest output was dropped (more than RECENT_MAX came): a window given it back is told (M5c).
+    trimmed: bool,
 }
+
+/// Said before kept output that lost its beginning (grey, as the window's own notes in a terminal).
+pub const TRIMMED_NOTE: &str =
+    "\x1b[90m[Earlier output was trimmed; the most recent part follows.]\x1b[0m\r\n";
 
 impl Outlet {
     fn data(&mut self, data: String) {
-        keep_recent(&mut self.recent, &data, RECENT_MAX);
+        self.trimmed |= keep_recent(&mut self.recent, &data, RECENT_MAX);
         if let Some(sink) = &self.sink
             && sink.send(TermEvent::Data { data }).is_err()
         {
@@ -75,11 +81,11 @@ impl Outlet {
 }
 
 /// Adds output to what a terminal keeps, dropping the oldest beyond `max` bytes from the start of a line, so
-/// the text given back does not begin halfway through one.
-pub fn keep_recent(recent: &mut String, data: &str, max: usize) {
+/// the text given back does not begin halfway through one. Answers whether anything was dropped.
+pub fn keep_recent(recent: &mut String, data: &str, max: usize) -> bool {
     recent.push_str(data);
     if recent.len() <= max {
-        return;
+        return false;
     }
     let mut cut = recent.len() - max;
     while !recent.is_char_boundary(cut) {
@@ -91,6 +97,7 @@ pub fn keep_recent(recent: &mut String, data: &str, max: usize) {
         .find(|(_, c)| *c == '\n')
         .map(|(i, _)| cut + i + 1);
     recent.drain(..line.unwrap_or(cut));
+    true
 }
 
 struct Term {
@@ -415,8 +422,10 @@ impl Terminals {
             .ok_or("That terminal has closed.")?;
         let mut o = outlet.lock().unwrap_or_else(|e| e.into_inner());
         if !o.recent.is_empty() {
+            // Plain output, so a window of any version shows it.
+            let note = if o.trimmed { TRIMMED_NOTE } else { "" };
             let _ = sink.send(TermEvent::Data {
-                data: o.recent.clone(),
+                data: format!("{note}{}", o.recent),
             });
         }
         if let Some(code) = o.ended {
@@ -565,15 +574,25 @@ mod tests {
     #[test]
     fn keeps_the_most_recent_output_from_a_line_start() {
         let mut recent = String::new();
-        keep_recent(&mut recent, "first line\nsecond line\n", 1024);
+        assert!(!keep_recent(&mut recent, "first line\nsecond line\n", 1024));
         assert_eq!(recent, "first line\nsecond line\n");
         // Over the limit: the oldest goes, and what is kept starts after a line end.
-        keep_recent(&mut recent, "third\n", 16);
+        assert!(keep_recent(&mut recent, "third\n", 16));
         assert_eq!(recent, "third\n");
         // A long run without line ends is cut at a character boundary.
         let mut r = String::new();
-        keep_recent(&mut r, &"é".repeat(20), 9);
+        assert!(keep_recent(&mut r, &"é".repeat(20), 9));
         assert!(r.len() <= 9 && r.chars().all(|c| c == 'é'), "{r:?}");
+    }
+
+    #[test]
+    fn an_outlet_that_dropped_output_says_so_when_given_back() {
+        let mut o = Outlet::default();
+        o.data("short\n".into());
+        assert!(!o.trimmed);
+        o.data("x\n".repeat(RECENT_MAX));
+        assert!(o.trimmed && o.recent.len() <= RECENT_MAX);
+        assert!(TRIMMED_NOTE.contains("Earlier output was trimmed"));
     }
 
     #[test]

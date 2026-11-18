@@ -13,9 +13,8 @@ use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 
@@ -212,11 +211,12 @@ impl Host for Here {
     }
 }
 
-/// A shown master, through its connection.
+/// A shown master, through its connection: This PC's own master too (migration M5c).
 pub struct On {
     link: Arc<dyn Link>,
     data_dir: String,
     sep: String,
+    place: &'static str,
 }
 
 impl On {
@@ -233,13 +233,26 @@ impl On {
             data_dir: info["dataDir"].as_str().unwrap_or("").to_string(),
             sep: info["sep"].as_str().unwrap_or("/").to_string(),
             link,
+            place: "that machine",
         })
+    }
+
+    /// This PC's own master: its sentences say "this computer".
+    pub fn this_pc(link: Arc<dyn Link>) -> Result<Self, String> {
+        Ok(Self {
+            place: "this computer",
+            ..Self::new(link)?
+        })
+    }
+
+    pub fn link(&self) -> Arc<dyn Link> {
+        self.link.clone()
     }
 }
 
 impl Host for On {
     fn place(&self) -> &'static str {
-        "that machine"
+        self.place
     }
     fn data_dir(&self) -> String {
         self.data_dir.clone()
@@ -511,46 +524,26 @@ pub enum LspEvent {
     },
 }
 
-/// How messages reach a running server.
+/// How messages reach a running server: a program pipe on its master (This PC's own too, M5c); each write is
+/// numbered, since the master may get them out of order.
 #[derive(Clone)]
-enum Input {
-    Local(Arc<Mutex<ChildStdin>>),
-    /// A program pipe on a shown master; each write numbered, since the master may get them out of order.
-    Remote {
-        link: Arc<dyn Link>,
-        id: String,
-        seq: Arc<AtomicU64>,
-    },
-}
-
-enum Proc {
-    Local {
-        child: Child,
-        _job: crate::browser::Job,
-    },
-    Remote,
+struct Input {
+    link: Arc<dyn Link>,
+    id: String,
+    seq: Arc<AtomicU64>,
 }
 
 struct Running {
     project: String,
     owner: String,
     input: Input,
-    proc: Proc,
 }
 
 impl Running {
-    fn end(mut self) {
-        match &mut self.proc {
-            Proc::Local { child, .. } => {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-            Proc::Remote => {
-                if let Input::Remote { link, id, .. } = &self.input {
-                    link.tell("pipe_stop", json!({"id": id}));
-                }
-            }
-        }
+    fn end(self) {
+        self.input
+            .link
+            .tell("pipe_stop", json!({"id": self.input.id}));
     }
 }
 
@@ -558,17 +551,6 @@ impl Running {
 #[derive(Default, Clone)]
 pub struct Servers {
     map: Arc<Mutex<HashMap<String, Running>>>,
-}
-
-fn hide(cmd: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // No console window; below-normal priority, so a busy server never slows the editor or a game.
-        cmd.creation_flags(0x0800_0000 | 0x0000_4000);
-    }
-    #[cfg(not(windows))]
-    let _ = cmd;
 }
 
 /// Reads one framed message (headers, an empty line, then `Content-Length` bytes). None at the end of the stream.
@@ -656,87 +638,31 @@ impl Servers {
                 }
             }
             let run = map.lock().unwrap().remove(&key);
-            let mut exit = *code.lock().unwrap();
-            if let Some(mut run) = run {
-                if let Proc::Local { child, .. } = &mut run.proc {
-                    let _ = child.kill();
-                    exit = child.wait().ok().and_then(|s| s.code());
-                }
+            let exit = *code.lock().unwrap();
+            if let Some(run) = run {
                 run.end();
             }
             let _ = sink.send(LspEvent::Exit { code: exit });
         });
     }
 
-    /// Starts a server for a project folder on This PC. Its messages go to `sink` until it ends.
-    pub fn start(
-        &self,
-        project: &str,
-        owner: &str,
-        root: &Path,
-        id: &str,
-        sink: Sink<LspEvent>,
-    ) -> Result<String, String> {
-        let spec = spec(id)?;
-        let (program, args) = command(&Here, spec)
-            .ok_or_else(|| format!("{} is not installed on this computer.", spec.label))?;
-        crate::machine::check(spec.label, spec.need_gb)?;
-        let mut cmd = Command::new(&program);
-        cmd.args(&args)
-            .current_dir(root)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        hide(&mut cmd);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("Could not start {}: {e}", spec.label))?;
-        let job = crate::browser::Job::for_child(&child);
-        let stdin = child.stdin.take().ok_or("The server has no input.")?;
-        let stdout = child.stdout.take().ok_or("The server has no output.")?;
-        let stderr = child.stderr.take();
-        let key = format!("lsp-{}", uuid::Uuid::new_v4());
-
-        if let Some(err) = stderr {
-            let s = sink.clone();
-            std::thread::spawn(move || {
-                for line in BufReader::new(err).lines().map_while(Result::ok) {
-                    if s.send(LspEvent::Log { text: line }).is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-        self.map.lock().unwrap().insert(
-            key.clone(),
-            Running {
-                project: project.into(),
-                owner: owner.into(),
-                input: Input::Local(Arc::new(Mutex::new(stdin))),
-                proc: Proc::Local { child, _job: job },
-            },
-        );
-        self.read(key.clone(), stdout, sink, Arc::default());
-        Ok(key)
-    }
-
-    /// Starts a server for a project on a shown master, through a program pipe there (migration M1). `project` is
-    /// the master's own id for it.
+    /// Starts a server for a project on a master (a shown one or This PC's own, migration M1/M5c), through a program
+    /// pipe there. `project` is the master's own id for it.
     pub fn start_on(
         &self,
-        link: Arc<dyn Link>,
+        host: On,
         project: &str,
         owner: &str,
         id: &str,
         sink: Sink<LspEvent>,
     ) -> Result<String, String> {
         let spec = spec(id)?;
-        let host = On::new(link.clone())?;
+        let link = host.link();
         let (program, args) = command(&host, spec)
-            .ok_or_else(|| format!("{} is not installed on that machine.", spec.label))?;
+            .ok_or_else(|| format!("{} is not installed on {}.", spec.label, host.place()))?;
         if let Some(room) = host.room() {
             crate::machine::fits(spec.label, spec.need_gb, room)
-                .map_err(|e| format!("On that machine: {e}"))?;
+                .map_err(|e| format!("On {}: {e}", host.place()))?;
         }
         let (tx, rx) = mpsc::channel::<Vec<u8>>();
         let tx = Mutex::new(Some(tx));
@@ -777,12 +703,11 @@ impl Servers {
             Running {
                 project: project.into(),
                 owner: owner.into(),
-                input: Input::Remote {
+                input: Input {
                     link,
                     id: pipe,
                     seq: Arc::default(),
                 },
-                proc: Proc::Remote,
             },
         );
         let received = Received {
@@ -796,29 +721,19 @@ impl Servers {
 
     pub fn send(&self, key: &str, text: &str) -> Result<(), String> {
         // The map is not held while writing: a slow server only holds up its own messages.
-        let input = self
+        let Input { link, id, seq } = self
             .map
             .lock()
             .unwrap()
             .get(key)
             .map(|r| r.input.clone())
             .ok_or("That language server is not running.")?;
-        match input {
-            Input::Local(stdin) => {
-                let mut w = stdin.lock().unwrap();
-                w.write_all(&frame(text))
-                    .and_then(|_| w.flush())
-                    .map_err(|e| format!("The language server stopped: {e}"))
-            }
-            Input::Remote { link, id, seq } => {
-                let n = seq.fetch_add(1, Ordering::SeqCst);
-                link.tell(
-                    "pipe_send",
-                    json!({"id": id, "seq": n, "data": B64.encode(frame(text))}),
-                );
-                Ok(())
-            }
-        }
+        let n = seq.fetch_add(1, Ordering::SeqCst);
+        link.tell(
+            "pipe_send",
+            json!({"id": id, "seq": n, "data": B64.encode(frame(text))}),
+        );
+        Ok(())
     }
 
     pub fn stop(&self, key: &str) {
@@ -862,6 +777,19 @@ impl Servers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use std::process::{ChildStdin, Command, Stdio};
+
+    /// A test program with no console window.
+    fn hide(cmd: &mut Command) {
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000);
+        }
+        #[cfg(not(windows))]
+        let _ = cmd;
+    }
 
     #[test]
     fn frames_and_reads_messages() {
@@ -1008,7 +936,13 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let sink = Sink::new(move |e: LspEvent| tx.send(e).is_ok());
         let key = servers
-            .start_on(link.clone(), "p-on-master", "main", "php", sink)
+            .start_on(
+                On::new(link.clone()).unwrap(),
+                "p-on-master",
+                "main",
+                "php",
+                sink,
+            )
             .unwrap();
         for i in 0..20 {
             servers.send(&key, &format!(r#"{{"id":{i}}}"#)).unwrap();
@@ -1051,9 +985,26 @@ mod tests {
             pipes: crate::pipes::Pipes::default(),
         }));
         let err = servers
-            .start_on(small, "p-on-master", "main", "php", Sink::new(|_| true))
+            .start_on(
+                On::new(small.clone()).unwrap(),
+                "p-on-master",
+                "main",
+                "php",
+                Sink::new(|_| true),
+            )
             .unwrap_err();
         assert!(err.starts_with("On that machine:"), "{err}");
+        // This PC's own master (M5c) is "this computer" in the same sentence.
+        let err = servers
+            .start_on(
+                On::this_pc(small).unwrap(),
+                "p-on-master",
+                "main",
+                "php",
+                Sink::new(|_| true),
+            )
+            .unwrap_err();
+        assert!(err.starts_with("On this computer:"), "{err}");
     }
     type Answer = mpsc::Sender<Result<Value, String>>;
 
@@ -1180,7 +1131,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let key = servers
             .start_on(
-                link.clone(),
+                On::new(link.clone()).unwrap(),
                 &pid,
                 "main",
                 "php",

@@ -14,7 +14,13 @@ const api = {
   },
 };
 vi.mock("$lib/api", () => ({ api, errorText: (e: unknown) => String(e) }));
-const started: { projectId: string; root: string; machine: string | null; stop: () => void }[] = [];
+const started: {
+  projectId: string;
+  root: string;
+  machine: string | null;
+  stop: () => void;
+  exit: (why: string) => void;
+}[] = [];
 vi.mock("$lib/lsp/client", () => ({
   LspClient: class {
     ready = Promise.resolve();
@@ -22,13 +28,17 @@ vi.mock("$lib/lsp/client", () => ({
     stop = vi.fn();
     on = vi.fn();
     applyEdit = async () => false;
+    open = vi.fn();
+    close = vi.fn();
+    exit: (why: string) => void;
     constructor(
       readonly projectId: string,
       readonly server: string,
       readonly root: string,
-      _onExit: unknown,
+      onExit: (why: string) => void,
       readonly machine: string | null = null,
     ) {
+      this.exit = onExit;
       started.push(this);
     }
   },
@@ -48,7 +58,7 @@ vi.mock("./settings.svelte", () => ({ settings }));
 const switcher = { shown: null as string | null };
 vi.mock("./switcher.svelte", () => ({ switcher }));
 
-const { lsp } = await import("./lsp.svelte");
+const { lsp, RESTARTS, RESTART_SPAN_MS, RESTART_WAIT_MS } = await import("./lsp.svelte");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -127,5 +137,52 @@ describe("language servers per machine", () => {
     lsp.setToolsOff(false);
     lsp.setEnabled("php", true);
     expect(lsp.switchedOn).toBe(at + 2);
+  });
+});
+
+describe("a server that ended by itself (M5c)", () => {
+  it("starts again for its open files, says so meanwhile, and stops trying after a few ends", async () => {
+    vi.useFakeTimers();
+    try {
+      switcher.shown = "vps";
+      const doc = { key: "t9", projectId: "there", path: "cart.php" };
+      await lsp.attach(doc, () => "<?php");
+      lsp.sync(["t9"]);
+      expect(lsp.state["there::php"]).toBe("ready");
+      for (let i = 1; i <= RESTARTS; i++) {
+        started[started.length - 1].exit("it crashed");
+        expect(lsp.running("there")[0].state, "the Problems list says Checking… meanwhile").toBe("restarting");
+        await vi.advanceTimersByTimeAsync(RESTART_WAIT_MS);
+        expect(started.length).toBe(i + 1);
+        expect(lsp.state["there::php"]).toBe("ready");
+      }
+      // One end too many in a short time: it stays stopped, with why.
+      started[started.length - 1].exit("it crashed");
+      expect(lsp.state["there::php"]).toBe("stopped");
+      expect(lsp.lastError).toContain("it crashed");
+      await vi.advanceTimersByTimeAsync(RESTART_WAIT_MS);
+      expect(started.length).toBe(RESTARTS + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not start again when its file closed meanwhile", async () => {
+    vi.useFakeTimers();
+    try {
+      switcher.shown = "vps";
+      // The ends of the test before are long past.
+      vi.setSystemTime(Date.now() + 2 * RESTART_SPAN_MS);
+      const doc = { key: "t10", projectId: "there", path: "b.php" };
+      await lsp.attach(doc, () => "<?php");
+      lsp.sync(["t10"]);
+      started[0].exit("it crashed");
+      lsp.sync([]);
+      await vi.advanceTimersByTimeAsync(RESTART_WAIT_MS);
+      expect(started.length).toBe(1);
+      expect(lsp.running("there")).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

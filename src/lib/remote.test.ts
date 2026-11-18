@@ -11,6 +11,7 @@ const {
   NotOnMachine,
   disown,
   forgetMaster,
+  linkEndedText,
   machineFor,
   nameMachines,
   own,
@@ -161,5 +162,15 @@ describe("This PC is a machine like any other (migration M5a)", () => {
     const e: unknown = await routed("nothing_here").catch((x: unknown) => x);
     expect(e).toBeInstanceOf(NotOnMachine);
     expect((e as Error).message).toBe("This cannot be done on this computer yet (nothing_here).");
+  });
+});
+
+describe("a terminal whose link ended (j1)", () => {
+  it("says the shell ended with it, naming the machine", () => {
+    nameMachines((id) => (id === "vps" ? "VPS" : id));
+    expect(linkEndedText(null)).toBe(
+      "Qanuvi's background part on this computer stopped, and this shell ended with it. Close this tab or open a new terminal.",
+    );
+    expect(linkEndedText("vps")).toMatch(/^The connection to VPS ended, and this shell ended with it./);
   });
 });

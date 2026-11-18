@@ -39,6 +39,8 @@ export interface EditorTab {
   cursor?: { line: number; column: number };
   /** A save that failed for another reason (for example invalid JSON in a config file); editing continues. */
   saveError: string;
+  /** Its unsaved text is a kept draft given back (i1): "Draft, not saved to disk" until saved or undone. */
+  draft?: boolean;
   /** Set for an agent's own configuration file instead of a project file. */
   config?: { provider: string; id: string; projectId: string | null };
   /** Tab text when the file name alone would be unclear. */
@@ -271,6 +273,7 @@ class EditorStore {
       tab.savedText = text;
       if (!tab.config) lsp.saved(tab, text);
       tab.dirty = false;
+      tab.draft = false;
       tab.conflict = false;
       tab.saveError = "";
       return true;
@@ -291,6 +294,7 @@ class EditorStore {
       tab.hash = file.hash;
       tab.savedText = file.text;
       tab.dirty = false;
+      tab.draft = false;
       tab.conflict = false;
       tab.error = "";
       tab.saveError = "";
@@ -409,6 +413,17 @@ class EditorStore {
    * drafts to keep on the machine; nothing is asked. The editor groups start empty for the next machine.
    */
   park(): Draft[] {
+    const out = this.unsaved();
+    this.tabs = [];
+    this.states.clear();
+    this.#lastActive.clear();
+    this.groups = [{ keys: [], active: null }];
+    this.focused = 0;
+    return out;
+  }
+
+  /** The open files' unsaved text, as drafts to keep on their machine; the tabs stay as they are. */
+  unsaved(): Draft[] {
     const out: Draft[] = [];
     for (const t of this.tabs) {
       if (!t.dirty || t.binary || t.tooLarge || t.error) continue;
@@ -419,11 +434,6 @@ class EditorStore {
         out.push({ projectId: "", path: t.key, text, hash: t.hash, meta });
       } else out.push({ projectId: t.projectId, path: t.path, text, hash: t.hash });
     }
-    this.tabs = [];
-    this.states.clear();
-    this.#lastActive.clear();
-    this.groups = [{ keys: [], active: null }];
-    this.focused = 0;
     return out;
   }
 
@@ -440,6 +450,7 @@ class EditorStore {
     if (view) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
     else this.states.set(key, EditorState.create({ doc: text }));
     tab.dirty = true;
+    tab.draft = true;
     return true;
   }
 

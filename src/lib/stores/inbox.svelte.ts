@@ -227,6 +227,14 @@ class InboxStore {
    * master's own work goes into that master's Inbox, so it is listed (and filtered) under that machine; an older
    * master without the command gets it here instead, so it is never lost.
    */
+  /** As add, answering once the item is in (a window that is going waits for it, i1). */
+  async addNow(item: NewInboxItem, master: string | null = null): Promise<void> {
+    const args = { item: { type: "info", ...item } };
+    const here = () => callThisPc<InboxItem>("inbox_add", args).then(() => {});
+    if (!master) return here();
+    await callMaster<InboxItem>(master, "inbox_add", args).then(() => {}, here);
+  }
+
   add(item: NewInboxItem, master: string | null = null): void {
     const args = { item: { type: "info", ...item } };
     const here = () => void callThisPc<InboxItem>("inbox_add", args).catch(() => {});

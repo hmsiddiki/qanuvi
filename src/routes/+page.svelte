@@ -27,6 +27,8 @@
   import { projects } from "$lib/stores/projects.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
   import { pick, restoreShown } from "$lib/stores/machines";
+  import { beforeWindowGoes } from "$lib/stores/closing";
+  import { keepUnsavedOnClose } from "$lib/stores/keepUnsaved";
   import { working } from "$lib/stores/working.svelte";
   import { memory } from "$lib/stores/memory.svelte";
   import { memoryDisk } from "$lib/stores/memoryDisk.svelte";
@@ -120,6 +122,8 @@
     startup.start().catch(() => {});
     claudeUpdate.start();
     usage.start();
+    // i1: a window that goes keeps its unsaved text as drafts on the shown machine.
+    beforeWindowGoes(keepUnsavedOnClose);
     const flush = () => {
       layout.saveNow();
       workspace.flush();

@@ -147,7 +147,8 @@
         type="button"
         role="tab"
         aria-selected={shown}
-        title={tab.path}
+        title={tab.draft ? `${tab.path} (Draft, not saved to disk)` : tab.path}
+        class:draft={tab.draft}
         onpointerdown={(e) => down(e, tab)}
         onpointermove={move}
         onpointerup={up}
@@ -165,7 +166,7 @@
         class="close"
         class:dirty={tab.dirty}
         aria-label="Close {fileName(tab.path)}"
-        title={tab.dirty ? "Unsaved changes" : "Close"}
+        title={tab.draft ? "Draft, not saved to disk" : tab.dirty ? "Unsaved changes" : "Close"}
         onclick={() => editor.close(tab.key, group)}
       >
         <span class="dot"></span>
@@ -229,6 +230,10 @@
   .tab > button:first-child {
     flex: 1;
     min-width: 0;
+  }
+
+  .draft .name {
+    font-style: italic;
   }
 
   .name {

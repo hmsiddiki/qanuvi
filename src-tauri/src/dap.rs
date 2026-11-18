@@ -20,9 +20,8 @@ use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::process::{Child, Command, Stdio};
+use std::io::{BufReader, Read, Write};
+use std::net::TcpStream;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
@@ -238,16 +237,6 @@ pub fn status(host: &dyn Host, spec: &'static Spec) -> Status {
 
 pub fn statuses(host: &dyn Host) -> Vec<Status> {
     SPECS.iter().map(|s| status(host, s)).collect()
-}
-
-fn hide(cmd: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000 | 0x0000_4000);
-    }
-    #[cfg(not(windows))]
-    let _ = cmd;
 }
 
 /// Picks the asset of a release (GitHub's JSON) whose name starts and ends as the spec says.
@@ -472,17 +461,11 @@ impl Write for PipeWriter {
     }
 }
 
-enum Proc {
-    Local {
-        child: Child,
-        _job: crate::browser::Job,
-    },
-    /// A program pipe on a master; a server adapter's port comes through `forward`.
-    Remote {
-        link: Arc<dyn Link>,
-        pipe: String,
-        _forward: Option<crate::pipes::Forward>,
-    },
+/// A program pipe on a master (This PC's own too, M5c); a server adapter's port comes through `forward`.
+struct Proc {
+    link: Arc<dyn Link>,
+    pipe: String,
+    _forward: Option<crate::pipes::Forward>,
 }
 
 struct Running {
@@ -498,13 +481,8 @@ struct Running {
 
 impl Running {
     fn end(self) {
-        match self.proc {
-            Proc::Local { mut child, .. } => {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-            Proc::Remote { link, pipe, .. } => link.tell("pipe_stop", json!({"id": pipe})),
-        }
+        let Proc { link, pipe, .. } = self.proc;
+        link.tell("pipe_stop", json!({"id": pipe}));
     }
 }
 
@@ -512,11 +490,6 @@ impl Running {
 #[derive(Default, Clone)]
 pub struct Adapters {
     map: Arc<Mutex<HashMap<String, Running>>>,
-}
-
-fn free_port() -> Result<u16, String> {
-    let l = TcpListener::bind("127.0.0.1:0").map_err(|e| format!("No free local port: {e}"))?;
-    l.local_addr().map(|a| a.port()).map_err(|e| e.to_string())
 }
 
 /// Reads a connection's messages into the sink until it closes.
@@ -583,139 +556,25 @@ impl Lines {
 }
 
 impl Adapters {
-    /// Starts an adapter for a project on this computer. Connection 0 is open when this returns; its messages go to
-    /// `sink`.
-    pub fn start(
-        &self,
-        project: &str,
-        owner: &str,
-        root: &std::path::Path,
-        id: &str,
-        sink: Sink<DapEvent>,
-    ) -> Result<String, String> {
-        let spec = spec(id)?;
-        let here = crate::lsp::Here;
-        let entry =
-            own_entry(&here, spec).ok_or_else(|| format!("{} is not installed.", spec.label))?;
-        let node = usable_node(&here, spec)?;
-        crate::machine::check(spec.label, spec.need_gb)?;
-        let port = match spec.transport {
-            Transport::Server => Some(free_port()?),
-            Transport::Stdio => None,
-        };
-        let mut cmd = Command::new(&node);
-        cmd.arg(&entry);
-        if let Some(p) = port {
-            cmd.arg(p.to_string()).arg("127.0.0.1");
-        }
-        cmd.current_dir(root)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        hide(&mut cmd);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("Could not start {}: {e}", spec.label))?;
-        let job = crate::browser::Job::for_child(&child);
-        let key = format!("dap-{}", uuid::Uuid::new_v4());
-        let stdin = child.stdin.take().ok_or("The debugger has no input.")?;
-        let stdout = child.stdout.take().ok_or("The debugger has no output.")?;
-        if let Some(err) = child.stderr.take() {
-            let s = sink.clone();
-            std::thread::spawn(move || {
-                for line in BufReader::new(err).lines().map_while(Result::ok) {
-                    if s.send(DapEvent::Log { text: line }).is_err() {
-                        break;
-                    }
-                }
-            });
-        }
-
-        let mut conns: HashMap<u32, Writer> = HashMap::new();
-        let first: Box<dyn Read + Send> = match port {
-            None => {
-                conns.insert(0, Arc::new(Mutex::new(Box::new(stdin))));
-                Box::new(stdout)
-            }
-            Some(p) => {
-                // A server adapter's own output is only its log.
-                let s = sink.clone();
-                std::thread::spawn(move || {
-                    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                        if s.send(DapEvent::Log { text: line }).is_err() {
-                            break;
-                        }
-                    }
-                });
-                drop(stdin);
-                let stream = match connect(p, Duration::from_secs(15)) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        return Err(e);
-                    }
-                };
-                let w = stream.try_clone().map_err(|e| e.to_string())?;
-                conns.insert(0, Arc::new(Mutex::new(Box::new(w))));
-                Box::new(stream)
-            }
-        };
-        self.map.lock().unwrap().insert(
-            key.clone(),
-            Running {
-                project: project.into(),
-                owner: owner.into(),
-                port,
-                conns,
-                next: 1,
-                sink: sink.clone(),
-                proc: Proc::Local { child, _job: job },
-            },
-        );
-        read_into(self.map.clone(), key.clone(), 0, first, sink.clone());
-
-        // Watch for the adapter's end.
-        let map = self.map.clone();
-        let k = key.clone();
-        std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(Duration::from_millis(300));
-                let mut guard = map.lock().unwrap();
-                let Some(run) = guard.get_mut(&k) else { break };
-                let Proc::Local { child, .. } = &mut run.proc else {
-                    break;
-                };
-                if let Ok(Some(st)) = child.try_wait() {
-                    guard.remove(&k);
-                    drop(guard);
-                    let _ = sink.send(DapEvent::Exit { code: st.code() });
-                    break;
-                }
-            }
-        });
-        Ok(key)
-    }
-
     /// Starts an adapter for a project on a shown master (migration M1d), through a program pipe there. `project` is
     /// the master's own id for it. A server adapter picks a free port on the master and says which; this computer
     /// reaches it through a tunnel.
     pub fn start_on(
         &self,
-        link: Arc<dyn Link>,
+        host: On,
         project: &str,
         owner: &str,
         id: &str,
         sink: Sink<DapEvent>,
     ) -> Result<String, String> {
         let spec = spec(id)?;
-        let host = On::new(link.clone())?;
+        let link = host.link();
         let entry = own_entry(&host, spec)
-            .ok_or_else(|| format!("{} is not installed on that machine.", spec.label))?;
+            .ok_or_else(|| format!("{} is not installed on {}.", spec.label, host.place()))?;
         let node = usable_node(&host, spec)?;
         if let Some(room) = host.room() {
             crate::machine::fits(spec.label, spec.need_gb, room)
-                .map_err(|e| format!("On that machine: {e}"))?;
+                .map_err(|e| format!("On {}: {e}", host.place()))?;
         }
         let key = format!("dap-{}", uuid::Uuid::new_v4());
         let server = spec.transport == Transport::Server;
@@ -850,7 +709,7 @@ impl Adapters {
                 conns,
                 next: 1,
                 sink: sink.clone(),
-                proc: Proc::Remote {
+                proc: Proc {
                     link,
                     pipe,
                     _forward: forward,
@@ -941,6 +800,24 @@ impl Adapters {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
+
+    /// A test program with no console window.
+    fn hide(cmd: &mut Command) {
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000);
+        }
+        #[cfg(not(windows))]
+        let _ = cmd;
+    }
+
+    fn free_port() -> Result<u16, String> {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+        l.local_addr().map(|a| a.port()).map_err(|e| e.to_string())
+    }
+
     use crate::lsp::Here;
 
     #[test]

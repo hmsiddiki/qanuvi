@@ -187,6 +187,31 @@ export async function onThisPcLinkEnd(fn: () => void): Promise<void> {
   }
 }
 
+/**
+ * Calls `fn` once when the link a machine's work goes on ended (null: This PC's own link). What that link started
+ * there ended with it (a master ends a connection's terminals and pipes). Answers the way to stop listening.
+ */
+export async function onLinkEnd(machine: string | null, fn: () => void): Promise<() => void> {
+  const link = machine ?? THIS_PC;
+  try {
+    return await listen<{ id: string }>("remote-closed", (e) => {
+      if (e.payload?.id === link) fn();
+    });
+  } catch {
+    // No app events (tests, a browser preview).
+    return () => {};
+  }
+}
+
+/** The sentence a terminal shows when its link ended (finding j1): the shell ended with it. */
+export function linkEndedText(machine: string | null): string {
+  const what =
+    machine === null
+      ? "Qanuvi's background part on this computer stopped"
+      : `The connection to ${machineName(machine)} ended`;
+  return `${what}, and this shell ended with it. Close this tab or open a new terminal.`;
+}
+
 /** A command the machine does not answer yet (24z3 Part A): said on screen, never done on This PC instead. */
 export class NotOnMachine extends Error {
   constructor(

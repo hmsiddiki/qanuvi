@@ -52,6 +52,10 @@ const clientKey = (projectId: string, server: ServerId) => `${projectId}::${serv
 const machineKey = (machine: string | null) => machine ?? "";
 /** How many of an install's newest output lines are shown while it runs. */
 const INSTALL_LINES = 4;
+/** A server that ended by itself starts again after this wait, at most RESTARTS times in RESTART_SPAN_MS (M5c). */
+export const RESTART_WAIT_MS = 2000;
+export const RESTARTS = 3;
+export const RESTART_SPAN_MS = 5 * 60_000;
 
 class LspStore {
   /** What each machine has installed (migration M1: a shown master's servers run there). */
@@ -67,7 +71,7 @@ class LspStore {
   /** The newest output lines of the install under way (shown under its button while the user waits). */
   installLog = $state<string[]>([]);
   /** Server state per project and language, for the status bar. */
-  state = $state<Record<string, "starting" | "ready" | "stopped" | "failed">>({});
+  state = $state<Record<string, "starting" | "restarting" | "ready" | "stopped" | "failed">>({});
   lastError = $state("");
   /** Bumps when coding tools or one server are switched on again: open editors attach their file once more (m2). */
   switchedOn = $state(0);
@@ -79,7 +83,11 @@ class LspStore {
   #clients = new Map<string, LspClient>();
   #lastUsed = new Map<string, number>();
   /** Which tab key has which document open, to close the ones whose tabs closed. */
-  #docs = new Map<string, { client: string; uri: string }>();
+  #docs = new Map<string, { client: string; uri: string; doc: Doc; text: () => string }>();
+  /** The tab keys open at the last sync (a restarted server opens again only the files still open). */
+  #open = new Set<string>();
+  /** When each client's server ended by itself lately (M5c: at most RESTARTS in RESTART_SPAN, then it stays stopped). */
+  #ends = new Map<string, number[]>();
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
   #notNow = new Set<string>();
   #statusLoad = new Map<string, Promise<void>>();
@@ -185,8 +193,16 @@ class LspStore {
           if (this.#clients.get(key) !== client) return;
           this.#clients.delete(key);
           this.#machineOf.delete(key);
+          const reopen = [...this.#docs.values()].filter((d) => d.client === key);
           this.#forget(key);
           this.#clearProblems(doc.projectId, server);
+          // M5c: it ended by itself (it crashed, or the master's link ended): started again for its open files, so
+          // the list says "Checking…" meanwhile instead of "No problems found".
+          if (reopen.length && this.#mayRestart(key)) {
+            this.state = { ...this.state, [key]: "restarting" };
+            setTimeout(() => void this.#restart(key, reopen), RESTART_WAIT_MS);
+            return;
+          }
           this.state = { ...this.state, [key]: "stopped" };
           if (why) this.lastError = `${st.label} stopped: ${why}`;
         },
@@ -223,7 +239,35 @@ class LspStore {
     const c = await this.clientFor(doc);
     if (!c) return;
     c.client.open(c.uri, doc.path, text());
-    this.#docs.set(doc.key, { client: clientKey(doc.projectId, c.client.server), uri: c.uri });
+    this.#docs.set(doc.key, { client: clientKey(doc.projectId, c.client.server), uri: c.uri, doc, text });
+  }
+
+  /** Whether a server that ended by itself is started again (fewer than RESTARTS ends in RESTART_SPAN). */
+  #mayRestart(key: string): boolean {
+    const now = Date.now();
+    const recent = (this.#ends.get(key) ?? []).filter((t) => now - t < RESTART_SPAN_MS);
+    recent.push(now);
+    this.#ends.set(key, recent);
+    return recent.length <= RESTARTS;
+  }
+
+  async #restart(key: string, docs: { doc: Doc; text: () => string }[]): Promise<void> {
+    // Stopped on purpose meanwhile (its project closed, its machine hidden): it stays so.
+    if (this.state[key] !== "restarting") return;
+    const still = docs.filter((d) => this.#open.has(d.doc.key));
+    if (!still.length) {
+      const s = { ...this.state };
+      delete s[key];
+      this.state = s;
+      return;
+    }
+    for (const d of still) await this.attach(d.doc, d.text);
+    // Nowhere to start it (its machine is not shown any more, it is not installed there now): it is not waited for.
+    if (this.state[key] === "restarting" && !this.#clients.has(key)) {
+      const s = { ...this.state };
+      delete s[key];
+      this.state = s;
+    }
   }
 
   /** The text changed: the server hears of it after a short pause in typing. */
@@ -262,6 +306,7 @@ class LspStore {
   /** Closes the documents of tabs that are gone. */
   sync(openKeys: string[]): void {
     const open = new Set(openKeys);
+    this.#open = open;
     for (const [key, d] of this.#docs) {
       if (open.has(key)) continue;
       this.#docs.delete(key);
@@ -375,7 +420,15 @@ class LspStore {
 
   #stop(key: string) {
     const c = this.#clients.get(key);
-    if (!c) return;
+    if (!c) {
+      // One waiting to start again stays stopped.
+      if (this.state[key] === "restarting") {
+        const s = { ...this.state };
+        delete s[key];
+        this.state = s;
+      }
+      return;
+    }
     this.#clients.delete(key);
     this.#machineOf.delete(key);
     this.#forget(key);
@@ -387,11 +440,17 @@ class LspStore {
   }
 
   stopServer(server: ServerId): void {
-    for (const [key, c] of this.#clients) if (c.server === server) this.#stop(key);
+    for (const key of this.#keys()) if (key.split("::")[1] === server) this.#stop(key);
   }
 
   stopProject(projectId: string): void {
-    for (const [key, c] of this.#clients) if (c.projectId === projectId) this.#stop(key);
+    for (const key of this.#keys()) if (key.startsWith(`${projectId}::`)) this.#stop(key);
+  }
+
+  /** Running clients and the ones waiting to start again. */
+  #keys(): string[] {
+    const waiting = Object.keys(this.state).filter((k) => this.state[k] === "restarting");
+    return [...new Set([...this.#clients.keys(), ...waiting])];
   }
 
   /** A machine stopped being shown, or its tools were switched off: its servers end (they start again on its next file). */

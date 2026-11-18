@@ -341,6 +341,7 @@
             const doc = update.state.doc;
             const same = doc.length === t.savedText.length && doc.toString() === t.savedText;
             if (t.dirty === same) t.dirty = !same;
+            if (same && t.draft) t.draft = false;
             const d = currentDoc();
             const key = shownKey;
             const text = () => (shownKey === key && view ? view.state : editor.states.get(key))?.doc.toString() ?? "";

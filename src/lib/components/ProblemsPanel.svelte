@@ -37,6 +37,8 @@
     return [...map.entries()];
   });
   let running = $derived(lsp.running(projectId));
+  /** A server is starting or starting again (M5c): an empty list means "not known yet", not "no problems". */
+  let checking = $derived(running.some((r) => r.state === "starting" || r.state === "restarting"));
 
   function openProblem(p: Problem) {
     editor.open(p.projectId, p.path, p.range.start.line + 1, p.range.start.character + 1);
@@ -81,7 +83,9 @@
     </div>
     {#if lsp.lastError}<p class="error">{lsp.lastError}</p>{/if}
     {#if groups.length === 0}
-      <p class="muted empty">{all.length ? "Nothing matches the filter." : "No problems found."}</p>
+      <p class="muted empty">
+        {all.length ? "Nothing matches the filter." : checking ? "Checking…" : "No problems found."}
+      </p>
     {:else}
       <ul>
         {#each groups as [path, list] (path)}

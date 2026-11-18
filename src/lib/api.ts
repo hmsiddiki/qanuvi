@@ -452,8 +452,8 @@ export const api = {
     },
   },
   lsp: {
-    // Language servers are the interface's (migration M1): the app runs them on This PC or, with `master`, on that
-    // master through its pipes; these calls never go to a master themselves.
+    // Language servers are the interface's (migration M1): the app runs them through a master's pipes, This PC's own
+    // master with no `master` (M5c); these calls never go to a master themselves.
     statuses: (master: string | null) => invoke<LspStatus[]>("lsp_statuses", { master }),
     /** `onLine` gets the install's output lines while it runs (npm or rustup, on that machine). */
     install: (id: string, master: string | null, onLine: (line: string) => void = () => {}) => {
@@ -472,8 +472,8 @@ export const api = {
     stopWindow: () => invoke<void>("lsp_stop_window"),
   },
   dap: {
-    // Debuggers are the interface's (migration M1d): the app runs them on This PC or, with `master`, on that master
-    // through its pipes; these calls never go to a master themselves.
+    // Debuggers are the interface's (migration M1d): the app runs them through a master's pipes, This PC's own
+    // master with no `master` (M5c); these calls never go to a master themselves.
     statuses: (master: string | null) => invoke<DapStatus[]>("dap_statuses", { master }),
     install: (id: string, master: string | null) => invoke<DapStatus>("dap_install", { id, master }),
     /** PHP on that machine and its Xdebug (with the Xdebug file chosen in its Settings, "" for none). */

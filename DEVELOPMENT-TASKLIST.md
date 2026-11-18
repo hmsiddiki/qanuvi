@@ -384,6 +384,48 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:30): M5c PART 1 BUILT, NOT DRIVEN LIVE. Verify:
+    clippy clean, fmt clean, Rust 482, web 487, svelte-check 0. Next: a release test build and a live drive on a
+    scratch project (below), then the two open M5c questions for the owner (below), then t1, b1/m2a as listed.
+    M5c PART 1 BUILT (2026-11-18):
+    - Coding tools through the pipes: This PC's language servers and debuggers start on This PC's master through
+      its program pipe, as every machine's (desktop.rs tools_host: no `master` = the "this-computer" link, On::this_pc
+      so sentences say "this computer"). The app starts no coding-tool program itself any more: Servers::start,
+      Adapters::start and their Local variants are gone (lsp.rs/dap.rs keep only the pipe path), as is project_root.
+      The inspector and preview stay the window's: This PC's localhost is the window's own, so no tunnel is needed.
+    - j1: a terminal whose link ended (This PC's master restarted, or a server's connection went) says so: "Qanuvi's
+      background part on this computer stopped, and this shell ended with it." / "The connection to X ended, ...".
+      (remote.ts onLinkEnd + linkEndedText; a master ends a connection's terminals and pipes with it.)
+    - "Earlier output trimmed": a terminal that dropped its oldest output (over 256 KB kept) says so in grey before
+      the kept part when a window attaches again (terminal.rs Outlet.trimmed, TRIMMED_NOTE; plain output, so a
+      window of any version shows it).
+    - "Checking…": a language server that ended by itself starts again for its open files after 2 s (at most 3 ends
+      in 5 minutes, then it stays stopped with why); meanwhile its state is "restarting" and the Problems list says
+      "Checking…" instead of "No problems found" (also while a server is starting).
+    - i1: a window that goes (closed by hand or by tray Quit, Restart, Restart to update, Reload) first keeps its
+      unsaved text as drafts on the shown machine (closing.ts windowGoing, run inside the one close handler; 6 s at
+      most) and puts a note in that machine's Inbox ("Unsaved changes to N files kept as drafts on X", files named).
+      They come back in their files when the project opens (the B2 path); such a tab's name is in italics with
+      "Draft, not saved to disk" until saved, reloaded or undone back to the file.
+    Drive next (release test build, scratch project only): a PHP or TS file on This PC gets its language server
+    (Settings, Languages shows This PC's servers through the master); a debugger starts; stop This PC's master
+    (kill its core: the watcher starts a new one) with a terminal and a file open: the terminal says it ended, the
+    Problems list says "Checking…", then the server is back; a terminal with over 256 KB of output, hidden and shown
+    again: the trimmed note; two unsaved files, close the window, start again: the Inbox note, both files back with
+    their text in italics.
+    Left (not built): other windows' unsaved text on Restart (the app ends without their close events); a machine
+    held as lost keeps no drafts on close.
+    OPEN M5c QUESTIONS (for the owner before building):
+    - This PC's server connections on its master: today the window connects This PC's servers itself (masters
+      store), and This PC's master refuses "local"/"self" targets and skips connect_away_servers on the app's data.
+      Proposal: This PC's master connects the servers marked to connect at start (so their Inbox and runs are
+      followed with no window), and the window reaches them through it as nested machines of This PC, one
+      connection each; "local" and "self" stay the window's. This changes the switcher's keys for This PC's
+      servers (a one-time move of open state) and is the larger part of M5c.
+    - The booked restore: the app applies it at every start before This PC's master starts (also the --background
+      start), because the restore includes the window's own WebView storage, which must be put back before a
+      window opens. Proposal: keep it in the app (the master never sees a booked restore on the app's data) and
+      mark this item done as it is.
     M5b BUILT (2026-11-18; verify: clippy clean, fmt clean, Rust 481, web 481, svelte-check 0). Map:
     - Watcher + core (master_watch.rs): `qanuvi-master serve` is the watcher (watcher.lock, one per data folder; the
       tray icon is its own, so it stays while a crashed core starts again). It starts `qanuvi-master core` (the old

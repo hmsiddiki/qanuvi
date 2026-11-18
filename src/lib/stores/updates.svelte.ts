@@ -15,6 +15,7 @@ import { api, errorText } from "$lib/api";
 import { settings } from "./settings.svelte";
 import { terminals } from "./terminals.svelte";
 import { itOrThem, keepVerb, thisPcWork, workText } from "./thisPcWork";
+import { windowGoing } from "./closing";
 
 /** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
 const EVERY = 60 * 60 * 1000;
@@ -46,6 +47,8 @@ class UpdatesStore {
     // downloaded update installs on close only when nothing works (installing stops This PC's master).
     getCurrentWindow()
       .onCloseRequested(async () => {
+        // i1: unsaved text is kept as drafts on its machine before anything else.
+        await windowGoing();
         const last = (await getAllWebviewWindows().catch(() => [])).length <= 1;
         const work = await thisPcWork().catch(() => null);
         const what = work ? workText(work) : null;
@@ -116,6 +119,7 @@ class UpdatesStore {
     if (!this.#update || this.state !== "ready") return;
     if (!(await this.#okToStop(true))) return;
     try {
+      await windowGoing();
       await stopThisPcsMaster();
       await this.#update.install();
       await restartQanuvi();
@@ -128,6 +132,7 @@ class UpdatesStore {
   /** A full restart of Qanuvi. */
   async restart(): Promise<void> {
     if (!(await this.#okToStop())) return;
+    await windowGoing();
     await restartQanuvi();
   }
 
@@ -136,6 +141,8 @@ class UpdatesStore {
    * session is opened); terminals start again in the same folders.
    */
   async reloadWindow(): Promise<void> {
+    // Unsaved text comes back as drafts when its project opens again (i1).
+    await windowGoing();
     // The window's shells stop; the list of terminals is kept, so they open again after the reload.
     await terminals.stopThisPc();
     await api.lsp.stopWindow().catch(() => {});

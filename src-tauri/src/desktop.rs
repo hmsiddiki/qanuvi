@@ -6,7 +6,6 @@
 use crate::{agent, preview, projects};
 
 use serde::Serialize;
-use std::path::PathBuf;
 use tauri::ipc::Channel;
 use tauri::{Manager, State};
 
@@ -45,22 +44,6 @@ use crate::remote::THIS_PC;
 /// One connect at a time to This PC's master, so two windows asking at once never start two links.
 static THIS_PC_CONNECT: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// A This PC project's folder, as This PC's master keeps it (the language servers and debuggers run here, M5c).
-fn project_root(id: &str) -> Res<PathBuf> {
-    let list = crate::master::this_pc_call(
-        &crate::paths::data_dir(),
-        "projects_list",
-        serde_json::json!({}),
-    )?;
-    list.as_array()
-        .into_iter()
-        .flatten()
-        .find(|p| p["id"] == id)
-        .and_then(|p| p["path"].as_str())
-        .map(PathBuf::from)
-        .ok_or_else(|| "That project is not in the list any more.".to_string())
-}
-
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Res<T> + Send + 'static) -> Res<T> {
     tauri::async_runtime::spawn_blocking(f)
         .await
@@ -88,76 +71,68 @@ fn startup_path() -> Option<String> {
     startup_folder(std::env::args(), &cwd)
 }
 
-// Language servers (15i) ------------------------------------------------------------------------------------
+// Language servers (15i) and debug adapters (15i part 3) ------------------------------------------------------
 
-/// The machine a language server call is about: This PC, or a connected master (migration M1).
-fn lsp_host(
-    state: &AppState,
-    master: &Option<String>,
-) -> Res<Option<std::sync::Arc<dyn crate::pipes::Link>>> {
+/// The machine a language server or debugger call is about: a connected master, or This PC's own master (migration
+/// M5c: the window starts no program itself; This PC's go through the same pipes as every machine's).
+fn tools_host(app: &tauri::AppHandle, master: &Option<String>) -> Res<crate::lsp::On> {
     match master.as_deref().filter(|m| !m.is_empty()) {
-        Some(m) => Ok(Some(state.remotes.link(m)?)),
-        None => Ok(None),
+        Some(m) => crate::lsp::On::new(app.state::<AppState>().remotes.link(m)?),
+        None => crate::lsp::On::this_pc(link_for(app, THIS_PC)?),
     }
 }
 
 #[tauri::command]
 async fn lsp_statuses(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     master: Option<String>,
 ) -> Res<Vec<crate::lsp::Status>> {
-    let link = lsp_host(&state, &master)?;
-    blocking(move || match link {
-        Some(l) => Ok(crate::lsp::statuses(&crate::lsp::On::new(l)?)),
-        None => Ok(crate::lsp::statuses(&crate::lsp::Here)),
-    })
-    .await
+    blocking(move || Ok(crate::lsp::statuses(&tools_host(&app, &master)?))).await
 }
 
 /// Installs a server; the window asked the user first.
 #[tauri::command]
 async fn lsp_install(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     id: String,
     master: Option<String>,
     on_line: Channel<String>,
 ) -> Res<crate::lsp::Status> {
     let spec = crate::lsp::spec(&id)?;
-    let link = lsp_host(&state, &master)?;
     // The install's output lines while it runs; nobody listens to them once it has answered.
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let d = done.clone();
     let live = crate::sink::Sink::new(move |l: String| {
         !d.load(std::sync::atomic::Ordering::SeqCst) && on_line.send(l).is_ok()
     });
-    let r = blocking(move || match link {
-        Some(l) => crate::lsp::install(&crate::lsp::On::new(l)?, spec, Some(live)),
-        None => crate::lsp::install(&crate::lsp::Here, spec, Some(live)),
-    })
-    .await;
+    let r =
+        blocking(move || crate::lsp::install(&tools_host(&app, &master)?, spec, Some(live))).await;
     done.store(true, std::sync::atomic::Ordering::SeqCst);
     r
 }
 
+/// `project_id` is the master's own id for the project (This PC's master's for a This PC project).
 #[tauri::command]
 async fn lsp_start(
     window: tauri::Window,
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     project_id: String,
     id: String,
     master: Option<String>,
     on_event: Channel<crate::lsp::LspEvent>,
 ) -> Res<String> {
-    let servers = state.languages.clone();
+    let servers = app.state::<AppState>().languages.clone();
     let owner = window.label().to_string();
-    // On a shown master, `project_id` is that master's own id for the project.
-    if let Some(link) = lsp_host(&state, &master)? {
-        return blocking(move || servers.start_on(link, &project_id, &owner, &id, on_event.into()))
-            .await;
-    }
-    let pid = project_id.clone();
-    let root = blocking(move || project_root(&pid)).await?;
-    blocking(move || servers.start(&project_id, &owner, &root, &id, on_event.into())).await
+    blocking(move || {
+        servers.start_on(
+            tools_host(&app, &master)?,
+            &project_id,
+            &owner,
+            &id,
+            on_event.into(),
+        )
+    })
+    .await
 }
 
 #[tauri::command]
@@ -176,32 +151,26 @@ fn lsp_stop_window(window: tauri::Window, state: State<AppState>) {
     state.languages.stop_owner(window.label());
 }
 
-// Debug adapters (15i part 3) -----------------------------------------------------------------------------
-
 #[tauri::command]
 async fn dap_statuses(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     master: Option<String>,
 ) -> Res<Vec<crate::dap::Status>> {
-    let link = lsp_host(&state, &master)?;
-    blocking(move || match link {
-        Some(l) => Ok(crate::dap::statuses(&crate::lsp::On::new(l)?)),
-        None => Ok(crate::dap::statuses(&crate::lsp::Here)),
-    })
-    .await
+    blocking(move || Ok(crate::dap::statuses(&tools_host(&app, &master)?))).await
 }
 
 /// PHP on that machine and its Xdebug (with the Xdebug file chosen in that machine's Settings).
 #[tauri::command]
 async fn dap_php(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     xdebug_file: String,
     master: Option<String>,
 ) -> Res<crate::dap::PhpInfo> {
-    let link = lsp_host(&state, &master)?;
-    blocking(move || match link {
-        Some(l) => Ok(crate::dap::php_info(&crate::lsp::On::new(l)?, &xdebug_file)),
-        None => Ok(crate::dap::php_info(&crate::lsp::Here, &xdebug_file)),
+    blocking(move || {
+        Ok(crate::dap::php_info(
+            &tools_host(&app, &master)?,
+            &xdebug_file,
+        ))
     })
     .await
 }
@@ -209,40 +178,35 @@ async fn dap_php(
 /// Installs an adapter on that machine; the window asked the user first.
 #[tauri::command]
 async fn dap_install(
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     id: String,
     master: Option<String>,
 ) -> Res<crate::dap::Status> {
     let spec = crate::dap::spec(&id)?;
-    let link = lsp_host(&state, &master)?;
-    blocking(move || match link {
-        Some(l) => crate::dap::install(&crate::lsp::On::new(l)?, spec),
-        None => crate::dap::install(&crate::lsp::Here, spec),
-    })
-    .await
+    blocking(move || crate::dap::install(&tools_host(&app, &master)?, spec)).await
 }
 
 #[tauri::command]
 async fn dap_start(
     window: tauri::Window,
-    state: State<'_, AppState>,
+    app: tauri::AppHandle,
     project_id: String,
     id: String,
     master: Option<String>,
     on_event: Channel<crate::dap::DapEvent>,
 ) -> Res<String> {
-    let adapters = state.debuggers.clone();
+    let adapters = app.state::<AppState>().debuggers.clone();
     let owner = window.label().to_string();
-    // On a shown master, `project_id` is the master's own id for the project.
-    if let Some(link) = lsp_host(&state, &master)? {
-        return blocking(move || {
-            adapters.start_on(link, &project_id, &owner, &id, on_event.into())
-        })
-        .await;
-    }
-    let pid = project_id.clone();
-    let root = blocking(move || project_root(&pid)).await?;
-    blocking(move || adapters.start(&project_id, &owner, &root, &id, on_event.into())).await
+    blocking(move || {
+        adapters.start_on(
+            tools_host(&app, &master)?,
+            &project_id,
+            &owner,
+            &id,
+            on_event.into(),
+        )
+    })
+    .await
 }
 
 #[tauri::command]

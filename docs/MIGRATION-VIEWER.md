@@ -331,6 +331,11 @@ Owner decisions (2026-11-18):
   shutdown / crash / ended with Resume and resume on their own after a restart when Qanuvi starts with Windows (else
   the Run panel offers the setting); the setting is "Start Qanuvi when Windows starts"; browser profiles and updater
   folders are cleaned up. Details in DEVELOPMENT-TASKLIST.md.
+- M5c PART 1 BUILT (2026-11-18): This PC's language servers and debuggers run on its master through the program
+  pipe, as every machine's (the app starts none itself); j1, "earlier output trimmed", "Checking…" for a
+  restarting language server, and i1 (drafts kept when a window goes, with an Inbox note). Open for the owner: This
+  PC's server connections on its master, and whether the booked restore stays in the app. Details in
+  DEVELOPMENT-TASKLIST.md.
 
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 

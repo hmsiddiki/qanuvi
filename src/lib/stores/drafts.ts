@@ -30,9 +30,12 @@ export class DraftsStore {
     return run;
   }
 
-  /** Keeps drafts on their machine; held in the window when it cannot be reached (or does not answer). */
-  keep(machine: string | null, drafts: Draft[], reachable: boolean): Promise<void> {
-    if (!drafts.length) return this.#queue.then(() => {});
+  /**
+   * Keeps drafts on their machine; held in the window when it cannot be reached (or does not answer). Answers the
+   * ones held in the window (none: all are on the machine).
+   */
+  keep(machine: string | null, drafts: Draft[], reachable: boolean): Promise<Draft[]> {
+    if (!drafts.length) return this.#queue.then(() => []);
     return this.#next(async () => {
       const failed: Draft[] = [];
       if (reachable)
@@ -45,6 +48,7 @@ export class DraftsStore {
         );
       else failed.push(...drafts);
       if (failed.length) this.#hold(machine, failed);
+      return failed;
     });
   }
 

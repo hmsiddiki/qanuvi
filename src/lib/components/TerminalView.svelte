@@ -7,6 +7,7 @@
   import "@xterm/xterm/css/xterm.css";
   import { api, errorText, type TermEvent } from "$lib/api";
   import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
+  import { linkEndedText, onLinkEnd, shownMachine } from "$lib/remote";
 
   interface Props {
     projectId: string;
@@ -61,6 +62,8 @@
   /** Old output is being played back into a new screen (24z3 Part B2). */
   let replaying = false;
   let played = false;
+  let stopListening: (() => void) | null = null;
+  let gone = false;
 
   function resize() {
     if (!term || !fit || !host || host.offsetWidth === 0 || host.offsetHeight === 0) return;
@@ -148,6 +151,15 @@
         } else term?.write(event.data);
       } else ended(event.code, endText ?? "The shell has ended. Close this tab or open a new terminal.");
     };
+    // j1: the link its shell runs through ended (its master restarted or the connection went): the shell ended with
+    // it, and no end comes on its stream, so the screen says so.
+    const machine = tab ? tab.machine : shownMachine();
+    void onLinkEnd(machine, () => {
+      if (id) ended(null, linkEndedText(machine));
+    }).then((stop) => {
+      if (gone) stop();
+      else stopListening = stop;
+    });
     const again = tab?.termId;
     if (again) {
       // Back from a hidden machine: the same shell, with what it wrote meanwhile.
@@ -192,6 +204,8 @@
 
   onDestroy(() => {
     observer?.disconnect();
+    gone = true;
+    stopListening?.();
     // Only a closed tab (or the window going) stops the shell. A screen that goes while its tab stays (its machine
     // hidden, the terminal panel or work pane closed) leaves it running, its output kept for the next screen.
     if (id && !tab?.parked) {
