@@ -27,6 +27,7 @@ pub mod local_servers;
 pub mod lsp;
 pub mod machine;
 pub mod master;
+pub mod master_update;
 pub mod mcp;
 pub mod memory;
 pub mod memory_disk;

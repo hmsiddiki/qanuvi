@@ -129,12 +129,31 @@ pub fn status_cli(dir: &Path) -> Result<(), String> {
     };
     let busy = call(dir, "master_busy", json!({}))?;
     let inbox = list_of(call(dir, "inbox_list", json!({}))?, None);
-    for line in status_lines(
+    let mut lines = status_lines(
         dir, &hello, &account, projects, &servers, &states, &busy, &inbox,
-    ) {
+    );
+    // M8a: what its own look on the update channel found (an older master has no such answer, and no line).
+    if let Ok(update) = call(dir, "update_status", json!({})) {
+        lines.insert(1, crate::master_update::status_line(&update));
+    }
+    for line in lines {
         println!("{line}");
     }
     Ok(())
+}
+
+/// M8a: the line every terminal command starts with when a newer version is out for this machine. Only a running
+/// master is asked (none is started for it), and a master that cannot answer says nothing.
+pub fn update_notice(dir: &Path) {
+    if !super::is_running(dir) {
+        return;
+    }
+    if let Some(line) = call(dir, "update_status", json!({}))
+        .ok()
+        .and_then(|s| crate::master_update::notice(&s))
+    {
+        eprintln!("{line}");
+    }
 }
 
 /// The project a typed word means: its id, its folder, or its name (letter case aside; a name two projects share

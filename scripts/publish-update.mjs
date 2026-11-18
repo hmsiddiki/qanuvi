@@ -8,6 +8,9 @@
 //    QANUVI_UPDATER_KEY, else %APPDATA%\Qanuvi-publisher\updater.key).
 // 3. Copies the installer and its signature to the channel's folder on the web server (QANUVI_UPDATES_DIR, else the
 //    dev channel folder) and writes latest.json there, which installed copies of Qanuvi read.
+// 4. M8a: master builds, signed with the same key, listed beside the installer as master-<os>-<arch>: the Windows one
+//    the build above made, and the Linux server build (cargo zigbuild; QANUVI_SKIP_LINUX_MASTER=1 leaves it out). A
+//    macOS master build is made on a Mac; until then macOS masters say the version has no build for them yet.
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -68,14 +71,48 @@ const signature = fs.readFileSync(`${built}.sig`, "utf8").trim();
 fs.mkdirSync(outDir, { recursive: true });
 fs.copyFileSync(built, path.join(outDir, name));
 fs.copyFileSync(`${built}.sig`, path.join(outDir, `${name}.sig`));
+const platforms = { "windows-x86_64": { signature, url: `${baseUrl}/${name}` } };
+
+// 4. The master builds (M8a): each copied to the channel with its signature and listed for its kind of machine.
+const masters = [["master-windows-x86_64", path.join(root, "src-tauri/target/release/qanuvi-master.exe"), ".exe"]];
+if (process.env.QANUVI_SKIP_LINUX_MASTER) {
+  console.warn("(No Linux master build this time: QANUVI_SKIP_LINUX_MASTER is set.)");
+} else {
+  const target = "x86_64-unknown-linux-gnu";
+  execSync(`cargo zigbuild --release --no-default-features --bin qanuvi-master --target ${target} -j 2`, {
+    cwd: path.join(root, "src-tauri"),
+    stdio: "inherit",
+  });
+  masters.push(["master-linux-x86_64", path.join(root, `src-tauri/target/${target}/release/qanuvi-master`), ""]);
+}
+for (const [key, file, ext] of masters) {
+  if (!fs.existsSync(file)) {
+    console.error(`The ${key} build is missing: ${file}`);
+    process.exit(1);
+  }
+  const out = `qanuvi-master_${version}_${key.replace(/^master-/, "")}${ext}`;
+  fs.copyFileSync(file, path.join(outDir, out));
+  platforms[key] = { signature: signFile(path.join(outDir, out)), url: `${baseUrl}/${out}` };
+  console.log(`Master build ${key}: ${out}`);
+}
+
 const latest = {
   version,
   notes: notes || `Qanuvi ${version}`,
   pub_date: new Date().toISOString(),
-  platforms: { "windows-x86_64": { signature, url: `${baseUrl}/${name}` } },
+  platforms,
 };
 fs.writeFileSync(path.join(outDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
 console.log(`Published ${name} and latest.json to ${outDir} (${baseUrl}/latest.json)`);
+
+/** Signs a file with the update key (Tauri's signer writes <file>.sig beside it) and answers the signature. */
+function signFile(file) {
+  execSync(`npx tauri signer sign -f "${keyFile}" -p "${process.env.QANUVI_UPDATER_KEY_PASSWORD ?? ""}" "${file}"`, {
+    cwd: root,
+    stdio: "ignore",
+  });
+  return fs.readFileSync(`${file}.sig`, "utf8").trim();
+}
 
 /** What is out of date before a release: Claude Code itself, and models it knows that Qanuvi does not offer yet. */
 async function releaseCheck(root) {

@@ -3494,6 +3494,7 @@ dependencies = [
  "jiff",
  "keyring",
  "libc",
+ "minisign-verify",
  "notify-rust",
  "png",
  "portable-pty",

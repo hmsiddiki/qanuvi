@@ -71,6 +71,15 @@ fn main() {
                 && Some(*i) != site_at.map(|d| d + 1)
         })
         .map(|(_, a)| a.as_str());
+    // M8a: a terminal command starts with "Update available: x" when its running master found one (status says it
+    // in its own lines; the service, its core and the window's bridge never print it).
+    if matches!(
+        command,
+        Some("login" | "logout" | "servers" | "pair" | "projects" | "inbox" | "plan")
+    ) && !args.iter().any(|a| a == "--stdio")
+    {
+        qanuvi_lib::master::update_notice(&data);
+    }
     let result = if args.iter().any(|a| a == "--stdio") {
         qanuvi_lib::master::stdio_bridge(&data)
     } else {

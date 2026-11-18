@@ -41,7 +41,7 @@ pub mod watch;
 pub use cli::{pair_cli, servers_cli};
 pub use cli_inbox::inbox_cli;
 pub use cli_plan::plan_cli;
-pub use cli_status::{projects_cli, status_cli};
+pub use cli_status::{projects_cli, status_cli, update_notice};
 pub use watch::Watch;
 
 /// What a running master shares with its connections.
@@ -85,6 +85,8 @@ pub struct Master {
     /// M5b: the plan runs the last master left going (their projects), and why it ended; resumed on their own
     /// after a computer restart when Qanuvi starts with Windows.
     cut_off: Mutex<(String, Vec<String>)>,
+    /// M8a: what its own look on the update channel found.
+    updates: crate::master_update::Updates,
 }
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
@@ -228,6 +230,7 @@ impl Master {
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
             cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
+            updates: crate::master_update::Updates::default(),
         })
     }
 
@@ -765,6 +768,9 @@ impl Master {
                 "agents": self.agents.open_count(),
                 "runs": self.runs.active().len(),
             })),
+            // M8a: what this master's own look on the update channel found, and a look now.
+            "update_status" => to(Ok(self.updates.state())),
+            "update_check" => to(Ok(self.updates.check(self.app_data))),
             // How many agents work here now (the window's machine switcher shows it, 24z3 step 4).
             "agents_working" => Ok(json!(crate::agent::working_count(&self.db))),
             "master_restart" => {
@@ -1301,6 +1307,19 @@ impl Master {
                 std::thread::sleep(Duration::from_secs(24 * 3600));
             }
         });
+        // M8a: its own look for a newer Qanuvi, two minutes after start, then every hour, with no window needed.
+        if crate::master_update::checks_by_itself() {
+            let me = Arc::downgrade(self);
+            std::thread::spawn(move || {
+                std::thread::sleep(crate::master_update::FIRST_CHECK);
+                loop {
+                    let Some(m) = me.upgrade() else { return };
+                    m.updates.check(m.app_data);
+                    drop(m);
+                    std::thread::sleep(crate::master_update::CHECK_EVERY);
+                }
+            });
+        }
         // The OmniRoute watch (24z3 D5): a minute after start, then every 30 minutes, with no window needed.
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {

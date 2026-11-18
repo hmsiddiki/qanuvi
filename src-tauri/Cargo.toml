@@ -62,6 +62,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 ureq = { version = "3", features = ["platform-verifier"] }
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sha2 = "0.11.1"
+minisign-verify = "0.3"
 spake2 = "0.4.0"
 hkdf = "0.13.0"
 ed25519-dalek = "2"
