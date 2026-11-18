@@ -438,6 +438,17 @@ The rule: the master does everything the app does today, updates included.
   master, and coding tools on a shown master.
 - Old installs: the server list import and existing data.
 - Publish only with the owner's yes.
+- Parts (owner agreed, 2026-11-18):
+  - M9a: full verify (free RAM checked first, Rust tests and clippy alone, then vitest, svelte-check, fmt); CI
+    green on all three after M8.
+  - M9b: long everyday check on scratch projects: R5 (scratch plan run, close the screen, reopen, progress intact;
+    This PC, then the VPS); coding tools on a shown master; nested depth 3 with the loop guard (window on This PC ->
+    local test master -> Linux laptop -> VPS; the laptop reaches the VPS, not the other way); Part F (window memory
+    with several masters shown in turn and nested ones); keep an eye out for v3.
+  - M9c: old installs: 0.1.25 on scratch data with servers and projects, updated to the M9 build; the server list
+    import and the existing data come through.
+  - M9d: release 0.1.26 (M7-M9) with the release rule; publish only with the owner's yes.
+  - After M9: n1, then t1.
 
 ### M10. Account gate and device discovery (owner, 2026-11-18; after the system is built)
 

@@ -536,6 +536,12 @@ runs on or off; with it off nothing is sent anywhere.
     about 10 s, Qanuvi back in the background (master only) on 0.9.0. Not driven: the waiting for running work on
     This PC (the same code as M8c, driven there) and This PC's auto-update (held while a window is open; tests only).
     Rust: +1 watcher test. M8d DONE on Windows; macOS/Linux This PC installs say "Windows only so far".
+    M9 PARTS AGREED (owner, 2026-11-18; docs/MIGRATION-VIEWER.md M9): M9a verify, M9b long check (R5, coding tools
+    on a shown master, nested depth 3 = This PC window -> local test master -> Linux laptop -> VPS, Part F, v3 watch),
+    M9c old installs, M9d release 0.1.26 (owner's yes). After M9: n1, then t1.
+    M9a DONE locally (2026-11-18, 298a21f + docs): cargo fmt clean, cargo test 522 + 1 pass (2 ignored), clippy
+    --all-targets -D warnings clean, vitest 502 pass (77 files), svelte-check 0 errors 0 warnings, prettier clean.
+    CI: 9604344 green; 298a21f was still running. Next: M9b.
     PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
     master updates the whole install with one installer and one button; the screen's own updater goes).
     PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
