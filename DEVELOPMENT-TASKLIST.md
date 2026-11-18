@@ -462,8 +462,13 @@ runs on or off; with it off nothing is sent anywhere.
     service's program path), f2 the "Downloading" line was skipped when the download was quick. Rust 516 (Linux 514), vitest 496: 6 new
     (master_update) + 1 watcher. Note: the test plan's step was slow because its agent's foreground `sleep 60` was
     blocked; not an M8b matter.
-    PICKUP POINT (2026-11-18, after M8b): M8b on the VPS (owner yes needed: cross-build, swap in the M8b server build by
-    hand once, then drive `update` there from a localhost test channel), then M8c (the screen for the shown master:
+    M8b ON THE VPS (owner yes, 2026-11-18): server builds cross-built (zigbuild -j 2, glibc 2.36, 10.4 MB, about 3 min
+    each: this code as 0.1.23 and as 0.9.0, the latter signed with the throwaway test key). Throwaway master in
+    /root/qanuvi-test/m8b (removed after) updated itself from a localhost channel: swapped, new serve + core from the
+    installed path (--after-pid), .prev 0.1.23; the real service untouched during it. Then the M8b server build was
+    swapped into ~/.local/bin by hand (idle first; the 03:28 M8a build kept as .prev), serve restarted with setsid:
+    2 projects and its Inbox item back.
+    PICKUP POINT (2026-11-18, after M8b on the VPS): next M8c (the screen for the shown master:
     status bar button with progress from `update_install` / `update_status.install`, "Restart to update", the
     per-master auto-update setting, off by default for a master set up from a terminal).
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data

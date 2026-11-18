@@ -408,8 +408,8 @@ The rule: the master does everything the app does today, updates included.
     the M8a server build). Details in DEVELOPMENT-TASKLIST.md.
   - M8b BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the Linux laptop: the running master puts
     the update in (`update_install`, progress in `update_status`), waits for running work with an Inbox note, keeps
-    `.prev`, and restarts from the new program through its watcher. The VPS drive waits for the owner's yes. Next:
-    M8b on the VPS, then M8c.
+    `.prev`, and restarts from the new program through its watcher. Driven on the VPS too (throwaway data; its
+    service runs the M8b server build). Next build: M8c.
 
 ### M9. Release
 
