@@ -359,9 +359,9 @@ Owner decisions (2026-11-18):
   terminal; the run is the master's and goes on until `plan stop`.
 - M7a BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS.
 - M7b BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS.
-- M7c BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master (VPS still to drive). Also `plan follow`, so a
+- M7c BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS. Also `plan follow`, so a
   terminal can follow a run again after Ctrl+C. A terminal run takes the setup of the last run a window started on
-  that master (run-starts/); with none it says to start one run from a window first. M7 DONE on Windows.
+  that master (run-starts/); with none it says to start one run from a window first. M7 DONE.
 
 ### M8. Masters update themselves (agreed 2026-11-17)
 

@@ -385,7 +385,7 @@ runs on or off; with it off nothing is sent anywhere.
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
     PICKUP POINT (fresh conversation starts here, 2026-11-18 13:30): M7c BUILT + DRIVEN LIVE on a Windows scratch
-    data folder (not yet on the VPS): `qanuvi-master plan run <plan file> [--steps 2-6] [--budget <dollars>]
+    data folder AND on the VPS basevm378 (throwaway --data, removed after; serve runs the M7c server build, M7b one kept as .prev; no agent there, so the run showed the "not found" path): `qanuvi-master plan run <plan file> [--steps 2-6] [--budget <dollars>]
     [--no-follow]`, `plan follow [<project>]`, `plan list`, `plan stop [<project>] [--now]`. The file picks its
     project (the deepest one holding it). The run copies the setup of the last run a window started on this master
     (run-starts/<project id>.json, else the newest one of another project with its model rules left out; none:
@@ -399,8 +399,9 @@ runs on or off; with it off nothing is sent anywhere.
     project root, x2 a done try no longer says "it goes on", x3 a busy project is refused before the setup line.
     CI NOTE (owner: fix later): CI fails since M4c 9b15c6d: Linux link needs libxdo-dev (tray-icon via muda) in
     build.yml apt line; macOS a Rust test fails since M5a 9e242f3 (name only in the signed-in log); Windows flaky
-    checks::kill_tree test (20 s wait for PowerShell, give 60 s). Next: M7c on the VPS (owner yes for the server
-    build), then the CI fixes, then M8.
+    checks::kill_tree test (20 s wait for PowerShell, give 60 s). y1 fixed (a note's own full stop before "; it tries again"). y2 FOR THE OWNER (runner, not M7c): on the VPS without
+    Claude Code, step 1 failed and waited for an answer, then started again by itself and asked a second time, and
+    plan list counted 2 steps for a 1-step plan. Next: y2 look, then the CI fixes, then M8.
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.

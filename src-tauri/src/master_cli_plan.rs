@@ -212,6 +212,7 @@ pub fn view_lines(before: Option<&Value>, now: &Value) -> Vec<String> {
                 step_name(st),
                 last.and_then(|t| t["model"].as_str()).unwrap_or("?"),
                 last.and_then(|t| t["note"].as_str())
+                    .map(|n| n.trim().trim_end_matches('.'))
                     .filter(|n| !n.is_empty())
                     .unwrap_or("not finished")
             ));
@@ -735,7 +736,7 @@ mod tests {
         );
         assert!(view_lines(Some(&a), &done).is_empty());
         let open = view(
-            step(json!([{"model": "m", "outcome": "open", "note": "tests fail"}])),
+            step(json!([{"model": "m", "outcome": "open", "note": "tests fail."}])),
             true,
         );
         assert_eq!(
