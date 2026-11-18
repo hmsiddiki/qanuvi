@@ -24,6 +24,8 @@ use std::time::{Duration, Instant};
 
 #[path = "master_cli.rs"]
 mod cli;
+#[path = "master_cli_inbox.rs"]
+mod cli_inbox;
 #[path = "master_cli_status.rs"]
 mod cli_status;
 #[path = "master_inbox.rs"]
@@ -35,6 +37,7 @@ mod server_cmds;
 #[path = "master_watch.rs"]
 pub mod watch;
 pub use cli::{pair_cli, servers_cli};
+pub use cli_inbox::inbox_cli;
 pub use cli_status::{projects_cli, status_cli};
 pub use watch::Watch;
 

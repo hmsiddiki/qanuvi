@@ -358,6 +358,7 @@ Owner decisions (2026-11-18):
   `plan run <file>` (follows the run's lines) + `plan list/stop`. Ctrl+C on a followed run only detaches the
   terminal; the run is the master's and goes on until `plan stop`.
 - M7a BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS.
+- M7b BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS.
 
 ### M8. Masters update themselves (agreed 2026-11-17)
 

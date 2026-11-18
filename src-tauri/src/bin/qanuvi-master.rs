@@ -97,7 +97,7 @@ fn main() {
             Some("logout") => {
                 qanuvi_lib::account::cli_logout(&qanuvi_lib::master::accounts_at(&data), site)
             }
-            Some(c @ ("servers" | "pair" | "projects")) => {
+            Some(c @ ("servers" | "pair" | "projects" | "inbox")) => {
                 let rest: Vec<String> = args
                     .iter()
                     .skip_while(|a| a.as_str() != c)
@@ -107,12 +107,13 @@ fn main() {
                 match c {
                     "servers" => qanuvi_lib::master::servers_cli(&data, &rest),
                     "projects" => qanuvi_lib::master::projects_cli(&data, &rest),
+                    "inbox" => qanuvi_lib::master::inbox_cli(&data, &rest),
                     _ => qanuvi_lib::master::pair_cli(&data, &rest),
                 }
             }
             _ => {
                 eprintln!(
-                    "Usage: qanuvi-master serve | core | --stdio | status | stop | login | logout | servers | pair | projects  [--data <folder>] [--site <address>]"
+                    "Usage: qanuvi-master serve | core | --stdio | status | stop | login | logout | servers | pair | projects | inbox  [--data <folder>] [--site <address>]"
                 );
                 std::process::exit(2);
             }

@@ -384,7 +384,18 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 10:50): M7 AGREED (owner, 2026-11-18): three parts,
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
+    folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
+    kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.
+    Numbers follow the list's order (open questions first, then newest), each line also shows the id's start; an
+    answer by number names the question it answered. Choice by id or label (letter case aside); text only when the
+    form has a text box; a secret question (login or password) is refused and sent to the run panel; a note, an
+    answered or a closed question says so; a late answer says "Already answered somewhere else.". Answers go with
+    by "terminal"; the window's Inbox says "(in a terminal)" (InboxView outcome). A run reads the answer from
+    the master's Inbox itself (running or at its next start), so nothing window-only is needed. Code in
+    src-tauri/src/master_cli_inbox.rs, 5 tests. Drive seeds questions through `--stdio` inbox_add (scratchpad
+    m7b.sh; use printf, Debian sh's echo breaks \n in JSON). Next: M7c plan run <file> + plan list/stop.
+    PICKUP POINT (before, 2026-11-18 10:50): M7 AGREED (owner, 2026-11-18): three parts,
     M7a status + projects, M7b inbox (list, show, answer), M7c plan run <file> + plan list/stop; Ctrl+C on a
     followed run only DETACHES the terminal (the run is the master's and goes on; `plan stop` stops it).
     M7a BUILT + DRIVEN LIVE (Windows scratch data folder + VPS basevm378, owner yes): `qanuvi-master status` (not

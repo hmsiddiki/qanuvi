@@ -46,7 +46,11 @@
     const label = item.form?.choices.find((c) => c.id === item.answer?.choice)?.label ?? item.answer?.choice ?? "";
     const said = item.answer?.text?.trim();
     const where =
-      item.answeredBy && !["main", "desktop"].includes(item.answeredBy) ? ` (in window ${item.answeredBy})` : "";
+      item.answeredBy === "terminal"
+        ? " (in a terminal)"
+        : item.answeredBy && !["main", "desktop"].includes(item.answeredBy)
+          ? ` (in window ${item.answeredBy})`
+          : "";
     return `You answered: ${label}${said ? ` · "${said}"` : ""}${where}`;
   }
 
