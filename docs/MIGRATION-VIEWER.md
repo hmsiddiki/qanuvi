@@ -427,6 +427,10 @@ The rule: the master does everything the app does today, updates included.
     installer started by hand. The app's own updater (tauri-plugin-updater) is gone; the status bar and Settings,
     Updates show the shown master's update for This PC too. `qanuvi-master update` on This PC goes through its running
     service.
+    DRIVEN LIVE on Windows the same day (real installers as 0.1.23 and 0.9.0 on a localhost test channel): from the
+    window and from the terminal with no window open, all pass after three fixes (the helper's start flags; the watcher
+    starts the helper, as the core's children die with it; the terminal stops following once the service ends).
+    Details in DEVELOPMENT-TASKLIST.md. M8d DONE (Windows). Next: M9.
 
 ### M9. Release
 

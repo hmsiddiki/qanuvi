@@ -517,6 +517,25 @@ runs on or off; with it off nothing is sent anywhere.
     clean. Next: drive live on Windows (a real NSIS build of this code as
     0.1.23 and 0.9.0, signed with the throwaway key, on a localhost test channel; an installed copy, not the real one,
     so it needs a scratch install folder) - ask the owner first, since it installs over Qanuvi.
+    M8d DRIVEN LIVE on Windows (2026-11-18, owner yes; real NSIS installers of this code as 0.1.23 and 0.9.0, the
+    0.9.0 one signed with the throwaway test key, a localhost test channel; installed over the owner's D:qanuvi on the
+    real data, 0.1.25 put back afterwards from the channel folder and the test installer removed). Found and fixed:
+    d1 PowerShell started with DETACHED_PROCESS ends at once without running its command: the helper now starts with
+    CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP (spawn_alone_with). d2 the watcher keeps its core in a kill-on-close
+    job, so the helper (the core's child) and its installer died with the watcher: a watched core now leaves the
+    helper's line in <data>/update-install.txt and exits with INSTALL_CODE (77); the watcher, outside that job, starts
+    the helper and ends (the helper not starting: the core starts again, nothing installed); an unwatched core starts it
+    itself. d3 `qanuvi-master update` on This PC kept following, and its calls started the old service again while
+    the installer ran (a mixed install: app 0.9.0, master 0.1.23) and made the helper wait its full minute for the
+    terminal: it now ends once the service is gone ("Qanuvi closes to put x in; the installer starts it again by
+    itself"). Then all pass: Settings, Updates shows This PC's 0.1.23, off by default; Check now -> "Qanuvi 0.9.0 is
+    available" + status bar "Update to 0.9.0"; clicked -> held as ready in <data>/updates, D:qanuvi untouched;
+    Restart to update -> the window closed, the watcher started the helper, the installer ran (about 1 s), app and
+    master 0.9.0, Qanuvi opened again by itself on the same project and session, Updates shows 0.9.0. No window
+    (`qanuvi --background`) + `qanuvi-master update --data <app data>` -> Downloading, the closing line, installed in
+    about 10 s, Qanuvi back in the background (master only) on 0.9.0. Not driven: the waiting for running work on
+    This PC (the same code as M8c, driven there) and This PC's auto-update (held while a window is open; tests only).
+    Rust: +1 watcher test. M8d DONE on Windows; macOS/Linux This PC installs say "Windows only so far".
     PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
     master updates the whole install with one installer and one button; the screen's own updater goes).
     PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),

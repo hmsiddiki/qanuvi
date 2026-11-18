@@ -7,7 +7,8 @@
 //
 // The core's exit code says what happened: 0 a clean end (the watcher ends too), RESTART_CODE a restart asked for
 // (started again at once), UPDATED_CODE an update swapped the program (M8b: a new service is started from the
-// program now in place and this watcher ends, as it runs the old one), anything else a crash.
+// program now in place and this watcher ends, as it runs the old one), INSTALL_CODE This PC's whole install is to be
+// updated (M8d: this watcher starts the installer's helper and ends), anything else a crash.
 
 use super::{connect, lock_file, on_app_data, restart_mark, service_file, stop_note_file};
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub const RESTART_CODE: i32 = 75;
 /// The core's exit code after an update put a new program in place (M8b).
 pub const UPDATED_CODE: i32 = 76;
+/// M8d: the core's exit code when This PC's installer is to run: the helper's line is in [`install_file`]. The
+/// watcher starts it, as the core's own children end with this watcher (its job object), the helper too.
+pub const INSTALL_CODE: i32 = 77;
 /// On this crash in a row the watcher stops restarting and looks into why.
 pub const CRASH_LIMIT: u32 = 3;
 /// A core that ran this long before it crashed starts the count again.
@@ -349,6 +353,22 @@ pub struct Watch {
     tell: Tell,
     ask_model: AskModel,
     updated: Updated,
+    /// M8d: starts the installer's helper from [`install_file`].
+    install: Updated,
+}
+
+/// M8d: where the core leaves the installer helper's line for its watcher.
+pub fn install_file(dir: &Path) -> PathBuf {
+    dir.join("update-install.txt")
+}
+
+/// M8d: starts the helper the core left (the file goes, whether it starts or not).
+fn run_install_file(dir: &Path) -> Result<(), String> {
+    let file = install_file(dir);
+    let script = std::fs::read_to_string(&file)
+        .map_err(|e| format!("The update's installer line was not found: {e}"))?;
+    let _ = std::fs::remove_file(&file);
+    super::run_helper(&script)
 }
 
 impl Watch {
@@ -362,6 +382,7 @@ impl Watch {
             tell: Box::new(tell_owner),
             ask_model: Box::new(ask_local_model),
             updated: Box::new(start_updated(std::env::current_exe().ok())),
+            install: Box::new(run_install_file),
         }
     }
 
@@ -454,6 +475,15 @@ impl Watch {
                     continue;
                 }
                 // The new service waits for this watcher to end before it opens the data.
+                // M8d: the installer's helper starts from here, outside the core's job; it waits for this watcher.
+                Some(INSTALL_CODE) => match (self.install)(&dir) {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        eprintln!("The update's installer could not start: {e}");
+                        without_startup = false;
+                        continue;
+                    }
+                },
                 Some(UPDATED_CODE) => match (self.updated)(&dir) {
                     Ok(()) => return Ok(()),
                     Err(e) => {
@@ -754,6 +784,7 @@ mod tests {
             }),
             ask_model: Box::new(|_, _| None),
             updated: Box::new(|_| Err("no updated program in this test".into())),
+            install: Box::new(|_| Err("no installer in this test".into())),
         }
     }
 
@@ -886,6 +917,45 @@ mod tests {
         watch(d.path(), core, Arc::default()).run().unwrap();
         assert_eq!(*n.lock().unwrap(), 2);
         assert!(!crashes_file(d.path()).exists());
+    }
+
+    #[test]
+    fn for_this_pcs_install_the_watcher_starts_the_installer_and_ends() {
+        let d = tempfile::tempdir().unwrap();
+        let n = Arc::new(Mutex::new(0));
+        let n2 = n.clone();
+        let core: CoreCommand = Box::new(move |dir: &Path, without: bool| {
+            *n2.lock().unwrap() += 1;
+            fake_core(INSTALL_CODE)(dir, without)
+        });
+        let ran = Arc::new(Mutex::new(0));
+        let mut w = watch(d.path(), core, Arc::default());
+        let r2 = ran.clone();
+        w.install = Box::new(move |_| {
+            *r2.lock().unwrap() += 1;
+            Ok(())
+        });
+        w.run().unwrap();
+        assert_eq!((*n.lock().unwrap(), *ran.lock().unwrap()), (1, 1));
+        assert!(!crashes_file(d.path()).exists());
+
+        // The helper does not start: the core starts again (nothing installed), no crash.
+        let n = Arc::new(Mutex::new(0));
+        let n2 = n.clone();
+        let core: CoreCommand = Box::new(move |dir: &Path, without: bool| {
+            let mut k = n2.lock().unwrap();
+            *k += 1;
+            fake_core(if *k == 1 { INSTALL_CODE } else { 0 })(dir, without)
+        });
+        watch(d.path(), core, Arc::default()).run().unwrap();
+        assert_eq!(*n.lock().unwrap(), 2);
+        assert!(!crashes_file(d.path()).exists());
+        // With no line left by the core, the real starter says so.
+        assert!(
+            run_install_file(d.path())
+                .unwrap_err()
+                .contains("not found")
+        );
     }
 
     #[test]

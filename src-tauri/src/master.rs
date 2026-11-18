@@ -1379,6 +1379,11 @@ impl Master {
 
     /// Ends this master, keeping why for its runs to say after the next start (M5a: "Stopped by the update").
     pub fn end_because(&self, why: &str) -> ! {
+        self.end_with(why, 0)
+    }
+
+    /// Ends this master with an exit code its watcher reads (M8d: [`watch::INSTALL_CODE`]).
+    fn end_with(&self, why: &str, code: i32) -> ! {
         if runs::stop_note(why).is_some() {
             let _ = std::fs::write(stop_note_file(&self.dir), why);
         }
@@ -1390,7 +1395,7 @@ impl Master {
         // A clean end: no state note left to read as a crash or a shutdown (M5b), no browser profile left behind.
         let _ = std::fs::remove_file(watch::state_file(&self.dir));
         crate::browser::sweep_profiles(true);
-        std::process::exit(0);
+        std::process::exit(code);
     }
 
     /// M4c, the tray's "Open Qanuvi": a running app shows its window; with none, the app beside this master starts.
@@ -1592,7 +1597,13 @@ impl Master {
         }
         let master = std::env::current_exe().map_err(|e| e.to_string())?;
         let app = crate::sign_in_start::app_exe()?;
-        run_installer_after(&[&master, &app], installer, !had_window)?;
+        let script = installer_script(&[&master, &app], installer, !had_window);
+        // A watched core's children end with its watcher (its job object), so the watcher starts the helper.
+        if watch::watched() {
+            std::fs::write(watch::install_file(&self.dir), &script).map_err(|e| e.to_string())?;
+            self.end_with("update", watch::INSTALL_CODE)
+        }
+        run_helper(&script)?;
         self.end_because("update")
     }
 
@@ -1683,28 +1694,24 @@ pub fn installer_script(programs: &[&Path], installer: &Path, background: bool) 
     )
 }
 
-/// M8d: starts the helper that runs the installer once `programs` have ended (it outlives this master).
-fn run_installer_after(
-    programs: &[&Path],
-    installer: &Path,
-    background: bool,
-) -> Result<(), String> {
-    let script = installer_script(programs, installer, background);
+/// M8d: starts the helper that runs the installer (its `installer_script` line); it outlives this master.
+fn run_helper(script: &str) -> Result<(), String> {
     #[cfg(windows)]
     {
         let args: Vec<std::ffi::OsString> = [
             "powershell.exe",
             "-NoProfile",
             "-NonInteractive",
-            "-WindowStyle",
-            "Hidden",
             "-Command",
-            &script,
+            script,
         ]
         .iter()
         .map(|a| a.into())
         .collect();
-        spawn_alone(&args).map_err(|e| e.replace("The master service", "The update's installer"))
+        // M8d drive: PowerShell started with DETACHED_PROCESS ends at once without running its command; with a hidden
+        // console of its own (CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP) it runs, and outlives this master.
+        spawn_alone_with(&args, 0x0800_0000 | 0x0000_0200)
+            .map_err(|e| e.replace("The master service", "The update's installer"))
     }
     #[cfg(not(windows))]
     {
@@ -2068,6 +2075,13 @@ fn quote_arg(a: &std::ffi::OsStr) -> Vec<u16> {
 /// Starts a detached program that inherits no handles at all (s5), with no console window.
 #[cfg(windows)]
 fn spawn_alone(args: &[std::ffi::OsString]) -> Result<(), String> {
+    // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+    spawn_alone_with(args, 0x0000_0008 | 0x0000_0200 | 0x0800_0000)
+}
+
+/// Starts a program that inherits no handles, with these creation flags.
+#[cfg(windows)]
+fn spawn_alone_with(args: &[std::ffi::OsString], flags: u32) -> Result<(), String> {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{
         CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW,
@@ -2085,8 +2099,6 @@ fn spawn_alone(args: &[std::ffi::OsString]) -> Result<(), String> {
         ..unsafe { std::mem::zeroed() }
     };
     let mut pi: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
-    // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
-    let flags = 0x0000_0008 | 0x0000_0200 | 0x0800_0000;
     let ok = unsafe {
         CreateProcessW(
             std::ptr::null(),

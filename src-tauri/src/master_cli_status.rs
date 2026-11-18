@@ -209,6 +209,18 @@ fn follow_update(dir: &Path, started: &Value, whole: bool) -> Result<(), String>
     let mut gone_at: Option<Instant> = None;
     loop {
         std::thread::sleep(Duration::from_millis(400));
+        // M8d drive: This PC's install ends its service for the installer, which starts Qanuvi again. Following it
+        // further would start the old service again (a call starts one when none runs) and keep the master's program
+        // in use while the installer replaces it; this terminal is a program the installer waits for too.
+        if whole && !super::is_running(dir) {
+            if on_line {
+                println!();
+            }
+            println!(
+                "Qanuvi closes to put {version} in; the installer starts it again by itself. `qanuvi-master version` says {version} once it is done."
+            );
+            return Ok(());
+        }
         let Ok(state) = call(dir, "update_status", json!({})) else {
             // The old service has ended: wait for the new one.
             let since = *gone_at.get_or_insert_with(Instant::now);
