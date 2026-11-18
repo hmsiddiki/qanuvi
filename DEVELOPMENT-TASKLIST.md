@@ -384,8 +384,10 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below). Next:
-    the owner's word on v1 and v2, then build M5c part 2 (owner decisions below), then t1, b1/m2a as listed.
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below), v1 and
+    v2 fixed. Next: drive v1 (Install again on This PC, then app.ts gets its errors) and v2 (12000 short lines, hide
+    and show This PC: the note is in view) in a test build, then build M5c part 2 (owner decisions below), then t1,
+    b1/m2a as listed.
     M5c PART 1 DRIVEN LIVE (2026-11-18, release test build of e54df14, scratch project m5c-proj):
     - Intelephense started as a child of This PC's master core (not the app), "ready", flagged an undefined function.
     - Core crashed (crash.js): the open terminal said "Qanuvi's background part on this computer stopped, and this
@@ -398,15 +400,17 @@ runs on or off; with it off nothing is sent anywhere.
       master shown) and shown again: "[Earlier output was trimmed; the most recent part follows.]" at the top.
     - Node debugger on run.js: paused on its breakpoint with variables and call stack; the adapter (dapDebugServer)
       ran under This PC's master core; Stop ended it and the program.
-    Found (not fixed, owner's word first):
+    Found, owner said yes to both proposals, FIXED (2026-11-18):
     - v1: the TypeScript language server never starts: "Could not find a valid TypeScript installation". Its install
       took typescript 7.0.2 (the native one, no tsserver), which typescript-language-server 6.1 cannot use; the same
       when started by hand, so not M5c. Cause: lsp.rs npm lists name "typescript" with no version (typescript and
-      svelte servers). Proposal: pin typescript@5 there and re-install a server folder that holds typescript 7.
+      svelte servers). Fix: both lists pin typescript@5; a Spec's `needs` names a file an own install must also hold
+      (typescript/lib/tsserver.js), so a folder that took typescript 7 counts as not installed and Settings,
+      Languages offers Install again, which puts typescript 5 in (unit test v1_...).
     - v2: with short lines the trimmed note is never seen: the master keeps 256 KB (about 5,450 lines of 47
-      characters) but the window's terminal holds about 5,000 lines, so the note at the start falls out of view.
-      Proposal: keep the master's kept part within the window's line limit too (by lines as well as bytes), or say
-      it again in the window's own first line.
+      characters) but the window's terminal holds 5,000 rows, so the note at the start falls out of view. Fix
+      (terminal.rs): the kept part is also held to 4,500 rows, a line counted as 1 + its length / 80 (never fewer
+      than it takes in a terminal 80 columns wide or wider), dropping whole lines from the front (unit test v2_...).
     - Drive note: terminals end when the window that opened them goes (by design); only the switcher re-attaches.
     Drive tools (scratchpad of session d500cea7): ui.ps1 `text` sends literal text in 8-character pieces and stops
     if focus leaves the test window (plain `keys` sends % as Alt: "% {" opened the window menu and the rest typed

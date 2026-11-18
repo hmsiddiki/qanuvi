@@ -44,6 +44,12 @@ pub enum TermEvent {
 /// The most recent output each terminal keeps for a window that comes back to it (about the last screens of text).
 const RECENT_MAX: usize = 256 * 1024;
 
+/// The kept output also fits in the window's terminal, which holds 5000 rows (TerminalView scrollback), so the
+/// trimmed note before it is never pushed out of view (v2). A line is counted as the rows it takes in a terminal 80
+/// columns wide or wider (1 + its length / 80), which is never fewer than it really takes; 500 rows are left for the
+/// note and the screen itself.
+const RECENT_ROWS: usize = 4500;
+
 /// Where a terminal's output goes (24z3 Part B2). While the window shows the terminal's machine, to that window; while
 /// the switcher hides the machine, nowhere, but the most recent output is always kept, so the window that shows the
 /// machine again gets it back (the shell itself goes on all the while).
@@ -51,6 +57,8 @@ const RECENT_MAX: usize = 256 * 1024;
 struct Outlet {
     sink: Option<Sink<TermEvent>>,
     recent: String,
+    /// Line ends in `recent`.
+    recent_lines: usize,
     /// The shell ended (with its exit code when known).
     ended: Option<Option<u32>>,
     /// The oldest output was dropped (more than RECENT_MAX came): a window given it back is told (M5c).
@@ -63,7 +71,13 @@ pub const TRIMMED_NOTE: &str =
 
 impl Outlet {
     fn data(&mut self, data: String) {
-        self.trimmed |= keep_recent(&mut self.recent, &data, RECENT_MAX);
+        self.trimmed |= keep_recent(
+            &mut self.recent,
+            &mut self.recent_lines,
+            &data,
+            RECENT_MAX,
+            RECENT_ROWS,
+        );
         if let Some(sink) = &self.sink
             && sink.send(TermEvent::Data { data }).is_err()
         {
@@ -80,24 +94,54 @@ impl Outlet {
     }
 }
 
-/// Adds output to what a terminal keeps, dropping the oldest beyond `max` bytes from the start of a line, so
-/// the text given back does not begin halfway through one. Answers whether anything was dropped.
-pub fn keep_recent(recent: &mut String, data: &str, max: usize) -> bool {
+/// Rows kept output is counted as (see RECENT_ROWS).
+fn rows(lines: usize, bytes: usize) -> usize {
+    lines + bytes / 80
+}
+
+/// Adds output to what a terminal keeps, dropping the oldest beyond `max` bytes or `max_rows` rows from the
+/// start of a line, so the text given back does not begin halfway through one. `lines` counts the line ends kept.
+/// Answers whether anything was dropped.
+pub fn keep_recent(
+    recent: &mut String,
+    lines: &mut usize,
+    data: &str,
+    max: usize,
+    max_rows: usize,
+) -> bool {
     recent.push_str(data);
-    if recent.len() <= max {
-        return false;
+    *lines += data.matches('\n').count();
+    let mut dropped = false;
+    if recent.len() > max {
+        let mut cut = recent.len() - max;
+        while !recent.is_char_boundary(cut) {
+            cut += 1;
+        }
+        let line = recent[cut..]
+            .char_indices()
+            .take_while(|(i, _)| *i < 4096)
+            .find(|(_, c)| *c == '\n')
+            .map(|(i, _)| cut + i + 1);
+        let end = line.unwrap_or(cut);
+        *lines -= recent[..end].matches('\n').count();
+        recent.drain(..end);
+        dropped = true;
     }
-    let mut cut = recent.len() - max;
-    while !recent.is_char_boundary(cut) {
-        cut += 1;
+    if rows(*lines, recent.len()) > max_rows {
+        // Whole lines from the front until the rest fits.
+        let (mut end, mut gone) = (0, 0);
+        for (i, _) in recent.match_indices('\n') {
+            end = i + 1;
+            gone += 1;
+            if rows(*lines - gone, recent.len() - end) <= max_rows {
+                break;
+            }
+        }
+        *lines -= gone;
+        recent.drain(..end);
+        dropped = true;
     }
-    let line = recent[cut..]
-        .char_indices()
-        .take_while(|(i, _)| *i < 4096)
-        .find(|(_, c)| *c == '\n')
-        .map(|(i, _)| cut + i + 1);
-    recent.drain(..line.unwrap_or(cut));
-    true
+    dropped
 }
 
 struct Term {
@@ -573,16 +617,49 @@ mod tests {
 
     #[test]
     fn keeps_the_most_recent_output_from_a_line_start() {
-        let mut recent = String::new();
-        assert!(!keep_recent(&mut recent, "first line\nsecond line\n", 1024));
-        assert_eq!(recent, "first line\nsecond line\n");
+        let (mut recent, mut lines) = (String::new(), 0);
+        let big = usize::MAX;
+        assert!(!keep_recent(
+            &mut recent,
+            &mut lines,
+            "first line\nsecond line\n",
+            1024,
+            big
+        ));
+        assert_eq!((recent.as_str(), lines), ("first line\nsecond line\n", 2));
         // Over the limit: the oldest goes, and what is kept starts after a line end.
-        assert!(keep_recent(&mut recent, "third\n", 16));
-        assert_eq!(recent, "third\n");
+        assert!(keep_recent(&mut recent, &mut lines, "third\n", 16, big));
+        assert_eq!((recent.as_str(), lines), ("third\n", 1));
         // A long run without line ends is cut at a character boundary.
-        let mut r = String::new();
-        assert!(keep_recent(&mut r, &"é".repeat(20), 9));
+        let (mut r, mut n) = (String::new(), 0);
+        assert!(keep_recent(&mut r, &mut n, &"é".repeat(20), 9, big));
         assert!(r.len() <= 9 && r.chars().all(|c| c == 'é'), "{r:?}");
+    }
+
+    #[test]
+    fn v2_kept_output_fits_the_windows_terminal_rows() {
+        // 12000 short lines (about 560 KB, as in the drive): fewer bytes than the limit would keep, but no more rows
+        // than the window's terminal holds, so the trimmed note before them stays in view.
+        let mut o = Outlet::default();
+        for i in 1..=12000 {
+            o.data(format!("line {i} {}\r\n", "x".repeat(32)));
+        }
+        assert!(o.trimmed);
+        let kept = o.recent.matches('\n').count();
+        assert_eq!(kept, o.recent_lines);
+        assert!(rows(kept, o.recent.len()) <= RECENT_ROWS, "{kept} lines");
+        assert!(
+            o.recent.starts_with("line ")
+                && o.recent
+                    .ends_with("line 12000 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n")
+        );
+        // Long lines: the byte limit is the one that cuts.
+        let mut o = Outlet::default();
+        for i in 1..=2000 {
+            o.data(format!("long {i} {}\r\n", "y".repeat(200)));
+        }
+        assert!(o.trimmed && o.recent.len() <= RECENT_MAX);
+        assert!(rows(o.recent_lines, o.recent.len()) <= RECENT_ROWS);
     }
 
     #[test]

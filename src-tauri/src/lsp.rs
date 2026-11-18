@@ -28,6 +28,10 @@ pub struct Spec {
     pub npm: &'static [&'static str],
     /// The script node runs, below the folder's node_modules (npm servers).
     pub entry: &'static str,
+    /// A file below node_modules an own install must also hold to count (empty: none). TypeScript 7 is the native
+    /// compiler with no tsserver, which typescript-language-server cannot use; an install that took it counts as
+    /// missing, so Install puts the pinned version in.
+    pub needs: &'static str,
     /// The program's name on PATH (a server the user installed, or a non-npm one).
     pub program: &'static str,
     pub args: &'static [&'static str],
@@ -45,6 +49,7 @@ pub const SPECS: &[Spec] = &[
         serves: "PHP",
         npm: &["intelephense"],
         entry: "intelephense/lib/intelephense.js",
+        needs: "",
         program: "intelephense",
         args: &["--stdio"],
         need_gb: 0.4,
@@ -53,8 +58,9 @@ pub const SPECS: &[Spec] = &[
         id: "typescript",
         label: "TypeScript language server",
         serves: "TypeScript, JavaScript",
-        npm: &["typescript-language-server", "typescript"],
+        npm: &["typescript-language-server", "typescript@5"],
         entry: "typescript-language-server/lib/cli.mjs",
+        needs: "typescript/lib/tsserver.js",
         program: "typescript-language-server",
         args: &["--stdio"],
         need_gb: 0.7,
@@ -63,8 +69,9 @@ pub const SPECS: &[Spec] = &[
         id: "svelte",
         label: "Svelte language server",
         serves: "Svelte",
-        npm: &["svelte-language-server", "typescript"],
+        npm: &["svelte-language-server", "typescript@5"],
         entry: "svelte-language-server/bin/server.js",
+        needs: "",
         program: "svelteserver",
         args: &["--stdio"],
         need_gb: 0.7,
@@ -75,6 +82,7 @@ pub const SPECS: &[Spec] = &[
         serves: "Rust",
         npm: &[],
         entry: "",
+        needs: "",
         program: "rust-analyzer",
         args: &[],
         need_gb: 1.0,
@@ -85,6 +93,7 @@ pub const SPECS: &[Spec] = &[
         serves: "Python",
         npm: &["pyright"],
         entry: "pyright/langserver.index.js",
+        needs: "",
         program: "pyright-langserver",
         args: &["--stdio"],
         need_gb: 0.4,
@@ -349,10 +358,15 @@ fn own_entry(host: &dyn Host, spec: &Spec) -> Option<String> {
     if spec.npm.is_empty() {
         return None;
     }
-    let mut parts = vec!["node_modules"];
-    parts.extend(spec.entry.split('/'));
-    let p = host.join(&own_dir(host, spec), &parts);
-    host.exists(&p).then_some(p)
+    let base = own_dir(host, spec);
+    let at = |rel: &str| {
+        let mut parts = vec!["node_modules"];
+        parts.extend(rel.split('/'));
+        host.join(&base, &parts)
+    };
+    let entry = at(spec.entry);
+    let whole = host.exists(&entry) && (spec.needs.is_empty() || host.exists(&at(spec.needs)));
+    whole.then_some(entry)
 }
 
 /// rustup puts a rust-analyzer proxy on PATH even when the component is missing; asking it for its version tells.
@@ -828,6 +842,71 @@ mod tests {
             let st = status(&Here, s);
             assert!(!st.install.is_empty() || !st.missing.is_empty(), "{}", s.id);
         }
+    }
+
+    /// A machine whose data folder is a temporary folder and which finds no programs.
+    struct Folder(PathBuf);
+    impl Host for Folder {
+        fn place(&self) -> &'static str {
+            "this computer"
+        }
+        fn data_dir(&self) -> String {
+            self.0.to_string_lossy().into_owned()
+        }
+        fn join(&self, base: &str, parts: &[&str]) -> String {
+            Here.join(base, parts)
+        }
+        fn find(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn exists(&self, path: &str) -> bool {
+            Path::new(path).exists()
+        }
+        fn run(
+            &self,
+            _: &str,
+            _: &[String],
+            _: Option<&str>,
+            _: u64,
+            _: Option<Sink<String>>,
+        ) -> Result<(bool, String), String> {
+            Err("not here".into())
+        }
+        fn write_new(&self, _: &str, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+        fn room(&self) -> Option<crate::machine::Room> {
+            None
+        }
+        fn read_small(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn fetch(&self, _: &str, _: &str, _: &str, _: &str, _: &str) -> Result<(), String> {
+            Err("not here".into())
+        }
+    }
+
+    #[test]
+    fn v1_an_own_typescript_install_without_tsserver_counts_as_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let host = Folder(dir.path().to_path_buf());
+        let ts = spec("typescript").unwrap();
+        assert!(ts.npm.contains(&"typescript@5"));
+        let modules = dir.path().join("language-servers/typescript/node_modules");
+        let put = |rel: &str| {
+            let p = modules.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "").unwrap();
+        };
+        // TypeScript 7 next to the server: no lib/tsserver.js, so it is not counted and Install is offered.
+        put(ts.entry);
+        put("typescript/lib/tsc.js");
+        assert!(own_entry(&host, ts).is_none());
+        assert_eq!(status(&host, ts).found, "");
+        // TypeScript 5: counted.
+        put("typescript/lib/tsserver.js");
+        assert!(own_entry(&host, ts).is_some());
+        assert_eq!(status(&host, ts).found, "qanuvi");
     }
 
     #[test]
