@@ -28,3 +28,8 @@ export function workText(w: Work): string | null {
 export function keepVerb(w: Work): string {
   return Math.max(0, w.agents) + Math.max(0, w.runs) === 1 ? "keeps" : "keep";
 }
+
+/** "it" for one thing, "them" for more (s2: "Quit Qanuvi from the tray icon to stop it"). */
+export function itOrThem(w: Work): string {
+  return keepVerb(w) === "keeps" ? "it" : "them";
+}

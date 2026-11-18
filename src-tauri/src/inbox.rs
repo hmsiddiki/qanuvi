@@ -183,6 +183,11 @@ pub fn add_new(db: &Db, item: &NewItem) -> Result<(InboxItem, bool), String> {
         return Ok((s.clone(), false));
     }
     let read = same.as_ref().is_some_and(|s| s.read) && unchanged;
+    // s3: the same note again while it is still open (a sign-in to renew, looked at every 30 minutes and at each
+    // start) was already told; it is refreshed, not told again.
+    let again = same
+        .as_ref()
+        .is_some_and(|s| unchanged && s.status == "open");
     if let Some(k) = &item.key {
         conn.execute("DELETE FROM inbox WHERE key = ?1", [k])
             .map_err(|e| e.to_string())?;
@@ -207,7 +212,7 @@ pub fn add_new(db: &Db, item: &NewItem) -> Result<(InboxItem, bool), String> {
     };
     insert(&conn, &new)?;
     prune(&conn)?;
-    Ok((new, true))
+    Ok((new, !again))
 }
 
 fn insert(conn: &rusqlite::Connection, i: &InboxItem) -> Result<usize, String> {
@@ -438,6 +443,26 @@ mod tests {
             form: None,
             source: None,
         }
+    }
+
+    // s3: an unread sign-in note looked at again (every 30 minutes, at each start) was told again each time.
+    #[test]
+    fn the_same_open_note_again_is_not_told_again() {
+        let db = Db::open_in_memory().unwrap();
+        let mut n = note("kiro: sign in again");
+        n.key = Some("sign-in:k".into());
+        let (_, new) = add_new(&db, &n).unwrap();
+        assert!(new);
+        let (again, new) = add_new(&db, &n).unwrap();
+        assert!(!new);
+        assert!(!again.read);
+        assert_eq!(list(&db).unwrap().len(), 1);
+        // Changed: told.
+        n.text = "a new reason".into();
+        assert!(add_new(&db, &n).unwrap().1);
+        // Resolved (removed) and back: told.
+        assert!(resolve(&db, "sign-in:k").unwrap());
+        assert!(add_new(&db, &n).unwrap().1);
     }
 
     #[test]

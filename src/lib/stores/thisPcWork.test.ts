@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keepVerb, workText } from "./thisPcWork";
+import { itOrThem, keepVerb, workText } from "./thisPcWork";
 
 describe("what This PC's master would stop, in words (M5a)", () => {
   it("names agent sessions and plan runs, or nothing", () => {
@@ -9,5 +9,7 @@ describe("what This PC's master would stop, in words (M5a)", () => {
     expect(workText({ agents: 0, runs: 3 })).toBe("3 plan runs");
     expect(keepVerb({ agents: 1, runs: 0 })).toBe("keeps");
     expect(keepVerb({ agents: 2, runs: 1 })).toBe("keep");
+    expect(itOrThem({ agents: 1, runs: 0 })).toBe("it");
+    expect(itOrThem({ agents: 0, runs: 2 })).toBe("them");
   });
 });

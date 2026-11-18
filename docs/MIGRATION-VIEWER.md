@@ -323,6 +323,9 @@ Owner decisions (2026-11-18):
 
 - M5a BUILT (2026-11-18: b633c95 cut-over with the second core deleted, 4f9f15f notices + r1 loop-guard fix); live
   drive pending. Hop measured: the stdio bridge adds 0.1 to 2.5 ms per call, so no direct TCP link is needed.
+- M5a DRIVEN LIVE (2026-11-18): s1 one master per data folder (master.lock), s2 it/they wording, s3 an open note
+  seen again is not told again, s4 no "keeps working" notice on tray Quit, s5 the detached service inherits no
+  handles (Windows); details in DEVELOPMENT-TASKLIST.md.
 
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)
 

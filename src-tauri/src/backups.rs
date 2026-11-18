@@ -18,10 +18,10 @@ const DAY: u64 = 24 * 60 * 60;
 
 /// Files of the data folder that are never copied: the database (copied its own way) and its side files, the pointer,
 /// locks, the window's storage (copied apart), folders that are rebuilt or only temporary, and a master's service
-/// file and restart mark (its port and token are made new at each start), and the machine's lasting id (a backup
-/// restored on another computer must not make it the same machine), nor a server's kept account sign-in (a secret; a
-/// restored copy must not sign another machine in).
-const SKIP: [&str; 13] = [
+/// file, restart mark and lock (its port and token are made new at each start; the lock is held while it runs), and
+/// the machine's lasting id (a backup restored on another computer must not make it the same machine), nor a
+/// server's kept account sign-in (a secret; a restored copy must not sign another machine in).
+const SKIP: [&str; 14] = [
     "qanuvi.db",
     "qanuvi.db-wal",
     "qanuvi.db-shm",
@@ -33,6 +33,7 @@ const SKIP: [&str; 13] = [
     "browser-profiles",
     "master.json",
     "master-restarting",
+    "master.lock",
     crate::machine::ID_FILE,
     crate::account::KEPT_FILE,
 ];

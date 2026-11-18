@@ -185,8 +185,10 @@ fn tally(dir: &Path) -> (u64, u64) {
     (files, bytes)
 }
 
-/// Cache folders of the window's engine: rebuilt by itself, and still changing for a few seconds after a restart.
-const SKIP: [&str; 10] = [
+/// Cache folders of the window's engine: rebuilt by itself, and still changing for a few seconds after a restart;
+/// and a master's lock (s1: held while it runs, unreadable on Windows then, and made new at each start).
+const SKIP: [&str; 11] = [
+    "master.lock",
     "Cache",
     "Code Cache",
     "GPUCache",

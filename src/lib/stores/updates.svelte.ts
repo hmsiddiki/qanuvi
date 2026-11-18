@@ -14,7 +14,7 @@ import { ask } from "$lib/stores/confirm.svelte";
 import { api, errorText } from "$lib/api";
 import { settings } from "./settings.svelte";
 import { terminals } from "./terminals.svelte";
-import { keepVerb, thisPcWork, workText } from "./thisPcWork";
+import { itOrThem, keepVerb, thisPcWork, workText } from "./thisPcWork";
 
 /** How often Qanuvi looks for a newer version, and the least time between two looks when the window comes back. */
 const EVERY = 60 * 60 * 1000;
@@ -52,10 +52,10 @@ class UpdatesStore {
         if (this.state === "ready" && this.#update && !what) {
           await stopThisPcsMaster();
           await this.#update.install().catch(() => {});
-        } else if (last && work && what) {
+        } else if (last && work && what && !(await invoke<boolean>("app_quitting").catch(() => false))) {
           await invoke("notify_notice", {
             title: "Qanuvi keeps working",
-            text: `${what} ${keepVerb(work)} going on this computer. Quit Qanuvi from the tray icon to stop them.`,
+            text: `${what} ${keepVerb(work)} going on this computer. Quit Qanuvi from the tray icon to stop ${itOrThem(work)}.`,
           }).catch(() => {});
         }
       })
@@ -147,9 +147,10 @@ class UpdatesStore {
   async #okToStop(update = false): Promise<boolean> {
     const work = await thisPcWork().catch(() => null);
     const what = work ? workText(work) : null;
-    if (!what) return true;
+    if (!what || !work) return true;
+    const they = itOrThem(work) === "it" ? "It" : "They";
     return ask(
-      `${update ? "Installing the update" : "Restarting Qanuvi"} stops ${what} on this computer. They can be resumed afterwards.`,
+      `${update ? "Installing the update" : "Restarting Qanuvi"} stops ${what} on this computer. ${they} can be resumed afterwards.`,
       {
         title: update ? "Install the update" : "Restart Qanuvi",
         kind: "warning",

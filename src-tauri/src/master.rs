@@ -1182,6 +1182,31 @@ fn stop_note_file(dir: &Path) -> PathBuf {
     dir.join("master-stopped-why")
 }
 
+/// The lock a running master holds on its data folder (s1).
+fn lock_file(dir: &Path) -> PathBuf {
+    dir.join("master.lock")
+}
+
+/// Takes the data folder's master lock; `None` when another master holds it.
+fn take_lock(dir: &Path) -> Result<Option<std::fs::File>, String> {
+    let f = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(lock_file(dir))
+        .map_err(|e| e.to_string())?;
+    match f.try_lock() {
+        Ok(()) => Ok(Some(f)),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+        Err(std::fs::TryLockError::Error(e)) => Err(e.to_string()),
+    }
+}
+
+/// A master holds this folder (it may still be starting and not yet have written its address).
+fn held(dir: &Path) -> bool {
+    matches!(take_lock(dir), Ok(None))
+}
+
 /// A restart mark younger than half a minute.
 fn restarting(dir: &Path) -> bool {
     std::fs::metadata(restart_mark(dir))
@@ -1300,9 +1325,12 @@ impl Master {
     /// A window still open after 20 seconds (its closing was cancelled) keeps everything running.
     pub fn quit_all(&self) {
         // M5a: work going on here stops with it; said first, and nothing stops without a yes.
-        if let Some(what) = work_text(self.work())
+        let (agents, runs) = self.work();
+        // s2: one thing is "it", more are "they".
+        let they = if agents.max(0) as usize + runs == 1 { "It" } else { "They" };
+        if let Some(what) = work_text((agents, runs))
             && !confirm_quit(&format!(
-                "Quitting Qanuvi stops {what} on this computer. They can be resumed afterwards.\n\nQuit anyway?"
+                "Quitting Qanuvi stops {what} on this computer. {they} can be resumed afterwards.\n\nQuit anyway?"
             ))
         {
             return;
@@ -1503,6 +1531,12 @@ pub type Tray = fn(Arc<Master>) -> !;
 
 /// Runs the background service until it is stopped. `tray`: shown when this master is This PC's.
 pub fn serve(dir: &Path, tray: Option<Tray>) -> Result<(), String> {
+    // One master per data folder (s1): the app's launch and its first This PC call could each start one. The lock
+    // is held until this process ends; a second master finds it taken and leaves the folder to the first.
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let Some(_lock) = take_lock(dir)? else {
+        return Ok(());
+    };
     let master = Master::open(dir)?.shared();
     master.start_own();
     // The daily backup (24z3 D3), as in the desktop app: checked 2 minutes after start, then every hour. On the app's
@@ -1622,35 +1656,131 @@ pub fn start_this_pc(dir: &Path) -> Result<(), String> {
     if is_running(dir) || restarting(dir) {
         return Ok(());
     }
-    let exe = master_exe_beside_me()?;
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    if held(dir) {
+        return Ok(());
+    }
+    let exe = master_exe_beside_me()?;
     let _ = std::fs::remove_file(service_file(dir));
     spawn_service(&exe, dir, None)
 }
 
 fn spawn_service(exe: &Path, dir: &Path, after: Option<u32>) -> Result<(), String> {
-    let mut cmd = std::process::Command::new(exe);
-    cmd.arg("serve").arg("--data").arg(dir);
-    if let Some(pid) = after {
-        cmd.arg(format!("--after-pid={pid}"));
-    }
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.process_group(0);
-    }
+    // s5: on Windows the service outlives whoever starts it, so it gets none of their handles. Started with every
+    // inheritable handle (as Command does), it kept the app's links to This PC's master open after the app was gone
+    // (the app -> bridge -> a second master's service), and the tray's Quit waited for a window that no longer was.
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
-        cmd.creation_flags(0x0000_0008 | 0x0000_0200 | 0x0800_0000);
+        let mut args = vec![
+            exe.as_os_str().to_owned(),
+            "serve".into(),
+            "--data".into(),
+            dir.as_os_str().to_owned(),
+        ];
+        if let Some(pid) = after {
+            args.push(format!("--after-pid={pid}").into());
+        }
         keep_own_stdio_from_children();
+        spawn_alone(&args)
     }
-    cmd.spawn()
-        .map_err(|e| format!("The master service could not start: {e}"))?;
+    #[cfg(not(windows))]
+    {
+        let mut cmd = std::process::Command::new(exe);
+        cmd.arg("serve").arg("--data").arg(dir);
+        if let Some(pid) = after {
+            cmd.arg(format!("--after-pid={pid}"));
+        }
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+        cmd.spawn()
+            .map_err(|e| format!("The master service could not start: {e}"))?;
+        Ok(())
+    }
+}
+
+/// One argument of a Windows command line, quoted the way the program's own argument parser reads it back.
+#[cfg(windows)]
+fn quote_arg(a: &std::ffi::OsStr) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+    let s: Vec<u16> = a.encode_wide().collect();
+    let plain = !s.is_empty()
+        && !s
+            .iter()
+            .any(|&c| c == ' ' as u16 || c == '\t' as u16 || c == '"' as u16);
+    if plain {
+        return s;
+    }
+    let mut out = vec!['"' as u16];
+    let mut slashes = 0;
+    for &c in &s {
+        if c == '\\' as u16 {
+            slashes += 1;
+            continue;
+        }
+        // Backslashes before a quote are doubled, and the quote escaped.
+        let n = if c == '"' as u16 { slashes * 2 + 1 } else { slashes };
+        out.extend(std::iter::repeat_n('\\' as u16, n));
+        slashes = 0;
+        out.push(c);
+    }
+    // Backslashes before the closing quote are doubled.
+    out.extend(std::iter::repeat_n('\\' as u16, slashes * 2));
+    out.push('"' as u16);
+    out
+}
+
+/// Starts a detached program that inherits no handles at all (s5), with no console window.
+#[cfg(windows)]
+fn spawn_alone(args: &[std::ffi::OsString]) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW,
+    };
+    let mut line: Vec<u16> = Vec::new();
+    for (i, a) in args.iter().enumerate() {
+        if i > 0 {
+            line.push(' ' as u16);
+        }
+        line.extend(quote_arg(a));
+    }
+    line.push(0);
+    let si = STARTUPINFOW {
+        cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+        ..unsafe { std::mem::zeroed() }
+    };
+    let mut pi: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+    // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+    let flags = 0x0000_0008 | 0x0000_0200 | 0x0800_0000;
+    let ok = unsafe {
+        CreateProcessW(
+            std::ptr::null(),
+            line.as_mut_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            0,
+            flags,
+            std::ptr::null(),
+            std::ptr::null(),
+            &si,
+            &mut pi,
+        )
+    };
+    if ok == 0 {
+        return Err(format!(
+            "The master service could not start: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    unsafe {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
     Ok(())
 }
 
@@ -1693,8 +1823,11 @@ pub fn ensure_service(dir: &Path) -> Result<(TcpStream, String), String> {
             return Ok(c);
         }
     }
-    let _ = std::fs::remove_file(service_file(dir));
-    start_service(dir, None)?;
+    // A master that holds the folder is starting: wait for its address instead of starting another (s1).
+    if !held(dir) {
+        let _ = std::fs::remove_file(service_file(dir));
+        start_service(dir, None)?;
+    }
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         if let Some(c) = connect(dir) {
@@ -1864,6 +1997,40 @@ mod tests {
             call(&m, "drafts_list", json!({"projectId": id})).unwrap(),
             json!([])
         );
+    }
+
+    // s5: the service starts with no inherited handles, from a command line its own parser reads back as given.
+    #[cfg(windows)]
+    #[test]
+    fn the_service_command_line_reads_back_as_given() {
+        let q = |s: &str| String::from_utf16(&quote_arg(std::ffi::OsStr::new(s))).unwrap();
+        assert_eq!(q("serve"), "serve");
+        assert_eq!(q(r"C:\Program Files\Qanuvi\qanuvi-master.exe"), r#""C:\Program Files\Qanuvi\qanuvi-master.exe""#);
+        assert_eq!(q(r"C:\My Data\"), r#""C:\My Data\\""#);
+        assert_eq!(q(r#"a "b""#), r#""a \"b\"""#);
+        assert_eq!(q(""), r#""""#);
+    }
+
+    // s1: the app's launch and its first This PC call each started a master on the same folder; only one may run.
+    #[test]
+    fn a_second_master_on_the_same_folder_leaves_it_to_the_first() {
+        let data = tempfile::tempdir().unwrap();
+        let first = take_lock(data.path()).unwrap();
+        assert!(first.is_some());
+        assert!(held(data.path()));
+        std::fs::write(service_file(data.path()), "first").unwrap();
+        // The second ends at once, without opening the data or writing its own address.
+        serve(data.path(), None).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(service_file(data.path())).unwrap(),
+            "first"
+        );
+        assert!(!data.path().join("qanuvi.db").exists());
+        // start_this_pc leaves a starting master alone (no second spawn, its address kept).
+        start_this_pc(data.path()).unwrap();
+        assert!(service_file(data.path()).exists());
+        drop(first);
+        assert!(!held(data.path()));
     }
 
     // Migration M3b: a master keeps its own server list and answers the window's servers_* and remote_* calls.
@@ -3351,6 +3518,7 @@ mod tests {
         "notify_take_start",
         "notify_test",
         "notify_notice",
+        "app_quitting",
         "notify_item",
         // The window's part of a browser sign-in: this computer's browser and its loopback answer (M2).
         "account_wait",

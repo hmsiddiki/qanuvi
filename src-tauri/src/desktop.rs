@@ -618,6 +618,14 @@ fn notify_notice(app: tauri::AppHandle, title: String, text: String) -> Res<()> 
     crate::desktop_notify::notice(&app, &title, &text)
 }
 
+/// s4: the tray's Quit closes the windows; then This PC's work stops too, so the last window says nothing goes on.
+static QUITTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn app_quitting() -> bool {
+    QUITTING.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 // A new item in a connected master's Inbox (24z R2d part 3): every window that follows the master asks, it is shown once.
 // The window sends that master's Notifications settings with it (24z3 D2); an older window sends none: This PC's.
 #[tauri::command]
@@ -772,6 +780,12 @@ pub fn run() {
                                 }
                             }
                             Some("quit") => {
+                                QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+                                // A window that cancelled its closing keeps everything running (master: 20 s).
+                                std::thread::spawn(|| {
+                                    std::thread::sleep(std::time::Duration::from_secs(30));
+                                    QUITTING.store(false, std::sync::atomic::Ordering::SeqCst);
+                                });
                                 for w in windows.values() {
                                     let _ = w.close();
                                 }
@@ -828,6 +842,7 @@ pub fn run() {
             notify_take_start,
             notify_test,
             notify_notice,
+            app_quitting,
             notify_item,
             app_info,
             browser_agent_shot,

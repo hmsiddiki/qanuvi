@@ -384,7 +384,12 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 06:00): M5a BUILT (b633c95 cut-over, 4f9f15f notices
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 06:30): M5a DRIVEN LIVE, s1-s5 found and fixed (notes
+    below; each fix driven on a release test build; verify: clippy clean, Rust 470 + quoting test, web 479,
+    svelte-check 0). Next: M5b (watcher + core split, crash limit, runs resume after a Windows restart, self-cleanup).
+    Later: t1 (Qanuvi-styled Quit question). Test build state: Notifications back to "problems", fake work cleared,
+    all test processes stopped.
+    PICKUP POINT (2026-11-18 06:00): M5a BUILT (b633c95 cut-over, 4f9f15f notices
     + r1 fix), NOT YET DRIVEN LIVE with the r1 fix. Next: drive M5a live on a scratch project (every page, terminal,
     Inbox, Settings; last window closed with work running says what keeps going; with no window, the master's own
     notification; tray Quit asks first; "Stopped when Qanuvi was quit" on the run after relaunch), then M5b.
@@ -413,6 +418,30 @@ runs on or off; with it off nothing is sent anywhere.
     the path at This PC; any other link back to this machine is still a loop.
     Left for later: This PC's server connections at start (master skips them on app data, M5c); a crash or power
     cut leaves no stop reason yet (M5b); tray Quit confirm is Windows-only (others with M5b's watcher).
+    M5a DRIVE (2026-11-18, build of 4f9f15f): pages, terminal (typed, output back), Explorer, Inbox (shared, both
+    machines), Settings Servers all through the master; last window closed with work: the notice came; no window:
+    the master's own notification came (driven with omniroute_look; inbox_add from a connection is the window's own
+    note and is told by the window, by design) and its click opened the test build at the item; tray Quit asked
+    (MessageBox of the master) and Yes ended master and window and wrote "quit". Found and fixed:
+    s1: two This PC masters on one folder: the app's launch (M4a start_this_pc) and the first This PC call (stdio
+    bridge ensure_service) each started one; both kept running the background jobs on one database. Fix: serve takes
+    an OS lock on master.lock (File::try_lock) and a second one ends at once; both start paths skip the spawn while
+    the lock is held (and no longer delete a starting master's master.json); backups and data moves skip the lock.
+    s2: "1 agent session ... to stop them" / "They can be resumed": it/they by count (notice, tray Quit, Restart).
+    s3: an unread OmniRoute sign-in note was told again at every look (30 minutes, and each start through the
+    window's look): add_new now says not new for the same note again while it is open (refreshed, not told).
+    s4: tray Quit closes the windows as by hand, so the last one said "... keeps going on this computer" while Quit
+    stopped it. Fix: the app marks quitting (app_quitting, an INTERFACE command; reset after 30 s, as a cancelled
+    close keeps everything running) and the window says nothing then.
+    s5: tray Quit, Yes: the window closed but This PC's master stayed (no stop reason): two connections of the gone
+    app still counted as a window following. Their handles had passed app -> local-master bridge -> that second
+    master's long-lived service (Command starts children with every inheritable handle); stopping it closed them.
+    Fix: on Windows the detached service starts through CreateProcessW with no inherited handles (spawn_alone, own
+    argument quoting with a test); windows-sys gains Win32_Security.
+    Driven again on the fixed build: one master on the folder (master.lock), the fake run said "Stopped when Qanuvi
+    was quit. Resume goes on from here." after relaunch, no sign-in note told again at start.
+    Later (owner, 2026-11-18) t1: the tray Quit question is a Windows MessageBox (the master has no window); ask
+    through an open window's own Qanuvi dialog, and with no window a small Qanuvi-styled one.
     PICKUP POINT (fresh conversation starts here, 2026-11-18 05:30): M5 AGREED (docs/MIGRATION-VIEWER.md M5:
     M5a cut-over with the second core deleted in the same pass, no old-core adapting; M5b watcher + crash limit of 3
     then the brain investigates, runs resume after a Windows restart when "Start Qanuvi when Windows starts" is on;
