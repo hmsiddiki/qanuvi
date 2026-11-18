@@ -385,9 +385,18 @@ runs on or off; with it off nothing is sent anywhere.
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
     PICKUP POINT (fresh conversation starts here, 2026-11-18 08:55): M5c PART 1 DRIVEN LIVE (notes below), v1 and
-    v2 fixed. Next: drive v1 (Install again on This PC, then app.ts gets its errors) and v2 (12000 short lines, hide
-    and show This PC: the note is in view) in a test build, then build M5c part 2 (owner decisions below), then t1,
-    b1/m2a as listed.
+    v2 fixed (aa39649) and DRIVEN LIVE. Next: build M5c part 2 (owner decisions below); keep an eye out for v3; then
+    t1, b1/m2a as listed.
+    v1 + v2 DRIVEN LIVE (2026-11-18, release test build of aa39649): the window offered Install for the TypeScript
+    server ("Downloads typescript-language-server and typescript@5 ...") because the old folder held typescript 7;
+    Install put 5.9.3 in, and app.ts showed "Type 'string' is not assignable to type 'number'" (server ready).
+    12000 short lines, This PC hidden and shown: the note at the top, then "line 9115" onward.
+    v3 (seen once, not reproduced, not fixed): the first start of that test build, with This PC's master stopped
+    before it (killed for the build), brought back two terminal tabs titled "Windows PowerShell" that never showed a
+    prompt or echoed input, though both shells were running under the new core (spawned in the same second as the
+    core started). A new tab worked. A second cold start the same way (window closed, masters killed, start) brought
+    both tabs back working. Suspect: the spawn's output stream lost in a race while the window makes This PC's link
+    to a master that is just starting (u1 area, desktop.rs connect_link); watch for it at the next cold starts.
     M5c PART 1 DRIVEN LIVE (2026-11-18, release test build of e54df14, scratch project m5c-proj):
     - Intelephense started as a child of This PC's master core (not the app), "ready", flagged an undefined function.
     - Core crashed (crash.js): the open terminal said "Qanuvi's background part on this computer stopped, and this
