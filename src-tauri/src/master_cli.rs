@@ -125,7 +125,7 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 
 /// The words that are not flags or flag values.
 pub(super) fn words(args: &[String]) -> Vec<&str> {
-    const VALUED: [&str; 7] = [
+    const VALUED: [&str; 9] = [
         "--data",
         "--site",
         "--name",
@@ -133,6 +133,8 @@ pub(super) fn words(args: &[String]) -> Vec<&str> {
         "--key",
         "--relay",
         "--code",
+        "--steps",
+        "--budget",
     ];
     let mut out = Vec::new();
     let mut skip = false;

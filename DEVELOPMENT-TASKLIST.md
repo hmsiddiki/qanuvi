@@ -384,7 +384,24 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 13:30): M7c BUILT + DRIVEN LIVE on a Windows scratch
+    data folder (not yet on the VPS): `qanuvi-master plan run <plan file> [--steps 2-6] [--budget <dollars>]
+    [--no-follow]`, `plan follow [<project>]`, `plan list`, `plan stop [<project>] [--now]`. The file picks its
+    project (the deepest one holding it). The run copies the setup of the last run a window started on this master
+    (run-starts/<project id>.json, else the newest one of another project with its model rules left out; none:
+    "start one plan run from a Qanuvi window first"). Following prints step lines (started on model, done with cost,
+    failed/blocked with the note, waits for your answer, set aside, skipped), new notices, usage-limit waits, Inbox
+    questions, the agent's text and tools (paths from the project root) and the end line; Ctrl+C only leaves
+    (the run goes on); stop is gentle, --now stops at once (Controls::stop twice). Code in
+    src-tauri/src/master_cli_plan.rs, 8 tests. Drive (scratchpad m7c.sh, m7c-start.js writes a Haiku kept start):
+    refusals, a 2-step Haiku run followed, follower killed mid-run (run went on), `plan follow` to the end, --steps 1,
+    busy refusal, gentle stop shown as "Stopped by you". Findings fixed in the same build: x1 tool paths from the
+    project root, x2 a done try no longer says "it goes on", x3 a busy project is refused before the setup line.
+    CI NOTE (owner: fix later): CI fails since M4c 9b15c6d: Linux link needs libxdo-dev (tray-icon via muda) in
+    build.yml apt line; macOS a Rust test fails since M5a 9e242f3 (name only in the signed-in log); Windows flaky
+    checks::kill_tree test (20 s wait for PowerShell, give 60 s). Next: M7c on the VPS (owner yes for the server
+    build), then the CI fixes, then M8.
+    PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.
     Numbers follow the list's order (open questions first, then newest), each line also shows the id's start; an
