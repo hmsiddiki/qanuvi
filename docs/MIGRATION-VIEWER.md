@@ -354,6 +354,10 @@ Owner decisions (2026-11-18):
 - `qanuvi-master status`, `login`, `projects`, `inbox`, `plan run <file>`, `servers add/list`.
 - These are thin clients to the local service over the same protocol.
 - A full terminal screen goes later (IDEAS-UPCOMING).
+- AGREED (owner, 2026-11-18): M7a `status` + `projects list/add/remove`; M7b `inbox` (list, show, answer); M7c
+  `plan run <file>` (follows the run's lines) + `plan list/stop`. Ctrl+C on a followed run only detaches the
+  terminal; the run is the master's and goes on until `plan stop`.
+- M7a BUILT + DRIVEN LIVE (2026-11-18) on a Windows scratch master and the VPS.
 
 ### M8. Masters update themselves (agreed 2026-11-17)
 

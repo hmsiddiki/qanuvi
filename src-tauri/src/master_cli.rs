@@ -124,7 +124,7 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 }
 
 /// The words that are not flags or flag values.
-fn words(args: &[String]) -> Vec<&str> {
+pub(super) fn words(args: &[String]) -> Vec<&str> {
     const VALUED: [&str; 7] = [
         "--data",
         "--site",

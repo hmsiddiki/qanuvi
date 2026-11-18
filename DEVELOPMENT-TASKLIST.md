@@ -384,7 +384,17 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 10:15): M5c PART 2 DONE. w1-w6 FIXED ff2ef72 (owner: fix
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 10:50): M7 AGREED (owner, 2026-11-18): three parts,
+    M7a status + projects, M7b inbox (list, show, answer), M7c plan run <file> + plan list/stop; Ctrl+C on a
+    followed run only DETACHES the terminal (the run is the master's and goes on; `plan stop` stops it).
+    M7a BUILT + DRIVEN LIVE (Windows scratch data folder + VPS basevm378, owner yes): `qanuvi-master status` (not
+    started to answer when it is not running) prints version/host, data folder, account (or how to sign in),
+    projects, servers + connected, agents and plan runs working, Inbox open + waiting for an answer;
+    `qanuvi-master projects list | add <folder> | remove <name, folder or id>` (folder made whole from the
+    terminal's own place, "already one of this master's projects", a name two projects share asks for the folder
+    or id). Code in src-tauri/src/master_cli_status.rs, 3 tests. VPS runs the M7a server build (Nov 17 one kept as
+    .prev). Next: M7b inbox.
+    PICKUP POINT (before, 2026-11-18 10:15): M5c PART 2 DONE. w1-w6 FIXED ff2ef72 (owner: fix
     all, in the order proposed) and DRIVEN LIVE on the VPS (release test build), except w3, unit-tested only (no
     failure line to show in the drive). Verify: Rust 487 + 2 ignored, clippy clean, fmt clean, web 496, svelte-check
     0, prettier clean (StartupSettings.svelte formatting from 29c8e38 fixed on the way). Next: keep an eye out for v3;
