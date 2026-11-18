@@ -834,11 +834,21 @@ class MastersStore {
     } catch (e) {
       return errorText(e);
     }
+    return this.backAfterRestart(id, wasShown);
+  }
+
+  /**
+   * A master restarted itself (a restart asked for, or M8c: the end of its update): the old connection goes, the
+   * window connects again and shows it again when it was shown. Answers an error text, empty when it is back.
+   */
+  async backAfterRestart(id: string, wasShown = shownMachine() === id, tries = 4): Promise<string> {
+    const m = this.find(id);
+    if (!m) return "That machine is not in the list.";
     await this.#letConnectionGo(id);
     this.#dropped(id);
     this.#set(id, { state: "connecting" });
     // The new service waits for the old one to end, then applies the restore before it answers.
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < tries; i++) {
       await new Promise((r) => setTimeout(r, i === 0 ? 1500 : 3000));
       await this.connect(m);
       if (this.statusOf(id).state === "on") {

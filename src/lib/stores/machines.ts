@@ -14,6 +14,7 @@ import { guides } from "./guides.svelte";
 import { usage } from "./usage.svelte";
 import { startup } from "./startup.svelte";
 import { claudeUpdate } from "./claudeUpdate.svelte";
+import { masterUpdate } from "./masterUpdate.svelte";
 import { agent } from "./agent.svelte";
 import { omni } from "./omniroute.svelte";
 import { memoryDisk } from "./memoryDisk.svelte";
@@ -77,6 +78,8 @@ export async function show(machine: string | null): Promise<void> {
   guides.switched();
   startup.switched();
   claudeUpdate.switched();
+  // M8c: the status bar's update button and Settings, Updates are the new machine's (a master's own update).
+  masterUpdate.switched();
   omni.switched();
   // The Agents page's Claude Code card: never the machine before's path and version while the new one answers.
   agent.info = null;

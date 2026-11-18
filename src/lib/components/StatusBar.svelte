@@ -4,6 +4,8 @@
    * git branch, servers, the memory disk, agents at work and this month's agent cost. Each item opens its page.
    */
   import { updates } from "$lib/stores/updates.svelte";
+  import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
   import { startup } from "$lib/stores/startup.svelte";
   import { bytes, usage } from "$lib/stores/usage.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
@@ -254,8 +256,55 @@
     </button>
   {/each}
 
-  <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. -->
-  {#if updates.state === "available"}
+  <!-- Updates (1b): a slim button, like other editors show; it stays until it is used. M8c: with a master shown, its
+       own update (the master does the work; the window asks it and shows its progress). -->
+  {#if switcher.shown}
+    {@const where = shownPlace()}
+    {#if masterUpdate.state === "available"}
+      <button
+        type="button"
+        class="item update-btn"
+        title={`Qanuvi ${masterUpdate.version} is available for ${where}${masterUpdate.notes ? `: ${masterUpdate.notes}` : ""}. Click to download it there.`}
+        onclick={() => masterUpdate.download()}
+      >
+        <ArrowDownToLine size={12} />
+        <span>Update to {masterUpdate.version}</span>
+      </button>
+    {:else if masterUpdate.state === "downloading"}
+      <span class="item static update" title="Downloading Qanuvi {masterUpdate.version} on {where}">
+        <span>Downloading {masterUpdate.version}</span>
+        <span class="progress"><span style:width="{masterUpdate.percent}%"></span></span>
+      </span>
+    {:else if masterUpdate.state === "verifying"}
+      <span class="item static" title="Checking its signature, and that it starts on {where}">
+        <LoaderCircle size={12} class="spin" />
+        <span>Checking {masterUpdate.version}</span>
+      </span>
+    {:else if masterUpdate.state === "ready"}
+      <button
+        type="button"
+        class="item update-btn"
+        title="Qanuvi {masterUpdate.version} is downloaded on {where}. Restart to use it; the restart waits for work running there."
+        onclick={() => masterUpdate.restartToUpdate()}
+      >
+        <RotateCw size={12} />
+        <span>Restart to update</span>
+      </button>
+    {:else if masterUpdate.state === "waiting"}
+      <span
+        class="item static"
+        title="Update to {masterUpdate.version} waits: {masterUpdate.waitingFor} on {where}. It goes in as soon as that ends; nothing is cut off."
+      >
+        <LoaderCircle size={12} class="spin" />
+        <span>Update waits for running work</span>
+      </span>
+    {:else if masterUpdate.state === "restarting"}
+      <span class="item static" title="{where} restarts with Qanuvi {masterUpdate.version}">
+        <LoaderCircle size={12} class="spin" />
+        <span>Restarting to update</span>
+      </span>
+    {/if}
+  {:else if updates.state === "available"}
     <button
       type="button"
       class="item update-btn"

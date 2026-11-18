@@ -771,8 +771,9 @@ impl Master {
             // M8a: what this master's own look on the update channel found, and a look now.
             "update_status" => to(Ok(self.updates.state())),
             "update_check" => to(Ok(self.updates.check(self.app_data))),
-            // M8b: put the update in (download, signature, start test, wait for work, swap, restart from it).
-            "update_install" => to(self.update_install()),
+            // M8b: put the update in (download, signature, start test, wait for work, swap, restart from it). M8c: the
+            // window's "Update to x" holds once it is checked ("Restart to update" asks again without hold).
+            "update_install" => to(self.update_install(args["hold"].as_bool().unwrap_or(false))),
             // How many agents work here now (the window's machine switcher shows it, 24z3 step 4).
             "agents_working" => Ok(json!(crate::agent::working_count(&self.db))),
             "master_restart" => {
@@ -1316,7 +1317,18 @@ impl Master {
                 std::thread::sleep(crate::master_update::FIRST_CHECK);
                 loop {
                     let Some(m) = me.upgrade() else { return };
-                    m.updates.check(m.app_data);
+                    let state = m.updates.check(m.app_data);
+                    // M8c: "Download updates by themselves" on this master: it puts the update in itself, still
+                    // waiting for running work. This PC's is updated with the whole app (M8d).
+                    if !m.app_data
+                        && crate::master_update::auto_wanted(
+                            &crate::settings::get_all(&m.db).unwrap_or_default(),
+                            &state,
+                        )
+                        && let Err(e) = m.update_install(false)
+                    {
+                        eprintln!("The update did not start by itself: {e}");
+                    }
                     drop(m);
                     std::thread::sleep(crate::master_update::CHECK_EVERY);
                 }
@@ -1501,7 +1513,7 @@ impl Master {
     }
 
     /// M8b: puts the update the last look found in. This PC's master installs the whole app instead (M8d).
-    fn update_install(&self) -> Result<crate::master_update::UpdateState, String> {
+    fn update_install(&self, hold: bool) -> Result<crate::master_update::UpdateState, String> {
         if self.app_data {
             return Err("This PC's master is updated with the whole app (that comes later); use Update in the app for now.".into());
         }
@@ -1545,7 +1557,7 @@ impl Master {
                 None => Err("The master ended before the update went in.".into()),
             }),
         };
-        self.updates.install(exe, hooks)
+        self.updates.install(exe, hooks, hold)
     }
 
     /// A restart, or (M8b, `updated`: the program now in place) the end of an update: the service is started again

@@ -1,10 +1,46 @@
 <script lang="ts">
-  /** Settings → Updates (1b): the version, the update channel, a manual check, reload and restart. */
+  /**
+   * Settings → Updates (1b): the version, the update channel, a manual check, reload and restart. M8c: with a master
+   * shown, its own update: the master looks, downloads and restarts itself; this page asks it and shows where it is,
+   * and "Download updates by themselves" is that master's own setting.
+   */
   import { updates } from "$lib/stores/updates.svelte";
+  import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
+  import { shownPlace } from "$lib/remote";
   import { ago } from "$lib/stores/git.svelte";
   import { settings } from "$lib/stores/settings.svelte";
 
+  const onMaster = $derived(!!switcher.shown);
+  const up = $derived(onMaster ? masterUpdate : updates);
+  const where = $derived(switcher.shown ? shownPlace() : "this computer");
+
   const status = $derived.by(() => {
+    if (onMaster) {
+      const m = masterUpdate;
+      switch (m.state) {
+        case "checking":
+          return "Looking for a newer version…";
+        case "none":
+          return m.noBuild || "Qanuvi is up to date there.";
+        case "available":
+          return `Qanuvi ${m.version} is available.${m.error ? ` ${m.error}` : ""}`;
+        case "downloading":
+          return `Downloading ${m.version}… ${m.percent}%`;
+        case "verifying":
+          return `Checking ${m.version}: its signature, and that it starts there.`;
+        case "ready":
+          return `${m.version} is ready. Restart to use it; the restart waits for work running there.`;
+        case "waiting":
+          return `Update to ${m.version} waits: ${m.waitingFor} working. It goes in as soon as that ends; nothing is cut off.`;
+        case "restarting":
+          return `Restarting with ${m.version}…`;
+        case "error":
+          return `The update check failed: ${m.error}`;
+        default:
+          return "It looks for a newer version two minutes after its start, then every hour.";
+      }
+    }
     switch (updates.state) {
       case "checking":
         return "Looking for a newer version…";
@@ -22,54 +58,69 @@
         return "Qanuvi looks for a newer version at start, every hour and when you come back to it.";
     }
   });
+
+  const working = $derived(["checking", "downloading", "verifying", "waiting", "restarting"].includes(up.state));
+  const failed = $derived(up.state === "error" || (onMaster && !!masterUpdate.error && up.state === "available"));
 </script>
 
 <h2>Updates</h2>
 <p class="intro">
-  New versions come from the <strong>dev</strong> channel, signed by the Qanuvi team; a version with a wrong signature is
-  refused. A newer version shows as a button in the status bar: click it to download, then restart (or close Qanuvi) to install.
+  New versions come from the <strong>dev</strong> channel, signed by the Qanuvi team; a version with a wrong signature
+  is refused.
+  {#if onMaster}
+    These are {where}'s own updates: it looks for them itself, and does the download and the restart. A newer version
+    shows as a button in the status bar while it is shown: click it to download, then restart to install.
+  {:else}
+    A newer version shows as a button in the status bar: click it to download, then restart (or close Qanuvi) to
+    install.
+  {/if}
 </p>
 
 <div class="card">
-  <div class="row"><span class="muted">This version</span><strong>{updates.current || "…"}</strong></div>
+  <div class="row"><span class="muted">This version</span><strong>{up.current || "…"}</strong></div>
   <div class="row"><span class="muted">Channel</span><span>dev</span></div>
-  {#if updates.checkedAt}
+  {#if up.checkedAt}
     <div class="row">
-      <span class="muted">Last checked</span><span>{ago(Math.floor(updates.checkedAt / 1000))}</span>
+      <span class="muted">Last checked</span><span>{ago(Math.floor(up.checkedAt / 1000))}</span>
     </div>
   {/if}
-  <p class="status" class:error={updates.state === "error"}>{status}</p>
-  {#if updates.state === "downloading"}
-    <div class="bar"><span style:width="{updates.percent}%"></span></div>
+  <p class="status" class:error={failed}>{status}</p>
+  {#if up.state === "downloading"}
+    <div class="bar"><span style:width="{up.percent}%"></span></div>
   {/if}
-  {#if updates.notes && ["available", "ready", "downloading"].includes(updates.state)}
-    <pre class="notes">{updates.notes}</pre>
+  {#if up.notes && ["available", "ready", "downloading", "verifying", "waiting"].includes(up.state)}
+    <pre class="notes">{up.notes}</pre>
   {/if}
   <div class="actions">
-    {#if updates.state === "ready"}
-      <button type="button" class="btn primary" onclick={() => updates.restartToUpdate()}>Restart to update</button>
-    {:else if updates.state === "available"}
-      <button type="button" class="btn primary" onclick={() => updates.download()}>Download {updates.version}</button>
+    {#if up.state === "ready"}
+      <button type="button" class="btn primary" onclick={() => up.restartToUpdate()}>Restart to update</button>
+    {:else if up.state === "available"}
+      <button type="button" class="btn primary" onclick={() => up.download()}>Download {up.version}</button>
     {:else}
-      <button
-        type="button"
-        class="btn"
-        disabled={updates.state === "checking" || updates.state === "downloading"}
-        onclick={() => updates.check()}>Check now</button
-      >
+      <button type="button" class="btn" disabled={working} onclick={() => up.check()}>Check now</button>
     {/if}
   </div>
+  {#if onMaster && masterUpdate.note && !["available", "error"].includes(up.state)}
+    <p class="status error">{masterUpdate.note}</p>
+  {/if}
 </div>
 
 <label class="auto">
   <input
     type="checkbox"
     checked={settings.value.updates.autoDownload}
-    onchange={(e) => settings.set("updates", { autoDownload: e.currentTarget.checked })}
+    onchange={(e) => settings.set("updates", { ...settings.value.updates, autoDownload: e.currentTarget.checked })}
   />
   <span>
     <strong>Download updates by themselves</strong>
-    <span class="muted">Off: a new version waits for your click in the status bar before it downloads.</span>
+    {#if onMaster}
+      <span class="muted"
+        >On: {where} puts a new version in by itself, once no agent or plan run is working there. Off: it only tells, here
+        and in its terminal.</span
+      >
+    {:else}
+      <span class="muted">Off: a new version waits for your click in the status bar before it downloads.</span>
+    {/if}
   </span>
 </label>
 

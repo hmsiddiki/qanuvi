@@ -169,9 +169,12 @@ pub fn update_cli(dir: &Path) -> Result<(), String> {
         return update_here();
     }
     let state = call(dir, "update_check", json!({}))?;
-    let under_way = state["install"]["stage"]
-        .as_str()
-        .is_some_and(|s| matches!(s, "downloading" | "checking" | "waiting" | "restarting"));
+    let under_way = state["install"]["stage"].as_str().is_some_and(|s| {
+        matches!(
+            s,
+            "downloading" | "checking" | "ready" | "waiting" | "restarting"
+        )
+    });
     if !under_way && mu::notice(&state).is_none() {
         println!("{}", mu::status_line(&state));
         return if state["error"].as_str().unwrap_or("").is_empty() {

@@ -163,8 +163,9 @@ pub struct UpdateState {
     pub install: Install,
 }
 
-/// Where putting an update in is. `stage`: "" (nothing), "downloading", "checking", "waiting" (for running work,
-/// `waiting_for` says which), "restarting", or "failed" (`error` says why; nothing was changed).
+/// Where putting an update in is. `stage`: "" (nothing), "downloading", "checking", "ready" (M8c: downloaded and
+/// checked, waiting for "Restart to update"), "waiting" (for running work, `waiting_for` says which), "restarting", or
+/// "failed" (`error` says why; nothing was changed).
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Install {
@@ -251,36 +252,66 @@ impl Updates {
 
     /// M8b: puts the update the last look found in, on a thread of its own (the answer goes out at once; `update_status`
     /// follows it). Refused when there is nothing to put in; asked again while one is under way, it changes nothing.
+    ///
+    /// M8c: with `hold` (the window's "Update to x"), it stops once the build is downloaded and checked: stage "ready",
+    /// and the window shows "Restart to update". Asked again without `hold` (that button, the terminal's `update` or the
+    /// master's own auto-update), a ready build goes on from there: wait for running work, swap, restart.
     pub fn install(
         self: &std::sync::Arc<Self>,
         exe: PathBuf,
         hooks: InstallHooks,
+        hold: bool,
     ) -> Result<UpdateState, String> {
-        let found = {
+        let job = {
             let mut s = self.0.lock().unwrap();
-            if s.install.under_way() {
+            if s.install.stage == "ready" {
+                if hold {
+                    return Ok(s.clone());
+                }
+                let new = new_path(&exe);
+                if !new.exists() {
+                    // The checked build went (removed by hand): download it again.
+                    s.install = Install::default();
+                    drop(s);
+                    return self.install(exe, hooks, hold);
+                }
+                s.install.stage = "waiting".into();
+                Job::Finish(s.install.version.clone(), new)
+            } else if s.install.under_way() {
                 return Ok(s.clone());
+            } else {
+                let found = s.available.clone().ok_or_else(|| {
+                    format!("{} is the newest; there is nothing to update.", s.current)
+                })?;
+                if found.url.is_empty() {
+                    return Err(format!(
+                        "{} is out, but has no build for this machine yet.",
+                        found.version
+                    ));
+                }
+                s.install = Install {
+                    stage: "downloading".into(),
+                    version: found.version.clone(),
+                    program: exe.display().to_string(),
+                    ..Install::default()
+                };
+                Job::Download(found)
             }
-            let found = s.available.clone().ok_or_else(|| {
-                format!("{} is the newest; there is nothing to update.", s.current)
-            })?;
-            if found.url.is_empty() {
-                return Err(format!(
-                    "{} is out, but has no build for this machine yet.",
-                    found.version
-                ));
-            }
-            s.install = Install {
-                stage: "downloading".into(),
-                version: found.version.clone(),
-                program: exe.display().to_string(),
-                ..Install::default()
-            };
-            found
         };
         let me = self.clone();
         std::thread::spawn(move || {
-            if let Err(e) = me.put_in(&found, &exe, hooks) {
+            let result = match job {
+                Job::Download(found) => me.fetch_build(&found, &exe).and_then(|new| {
+                    if hold {
+                        me.set_install(|i| i.stage = "ready".into());
+                        Ok(())
+                    } else {
+                        me.finish(&found.version, &exe, &new, hooks)
+                    }
+                }),
+                Job::Finish(version, new) => me.finish(&version, &exe, &new, hooks),
+            };
+            if let Err(e) = result {
                 me.set_install(|i| {
                     i.stage = "failed".into();
                     i.waiting_for.clear();
@@ -291,8 +322,9 @@ impl Updates {
         Ok(self.state())
     }
 
-    fn put_in(&self, found: &Found, exe: &Path, hooks: InstallHooks) -> Result<(), String> {
-        let new = prepare(
+    /// Downloads and checks the build beside the program (`<exe>.new`).
+    fn fetch_build(&self, found: &Found, exe: &Path) -> Result<PathBuf, String> {
+        prepare(
             found,
             exe,
             &trusted_key(),
@@ -303,7 +335,17 @@ impl Updates {
                 })
             },
             || self.set_install(|i| i.stage = "checking".into()),
-        )?;
+        )
+    }
+
+    /// Waits for running work (never cutting it off), swaps the checked build in and restarts the service from it.
+    fn finish(
+        &self,
+        version: &str,
+        exe: &Path,
+        new: &Path,
+        hooks: InstallHooks,
+    ) -> Result<(), String> {
         // Running work is never cut off: the swap waits until nothing works, and says so once.
         let mut told = false;
         while let Some(what) = (hooks.busy)() {
@@ -312,7 +354,7 @@ impl Updates {
                 i.waiting_for = what.clone();
             });
             if !told {
-                (hooks.waits)(&found.version, &what);
+                (hooks.waits)(version, &what);
                 told = true;
             }
             std::thread::sleep(BUSY_EVERY);
@@ -324,12 +366,18 @@ impl Updates {
             i.stage = "restarting".into();
             i.waiting_for.clear();
         });
-        swap_in(exe, &new)?;
+        swap_in(exe, new)?;
         (hooks.restart)(exe).inspect_err(|_| {
             // The service could not start again from the new one: the old one goes back, so a later start finds it.
             let _ = swap_back(exe);
         })
     }
+}
+
+/// What a call to [`Updates::install`] starts on its thread.
+enum Job {
+    Download(Found),
+    Finish(String, PathBuf),
 }
 
 /// The new build's place while it is checked (beside the program, so the swap is one rename on the same disk).
@@ -508,6 +556,18 @@ fn swap_back(exe: &Path) -> Result<(), String> {
     std::fs::rename(&prev, exe).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(&failed);
     Ok(())
+}
+
+/// M8c: whether this master puts an update in by itself: its "Download updates by themselves" setting is on (off
+/// unless switched on, so a master set up from a terminal only tells), and the last look found a build for it that is not
+/// already going in. A build checked and held for "Restart to update" goes on too.
+pub fn auto_wanted(settings: &serde_json::Map<String, Value>, state: &UpdateState) -> bool {
+    let on = settings
+        .get("updates")
+        .and_then(|u| u["autoDownload"].as_bool())
+        .unwrap_or(false);
+    let has_build = state.available.as_ref().is_some_and(|f| !f.url.is_empty());
+    on && has_build && (state.install.stage == "ready" || !state.install.under_way())
 }
 
 /// Whether this master looks by itself (`QANUVI_NO_UPDATE_CHECK=1` turns it off, for tests and throwaway masters).
@@ -852,13 +912,13 @@ mod tests {
             restart: Box::new(|_| Ok(())),
         };
         let u = std::sync::Arc::new(Updates::default());
-        let e = u.install(PathBuf::from("x"), hooks()).unwrap_err();
+        let e = u.install(PathBuf::from("x"), hooks(), false).unwrap_err();
         assert!(e.contains("nothing to update"), "{e}");
         u.0.lock().unwrap().available = Some(Found {
             version: "0.9.0".into(),
             ..Found::default()
         });
-        let e = u.install(PathBuf::from("x"), hooks()).unwrap_err();
+        let e = u.install(PathBuf::from("x"), hooks(), false).unwrap_err();
         assert!(e.contains("no build for this machine"), "{e}");
     }
 
@@ -885,7 +945,7 @@ mod tests {
                 Ok(())
             }),
         };
-        let first = u.install(exe.clone(), hooks).unwrap();
+        let first = u.install(exe.clone(), hooks, false).unwrap();
         assert_eq!(first.install.stage, "downloading");
         // Asked again while under way: nothing new starts.
         let again = InstallHooks {
@@ -894,7 +954,12 @@ mod tests {
             waited: Box::new(|| {}),
             restart: Box::new(|_| Ok(())),
         };
-        assert!(u.install(exe.clone(), again).unwrap().install.under_way());
+        assert!(
+            u.install(exe.clone(), again, false)
+                .unwrap()
+                .install
+                .under_way()
+        );
         // Signed by the test key only, so (the app's key in a test) it fails before any waiting or swap.
         let started = Instant::now();
         while u.state().install.under_way() && started.elapsed() < Duration::from_secs(20) {
@@ -905,6 +970,77 @@ mod tests {
         assert!(end.error.contains("signature is wrong"), "{}", end.error);
         assert!(!*restarted.lock().unwrap());
         assert_eq!(std::fs::read_to_string(&exe).unwrap(), "running");
+    }
+
+    #[test]
+    fn a_held_build_waits_ready_then_goes_in_when_asked_without_hold() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = d.path().join("qanuvi-master");
+        std::fs::write(&exe, "running").unwrap();
+        std::fs::write(new_path(&exe), "checked 0.9.0").unwrap();
+        let u = std::sync::Arc::new(Updates::default());
+        u.0.lock().unwrap().install = Install {
+            stage: "ready".into(),
+            version: "0.9.0".into(),
+            program: exe.display().to_string(),
+            ..Install::default()
+        };
+        let restarted = std::sync::Arc::new(Mutex::new(false));
+        let r2 = restarted.clone();
+        let hooks = |r: Option<std::sync::Arc<Mutex<bool>>>| InstallHooks {
+            busy: Box::new(|| None),
+            waits: Box::new(|_, _| {}),
+            waited: Box::new(|| {}),
+            restart: Box::new(move |_| {
+                if let Some(r) = r {
+                    *r.lock().unwrap() = true;
+                }
+                Ok(())
+            }),
+        };
+        // "Update to x" asked again: it stays ready, nothing is swapped.
+        let same = u.install(exe.clone(), hooks(None), true).unwrap();
+        assert_eq!(same.install.stage, "ready");
+        assert_eq!(std::fs::read_to_string(&exe).unwrap(), "running");
+        // "Restart to update": swapped in and restarted, the old one kept.
+        u.install(exe.clone(), hooks(Some(r2)), false).unwrap();
+        let started = Instant::now();
+        while !*restarted.lock().unwrap() && started.elapsed() < Duration::from_secs(20) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(*restarted.lock().unwrap());
+        assert_eq!(std::fs::read_to_string(&exe).unwrap(), "checked 0.9.0");
+        assert_eq!(std::fs::read_to_string(prev_path(&exe)).unwrap(), "running");
+    }
+
+    #[test]
+    fn a_master_updates_by_itself_only_when_its_setting_is_on() {
+        let on = json!({"updates": {"autoDownload": true}});
+        let off = json!({"updates": {"autoDownload": false}});
+        let (on, off, none) = (
+            on.as_object().unwrap().clone(),
+            off.as_object().unwrap().clone(),
+            serde_json::Map::new(),
+        );
+        let mut state = UpdateState {
+            available: Some(Found {
+                version: "0.9.0".into(),
+                url: "http://x/b".into(),
+                ..Found::default()
+            }),
+            ..UpdateState::default()
+        };
+        assert!(auto_wanted(&on, &state));
+        assert!(!auto_wanted(&off, &state));
+        // Never switched: a master set up from a terminal only tells.
+        assert!(!auto_wanted(&none, &state));
+        state.install.stage = "downloading".into();
+        assert!(!auto_wanted(&on, &state));
+        state.install.stage = "ready".into();
+        assert!(auto_wanted(&on, &state));
+        state.install.stage = String::new();
+        state.available.as_mut().unwrap().url.clear();
+        assert!(!auto_wanted(&on, &state));
     }
 
     #[test]
