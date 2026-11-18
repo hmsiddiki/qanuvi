@@ -410,6 +410,10 @@ The rule: the master does everything the app does today, updates included.
     the update in (`update_install`, progress in `update_status`), waits for running work with an Inbox note, keeps
     `.prev`, and restarts from the new program through its watcher. Driven on the VPS too (throwaway data; its
     service runs the M8b server build). Next build: M8c.
+  - M8c BUILT (2026-11-18, b4bc5b3), not driven live yet: "Update to x" downloads and checks the build on the shown
+    master and holds it (stage "ready"); "Restart to update" waits for running work, swaps and restarts, and the window
+    connects again. Settings, Updates shows that master's state and its own "Download updates by themselves" (off unless
+    switched on); when on, its hourly look puts the update in by itself. Next: drive it live, then M8d.
 
 ### M9. Release
 

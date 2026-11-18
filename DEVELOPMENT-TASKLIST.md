@@ -468,7 +468,25 @@ runs on or off; with it off nothing is sent anywhere.
     installed path (--after-pid), .prev 0.1.23; the real service untouched during it. Then the M8b server build was
     swapped into ~/.local/bin by hand (idle first; the 03:28 M8a build kept as .prev), serve restarted with setsid:
     2 projects and its Inbox item back.
-    PICKUP POINT (2026-11-18, after M8b on the VPS): next M8c (the screen for the shown master:
+    M8c BUILT (2026-11-18, b4bc5b3; NOT DRIVEN LIVE yet): the screen for the shown master. `update_install` takes
+    `hold`: the window's "Update to x" stops once the build is downloaded and checked (new stage "ready", `<exe>.new`
+    kept); asked again without hold ("Restart to update", the terminal's `update`, or auto-update) a ready build goes on:
+    wait for running work (Inbox note), swap, restart. A ready build removed by hand is downloaded again. Window: new
+    masterUpdate store (asks the shown master's `update_status`, every second while an update goes on, else every 5
+    minutes and on every switch); the status bar shows Update to x / Downloading x + bar / Checking x / Restart to update
+    / Update waits for running work / Restarting to update; the restart's lost connection is expected: masters.
+    backAfterRestart (split out of masters.restart, 10 tries) connects again and shows it, then the store sees the new
+    version. Settings, Updates shows the shown master's version, state, Check now / Download / Restart, and its own
+    "Download updates by themselves" (the master's settings; off unless switched on, so a terminal-set-up master only
+    tells). The master's hourly look puts the update in by itself when that is on (master_update::auto_wanted), still
+    waiting for running work. This PC keeps the app's own updater until M8d. Rust 518, vitest 501 (+2 Rust, +5 vitest),
+    svelte-check and clippy clean.
+    PICKUP POINT (2026-11-18, after M8c built): next drive M8c live: release window build + a Windows scratch master on
+    a localhost test channel (the M8b way: this code as 0.1.23 and 0.9.0, throwaway test key, scripts in the m8b/
+    scratch of session f4b4a43e): Update to x -> progress -> Restart to update; with a plan run working -> waits + Inbox
+    note, then restarts and the window connects back on 0.9.0; auto-update on -> it goes in by itself; off by default.
+    Then the Linux laptop and the VPS (ask first), then M8d.
+    PICKUP POINT (before, 2026-11-18, after M8b on the VPS): next M8c (the screen for the shown master:
     status bar button with progress from `update_install` / `update_status.install`, "Restart to update", the
     per-master auto-update setting, off by default for a master set up from a terminal).
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
