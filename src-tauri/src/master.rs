@@ -3180,7 +3180,7 @@ mod tests {
                 true
             })
         };
-        let start = json!({"projectId": id, "onEvent": "r1", "start": {"file": "PLAN.md", "projectName": "Shop"}});
+        let start = json!({"projectId": id, "onEvent": "r1", "start": {"file": "PLAN.md", "projectName": "Shop", "provider": "qanuvi"}});
         m.dispatch(
             "plan_run_start",
             &start,

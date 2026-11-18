@@ -12,7 +12,7 @@ cd "$(dirname "$0")/../src-tauri"
 annotate() {
   local title body
   title=$(printf '%s' "$1" | sed 's/%/%25/g; s/:/%3A/g; s/,/%2C/g')
-  body=$(printf '%s' "$2" | tail -n 60 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')
+  body=$(printf '%s' "$2" | tr -d '\r' | tail -n 60 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')
   echo "::error title=${title}::${body}"
 }
 

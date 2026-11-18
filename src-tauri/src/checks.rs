@@ -269,7 +269,8 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .unwrap();
-        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        // A cold PowerShell on a busy CI runner can take well over 20 seconds to start the child.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
         let child = loop {
             if let Some(pid) = std::fs::read_to_string(&pid_file)
                 .ok()
