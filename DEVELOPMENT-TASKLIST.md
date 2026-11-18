@@ -418,7 +418,7 @@ runs on or off; with it off nothing is sent anywhere.
     machine: Rust + Node 24 in the user's home, clone in ~/src/qanuvi, ~/src/verify.sh runs CI's verify
     (Zorin needs libayatana-appindicator3-dev, not libappindicator3-dev). M8 PARTS AGREED (owner, 2026-11-18):
     M8a check on the master, M8b `qanuvi-master update`, M8c the screen for a shown master, M8d This PC's whole
-    install (docs/MIGRATION-VIEWER.md M8). PICKUP POINT (2026-11-18): next build M8a; the laptop can run
+    install (docs/MIGRATION-VIEWER.md M8). (Pickup point before M8a.) The laptop can run
     ~/src/verify.sh (git pull first) for a Linux check before pushing.
     M8a BUILT + DRIVEN LIVE (2026-11-18, Windows scratch masters, the Linux laptop and the VPS): every
     master looks on the update channel itself (master_update.rs: two minutes after start, then hourly;
@@ -436,7 +436,10 @@ runs on or off; with it off nothing is sent anywhere.
     throwaway test key. VPS (owner yes): server build cross-built (zigbuild -j 2, glibc 2.36, 10.2 MB, 4m54s),
     driven on throwaway data (real channel and a localhost test channel, as on Windows), then swapped into
     ~/.local/bin with the 00:42 build kept as .prev; the service restarted idle. publish-update.mjs now builds
-    the .2.36 target with zig on its PATH (QANUVI_ZIG_DIR). Next: M8b (`qanuvi-master update`).
+    the .2.36 target with zig on its PATH (QANUVI_ZIG_DIR).
+    PICKUP POINT (2026-11-18, after M8a): next build M8b, `qanuvi-master update` (download, verify() against the
+    signature, swap with .prev, service restart; waits on master_busy, says so in the terminal and as an Inbox note).
+    Linux check first on the laptop (git pull, ~/src/verify.sh); VPS drives need the owner's yes.
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.
