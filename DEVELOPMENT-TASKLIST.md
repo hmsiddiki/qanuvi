@@ -420,7 +420,7 @@ runs on or off; with it off nothing is sent anywhere.
     M8a check on the master, M8b `qanuvi-master update`, M8c the screen for a shown master, M8d This PC's whole
     install (docs/MIGRATION-VIEWER.md M8). PICKUP POINT (2026-11-18): next build M8a; the laptop can run
     ~/src/verify.sh (git pull first) for a Linux check before pushing.
-    M8a BUILT + DRIVEN LIVE (2026-11-18, Windows scratch masters + the Linux laptop; VPS drive waits for a yes): every
+    M8a BUILT + DRIVEN LIVE (2026-11-18, Windows scratch masters, the Linux laptop and the VPS): every
     master looks on the update channel itself (master_update.rs: two minutes after start, then hourly;
     QANUVI_UPDATES_URL for a test channel, QANUVI_NO_UPDATE_CHECK=1 turns it off) and answers update_status and
     update_check. Build keys: This PC's master reads the app installer's (windows-x86_64; it installs the whole app,
@@ -433,7 +433,10 @@ runs on or off; with it off nothing is sent anywhere.
     owner). Driven: real channel (0.1.25, no master build: "out, but has no build for this machine yet"), a localhost
     test channel with a master build ("0.2.0 is available", the notice before projects list / inbox list), a 404
     channel ("the last look failed (the update channel answered 404)"). Rust 509 (Linux 507), 4 new tests with a
-    throwaway test key. Next: M8b (`qanuvi-master update`).
+    throwaway test key. VPS (owner yes): server build cross-built (zigbuild -j 2, glibc 2.36, 10.2 MB, 4m54s),
+    driven on throwaway data (real channel and a localhost test channel, as on Windows), then swapped into
+    ~/.local/bin with the 00:42 build kept as .prev; the service restarted idle. publish-update.mjs now builds
+    the .2.36 target with zig on its PATH (QANUVI_ZIG_DIR). Next: M8b (`qanuvi-master update`).
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.

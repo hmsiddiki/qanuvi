@@ -404,8 +404,8 @@ The rule: the master does everything the app does today, updates included.
     per-master auto-update setting (off by default for a master set up from a terminal).
   - M8d: This PC's master updates the whole install with one installer and one button; the screen's own updater
     goes.
-  - M8a BUILT + DRIVEN LIVE (2026-11-18) on Windows scratch masters and a Linux laptop; the VPS drive waits for the
-    owner's yes. Details in DEVELOPMENT-TASKLIST.md. Next build: M8b.
+  - M8a BUILT + DRIVEN LIVE (2026-11-18) on Windows scratch masters, a Linux laptop and the VPS (its service runs
+    the M8a server build). Details in DEVELOPMENT-TASKLIST.md. Next build: M8b.
 
 ### M9. Release
 

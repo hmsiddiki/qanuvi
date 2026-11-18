@@ -78,10 +78,13 @@ const masters = [["master-windows-x86_64", path.join(root, "src-tauri/target/rel
 if (process.env.QANUVI_SKIP_LINUX_MASTER) {
   console.warn("(No Linux master build this time: QANUVI_SKIP_LINUX_MASTER is set.)");
 } else {
+  // glibc 2.36, so the build runs on older servers too; zig from QANUVI_ZIG_DIR (else where it is installed here).
   const target = "x86_64-unknown-linux-gnu";
-  execSync(`cargo zigbuild --release --no-default-features --bin qanuvi-master --target ${target} -j 2`, {
+  const zig = process.env.QANUVI_ZIG_DIR || "E:/DevTools/zig/zig-windows-x86_64-0.13.0";
+  execSync(`cargo zigbuild --release --no-default-features --bin qanuvi-master --target ${target}.2.36 -j 2`, {
     cwd: path.join(root, "src-tauri"),
     stdio: "inherit",
+    env: { ...process.env, PATH: `${zig}${path.delimiter}${process.env.PATH}` },
   });
   masters.push(["master-linux-x86_64", path.join(root, `src-tauri/target/${target}/release/qanuvi-master`), ""]);
 }
