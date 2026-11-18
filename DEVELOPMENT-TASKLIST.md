@@ -409,6 +409,14 @@ runs on or off; with it off nothing is sent anywhere.
     blocked and skipped steps come back (both leave a mark in the plan); a failed one comes back through its Inbox
     answer. Scenario test y2_a_step_that_failed_on_every_model_runs_once_and_asks_once (fails without the fix); driven
     live (Haiku-only, FAIL.md: one copy, one question, step 2 done). Rust 505. Next: the CI fixes, then M8.
+    CI FIXED (2026-11-18, ff5f011 + 5dced09): all three green for the first time since M4c. Causes: Linux link needed
+    libxdo-dev (build.yml); macOS was never a test but a clippy dead-code error (master_notify APP_ID used only on
+    Windows), hidden because a carriage return cut the annotation; Windows failed a master run test since y2 part 1
+    (runners have no Claude Code; the test now starts with Qanuvi agent) and the kill_tree start wait is 60 s.
+    ci-verify.sh now strips colour codes and carriage returns and posts failing Rust tests by name in their own
+    annotation. The owner's Linux laptop (Zorin OS 18.1, on the same wifi, reached over SSH) is set up as a Linux check
+    machine: Rust + Node 24 in the user's home, clone in ~/src/qanuvi, ~/src/verify.sh runs CI's verify
+    (Zorin needs libayatana-appindicator3-dev, not libappindicator3-dev). Next: M8 (split into parts for the owner).
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.
