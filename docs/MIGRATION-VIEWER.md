@@ -333,8 +333,9 @@ Owner decisions (2026-11-18):
   folders are cleaned up. Details in DEVELOPMENT-TASKLIST.md.
 - M5c PART 1 BUILT (2026-11-18): This PC's language servers and debuggers run on its master through the program
   pipe, as every machine's (the app starts none itself); j1, "earlier output trimmed", "Checking…" for a
-  restarting language server, and i1 (drafts kept when a window goes, with an Inbox note). Open for the owner: This
-  PC's server connections on its master, and whether the booked restore stays in the app. Details in
+  restarting language server, and i1 (drafts kept when a window goes, with an Inbox note). Owner (2026-11-18): This PC's
+  master holds This PC's server connections and the window reaches them through it (M5c part 2, to build); the
+  booked restore stays in the app (done). Details in
   DEVELOPMENT-TASKLIST.md.
 
 ### M6. Delete the second core (folded into M5a, owner 2026-11-18)

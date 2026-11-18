@@ -415,7 +415,11 @@ runs on or off; with it off nothing is sent anywhere.
     their text in italics.
     Left (not built): other windows' unsaved text on Restart (the app ends without their close events); a machine
     held as lost keeps no drafts on close.
-    OPEN M5c QUESTIONS (for the owner before building):
+    OWNER DECISIONS (2026-11-18, "yes to both"): (1) BUILD M5c part 2: This PC's master holds This PC's server
+    connections (connect at start, kept with no window) and the window reaches them through it as nested machines
+    of This PC; "local" and "self" stay the window's. (2) The booked restore stays in the app: item done as it is.
+    Next: release test build + drive of part 1, then build part 2.
+    THE QUESTIONS AS ASKED:
     - This PC's server connections on its master: today the window connects This PC's servers itself (masters
       store), and This PC's master refuses "local"/"self" targets and skips connect_away_servers on the app's data.
       Proposal: This PC's master connects the servers marked to connect at start (so their Inbox and runs are
