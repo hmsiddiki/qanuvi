@@ -394,6 +394,17 @@ The rule: the master does everything the app does today, updates included.
 - **This PC:** after M4, This PC's master updates the whole install, both the master and the screen app, with one
   installer and one button. The screen app has no updater of its own any more.
 - **Publishing:** an update still goes out only with the owner's yes.
+- PARTS AGREED (owner, 2026-11-18), each driven live on a scratch master and the VPS:
+  - M8a: the master's own check (hourly `latest.json`, signature checked in Rust with the same public key, a wrong
+    one refused); `latest.json` lists master builds and `publish-update.mjs` builds and signs them; `status` and
+    every terminal command say "Update available: 0.x.y".
+  - M8b: `qanuvi-master update` (download, signature check, swap with `.prev`, service restart); waits on
+    `master_busy` and says so in the terminal and as an Inbox note; never cuts a run off.
+  - M8c: the screen for the shown master: the status bar button with progress, then "Restart to update"; the
+    per-master auto-update setting (off by default for a master set up from a terminal).
+  - M8d: This PC's master updates the whole install with one installer and one button; the screen's own updater
+    goes.
+  - Next build: M8a.
 
 ### M9. Release
 

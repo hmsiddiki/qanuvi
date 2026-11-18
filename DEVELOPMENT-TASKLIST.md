@@ -416,7 +416,10 @@ runs on or off; with it off nothing is sent anywhere.
     ci-verify.sh now strips colour codes and carriage returns and posts failing Rust tests by name in their own
     annotation. The owner's Linux laptop (Zorin OS 18.1, on the same wifi, reached over SSH) is set up as a Linux check
     machine: Rust + Node 24 in the user's home, clone in ~/src/qanuvi, ~/src/verify.sh runs CI's verify
-    (Zorin needs libayatana-appindicator3-dev, not libappindicator3-dev). Next: M8 (split into parts for the owner).
+    (Zorin needs libayatana-appindicator3-dev, not libappindicator3-dev). M8 PARTS AGREED (owner, 2026-11-18):
+    M8a check on the master, M8b `qanuvi-master update`, M8c the screen for a shown master, M8d This PC's whole
+    install (docs/MIGRATION-VIEWER.md M8). PICKUP POINT (2026-11-18): next build M8a; the laptop can run
+    ~/src/verify.sh (git pull first) for a Linux check before pushing.
     PICKUP POINT (before, 2026-11-18 11:30): M7b BUILT + DRIVEN LIVE (Windows scratch data
     folder + VPS basevm378 on a throwaway --data folder, removed after; VPS serve runs the M7b server build, M7a one
     kept as .prev): `qanuvi-master inbox list [--all] | show <number or id> | answer <number or id> <choice> [text]`.
