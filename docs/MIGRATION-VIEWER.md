@@ -414,7 +414,8 @@ The rule: the master does everything the app does today, updates included.
     master and holds it (stage "ready"); "Restart to update" waits for running work, swaps and restarts, and the window
     connects again. Settings, Updates shows that master's state and its own "Download updates by themselves" (off unless
     switched on); when on, its hourly look puts the update in by itself. DRIVEN LIVE on Windows the same day (a local
-    test master on a localhost test channel; all checks pass, no findings). Next: the Linux laptop and the VPS, then M8d.
+    test master on a localhost test channel; all checks pass, no findings), then its master side on the Linux laptop and
+    the VPS (throwaway data; all pass; the VPS service runs the M8c server build). M8c DONE. Next: M8d.
 
 ### M9. Release
 

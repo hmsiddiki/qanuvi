@@ -493,7 +493,18 @@ runs on or off; with it off nothing is sent anywhere.
     first look (2 minutes after its start, 17:31:42) put 0.9.0 in by itself and the window followed. No findings.
     Drive note: the window's link restarts a stopped local test master at once and This PC's master runs from the same
     target/release program, so a program in use is renamed aside, never copied over.
-    PICKUP POINT (2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
+    M8c ON THE LINUX LAPTOP AND THE VPS (owner yes, 2026-11-18, f54a523; throwaway --data, a localhost test channel,
+    the same code as 0.1.23 and 0.9.0 signed with the throwaway key; laptop: stripped debug builds, VPS: zigbuild glibc
+    2.36 release builds), the master side of the window's buttons through the service's own commands. Both pass: off
+    by default, the first look (2 minutes) only tells "0.9.0 is available"; update_install {hold} -> downloading /
+    checking -> ready, `.new` 0.9.0 beside the untouched program; update_install again -> swapped and restarted, new
+    serve (--after-pid) + core from the installed path, .prev 0.1.23; autoDownload on + 0.1.23 put back -> the first
+    look put 0.9.0 in by itself at 2:02 (laptop) / 2:00 (VPS). The window side was driven on Windows only. The VPS's real
+    service was untouched during it; afterwards the M8c server build was swapped into ~/.local/bin (idle first; the M8b
+    build kept as .prev) and serve restarted with setsid: 2 projects and its Inbox item back.
+    PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
+    master updates the whole install with one installer and one button; the screen's own updater goes).
+    PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
     then M8d (This PC's whole app).
     PICKUP POINT (before, 2026-11-18, after M8c built): next drive M8c live: release window build + a Windows scratch master on
     a localhost test channel (the M8b way: this code as 0.1.23 and 0.9.0, throwaway test key, scripts in the m8b/
