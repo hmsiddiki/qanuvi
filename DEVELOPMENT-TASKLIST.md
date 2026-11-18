@@ -384,7 +384,42 @@ runs on or off; with it off nothing is sent anywhere.
     ("reached its budget of $1.00"), the plan panel showed a done step and Resume. Fix: (a) before a run starts, warn
     when its budget is below the expected cost of the first step (its model's usual step cost); (b) the plan header
     says why a run stopped ("Stopped: budget $1.00 reached") with a Raise budget action next to Resume.
-    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:40): M5c PART 2 BUILT, NOT DRIVEN LIVE (map below).
+    PICKUP POINT (fresh conversation starts here, 2026-11-18 09:55): M5c PART 2 DRIVEN LIVE (release test build of
+    ee63f3b, This PC -> VPS basevm378 over SSH, owner's yes for the VPS; VPS kept its 2026-11-17 server build). All
+    six drive checks pass; findings w1-w6 below wait for the owner's word. Next: owner's word on w1-w6, fix, drive w2
+    again (kill This PC's core with a VPS file open); keep an eye out for v3; then t1, b1/m2a.
+    M5c PART 2 DRIVEN LIVE (2026-11-18):
+    - Pass: This PC's master started alone (serve, no window) connected the VPS in under 12 s; the window opened on
+      it at once (2/2), with no second SSH link (the local test master's own VPS link is its M3 list, expected).
+    - Pass: VPS terminal (bash -l) and intelephense ran under the VPS master's serve, reached through This PC's
+      master (the only ssh.exe was under This PC's core); diagnostics showed ("Undefined function").
+    - Pass: window closed: the terminal and intelephense ended on the VPS; This PC's master kept its VPS link.
+    - Pass: This PC's core killed with the VPS shown: overlay at once, back on in about 3 s (2/2, green).
+    - Pass: "Open in a new window" for the VPS joined the held connection (no new link on the VPS).
+    - Pass: server removed in the main window: This PC's master let its link go, the second window fell back to
+      This PC (1/1), the VPS language servers ended. Server put back afterwards with the same id (test data).
+    - Not findings: the first core kill was the 3rd crash in the count (two crash tests left in the test data from
+      M5b; the count only resets after CLEAN_RUN), so the watcher stopped; crash file cleared, serve started by hand.
+      The nested basevm378 under the local test master is red as "the same computer as basevm378" (n1, by design).
+    FINDINGS (await owner):
+    - w2 (bug): after This PC's core restarts, the VPS language server fails: "This computer's background part is too
+      old to reach its servers. Restart Qanuvi." Cause: Remotes::connect_new puts This PC's new link in the map
+      before its hello, with info Null; a call in that gap (the language server restart) goes through Remotes::link,
+      which reads forwards != true as "too old". Proposal: link waits for a link still starting (as connect does,
+      up to 35 s) and only says "too old" for a hello without forwards; unit test for the gap.
+    - w3: that VPS error line stayed in This PC's Problems after switching to This PC (This PC's own servers were
+      ready). Proposal: language server status lines belong to their machine and go with a switch.
+    - w1: the overlay when This PC's core stops is the generic "connection lost, reconnecting..." (Part E #lose sets
+      no error); the reason is only on the switcher row. Proposal: the overlay says it ("Qanuvi's background part on
+      this computer stopped; it comes back by itself").
+    - w4: opening the VPS in a second window started two intelephense processes on the VPS in the same second; both
+      ended with the removal. Not traced yet (one per window, or a doubled start). Proposal: trace, then one per
+      machine and project.
+    - w5: the Remove server question says "it just leaves this window"; now it leaves This PC's list, so every
+      window. Proposal: "It leaves Qanuvi on this computer, in every window. Nothing on the server is changed."
+    - w6: the second window's title stayed "basevm378 - Qanuvi" after it fell back to This PC. Proposal: the title
+      follows the shown machine.
+    PICKUP POINT (before, 2026-11-18 09:40): M5c PART 2 BUILT, NOT DRIVEN LIVE (map below).
     Next: release test build + drive of part 2 (needs a server This PC reaches over SSH or the relay: a "local" test
     master stays the window's own, so it does not take the new way); keep an eye out for v3; then t1, b1/m2a.
     M5c PART 2 BUILT (2026-11-18; verify: Rust 486, clippy clean, server build check clean, web 501, svelte-check 0):
