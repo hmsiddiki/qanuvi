@@ -844,24 +844,259 @@ fn without_any_model_the_question_still_says_it_all_and_end_the_run_leaves_the_s
     );
     assert!(first.text.contains("Uploads return 404"));
     assert!(first.text.contains("alias /srv/app/files/;"));
-    // "I don't understand" is still heard: a fuller question, no retry.
+    // n2: no phrase list. With no model to read the reply, the owner's words go to the step's own agent, told to
+    // answer a question back and ask again rather than guess or redo the work.
     env.answer(
         first.key.as_deref().unwrap(),
         json!({"choice": "go", "text": "I don't understand"}),
     );
-    wait_until("no fuller question", &|| {
+    wait_until("the step never heard the reply", &|| {
+        tries.load(std::sync::atomic::Ordering::SeqCst) == 2
+    });
+    let told = env
+        .prompts()
+        .iter()
+        .rev()
+        .find(|(_, p)| p.contains("Owner: \"I don't understand\""))
+        .map(|(_, p)| p.clone())
+        .expect("the reply reached the step");
+    assert!(told.contains("ask something back"), "{told}");
+    wait_until("no new question", &|| {
         open_question(&env).is_some_and(|q| q.id != first.id)
     });
-    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
     let second = open_question(&env).unwrap();
-    assert!(second.text.contains("Tell me what is unclear"));
     // End the run: it ends, the step stays open for the next run.
     env.answer(second.key.as_deref().unwrap(), json!({"choice": "end"}));
     let r = running.wait();
     assert_ne!(r.status, RunStatus::Running);
-    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(step(&r, "21").status, RunStepStatus::Done);
     assert!(!env.text(FILE).contains("- [x] **20."));
+}
+
+/// n2: a step blocked on a value only the owner's computer knows (the MySQL port).
+fn port_blocker(c: &AgentCall) -> AgentReply {
+    c.env.mark(FILE, "30", '!');
+    let text = c.env.text(FILE).replace(
+        "**30. Database tests**",
+        "**30. Database tests**\n  - Blocked: needs the MySQL port of the local server",
+    );
+    c.env.put(FILE, &text);
+    AgentReply {
+        result: Some(
+            "The tests cannot reach MySQL on 3306. Which port does the local MySQL listen on?"
+                .into(),
+        ),
+        ..Default::default()
+    }
+}
+
+fn says(text: &str) -> AgentReply {
+    AgentReply {
+        result: Some(text.into()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn the_inbox_reads_every_reply_by_meaning_answers_a_question_back_guides_and_never_repeats_itself()
+{
+    let env = world("# Plan\n\n- [ ] **30. Database tests**\n");
+    let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let readings = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let (t, seen) = (tries.clone(), readings.clone());
+    env.set_agent(move |c| {
+        let title = c.title.unwrap_or("");
+        if title.starts_with("Question for you") {
+            return says(
+                r#"{"headline": "Which port does your MySQL use?", "happened": "The tests could not reach the database.", "wanted": "The port number of MySQL on this computer."}"#,
+            );
+        }
+        if title.starts_with("Your answer") {
+            seen.lock().unwrap().push(c.prompt.to_string());
+            let p = c.prompt;
+            return says(if p.contains("<<<\nwhat is a port??\n>>>") {
+                r#"{"intent": "question", "reply": "A port is the number a program listens on, like a door number; MySQL usually uses 3306.", "card": {"headline": "Which door number does MySQL use on your computer?"}}"#
+            } else if p.contains("<<<\nhuh\n>>>") {
+                // The very words of the first question: Qanuvi never asks the same way twice.
+                r#"{"intent": "unclear", "card": {"headline": "Which port does your MySQL use?", "wanted": "Open Wnmp and look at the number next to MySQL, for example 3306."}}"#
+            } else if p.contains("<<<\nfind it yourself\n>>>") {
+                r#"{"intent": "tried", "card": {"headline": "I found port 3307 in my.ini. Shall I use it?"}}"#
+            } else {
+                r#"{"intent": "act", "instruction": "Use MySQL port 3307 (found in my.ini) for the tests."}"#
+            });
+        }
+        if planner(c) {
+            return ok_review(c);
+        }
+        if t.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            return port_blocker(c);
+        }
+        c.env.mark(FILE, "30", 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("the question never came", &|| open_question(&env).is_some());
+    let ask = |prev: &crate::inbox::InboxItem, text: &str| -> crate::inbox::InboxItem {
+        env.answer(
+            prev.key.as_deref().unwrap(),
+            json!({"choice": "go", "text": text}),
+        );
+        wait_until(&format!("no question after \"{text}\""), &|| {
+            open_question(&env).is_some_and(|q| q.id != prev.id)
+        });
+        open_question(&env).unwrap()
+    };
+    let first = open_question(&env).unwrap();
+    assert!(first.text.starts_with("Which port does your MySQL use?"));
+
+    // A question back: answered plainly first, then the need asked again; the step does not run.
+    let second = ask(&first, "what is a port??");
+    assert!(
+        second
+            .text
+            .starts_with("A port is the number a program listens on"),
+        "{}",
+        second.text
+    );
+    assert!(
+        second
+            .text
+            .contains("Which door number does MySQL use on your computer?")
+    );
+    assert_eq!(
+        second.form.as_ref().unwrap()["card"]["reply"],
+        "A port is the number a program listens on, like a door number; MySQL usually uses 3306."
+    );
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    // Still stuck: the reading is told to guide, one small question with where to look and an example. Its card
+    // repeats the first question word for word, so Qanuvi words it differently.
+    let third = ask(&second, "huh");
+    let huh = readings.lock().unwrap()[1].clone();
+    assert!(huh.contains("still stuck"), "{huh}");
+    assert!(huh.contains("one small question"));
+    assert!(
+        huh.contains("Which door number does MySQL use on your computer?"),
+        "the talk so far"
+    );
+    assert!(
+        !third.text.starts_with("Which port does your MySQL use?"),
+        "asked the same way twice: {}",
+        third.text
+    );
+    assert!(
+        third
+            .text
+            .starts_with("Open Wnmp and look at the number next to MySQL")
+    );
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    // An instruction it can carry out by looking: done read-only, the result shown for a yes.
+    let fourth = ask(&third, "find it yourself");
+    assert!(readings.lock().unwrap()[2].contains("read-only"));
+    assert!(
+        fourth
+            .text
+            .starts_with("I found port 3307 in my.ini. Shall I use it?")
+    );
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    // The yes: the step runs with the whole talk and what the answer means.
+    env.answer(
+        fourth.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "yes"}),
+    );
+    let r = running.wait();
+    assert_eq!(r.status, RunStatus::Done);
+    let last = env.prompts().last().unwrap().1.clone();
+    assert!(last.contains("Owner: \"what is a port??\""), "{last}");
+    assert!(last.contains("Owner: \"find it yourself\""));
+    assert!(last.contains("What their answer means for this try: Use MySQL port 3307"));
+    assert_eq!(step(&r, "30").talk.as_ref().map(Vec::len), Some(4));
+}
+
+#[test]
+fn a_held_steps_typed_answer_is_read_too() {
+    let env = world("# Plan\n\n- [ ] **2a. Connect the test database**\n");
+    let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let t = tries.clone();
+    env.set_agent(move |c| {
+        let title = c.title.unwrap_or("");
+        if title.starts_with("Your answer") {
+            return says(if c.prompt.contains("<<<\nwhat do you mean??\n>>>") {
+                r#"{"intent": "question", "reply": "It is the address of the database server, like localhost:3306.", "card": {"headline": "Where is the test database?"}}"#
+            } else {
+                r#"{"intent": "act", "instruction": "Use localhost:3306 as the test database address."}"#
+            });
+        }
+        if planner(c) {
+            return ok_review(c);
+        }
+        t.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        c.env.mark(FILE, "2a", 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            wait_before: extra(
+                "2a",
+                "it needs Where the test database is (DB_HOST). Before the run you wrote \"the usual one\". Give the value, or say where Qanuvi can find it",
+            ),
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("the question never came", &|| open_question(&env).is_some());
+    let first = open_question(&env).unwrap();
+    assert!(
+        first.form.as_ref().unwrap()["text"].is_string(),
+        "an answer box"
+    );
+    env.answer(
+        first.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "what do you mean??"}),
+    );
+    wait_until("no answer to the question back", &|| {
+        open_question(&env).is_some_and(|q| q.id != first.id)
+    });
+    let second = open_question(&env).unwrap();
+    assert!(
+        second
+            .text
+            .starts_with("It is the address of the database server"),
+        "{}",
+        second.text
+    );
+    assert!(second.text.contains("Where is the test database?"));
+    assert_eq!(
+        tries.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "not run on a question back"
+    );
+    env.answer(
+        second.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "localhost:3306"}),
+    );
+    let r = running.wait();
+    assert_eq!(r.status, RunStatus::Done);
+    let last = env.prompts().last().unwrap().1.clone();
+    assert!(
+        last.contains("Use localhost:3306 as the test database address."),
+        "{last}"
+    );
+    assert!(last.contains("Owner: \"what do you mean??\""));
 }
 
 #[test]

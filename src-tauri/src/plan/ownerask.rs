@@ -1,9 +1,11 @@
 //! n1: a blocked or unfinished plan step asks the owner a question that stands on its own, so it can be answered from
 //! a phone without reading the chat: what happened, why only the owner can act, the exact change wanted (with a
-//! copyable snippet), and what an answer does. The owner's typed answer is read before anything runs again: "I don't
-//! understand" brings a simpler, more detailed question; an answer that does not settle the need brings a follow-up
-//! question; anything else is an instruction the step's next try acts on. The talk goes on until the need is met, the
-//! owner skips the step, or the run ends.
+//! copyable snippet), and what an answer does. The owner's typed answer is read by its meaning before anything runs
+//! again (n2: never by a list of phrases): a question back is answered plainly and the need asked again; something
+//! looking can settle is looked up read-only and offered for a yes; an unclear reply brings a plainer question, and
+//! after one, guidance one small step at a time; a reply that settles the need is an instruction the step's next try
+//! acts on. No question is asked the same way twice. The talk goes on until the need is met, the owner skips the
+//! step, or the run ends.
 
 use super::js;
 use regex::Regex;
@@ -23,6 +25,9 @@ pub struct Snippet {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Card {
+    /// n2: the plain answer to what the owner asked back, shown before the question.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reply: String,
     /// One plain sentence: what is wanted from the owner.
     pub headline: String,
     /// What the step tried and what went wrong.
@@ -64,7 +69,11 @@ pub const ANSWER_HINT: &str = "Your answer, in your own words: \"do it yourself\
 
 /// The card as plain text: the Inbox item's text, a notification, `qanuvi-master inbox list`, and older windows.
 pub fn card_text(c: &Card) -> String {
-    let mut out = vec![c.headline.trim().to_string()];
+    let mut out = vec![];
+    if !c.reply.trim().is_empty() {
+        out.push(c.reply.trim().to_string());
+    }
+    out.push(c.headline.trim().to_string());
     let mut part = |label: &str, text: &str| {
         let t = text.trim();
         if !t.is_empty() {
@@ -159,35 +168,82 @@ pub fn explain_prompt(f: &StepFacts) -> String {
     .join("\n")
 }
 
-/// The prompt that reads the owner's typed answer to `card`.
+/// n2: the prompt that reads the owner's typed reply to `card` by its meaning (any wording, spelling or language;
+/// never a list of phrases). After a reply that settled nothing, it guides instead of asking the same way again.
 pub fn reading_prompt(f: &StepFacts, card: &Card, answer: &str) -> String {
-    [
-        "A step of a coding plan stopped and the owner was asked the question below. Read their answer.".to_string(),
+    let round = f.talk.len() + 1;
+    let mut out = vec![
+        "A step of a coding plan stopped and the owner was asked the question below. Read their reply by what it \
+         means (any wording, spelling or language, however short), never word by word."
+            .to_string(),
         String::new(),
         step_block(f),
         String::new(),
         format!("The question:\n<<<\n{}\n>>>", card_text(card)),
-        format!("The owner's answer:\n<<<\n{}\n>>>", answer.trim()),
+        format!(
+            "The owner's reply (reply {round} about this step):\n<<<\n{}\n>>>",
+            answer.trim()
+        ),
         String::new(),
-        "Decide what the answer is:".into(),
-        "- \"act\": it says what to do (do it yourself, it is done now, use this value, do it another way…). \
-         Give \"instruction\": what the step must do now, in one or two exact sentences."
+        "Decide what the reply is:".into(),
+        "- \"act\": it settles the need: a value, \"it is done now\", \"do it yourself\", \"do it another way\", or a \
+         yes to something you offered. Give \"instruction\": what the step must do now, in one or two exact sentences."
             .into(),
-        "- \"clarify\": the owner does not understand the question. Give \"card\": the same need asked again, simpler \
-         and in more detail (explain any technical word, say step by step what to do and where)."
+        "- \"question\": the owner asks something back (what a word means, why, where). Give \"reply\": the plain \
+         answer to what they asked, one or two sentences with an example; and \"card\": the need asked again in the \
+         light of that answer."
             .into(),
-        "- \"followup\": the answer does not settle the need (it is vague, says something else, or misses what is \
-         needed). Give \"card\": a follow-up question that asks exactly for what is still missing, and says what \
-         their answer gave."
+        "- \"tried\": they ask you to find or check something that looking can settle (a value in a config file, the \
+         docs, a setting on this computer). Do it now, read-only and quick (a few looks at most), and give \"card\": \
+         what you found and where, asked as a yes question (\"I found … in …. Shall I use it?\"). Found nothing: say \
+         where you looked and ask for exactly what is missing. A change to make is \"act\", not this."
+            .into(),
+        "- \"unclear\": you cannot tell what they mean, or they say they do not follow. Give \"card\": the need asked \
+         again more plainly (explain any technical word, say step by step what to do and where)."
+            .into(),
+        "- \"followup\": the reply gives part of the need or something else. Give \"card\": a follow-up question \
+         that asks exactly for what is still missing, and says what their reply gave."
+            .into(),
+    ];
+    if round > 1 {
+        out.extend([
+            String::new(),
+            "The owner is still stuck: this is not the first reply. Guide them instead of asking the whole thing \
+             again: ask one small question only, say exactly where to find the thing (which program, window, menu or \
+             file, for example \"open Wnmp and look at the number next to MySQL\"), give an example answer, and offer \
+             to find it yourself."
+                .into(),
+        ]);
+    }
+    out.extend([
+        "Never repeat the wording of a question already asked (the question above and the ones under \"Asked and \
+         answered so far\"); say it another way."
             .into(),
         String::new(),
         CARD_RULES.into(),
         String::new(),
         format!(
-            "Answer with JSON only: {{\"intent\": \"act\" | \"clarify\" | \"followup\", \"instruction\": \"...\", \"card\": {CARD_SHAPE} or null}}"
+            "Answer with JSON only: {{\"intent\": \"act\" | \"question\" | \"tried\" | \"unclear\" | \"followup\", \"instruction\": \"...\", \"reply\": \"...\", \"card\": {CARD_SHAPE} or null}}"
         ),
-    ]
-    .join("\n")
+    ]);
+    out.join("\n")
+}
+
+/// n2: a new question never repeats an earlier one word for word (the question being answered and the talk's): it is
+/// asked another way, from what is needed, else plainly marked as put another way.
+pub fn not_repeated(mut card: Card, asked_now: &str, talk: &[Exchange]) -> Card {
+    let same = |a: &str| a.trim().eq_ignore_ascii_case(card.headline.trim());
+    if !same(asked_now) && !talk.iter().any(|e| same(&e.asked)) {
+        return card;
+    }
+    let wanted = card.wanted.trim().to_string();
+    card.headline = if wanted.is_empty() || same(&wanted) {
+        format!("Put another way: {}", card.headline.trim())
+    } else {
+        card.wanted = String::new();
+        wanted
+    };
+    card
 }
 
 fn json_in(text: &str) -> Option<Value> {
@@ -221,6 +277,7 @@ fn card_of(v: &Value) -> Option<Card> {
         })
     });
     Some(Card {
+        reply: s("reply", 600),
         headline,
         happened: s("happened", 600),
         why_you: s("whyYou", 400),
@@ -238,7 +295,18 @@ pub fn parse_card(text: &str) -> Option<Card> {
 /// What the reading call made of the answer; None when it gave nothing usable.
 pub fn parse_reading(text: &str) -> Option<Reading> {
     let v = json_in(text)?;
-    let card = v.get("card").and_then(card_of);
+    // n2: the plain answer to a question back goes on the card, before the question.
+    let reply = js::cut(
+        v.get("reply").and_then(Value::as_str).unwrap_or("").trim(),
+        600,
+    )
+    .to_string();
+    let card = v.get("card").and_then(card_of).map(|mut c| {
+        if !reply.is_empty() {
+            c.reply = reply;
+        }
+        c
+    });
     match v.get("intent").and_then(Value::as_str)?.trim() {
         "act" => Some(Reading::Act {
             instruction: js::cut(
@@ -250,8 +318,8 @@ pub fn parse_reading(text: &str) -> Option<Reading> {
             )
             .to_string(),
         }),
-        "clarify" => card.map(Reading::Clarify),
-        "followup" => card.map(Reading::FollowUp),
+        "clarify" | "question" | "unclear" => card.map(Reading::Clarify),
+        "followup" | "tried" => card.map(Reading::FollowUp),
         _ => None,
     }
 }
@@ -299,35 +367,8 @@ pub fn fallback_card(f: &StepFacts) -> Card {
         wanted: sentences(&without_blocks, 900),
         snippet: first_block(f.last_message),
         can_do: String::new(),
+        reply: String::new(),
     }
-}
-
-/// A clearer card when the owner did not understand and no model could rewrite it: the agent's message in full.
-pub fn fallback_clarify(f: &StepFacts, card: &Card) -> Card {
-    let without_blocks = Regex::new(r"(?s)```.*?```")
-        .map(|re| re.replace_all(f.last_message, " ").to_string())
-        .unwrap_or_default();
-    Card {
-        headline: card.headline.clone(),
-        happened: card.happened.clone(),
-        why_you: card.why_you.clone(),
-        wanted: sentences(&without_blocks, 2000),
-        snippet: card.snippet.clone().or_else(|| first_block(f.last_message)),
-        can_do:
-            "Tell me what is unclear, or say \"do it yourself\" and I will try it with what I have."
-                .into(),
-    }
-}
-
-/// When no model can read an answer: words that say the owner did not understand.
-pub fn sounds_unsure(answer: &str) -> bool {
-    static RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"(?i)(^\s*\?+\s*$)|(?-u:\b)(i\s+)?(do\s*n[o']?t|did\s*n[o']?t|don't|didn't|cannot|can't)\s+(understand|get\s+it|follow|know\s+what)|(?-u:\b)what\s+(does|do)\s+(that|this|it)\s+mean|^\s*(explain|what\??|huh\??|confused)\s*[.!?]*\s*$|(?-u:\b)(explain|clarify)\s+(it|this|that|more)",
-        )
-        .unwrap()
-    });
-    RE.is_match(answer)
 }
 
 /// What the next try is told: the talk so far and how to act on the owner's last answer.
@@ -353,7 +394,9 @@ pub fn next_try_note(why: &str, talk: &[Exchange], answer: &str, instruction: &s
          that (where a file is, access you do not have), mark the step \"- [!]\" again and ask for exactly that one \
          thing. If they say it is done, check that it is in place, then go on. Do not repeat what failed before \
          without a new reason; if the answer does not settle what you need, mark the step \"- [!]\" and ask a clear \
-         follow-up question instead of guessing."
+         follow-up question instead of guessing. If their words ask something back or say they do not follow, do \
+         not do the work: answer what they asked in plain words with an example, then mark the step \"- [!]\" and \
+         ask again more simply, never in the same words as before."
             .into(),
     );
     out.join("\n")
@@ -456,28 +499,64 @@ mod tests {
     }
 
     #[test]
-    fn hears_when_the_owner_did_not_understand() {
-        for a in [
-            "I don't understand",
-            "dont understand this",
-            "?",
-            "what does that mean?",
-            "explain",
-            "Huh?",
-            "I didn't get it",
-            "can you explain more",
-        ] {
-            assert!(sounds_unsure(a), "{a}");
-        }
-        for a in [
-            "do it yourself",
-            "done, try again",
-            "the file is /etc/nginx/nginx.conf",
-            "use port 8080",
-            "I understand, go",
-        ] {
-            assert!(!sounds_unsure(a), "{a}");
-        }
+    fn reads_a_question_back_a_tried_lookup_and_an_unclear_reply() {
+        let r = parse_reading(
+            r#"{"intent": "question", "reply": "A port is a door number, like 3306.", "card": {"headline": "Which number does MySQL use?"}}"#,
+        );
+        let Some(Reading::Clarify(c)) = r else {
+            panic!("{r:?}")
+        };
+        assert_eq!(c.reply, "A port is a door number, like 3306.");
+        assert!(card_text(&c).starts_with("A port is a door number, like 3306.\n\nWhich number"));
+        assert!(matches!(
+            parse_reading(r#"{"intent": "tried", "card": {"headline": "I found 3307. Use it?"}}"#),
+            Some(Reading::FollowUp(_))
+        ));
+        assert!(matches!(
+            parse_reading(r#"{"intent": "unclear", "card": {"headline": "Plainer"}}"#),
+            Some(Reading::Clarify(_))
+        ));
+    }
+
+    #[test]
+    fn guides_once_the_owner_is_still_stuck() {
+        let talk = [Exchange {
+            asked: "Which port?".into(),
+            answer: "what is a port".into(),
+        }];
+        let card = fallback_card(&facts(NGINX, &[]));
+        assert!(!reading_prompt(&facts(NGINX, &[]), &card, "huh").contains("still stuck"));
+        let p = reading_prompt(&facts(NGINX, &talk), &card, "huh");
+        assert!(p.contains("still stuck") && p.contains("one small question"));
+        assert!(p.contains("reply 2 about this step"));
+        assert!(p.contains("read-only"));
+    }
+
+    #[test]
+    fn never_asks_the_same_way_twice() {
+        let talk = [Exchange {
+            asked: "Which port does MySQL use?".into(),
+            answer: "?".into(),
+        }];
+        let card = |headline: &str, wanted: &str| Card {
+            headline: headline.into(),
+            wanted: wanted.into(),
+            ..Default::default()
+        };
+        let fresh = not_repeated(card("Which number is next to MySQL?", ""), "Now", &talk);
+        assert_eq!(fresh.headline, "Which number is next to MySQL?");
+        let again = not_repeated(
+            card(
+                "which port does MySQL use? ",
+                "Open Wnmp and look next to MySQL.",
+            ),
+            "Now",
+            &talk,
+        );
+        assert_eq!(again.headline, "Open Wnmp and look next to MySQL.");
+        assert_eq!(again.wanted, "");
+        let bare = not_repeated(card("Now", ""), "Now", &[]);
+        assert_eq!(bare.headline, "Put another way: Now");
     }
 
     #[test]
@@ -520,6 +599,8 @@ mod tests {
         );
         let card = fallback_card(&facts(NGINX, &[]));
         let r = reading_prompt(&facts(NGINX, &[]), &card, " do it yourself ");
-        assert!(r.contains("The owner's answer:\n<<<\ndo it yourself\n>>>"));
+        assert!(
+            r.contains("The owner's reply (reply 1 about this step):\n<<<\ndo it yourself\n>>>")
+        );
     }
 }

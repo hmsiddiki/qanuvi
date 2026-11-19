@@ -4067,6 +4067,8 @@ mod tests {
 
     /// Commands that stay with the interface (the visual container).
     const INTERFACE: &[&str] = &[
+        // t1: the tray Quit question in the main window passes the answer on to the master (app_quit_answer).
+        "quit_question_answer",
         // Popup notifications, the app itself, this screen's files and data folder.
         "notify_settings",
         "notify_take_start",
@@ -4116,7 +4118,8 @@ mod tests {
     /// The command names of the app's `generate_handler!` list.
     fn window_commands() -> Vec<String> {
         let src = include_str!("desktop.rs");
-        let list = &src[src.find("generate_handler![").expect("the handler list")..];
+        // The main window's list is the last one (the small quit-question window, t1, has its own before it).
+        let list = &src[src.rfind("generate_handler![").expect("the handler list")..];
         let list = &list[list.find('[').unwrap() + 1..list.find(']').unwrap()];
         list.lines()
             .map(|l| l.split("//").next().unwrap_or(""))

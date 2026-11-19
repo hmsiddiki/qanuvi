@@ -687,7 +687,7 @@
    "what?",
    "It is the key. \n"
   ],
-  "out": "it needs X (A). Before the run you wrote \"what?\"; It is the key. Answer here with the value, or say where Qanuvi can find it"
+  "out": "it needs X (A). Before the run you wrote \"what?\"; It is the key. Give the value, or say where Qanuvi can find it"
  },
  {
   "fn": "unsettledWhy",
@@ -696,7 +696,7 @@
    "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
    ""
   ],
-  "out": "it needs X (A). Before the run you wrote \"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…\". Answer here with the value, or say where Qanuvi can find it"
+  "out": "it needs X (A). Before the run you wrote \"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…\". Give the value, or say where Qanuvi can find it"
  },
  {
   "fn": "readAnswers",
@@ -814,27 +814,27 @@
    "holds": [
     {
      "step": "2a",
-     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "1",
-     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "3",
-     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "4a",
-     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "4b",
-     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Give the value, or say where Qanuvi can find it",
      "by": "default"
     }
    ],
@@ -999,12 +999,12 @@
    "holds": [
     {
      "step": "1",
-     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "4b",
-     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Give the value, or say where Qanuvi can find it",
      "by": "default"
     }
    ],
@@ -1129,22 +1129,22 @@
    "holds": [
     {
      "step": "2a",
-     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "3",
-     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "4a",
-     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "4b",
-     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Give the value, or say where Qanuvi can find it",
      "by": "default"
     }
    ],
@@ -1220,17 +1220,17 @@
    "holds": [
     {
      "step": "2a",
-     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "1",
-     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     },
     {
      "step": "3",
-     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Give the value, or say where Qanuvi can find it",
      "by": "default"
     }
    ],

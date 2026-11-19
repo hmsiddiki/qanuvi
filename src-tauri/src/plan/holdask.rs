@@ -28,12 +28,16 @@ pub fn hold_key(project_id: &str, file: &str, step: &str) -> String {
     format!("hold:{project_id}:{file}:{step}")
 }
 
-/// The hold asks for a login, password or key: such answers are typed in the run panel only.
+/// The hold asks for a login, password or key: such answers are typed in the run panel only. p2 holds name the
+/// project secret as a variable (DB_PASSWORD, SHOP_API_KEY), whose underscores join the words, so those count too.
 pub fn asks_secret(why: &str) -> bool {
     static RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?i)(?-u:\b)(password|passphrase|log ?in|sign[- ]?in|credential|token|api[- ]?key|secret|ssh key)s?(?-u:\b)").unwrap()
     });
-    RE.is_match(why)
+    static VAR: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?-u:\b)[A-Z0-9_]*_?(PASSWORD|PASSWD|PASS|PWD|PASSPHRASE|TOKEN|SECRET|KEY|CREDENTIALS?)(_[A-Z0-9_]*)?(?-u:\b)").unwrap()
+    });
+    RE.is_match(why) || VAR.is_match(why)
 }
 
 /// "Let Qanuvi decide" as the held step is told it.
@@ -187,6 +191,15 @@ mod tests {
         assert!(asks_secret("needs an API key for the mail service"));
         assert!(asks_secret("sign in to the admin page"));
         assert!(!asks_secret("it changes the date format"));
+        // p2 holds name the secret as a variable.
+        assert!(asks_secret(
+            "it needs The test key (SHOP_API_KEY). Before the run you wrote \"x\""
+        ));
+        assert!(asks_secret("it needs Where it signs (DB_PASSWORD)"));
+        assert!(!asks_secret(
+            "it needs Where the test database is (DB_HOST)"
+        ));
+        assert!(!asks_secret("the key point is the date (KEYBOARD_LAYOUT)"));
         let f = hold_form(HeldKind::Hold, "it needs the database login");
         assert_eq!(f.secret, Some(true));
         assert!(f.text.is_none());

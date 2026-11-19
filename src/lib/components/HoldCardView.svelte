@@ -29,6 +29,7 @@
 </script>
 
 <div class="card">
+  {#if card.reply?.trim()}<p class="reply">{card.reply}</p>{/if}
   <p class="headline">{card.headline}</p>
   {#each parts as [label, text] (label)}
     <p class="part"><span class="label">{label}:</span> {text}</p>
@@ -57,6 +58,12 @@
 
   .headline {
     font-weight: 600;
+  }
+
+  .reply {
+    padding: 6px 8px;
+    border-left: 2px solid var(--qx-accent);
+    background: color-mix(in srgb, var(--qx-accent) 8%, transparent);
   }
 
   .part,

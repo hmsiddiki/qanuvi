@@ -787,7 +787,7 @@ pub fn unsettled_why(ask: &str, typed: &str, reply: &str) -> String {
         format!("; {more}")
     };
     format!(
-        "it needs {ask}. Before the run you wrote \"{said}\"{more}. Answer here with the value, or say where Qanuvi can find it"
+        "it needs {ask}. Before the run you wrote \"{said}\"{more}. Give the value, or say where Qanuvi can find it"
     )
 }
 

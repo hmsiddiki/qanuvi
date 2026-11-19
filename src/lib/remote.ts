@@ -87,6 +87,8 @@ export function nameMachines(names: (master: string) => string): void {
  * data folder and the coding tools.
  */
 const WINDOW_ONLY = new Set([
+  // t1: the tray Quit question's answer (sent by quitQuestion.ts straight to the app, listed so it never goes on).
+  "quit_question_answer",
   "app_info",
   "screen_usage",
   "app_restart",

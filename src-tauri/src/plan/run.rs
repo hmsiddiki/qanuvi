@@ -1504,7 +1504,14 @@ impl<'a> Loop<'a> {
                 _ => String::new(),
             };
             let talk = self.run.steps[i].talk.clone().unwrap_or_default();
-            answer_note = if released.kind != HeldKind::Hold && !talk.is_empty() {
+            // n2: a held step talked with the owner too: it gets the talk and what their last reply means.
+            let means = self.run.steps[i]
+                .instruction
+                .as_deref()
+                .filter(|m| !m.trim().is_empty())
+                .map(|m| format!(" What their answer means for this step: {}", m.trim()))
+                .unwrap_or_default();
+            answer_note = if !talk.is_empty() {
                 let last = talk.last().cloned().unwrap_or_default();
                 format!(
                     "\n\n{}",
@@ -1517,7 +1524,7 @@ impl<'a> Loop<'a> {
                 )
             } else if released.kind == HeldKind::Hold {
                 format!(
-                    "\n\nThis step was held for the owner ({}); they said go ahead.{said}",
+                    "\n\nThis step was held for the owner ({}); they said go ahead.{said}{means}",
                     released.why
                 )
             } else {
@@ -2803,11 +2810,10 @@ impl<'a> Loop<'a> {
             self.sh.live().finish_without = true;
             return false;
         }
-        // n1: a typed answer to a blocked or unfinished step is read before anything runs again.
-        let kind = self.run.steps[i].held.as_ref().map(|h| h.kind);
+        // n1: a typed answer is read before anything runs again (n2: a held step's too, every reply by meaning).
         let typed = reply.choice == holdask::AnswerChoice::Go && !reply.text.is_empty();
         let mut instruction = None;
-        if typed && kind.is_some_and(|k| k != HeldKind::Hold) {
+        if typed {
             match self.read_answer(i, &reply.text) {
                 ownerask::Reading::Act { instruction: how } => {
                     instruction = Some(how).filter(|h| !h.is_empty());
@@ -3020,8 +3026,8 @@ impl<'a> Loop<'a> {
         .unwrap_or_else(|| ownerask::fallback_card(&f))
     }
 
-    /// n1: what the owner's typed answer means. Without any model: "I don't understand" is heard, anything else is
-    /// acted on.
+    /// n1/n2: what the owner's typed answer means, read by meaning. Without any model it is acted on: the step's own
+    /// agent reads the words (and is told to answer a question back rather than do the work).
     fn read_answer(&mut self, i: usize, answer: &str) -> ownerask::Reading {
         let (step, details, last, changed, talk) = self.facts_of(i);
         let held = self.run.steps[i].held.clone();
@@ -3038,21 +3044,26 @@ impl<'a> Loop<'a> {
             .and_then(|h| h.card)
             .unwrap_or_else(|| ownerask::fallback_card(&f));
         let k = key(&self.run.steps[i]);
-        if let Some(r) = self
+        let asked_now = card.headline.clone();
+        match self
             .owner_call(
                 &ownerask::reading_prompt(&f, &card, answer),
                 &format!("Your answer: step {k}"),
             )
             .and_then(|t| ownerask::parse_reading(&t))
         {
-            return r;
-        }
-        if ownerask::sounds_unsure(answer) {
-            ownerask::Reading::Clarify(ownerask::fallback_clarify(&f, &card))
-        } else {
-            ownerask::Reading::Act {
-                instruction: String::new(),
+            // n2: a new question is never the same words as one already asked.
+            Some(ownerask::Reading::Clarify(c)) => {
+                ownerask::Reading::Clarify(ownerask::not_repeated(c, &asked_now, &talk))
             }
+            Some(ownerask::Reading::FollowUp(c)) => {
+                ownerask::Reading::FollowUp(ownerask::not_repeated(c, &asked_now, &talk))
+            }
+            Some(r) => r,
+            // n2: no model could read it, and no phrase list guesses: the step's own agent reads the owner's words.
+            None => ownerask::Reading::Act {
+                instruction: String::new(),
+            },
         }
     }
 

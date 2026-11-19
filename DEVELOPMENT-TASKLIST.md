@@ -863,6 +863,23 @@ runs on or off; with it off nothing is sent anywhere.
     record); only sentences are read. If the reading call fails: sentences in secret boxes are held, typed choices
     stand as before. Not yet: an Inbox answer to such a hold is told to the step as text, not saved as a secret (n2
     or later).
+    n2 BUILT 2026-11-20 (not driven live): every typed Inbox reply is read by meaning (ownerask::reading_prompt; the
+    sounds_unsure phrase list and fallback_clarify are gone), held steps' replies too (p2 holds, risky waits). Intents:
+    act (instruction for the next try), question (Card.reply = the plain answer to what they asked, shown first in
+    the card and its text, then the need asked again), tried (looked up read-only in the same call, the result asked
+    as a yes question), unclear (asked again more plainly), followup. From the second reply on the prompt says the
+    owner is still stuck: one small question, where to find it, an example, an offer to find it itself.
+    ownerask::not_repeated: a new question never has the headline of one already asked (takes "what is needed"
+    instead, else "Put another way: …"). With no model at all the reply goes to the step's own agent, whose next-try
+    note now says to answer a question back and ask again rather than do the work. A released held step now gets
+    the talk and what the reply means. holdask::asks_secret also hears variable names (DB_PASSWORD, SHOP_API_KEY), so
+    those holds get no Inbox text box. p2 hold wording now "Give the value, or say where Qanuvi can find it".
+    Scenarios: the_inbox_reads_every_reply_by_meaning_..., a_held_steps_typed_answer_is_read_too, no-model scenario
+    rewritten. Also fixed two master tests failing since t1 (ab2c1b0): the handler-list test read the quit-question
+    window's small list; quit_question_answer added to INTERFACE and remote.ts WINDOW_ONLY.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20): p2 + n2 BUILT (not driven live), nothing published
+    after 0.1.27. Next: drive p1 + p2 + n2 + 24q(a) + the Project settings scroll in a test build on a scratch project
+    (owner away from mouse/keyboard; a few cents of model calls), then 0.1.28 (publish asks the owner first).
     PICKUP POINT (before, 2026-11-20 02:15): p1 fixed 67fb643, 24q(a) 8654849, nothing
     published after 0.1.27. Next: build p2, then n2 (AGREED NEXT above), each driven live on a scratch project.
     PICKUP POINT (before, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:

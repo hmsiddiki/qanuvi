@@ -120,7 +120,7 @@ describe("p2: the check's answers read by meaning", () => {
     expect(r.offered.map((f) => f.id)).toEqual(["secret:DB_HOST", "secret:SHOP_KEY"]);
     expect(r.holds.map((h) => h.step)).toEqual(["2a", "1", "3", "4b"]);
     expect(r.holds[1].why).toBe(
-      'it needs The test key (API_KEY). Before the run you wrote "what is this?"; It is the key from the test dashboard, like sk_test_123. Answer here with the value, or say where Qanuvi can find it',
+      'it needs The test key (API_KEY). Before the run you wrote "what is this?"; It is the key from the test dashboard, like sk_test_123. Give the value, or say where Qanuvi can find it',
     );
     expect(r.answers[1]).toBe("");
     expect(r.answers[2]).toBe("dark");
@@ -154,7 +154,7 @@ describe("p2: the check's answers read by meaning", () => {
     expect(r.holds).toEqual([
       {
         step: "2a",
-        why: 'it needs Where the test database is (DB_HOST). Before the run you wrote "the usual one". Answer here with the value, or say where Qanuvi can find it',
+        why: 'it needs Where the test database is (DB_HOST). Before the run you wrote "the usual one". Give the value, or say where Qanuvi can find it',
         by: "default",
       },
     ]);

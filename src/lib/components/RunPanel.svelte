@@ -567,7 +567,7 @@
       if (!done)
         read.holds.push({
           step: c.secrets.find((s) => s.name === x.name)?.steps[0] || firstStep,
-          why: `it needs ${x.name}; Qanuvi could not copy ${x.from} from ${x.project}. Answer here with the value`,
+          why: `it needs ${x.name}; Qanuvi could not copy ${x.from} from ${x.project}. Give the value, or say where Qanuvi can find it`,
           by: "default",
         });
     }

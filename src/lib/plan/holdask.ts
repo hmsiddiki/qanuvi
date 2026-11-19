@@ -11,6 +11,8 @@ export type AnswerChoice = "go" | "skip" | "decide" | "keep" | "qanuvi" | "end";
  * why only the owner can act, the exact change wanted, a snippet to copy, and what Qanuvi can do itself.
  */
 export interface HoldCard {
+  /** n2: the plain answer to what the owner asked back, shown before the question. */
+  reply?: string;
   headline: string;
   happened?: string;
   whyYou?: string;

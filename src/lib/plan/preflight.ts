@@ -451,7 +451,7 @@ export interface ReadAnswers {
 export function unsettledWhy(ask: string, typed: string, reply: string): string {
   const said = clipReason(typed, 120);
   const more = reply.replace(/[.\s]+$/, "");
-  return `it needs ${ask}. Before the run you wrote "${said}"${more ? `; ${more}` : ""}. Answer here with the value, or say where Qanuvi can find it`;
+  return `it needs ${ask}. Before the run you wrote "${said}"${more ? `; ${more}` : ""}. Give the value, or say where Qanuvi can find it`;
 }
 
 /**
