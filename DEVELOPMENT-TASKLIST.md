@@ -782,7 +782,27 @@ runs on or off; with it off nothing is sent anywhere.
     status. NOT DRIVEN YET: the install and the sign-in themselves (This PC and the VPS are already signed in): needs
     a machine without Claude Code, the Linux laptop (none there; curl + bash there) with a new server build, and the
     owner's own sign-in in the browser (owner's yes asked).
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 22:00): t1 DONE (built + driven live), c1 BUILT and its
+    c1 DRIVEN LIVE ON THE LINUX LAPTOP (2026-11-20, owner: "go ahead to laptop"): laptop master rebuilt from ab2c1b0
+    (debug, ~/src/m9, swapped by rename while running), shown at depth 2 (DESKTOP-R8G3PAK (test) > Laptop). Agents
+    card: "Not found" + "Claude Code is not on Laptop ... Install Claude Code"; the question named the exact line
+    (curl -fsSL https://claude.ai/install.sh | bash); the install ran in the card's terminal ("Installation
+    complete!", its own note that ~/.local/bin is not on PATH), card then "Connected 2.1.328", "not signed in yet",
+    path /home/neel/.local/bin/claude (found off PATH, z8). Sign in: `claude auth login` in the terminal, "Open the
+    sign-in page" came from its link, the owner signed in in the browser and sent the code through the box: "Login
+    successful", card "Claude Code is signed in on Laptop". Checked on the laptop: auth status Claude Max account,
+    `claude -p "say ok"` answers ok. c1 DONE. Left on the laptop: Claude Code 2.1.328 signed in (owner's account;
+    keep or `claude auth logout` + remove ~/.local/bin/claude and ~/.local/share/claude as the owner wishes).
+    0.1.27 PUBLISHED (owner: "and also publish anyway", 2026-11-20; release rule skipped with QANUVI_RELEASE_ANYWAY=1,
+    This PC's Claude Code 2.1.318 with 2.1.328 out): u2, n1, t1, c1. Built once with CARGO_BUILD_JOBS=1 (free RAM
+    1.4 GB, commit headroom 14 GB), signed, into E:qc-scratchelease-0.1.27chan, then copied into
+    qanuvi-updates/dev (old latest.json kept in E:Backupsqanuvichannel-before-0.1.27). Checked:
+    https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.27; installer (8564028), Linux master (10453232) and
+    Windows master (10371584) served 200 with matching sizes. Tagged v0.1.27. Not done: the owner's install updating
+    to 0.1.27 (its updater offers it), the VPS server build swap to 0.1.27.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 00:40): t1 + c1 DONE (both driven live), 0.1.27
+    PUBLISHED. Next: watch the owner's install update to 0.1.27; VPS server build swap when the owner wants; test state
+    to put back (listed below) still open, plus the laptop's Claude Code (owner's choice) and its ~/src/m9 masters.
+    PICKUP POINT (before, 2026-11-19 22:00): t1 DONE (built + driven live), c1 BUILT and its
     status part driven; next: c1 install + sign-in driven on the Linux laptop when the owner says yes (new server
     build there; the owner signs in), then 0.1.27 (u2, n1, t1, c1) publish waits for the owner's yes. Test state: the
     release test window runs the c1 build; test state to put back (listed below) still open. Drive tools: tray.js
