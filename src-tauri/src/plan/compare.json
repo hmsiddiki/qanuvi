@@ -2352,7 +2352,7 @@
     }
    ]
   ],
-  "out": "Plan the following work for this project. You are the planner: read the code as much as you need (read-only),\nthen answer with the plan only, as task-list steps inside one ```tasklist block. Do not change any file.\n\nRequest:\nAdd VAT to the cart\n\nFormat of each step (Qanuvi reads exactly this):\n```tasklist\n- [ ] **1. Short step title**\n  - What to do, concretely: files, functions, behaviour. One point per line.\n  - Validate: how to check it is done (a test, a command, what to look at).\n  - Model: <model id>\n```\n\nRules:\n- 2 to 10 steps, in order; each small enough for one focused session, and each leaves the project working.\n- Choose a model per step from: claude-opus-5-5, claude-haiku-5-5 (strongest first). Use the strongest for money, security and hard design; a mid model for normal coding; the smallest for docs and small edits.\n- Number the steps from 1; Qanuvi renumbers them to follow the steps already in TASKLIST.md.\n- Put tests in the same step as the code they test."
+  "out": "Plan the following work for this project. You are the planner: read the code as much as you need (read-only),\nthen answer with the plan only, as task-list steps inside one ```tasklist block. Do not change any file.\n\nRequest:\nAdd VAT to the cart\n\nFormat of each step (Qanuvi reads exactly this):\n```tasklist\n- [ ] **1. Short step title**\n  - What to do, concretely: files, functions, behaviour. One point per line.\n  - Validate: how to check it is done (a test, a command, what to look at).\n  - Model: <model id>\n```\n\nRules:\n- 2 to 15 steps, in order; each leaves the project working.\n- Size: one feature or change per step, touching at most 4 or 5 files, so one session finishes it in about 30 to 40 tool calls. Split bigger work into more steps: a session re-reads its whole conversation on every tool call, so one long step costs far more than several short ones.\n- Choose a model per step from: claude-opus-5-5, claude-haiku-5-5 (strongest first). Use the strongest for money, security and hard design; a mid model for normal coding; the smallest for docs and small edits.\n- Number the steps from 1; Qanuvi renumbers them to follow the steps already in TASKLIST.md.\n- Put tests in the same step as the code they test."
  },
  {
   "fn": "extractSteps",
@@ -4181,7 +4181,7 @@
   "args": [
    "PLAN.md"
   ],
-  "out": "Write a task list for this project in PLAN.md, in this format so Qanuvi can show and run it:\n\n## Section name\n\n- [ ] **1. Step title** (optional short note)\n  - What the step does, one point per line.\n  - Validate: how to check it is done.\n  - Model: claude-opus-5-5\n\nFor each step choose the model that fits the work (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5): the strongest for money, security and hard design, a mid model for normal coding, the smallest for small edits and docs. If the file already exists, keep what is there and add to it. Ask me first if the goal is not clear from the project's files.\n\nGoal: "
+  "out": "Write a task list for this project in PLAN.md, in this format so Qanuvi can show and run it:\n\n## Section name\n\n- [ ] **1. Step title** (optional short note)\n  - What the step does, one point per line.\n  - Validate: how to check it is done.\n  - Model: claude-opus-5-5\n\nFor each step choose the model that fits the work (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5): the strongest for money, security and hard design, a mid model for normal coding, the smallest for small edits and docs. If the file already exists, keep what is there and add to it. Ask me first if the goal is not clear from the project's files.\n\nKeep each step to one feature or change touching at most 4 or 5 files, so one session finishes it in about 30 to 40 tool calls; split bigger work into more steps (a session re-reads its whole conversation on every tool call, so one long step costs far more than several short ones).\n\nGoal: "
  },
  {
   "fn": "parsePlan",
@@ -9738,7 +9738,7 @@
     }
    ]
   ],
-  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nWhat went wrong:\n(no details)"
+  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong; each step one change touching at most 4 or 5 files. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nWhat went wrong:\n(no details)"
  },
  {
   "fn": "replanPrompt",
@@ -9758,7 +9758,7 @@
     }
    ]
   ],
-  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**12-2. Plain numbered**\n  * star detail\n\nWhat went wrong:\nTests kept failing: x !== y"
+  "out": "A step in T.md was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong; each step one change touching at most 4 or 5 files. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: claude-opus-5-5, claude-haiku-5-5).\n\nThe step:\n**12-2. Plain numbered**\n  * star detail\n\nWhat went wrong:\nTests kept failing: x !== y"
  },
  {
   "fn": "replaceStep",

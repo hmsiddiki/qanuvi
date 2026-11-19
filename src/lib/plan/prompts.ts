@@ -18,6 +18,10 @@ export function taskListPrompt(file = "DEVELOPMENT-TASKLIST.md", provider: Agent
       "design, a mid model for normal coding, the smallest for small edits and docs. If the file already exists, " +
       "keep what is there and add to it. Ask me first if the goal is not clear from the project's files.",
     "",
+    "Keep each step to one feature or change touching at most 4 or 5 files, so one session finishes it in about 30 " +
+      "to 40 tool calls; split bigger work into more steps (a session re-reads its whole conversation on every tool " +
+      "call, so one long step costs far more than several short ones).",
+    "",
     "Goal: ",
   ].join("\n");
 }

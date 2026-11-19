@@ -39,7 +39,8 @@ pub fn planner_prompt(request: &str, file: &str, models: &[AgentModel]) -> Strin
         "```".into(),
         String::new(),
         "Rules:".into(),
-        "- 2 to 10 steps, in order; each small enough for one focused session, and each leaves the project working.".into(),
+        "- 2 to 15 steps, in order; each leaves the project working.".into(),
+        "- Size: one feature or change per step, touching at most 4 or 5 files, so one session finishes it in about 30 to 40 tool calls. Split bigger work into more steps: a session re-reads its whole conversation on every tool call, so one long step costs far more than several short ones.".into(),
         format!("- Choose a model per step from: {} (strongest first). Use the strongest for money, security and hard design; a mid model for normal coding; the smallest for docs and small edits.", ids(models)),
         format!("- Number the steps from 1; Qanuvi renumbers them to follow the steps already in {file}."),
         "- Put tests in the same step as the code they test.".into(),
@@ -62,7 +63,7 @@ pub fn replan_prompt(file: &str, step: &Step, failure: &str, models: &[AgentMode
     let failure = js::trim(failure);
     let mut out = vec![
         format!(
-            "A step in {file} was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: {}).",
+            "A step in {file} was not finished, even by the strongest model. Rewrite it into 2 to 5 smaller steps that together do the same work, using what went wrong; each step one change touching at most 4 or 5 files. Read the code as you need (read-only); answer with the steps only, inside one ```tasklist block, in the same format as the task list (with Validate and Model lines; models: {}).",
             ids(models)
         ),
         String::new(),

@@ -28,6 +28,11 @@ pub fn task_list_prompt(file: &str, models: &[&str]) -> String {
             models.join(", ")
         ),
         String::new(),
+        "Keep each step to one feature or change touching at most 4 or 5 files, so one session finishes it in about 30 \
+         to 40 tool calls; split bigger work into more steps (a session re-reads its whole conversation on every tool \
+         call, so one long step costs far more than several short ones)."
+            .into(),
+        String::new(),
         "Goal: ".into(),
     ]
     .join("\n")

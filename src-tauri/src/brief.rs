@@ -24,7 +24,9 @@ have a letter (12, 12a, 12b). Needs (optional) lists steps that must be done fir
 are not done and writes the reason on a '- Skipped:' line. Finished sections may have been moved to an archive \
 next to the plan (PLAN.archive.md for PLAN.md); their steps count as done, so new numbers must not reuse them. Model (optional) picks the model for that step: the \
 strongest for money, security and hard design, a mid one for normal coding, the smallest for docs and small edits. \
-Make each step small enough for one focused session, leaving the project working, with its tests in the same step. \
+Keep each step to one feature or change touching at most 4 or 5 files (about 30 to 40 tool calls for one session; \
+a session re-reads its whole conversation on every tool call, so long steps cost far more), leaving the project \
+working, with its tests in the same step. \
 Write the plan; do not start doing the steps unless the user asks. Do not read Qanuvi's source to learn this.";
 
 /// The brief, or nothing for lean sessions (plan steps get their own exact instructions).
