@@ -1,6 +1,7 @@
 //! The owner's messages in a step's chat (24z R2c part 2, owner agreed 2026-11-15). A message the owner types into a
-//! chat the runner opened goes to the runner first, not straight into the agent's task. The decider (a free model,
-//! else word rules) sorts it:
+//! chat the runner opened goes to the runner first, not straight into the agent's task. The decider (a free model)
+//! reads it by its meaning, in any language, never by word lists; with no model a message is a question only by its
+//! question mark, else a change, so the owner is asked. It sorts it:
 //!
 //! - a note (a correction or a fact for this step): passed to the agent, the work goes on;
 //! - a question: the agent answers it briefly in the chat, then goes on;
@@ -23,7 +24,7 @@ pub const SORT_SYSTEM: &str =
     "You sort an owner's chat message to a coding agent. Answer with JSON only.";
 
 /// Who sorted a message when no model did.
-pub const WORD_RULES: &str = "Qanuvi (word rules)";
+pub const WORD_RULES: &str = "Qanuvi (no model)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -95,10 +96,12 @@ impl When {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Sorted {
     pub kind: Kind,
-    /// Who sorted it (the free model's name, or the word rules).
+    /// Who sorted it (the free model's name, or Qanuvi with no model).
     pub by: String,
     /// For a change: a short title for it as a plan step.
     pub title: String,
+    /// The message answers the waiting change question (now, after this step, a new step), read by the model.
+    pub when: Option<When>,
 }
 
 /// One message as the step's log and the run's decisions keep it.
@@ -119,88 +122,14 @@ pub struct NewStep {
     pub text: String,
 }
 
-fn words(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '\'' {
-                c
-            } else {
-                ' '
-            }
-        })
-        .collect::<String>()
-        .split_whitespace()
-        .filter(|w| *w != "please")
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// A message that is only a stop or pause word needs no model ("stop", "pause the run", "hold on"). Anything longer
-/// ("stop using sqlite") is sorted as usual.
-pub fn quick(text: &str) -> Option<Kind> {
-    match words(text).as_str() {
-        "stop" | "stop now" | "stop it" | "stop the run" | "stop the step" | "stop here"
-        | "abort" | "cancel" | "cancel the run" => Some(Kind::Stop),
-        "pause" | "pause now" | "pause it" | "pause the run" | "pause the step" | "pause here"
-        | "hold on" | "wait" => Some(Kind::Pause),
-        _ => None,
-    }
-}
-
-/// The word rules, when no model answers: a question by its form, a change by its words; when unsure, a change (the
-/// owner is asked, nothing is lost).
+/// With no model, nothing is read by its words (a word list knows one language only): a message ending in a
+/// question mark (any script's) is a question, anything else is taken as a change, so the owner is asked in words
+/// what they meant and when; nothing is lost.
 pub fn guess(text: &str) -> Kind {
-    if let Some(k) = quick(text) {
-        return k;
-    }
-    let w = words(text);
-    let first = w.split(' ').next().unwrap_or("");
-    const ASKS: [&str; 16] = [
-        "why", "what", "how", "when", "where", "which", "who", "is", "are", "can", "could", "does",
-        "did", "should", "will", "would",
-    ];
-    if text.trim_end().ends_with('?') || ASKS.contains(&first) {
+    if text.trim_end().ends_with(['?', '؟', '？', ';']) {
         return Kind::Question;
     }
-    // Words that set how all the work goes, not this step only ("always ...", "from now on ...").
-    const RULES: [&str; 9] = [
-        "always ",
-        "never ",
-        "from now on",
-        "in every step",
-        "for every step",
-        "in all steps",
-        "for all steps",
-        "each step ",
-        "every time ",
-    ];
-    let spaced = format!(" {w} ");
-    if first == "always"
-        || first == "never"
-        || RULES.iter().any(|r| spaced.contains(&format!(" {r}")))
-    {
-        return Kind::Rule;
-    }
-    const CHANGES: [&str; 12] = [
-        "also ",
-        "as well",
-        "instead",
-        "new step",
-        "another step",
-        "change the plan",
-        "add ",
-        "remove ",
-        "skip ",
-        "don't do",
-        "do not do",
-        "drop ",
-    ];
-    let padded = format!("{w} ");
-    if CHANGES.iter().any(|c| padded.contains(c)) {
-        return Kind::Change;
-    }
-    Kind::Note
+    Kind::Change
 }
 
 /// A short title for a change as a plan step, from the message itself: a long message ends at a word (the step's
@@ -272,53 +201,59 @@ pub fn tidy_title(title: &str) -> String {
     }
 }
 
-/// The decider's question.
-pub fn sort_prompt(step: &str, text: &str) -> String {
+/// The decider's question. `waiting`: the owner's earlier change that Qanuvi asked about ("when should it be done?");
+/// the message may be their answer, in any language or spelling.
+pub fn sort_prompt(step: &str, text: &str, waiting: Option<&str>) -> String {
+    let when = match waiting {
+        Some(change) => format!(
+            "\n\nQanuvi is waiting for the owner's answer to: when should their change \"{change}\" be done: now in \
+             this step, after this step in the same session, or as a new step of its own? Read the message by what it \
+             means (any language, spelling or wording, however short), never word by word. If it answers that \
+             question, give \"when\": \"now\", \"after\" or \"new\" (\"later\" or \"not now\" means \"new\"); if it is \
+             something else, give \"when\": null and sort it as below."
+        ),
+        None => String::new(),
+    };
     format!(
         "The owner typed a message into the chat of a running plan step. Sort it.\n\nStep: {step}\nMessage: \
-         \"{text}\"\n\nKinds:\n- note: a correction or a fact for this step; the agent takes it into account and goes \
-         on.\n- rule: a standing rule for the whole plan, not only this step (how all the work should be done, e.g. \
+         \"{text}\"{when}\n\nKinds:\n- note: a correction or a fact for this step; the agent takes it into account and \
+         goes on.\n- rule: a standing rule for the whole plan, not only this step (how all the work should be done, e.g. \
          \"always follow the core code style\", \"check the other plugins before adding helpers\"); every later step \
          gets it.\n- question: the owner asks something; the agent answers briefly and goes on.\n- change: the owner wants \
          something this step does not cover, or a change of the plan or its scope.\n- stop: the owner wants the run \
-         stopped.\n- pause: the owner wants the run paused.\n\nWhen unsure between note and change, answer change. \
-         When unsure between note and rule, answer note. Answer with JSON only: {{\"kind\": \
-         \"note|rule|question|change|stop|pause\", \"title\": \"for a change: a short \
-         title for it as a plan step\"}}"
+         stopped.\n- pause: the owner wants the run paused.\n\nRead the message by what it means, in any language. \
+         When unsure between note and change, answer change. When unsure between note and rule, answer note. Answer \
+         with JSON only: {{\"kind\": \"note|rule|question|change|stop|pause\", \"title\": \"for a change: a short \
+         title for it as a plan step\", \"when\": \"now|after|new\" or null}}"
     )
 }
 
-/// The decider's answer; None when it is not clear (the word rules decide then).
-pub fn parse_sort(answer: &str) -> Option<(Kind, String)> {
+/// The decider's answer: the kind, a change's title, and the answer to a waiting change question when the message is
+/// one. None when it is not clear (then Qanuvi with no model sorts it).
+pub fn parse_sort(answer: &str) -> Option<(Kind, String, Option<When>)> {
     let start = answer.find('{')?;
     let end = answer.rfind('}')?;
     let v: Value = serde_json::from_str(answer.get(start..=end)?).ok()?;
-    let kind = Kind::from_word(v.get("kind")?.as_str()?)?;
+    let when = v
+        .get("when")
+        .and_then(Value::as_str)
+        .and_then(When::from_id);
+    let kind = match v
+        .get("kind")
+        .and_then(Value::as_str)
+        .and_then(Kind::from_word)
+    {
+        Some(k) => k,
+        // An answer to the waiting question needs no kind of its own.
+        None if when.is_some() => Kind::Note,
+        None => return None,
+    };
     let title = v
         .get("title")
         .and_then(Value::as_str)
         .map(|t| t.trim().to_string())
         .unwrap_or_default();
-    Some((kind, title))
-}
-
-/// The owner answers a change question in words in the chat ("now", "after this step", "new step"); a longer message
-/// is a new message, not an answer.
-pub fn when_in_words(text: &str) -> Option<When> {
-    let w = words(text);
-    if w.split(' ').count() > 8 {
-        return None;
-    }
-    let has = |p: &str| format!(" {w} ").contains(&format!(" {p} "));
-    if has("new step") || has("own step") || has("separate") || has("later") || has("not now") {
-        Some(When::NewStep)
-    } else if has("after") || has("afterwards") || has("when done") {
-        Some(When::After)
-    } else if has("now") || has("right away") || has("in this step") || has("go ahead") {
-        Some(When::Now)
-    } else {
-        None
-    }
+    Some((kind, title, when))
 }
 
 // ---------- What the agent is told ----------
@@ -501,58 +436,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_bare_stop_and_pause_words_skip_the_decider() {
-        assert_eq!(quick("Stop!"), Some(Kind::Stop));
-        assert_eq!(quick("please pause the run"), Some(Kind::Pause));
-        assert_eq!(quick("hold on"), Some(Kind::Pause));
-        assert_eq!(quick("stop using sqlite here"), None);
-        assert_eq!(quick("wait, the key is in .env"), None);
-    }
-
-    #[test]
-    fn the_word_rules_sort_questions_changes_and_notes() {
+    fn with_no_model_nothing_is_read_by_its_words() {
+        // A question by its mark only, in any script; anything else is a change, so the owner is asked.
         assert_eq!(guess("why sqlite?"), Kind::Question);
-        assert_eq!(guess("Should this go in the helper"), Kind::Question);
+        assert_eq!(guess("pourquoi sqlite ?"), Kind::Question);
+        assert_eq!(guess("لماذا؟"), Kind::Question);
+        assert_eq!(guess("為什麼？"), Kind::Question);
         assert_eq!(guess("also add a CSV export"), Kind::Change);
-        assert_eq!(guess("do the export in JSON instead"), Kind::Change);
-        assert_eq!(guess("the price helper is in lib/money.php"), Kind::Note);
-        assert_eq!(guess("stop"), Kind::Stop);
-        assert_eq!(guess("always follow WordPress core style"), Kind::Rule);
-        assert_eq!(
-            guess("From now on check the other plugins before adding helpers"),
-            Kind::Rule
-        );
-        assert_eq!(guess("never edit the vendor folder"), Kind::Rule);
-        assert_eq!(guess("always add tests?"), Kind::Question);
+        assert_eq!(guess("the price helper is in lib/money.php"), Kind::Change);
+        assert_eq!(guess("stop"), Kind::Change);
+        assert_eq!(guess("plus tard"), Kind::Change);
     }
 
     #[test]
-    fn reads_the_deciders_answer_or_leaves_it_to_the_word_rules() {
+    fn reads_the_deciders_answer_with_when_in_any_language() {
         assert_eq!(
             parse_sort("Sure: {\"kind\": \"change\", \"title\": \"CSV export\"}"),
-            Some((Kind::Change, "CSV export".into()))
+            Some((Kind::Change, "CSV export".into(), None))
         );
         assert_eq!(
-            parse_sort("{\"kind\":\"question\"}"),
-            Some((Kind::Question, String::new()))
+            parse_sort("{\"kind\":\"question\", \"when\": null}"),
+            Some((Kind::Question, String::new(), None))
+        );
+        // "plus tard" answering the waiting question: the model says new.
+        assert_eq!(
+            parse_sort("{\"kind\": \"note\", \"when\": \"new\"}"),
+            Some((Kind::Note, String::new(), Some(When::NewStep)))
+        );
+        assert_eq!(
+            parse_sort("{\"when\": \"now\"}"),
+            Some((Kind::Note, String::new(), Some(When::Now)))
         );
         assert_eq!(parse_sort("{\"kind\": \"maybe\"}"), None);
         assert_eq!(parse_sort("no idea"), None);
-    }
-
-    #[test]
-    fn reads_when_in_the_owners_words() {
-        assert_eq!(when_in_words("now"), Some(When::Now));
-        assert_eq!(when_in_words("Do it now please."), Some(When::Now));
-        assert_eq!(when_in_words("after this step"), Some(When::After));
-        assert_eq!(when_in_words("make it a new step"), Some(When::NewStep));
-        assert_eq!(when_in_words("not now"), Some(When::NewStep));
-        assert_eq!(when_in_words("later"), Some(When::NewStep));
-        assert_eq!(
-            when_in_words("now that I think of it the export should also write a header row"),
-            None
+        let p = sort_prompt("1. Export", "plus tard", Some("also add a CSV export"));
+        assert!(
+            p.contains("when should their change \"also add a CSV export\" be done"),
+            "{p}"
         );
-        assert_eq!(when_in_words("use the helper"), None);
+        assert!(p.contains("any language"), "{p}");
+        assert!(!sort_prompt("1. Export", "x", None).contains("Qanuvi is waiting"));
     }
 
     #[test]

@@ -249,6 +249,8 @@ class RunnerStore {
     if (!busy && wasBusy) {
       this.#unhook();
       if (v.error) agent.notice(`The plan run ended with an error: ${v.error}`);
+      // The run's sessions as the core left them: none of them stays "working" in this window.
+      void agent.refreshSessions();
     }
     const now = shape(v.run);
     if (now !== this.#shape) {

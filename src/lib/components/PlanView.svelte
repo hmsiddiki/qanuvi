@@ -212,6 +212,16 @@
     void applyToStep(step, (t, line, title) => setStepStatus(t, line, next, title));
   }
 
+  /** A step's own chat is working now: a session of this plan's run record for this step, shown running or waiting. */
+  function stepChatWorking(step: Step): boolean {
+    const r = runner.run;
+    if (!r || r.projectId !== project.id || r.file !== file) return false;
+    const s = r.steps.find((x) => x.number === step.number && x.title === step.title);
+    if (!s) return false;
+    const ids = new Set(s.attempts.map((a) => a.sessionId));
+    return agent.sessions.some((x) => ids.has(x.id) && ["running", "waiting"].includes(x.status));
+  }
+
   /** f1: a plan written as a plain list, and how many steps it would give; null when it has steps or no list. */
   let listed = $derived(plan && !plan.sections.some((s) => s.steps.length) ? listToSteps(text) : null);
 
@@ -571,16 +581,9 @@
                       runner.run.steps.some(
                         (r) => r.status === "running" && r.number === step.number && r.title === step.title,
                       )) ||
-                      // A step chat working outside a run. During a run its view says which step works: a session
-                      // that goes on across steps keeps the first step's title (R2e).
-                      (!thisRunning &&
-                        !!step.number &&
-                        agent.sessions.some(
-                          (x) =>
-                            x.project_id === project.id &&
-                            ["running", "waiting"].includes(x.status) &&
-                            x.title.startsWith(`Step ${step.number}:`),
-                        ))}
+                      // A step chat working outside a run: one of this plan's sessions for this very step, by the
+                      // run record's session ids (a title like "Step 4:" also fits other plans' step 4).
+                      (!thisRunning && stepChatWorking(step))}
                     title="{STATUS_LABELS[step.status]} (click to change)"
                     aria-label="Status: {STATUS_LABELS[step.status]}"
                     onclick={() => cycleStatus(step)}

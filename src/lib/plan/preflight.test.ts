@@ -149,17 +149,38 @@ describe("p2: the check's answers read by meaning", () => {
     expect(no.holds.map((h) => h.step)).toContain("2a");
   });
 
-  it("holds a sentence nobody could read, and keeps a typed choice as before", () => {
+  it("holds every sentence nobody could read, in any language; a one-piece choice stands (f5)", () => {
     const r = readAnswers(check, { DB_HOST: "the usual one" }, { 2: "light please" }, { 2: true }, [], {}, "1");
     expect(r.save).toEqual([]);
-    expect(r.holds).toEqual([
+    expect(r.holds.slice(0, 1)).toEqual([
       {
         step: "2a",
         why: 'it needs where the test database is (DB_HOST). Before the run you wrote "the usual one". Give the value, or say where Qanuvi can find it',
         by: "default",
       },
     ]);
-    expect(r.answers[2]).toBe("light please");
+    expect(r.answers[2]).toBe("");
+    expect(r.holds.map((h) => h.step)).toEqual(["2a", "4c"]);
+    expect(r.holds[1].why).toBe(
+      'it needs your answer to: Which theme? Before the run you wrote "light please". Answer it in your own words',
+    );
+    // No model: "plus tard" is not saved as the choice; "dark" (one piece) is.
+    const fr = readAnswers(check, {}, { 1: "plus tard", 2: "dark" }, { 1: true, 2: true }, [], {}, "1");
+    expect(fr.answers[1]).toBe("");
+    expect(fr.holds.map((h) => h.step)).toEqual(["4b"]);
+    expect(fr.answers[2]).toBe("dark");
+    // With a model, "later" comes back unclear: the step waits, nothing is skipped.
+    const later = readAnswers(
+      check,
+      { DB_HOST: "je vous le dirai plus tard" },
+      {},
+      {},
+      [reading("secret:DB_HOST", "unclear", { reply: "Qanuvi will ask again." })],
+      {},
+      "1",
+    );
+    expect(later.save).toEqual([]);
+    expect(later.holds.map((h) => h.step)).toEqual(["2a"]);
     const v = readAnswers(
       check,
       { DB_HOST: "it is localhost 3306" },

@@ -370,10 +370,13 @@ export function answersPrompt(
     "  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's",
     "  docs, config and example files, or the other projects below): put what you found in value and the file or",
     "  place in where. When it is a known secret of another project, give copyFrom with that project's name and the",
-    "  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.",
+    "  secret's name and leave value empty (Qanuvi copies it; you never see it). skip true only when the owner clearly",
+    "  says to go on without it or lets Qanuvi decide.",
     "  Found nothing: value empty, and reply says in one sentence where you looked.",
     '- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked',
     "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.",
+    "  Not now, later, not known yet, or anything you cannot place is unclear too (the step waits and asks again),",
+    "  never skip; when unsure between skip and unclear, answer unclear.",
     "Change nothing. Never guess a password.",
     NEUTRAL_EXAMPLES,
     "",
@@ -531,8 +534,14 @@ export function readAnswers(
     const id = `question:${i}`;
     if (!a || !answersTouched[i] || a === q.recommended) return;
     const r = reading(id);
-    // A typed choice with no reading stays the owner's answer, as before.
-    if (!r) return;
+    // No reading (no model, or it failed): a one-piece answer ("dark", "1,234.00") stands as typed; a sentence is
+    // never taken word by word (it may be "plus tard" or a question back): the step waits and asks again.
+    if (!r) {
+      if (!secretNeedsReading(a)) return;
+      out.answers[i] = "";
+      hold([q.step], unsettledWhy(`your answer to: ${q.question}`, a, "", true));
+      return;
+    }
     if (r.kind === "value") {
       out.answers[i] = r.value || a;
       return;

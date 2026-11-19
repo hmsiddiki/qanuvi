@@ -322,33 +322,35 @@ struct Asking {
     until: i64,
 }
 
-/// Sorts the owner's message: bare stop and pause words at once, else the free decider, else the word rules.
-fn sort_message(env: &dyn RunEnv, setup: &TurnSetup, step: &str, text: &str) -> ownermsg::Sorted {
-    if let Some(kind) = ownermsg::quick(text) {
-        return ownermsg::Sorted {
-            kind,
-            by: ownermsg::WORD_RULES.into(),
-            title: String::new(),
-        };
-    }
+/// Sorts the owner's message by its meaning on the free decider (any language; `waiting`: the change Qanuvi asked
+/// "when?" about, which the message may answer). With no model: a question by its mark, else a change (asked).
+fn sort_message(
+    env: &dyn RunEnv,
+    setup: &TurnSetup,
+    step: &str,
+    text: &str,
+    waiting: Option<&str>,
+) -> ownermsg::Sorted {
     if let Some(free) = setup.setups.get("qanuvi")
         && let Ok((who, answer)) = env.free_decide(
             free,
             ownermsg::SORT_SYSTEM,
-            &ownermsg::sort_prompt(step, text),
+            &ownermsg::sort_prompt(step, text, waiting),
         )
-        && let Some((kind, title)) = ownermsg::parse_sort(&answer)
+        && let Some((kind, title, when)) = ownermsg::parse_sort(&answer)
     {
         return ownermsg::Sorted {
             kind,
             by: who,
             title,
+            when: when.filter(|_| waiting.is_some()),
         };
     }
     ownermsg::Sorted {
         kind: ownermsg::guess(text),
         by: ownermsg::WORD_RULES.into(),
         title: String::new(),
+        when: None,
     }
 }
 
@@ -528,8 +530,10 @@ pub fn turn(
         }
         // The owner's words in the step's chat (R2c part 2): sorted first, then passed on as fits.
         if let Some(text) = controls.take_said() {
-            if asking.is_some()
-                && let Some(when) = ownermsg::when_in_words(&text)
+            // A change question waiting: the model reads whether this answers it ("plus tard", "after", "now"...).
+            let waiting = asking.as_ref().map(|a| a.text.clone());
+            let sorted = sort_message(env, setup, title, &text, waiting.as_deref());
+            if let Some(when) = sorted.when
                 && let Some(a) = asking.take()
             {
                 let (flow, said) = settle(env, watch, a, when, false, wait);
@@ -538,7 +542,6 @@ pub fn turn(
                 });
                 return flow;
             }
-            let sorted = sort_message(env, setup, title, &text);
             let record = |handled: &str| ownermsg::Record {
                 at: now,
                 text: text.clone(),

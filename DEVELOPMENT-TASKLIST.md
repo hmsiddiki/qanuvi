@@ -916,7 +916,34 @@ runs on or off; with it off nothing is sent anywhere.
     FINDING f5 (not fixed, owner decides): "i will tell you later" typed in the password box was read as "leave it"
     (skip), so step 1 ran without the password and came back blocked ($0.10) instead of being held; "later" arguably
     means hold the step and ask again.
+    f5 FIXED + NO WORD LISTS (owner, 2026-11-20: "flagging word by word, is it meaningful? the user could type French;
+    handle it by model, and if it cannot understand or no model is there, ask the question again"). (1) The answer
+    reading prompt (TS + Rust): skip only when the owner clearly says go on without it or lets Qanuvi decide; not now,
+    later, not known yet or anything it cannot place is unclear (held, asked again); unsure between skip and unclear
+    = unclear. The Inbox reply reading: later / not now is never "act" (followup, the step keeps waiting). (2) No model
+    (or the reading failed): a typed choice that is a sentence is held and asked again ("Answer it in your own
+    words"), never saved word for word; a one-piece answer ("dark") stands; secrets as before. (3) Step chat
+    (ownermsg.rs): when_in_words and quick() (English stop/pause/now/after/later lists) and the keyword lists in
+    guess() are gone. The answer to "when should your change be done?" is read by the model in the same sort call
+    (sort_prompt gets the waiting change; parse_sort gives when); with no model a message is a question only by its
+    question mark (? ؟ ？ ;), else a change, so the owner is asked; the Inbox choices and the safe default stay.
+    Stop/pause typed in the chat go through the model (the buttons are instant). WORD_RULES label now "Qanuvi (no
+    model)". Scenarios: "fais-le maintenant" -> now, "plus tard" -> new step at once, no model -> not guessed, stop
+    typed as "arrête tout !" stops. DRIVEN LIVE: "je vous le dirai plus tard" in the password box -> reading said
+    unclear -> step 1 held, no attempts; hold text "it needs the password of ..." (f3 seen live too).
+    STEP SPINNER FIX (owner saw step 4 spinning on qpfixbase QC-MODUL-SETTING-PLAN.md after the run ended; the file had
+    [x], the core had no running session): the Plan pane spun a step when any session titled "Step 4:" in the project
+    was running or waiting in the window's own list, which can stay stale (a session the core stopped without an
+    event reaching the window), and the title also fits other plans' step 4. Now: a step's chat is matched by the run
+    record's session ids for that plan and step (stepChatWorking); the window reloads its sessions when a run ends and
+    every 20 s while any shows working (agent.refreshSessions). Driven live: spinner while step 1 worked, gone with
+    "1 working" at the end. The stale case itself not reproduced live.
+    Verify: vitest 529, svelte-check 0, clippy clean, Rust lib 551.
     PICKUP POINT (fresh conversation starts here, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
+    p3 + g1 + f1-f5 fixed, no word lists left in answer reading or step chat, step spinner fix; nothing published after
+    0.1.27. Next: 0.1.28 (publish asks the owner first), then 24n or 24y. Test window and test masters stopped; scratch
+    project p2proj (session 6b80dfe9).
+    PICKUP POINT (before, 2026-11-20 04:00): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
     p3 + g1 + f1-f4 fixed; nothing published after 0.1.27. Next: owner on f5, then 0.1.28 (publish asks the owner
     first), then 24n or 24y. Test window and test masters stopped; scratch project p2proj (session 6b80dfe9).
     PICKUP POINT (before, 2026-11-20 03:30): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,

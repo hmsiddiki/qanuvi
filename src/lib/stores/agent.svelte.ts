@@ -391,6 +391,22 @@ ${text}`
     } catch (e) {
       this.error = errorText(e);
     }
+    // A session the core stopped or ended without an event reaching this window (a run's step, a handover) would
+    // stay "working" here: while any shows so, its status is read again from the core now and then.
+    if (this.#statusTimer === null)
+      this.#statusTimer = setInterval(() => {
+        if (this.sessions.some((s) => ["running", "waiting"].includes(s.status))) void this.refreshSessions();
+      }, 20_000);
+  }
+
+  #statusTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Reads the shown project's sessions again from the core (their status as the core has it now). */
+  async refreshSessions(): Promise<void> {
+    const projectId = this.#projectId;
+    if (!projectId) return;
+    const list = await api.agent.sessions(projectId).catch(() => null);
+    if (list && this.#projectId === projectId) this.sessions = list;
   }
 
   /**

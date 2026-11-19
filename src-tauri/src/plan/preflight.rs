@@ -668,10 +668,13 @@ pub fn answers_prompt(file: &str, items: &[TypedAnswer], known: &KnownForAnswers
         "  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's".into(),
         "  docs, config and example files, or the other projects below): put what you found in value and the file or".into(),
         "  place in where. When it is a known secret of another project, give copyFrom with that project's name and the".into(),
-        "  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.".into(),
+        "  secret's name and leave value empty (Qanuvi copies it; you never see it). skip true only when the owner clearly".into(),
+        "  says to go on without it or lets Qanuvi decide.".into(),
         "  Found nothing: value empty, and reply says in one sentence where you looked.".into(),
         r#"- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked"#.into(),
         "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.".into(),
+        "  Not now, later, not known yet, or anything you cannot place is unclear too (the step waits and asks again),".into(),
+        "  never skip; when unsure between skip and unclear, answer unclear.".into(),
         "Change nothing. Never guess a password.".into(),
         NEUTRAL_EXAMPLES.into(),
         String::new(),
@@ -938,8 +941,16 @@ pub fn read_answers(
         {
             continue;
         }
-        // A typed choice with no reading stays the owner's answer, as before.
-        let Some(r) = reading(&id) else { continue };
+        // No reading (no model, or it failed): a one-piece answer ("dark", "1,234.00") stands as typed; a sentence is
+        // never taken word by word (it may be "plus tard" or a question back): the step waits and asks again.
+        let Some(r) = reading(&id) else {
+            if secret_needs_reading(a) {
+                out.answers.insert(i, String::new());
+                let why = unsettled_why(&format!("your answer to: {}", q.question), a, "", true);
+                hold_once(&mut out, std::slice::from_ref(&q.step), &why);
+            }
+            continue;
+        };
         if r.kind == ReadingKind::Value {
             let v = if r.value.is_empty() {
                 a.to_string()

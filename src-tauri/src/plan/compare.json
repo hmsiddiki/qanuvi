@@ -592,7 +592,7 @@
     ]
    }
   ],
-  "out": "Before a run of PLAN.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\nChange nothing. Never guess a password.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\n\nKnown secrets of this project (names only): DB_USER, X\nOther projects on this machine (their secrets, names only):\n- qchmmart (E:/www/q): none\n\nAnswers:\n- id: secret:DB_HOST\n  asked: Where (DB_HOST)\n  example: localhost\n  answer: \"use \\\"the\\\" same é\\n\"\n- id: question:1\n  asked: Bank?\n  answer: \"dont get it\"\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
+  "out": "Before a run of PLAN.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). skip true only when the owner clearly\n  says to go on without it or lets Qanuvi decide.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\n  Not now, later, not known yet, or anything you cannot place is unclear too (the step waits and asks again),\n  never skip; when unsure between skip and unclear, answer unclear.\nChange nothing. Never guess a password.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\n\nKnown secrets of this project (names only): DB_USER, X\nOther projects on this machine (their secrets, names only):\n- qchmmart (E:/www/q): none\n\nAnswers:\n- id: secret:DB_HOST\n  asked: Where (DB_HOST)\n  example: localhost\n  answer: \"use \\\"the\\\" same é\\n\"\n- id: question:1\n  asked: Bank?\n  answer: \"dont get it\"\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
  },
  {
   "fn": "answersPrompt",
@@ -604,7 +604,7 @@
     "others": []
    }
   ],
-  "out": "Before a run of P.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\nChange nothing. Never guess a password.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\n\nKnown secrets of this project (names only): none\nOther projects on this machine (their secrets, names only):\n- none\n\nAnswers:\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
+  "out": "Before a run of P.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). skip true only when the owner clearly\n  says to go on without it or lets Qanuvi decide.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\n  Not now, later, not known yet, or anything you cannot place is unclear too (the step waits and asks again),\n  never skip; when unsure between skip and unclear, answer unclear.\nChange nothing. Never guess a password.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\n\nKnown secrets of this project (names only): none\nOther projects on this machine (their secrets, names only):\n- none\n\nAnswers:\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
  },
  {
   "fn": "parseAnswerReadings",
@@ -1243,10 +1243,10 @@
    ],
    "copy": [],
    "answers": {
-    "0": "use the shop one",
-    "1": "dont get it",
-    "2": "you pick",
-    "3": "blue please"
+    "0": "",
+    "1": "",
+    "2": "",
+    "3": ""
    },
    "answersTouched": {
     "0": true,
@@ -1268,6 +1268,21 @@
     {
      "step": "3",
      "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Give the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4a",
+     "why": "it needs your answer to: Which currency format? Before the run you wrote \"use the shop one\". Answer it in your own words",
+     "by": "default"
+    },
+    {
+     "step": "4b",
+     "why": "it needs your answer to: Which bank? Before the run you wrote \"dont get it\". Answer it in your own words",
+     "by": "default"
+    },
+    {
+     "step": "4c",
+     "why": "it needs your answer to: Which theme? Before the run you wrote \"you pick\". Answer it in your own words",
      "by": "default"
     }
    ],

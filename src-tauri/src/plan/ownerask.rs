@@ -205,6 +205,9 @@ pub fn reading_prompt(f: &StepFacts, card: &Card, answer: &str) -> String {
         "- \"followup\": the reply gives part of the need or something else. Give \"card\": a follow-up question \
          that asks exactly for what is still missing, and says what their reply gave."
             .into(),
+        "Not now, later, or not known yet (in any language) is never \"act\": answer \"followup\" with a card that \
+         says the step keeps waiting until they give it, and what exactly is still needed."
+            .into(),
     ];
     if round > 1 {
         out.extend([

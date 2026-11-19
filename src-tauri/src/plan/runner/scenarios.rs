@@ -1728,10 +1728,26 @@ fn a_change_with_no_answer_waits_then_becomes_a_new_step_after_this_one_and_runs
     );
 }
 
+/// The decider for a change and then the owner's answer to "when?": the answer is read by the model (any language),
+/// which gets the waiting change in its prompt; no words are matched by Qanuvi itself.
+fn decider_reads_when(env: &FakeEnv, answer: &'static str, when: &'static str) {
+    env.set_decide(move |prompt| {
+        assert!(prompt.contains("Sort it."), "{prompt}");
+        let reply = if prompt.contains(&format!("Message: \"{answer}\"")) {
+            assert!(prompt.contains("Qanuvi is waiting"), "{prompt}");
+            json!({"kind": "note", "when": when})
+        } else {
+            json!({"kind": "change", "title": "JSON export", "when": null})
+        };
+        Ok(("Free model".into(), reply.to_string()))
+    });
+}
+
 #[test]
 fn a_change_answered_now_in_words_in_the_chat_goes_into_this_step() {
     let env = world("# Plan\n\n- [ ] **1. Export**\n");
-    decider_says(&env, "change", "JSON export");
+    // The owner answers in French: read by meaning, not by English words.
+    decider_reads_when(&env, "fais-le maintenant", "now");
     let stop = stop_button();
     let sh = stop.0.clone();
     let asked = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -1743,7 +1759,7 @@ fn a_change_answered_now_in_words_in_the_chat_goes_into_this_step() {
             .iter()
             .any(|i| i.key.as_deref().is_some_and(|k| k.starts_with("msg:")));
         if open && !once.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            sh2.owner_message("do it now");
+            sh2.owner_message("fais-le maintenant");
         }
     });
     env.set_agent(move |c| {
@@ -1773,6 +1789,85 @@ fn a_change_answered_now_in_words_in_the_chat_goes_into_this_step() {
         "{:?}",
         decided
     );
+}
+
+#[test]
+fn a_change_answered_plus_tard_in_the_chat_becomes_a_new_step_without_waiting() {
+    let env = world("# Plan\n\n- [ ] **1. Export**\n");
+    decider_reads_when(&env, "plus tard", "new");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let asked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (sh2, once) = (sh.clone(), asked.clone());
+    let started = env.now_ms();
+    env.set_tick(move |e| {
+        let open = e
+            .inbox()
+            .iter()
+            .any(|i| i.key.as_deref().is_some_and(|k| k.starts_with("msg:")));
+        if open && !once.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            sh2.owner_message("plus tard");
+        }
+    });
+    env.set_agent(move |c| {
+        if c.prompt
+            .starts_with("(Qanuvi: go on with the step as planned")
+        {
+            c.env.mark(FILE, "1", 'x');
+            return AgentReply::default();
+        }
+        if c.turn == 1 && step_of(c.prompt, &["1", "1a"]) == "1" {
+            sh.owner_message("write the export as JSON instead");
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "1a"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = with_free(&env, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
+    // Taken as "a new step" at once: no 10-minute wait, the change is step 1a, the question is gone.
+    assert!(env.now_ms() - started < ownermsg::WAIT_DEFAULT_MS);
+    assert!(
+        env.text(FILE).contains("**1a. JSON export**"),
+        "{}",
+        env.text(FILE)
+    );
+    assert_eq!(questions(&env), 0);
+}
+
+#[test]
+fn with_no_model_a_change_answer_in_words_is_not_guessed_and_the_safe_choice_is_taken() {
+    // No free model: "do it now" is not read by English words; it is sorted as a message of its own, and the waiting
+    // question gets the safe choice (a new step) once its wait is over. The owner can answer in the Inbox instead.
+    let env = world("# Plan\n\n- [ ] **1. Export**\n- [ ] **2. Later**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        if c.prompt
+            .starts_with("(Qanuvi: go on with the step as planned")
+        {
+            c.env.mark(FILE, "1", 'x');
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "1a", "2"]);
+        if n == "1" && c.turn == 1 {
+            sh.owner_message("write the export as JSON instead");
+            return AgentReply {
+                ticks: 2,
+                ..Default::default()
+            };
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(!env.calls().iter().any(|c| c == "free_decide"));
+    let decided = messages_decided(&r);
+    assert_eq!(decided[0].0, ownermsg::WORD_RULES);
+    assert_eq!(decided[0].1, "change");
 }
 
 #[test]
@@ -1821,13 +1916,14 @@ fn a_change_answered_after_this_step_in_the_inbox_goes_on_in_the_same_session() 
 }
 
 #[test]
-fn stop_typed_in_the_chat_stops_the_run_like_the_button_without_asking_a_model() {
+fn stop_typed_in_the_chat_in_any_language_stops_the_run_like_the_button() {
+    // Read by meaning on the model ("arrête tout"), never by a list of English stop words.
     let env = world("# Plan\n\n- [ ] **1. Long**\n- [ ] **2. Later**\n");
-    decider_says(&env, "note", "");
+    decider_says(&env, "stop", "");
     let stop = stop_button();
     let sh = stop.0.clone();
     env.set_agent(move |_| {
-        sh.owner_message("Stop!");
+        sh.owner_message("arrête tout !");
         AgentReply {
             ticks: 2,
             ..Default::default()
@@ -1835,7 +1931,7 @@ fn stop_typed_in_the_chat_stops_the_run_like_the_button_without_asking_a_model()
     });
     let r = with_free(&env, options(), stop).wait();
     assert_eq!(r.status, RunStatus::Stopped);
-    assert!(!env.calls().iter().any(|c| c == "free_decide"));
+    assert!(env.calls().iter().any(|c| c == "free_decide"));
     assert!(
         sent_texts(&env)
             .iter()
