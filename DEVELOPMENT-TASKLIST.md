@@ -939,7 +939,17 @@ runs on or off; with it off nothing is sent anywhere.
     every 20 s while any shows working (agent.refreshSessions). Driven live: spinner while step 1 worked, gone with
     "1 working" at the end. The stale case itself not reproduced live.
     Verify: vitest 529, svelte-check 0, clippy clean, Rust lib 551.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
+    0.1.28 PUBLISHED (owner: "publish anyway", 2026-11-20; release rule skipped with QANUVI_RELEASE_ANYWAY=1, This
+    PC's Claude Code 2.1.318 with 2.1.329 out): 24q(a), p1, p2, n2, p3, g1, f1-f5, step spinner, settings scroll.
+    Stray old session tree cleared first (one VS Code claude.exe + its 4 MCP node helpers; the installed app's agent
+    left running). Built with CARGO_BUILD_JOBS=2 (free RAM 6 GB), signed, into E:/qc-scratch/release-0.1.28/chan, then
+    copied into qanuvi-updates/dev (old latest.json kept in E:/Backups/qanuvi/channel-before-0.1.28). Checked:
+    https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.28; installer (8569135), Linux master (10458224) and
+    Windows master (10373632) served 200 with matching sizes. Tagged v0.1.28. Not done: the owner's install updating
+    to 0.1.28 (its updater offers it), the VPS server build swap to 0.1.28 (asks the owner).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 05:20): 0.1.28 PUBLISHED. Next: owner's install update,
+    VPS swap when the owner wants, then 24n or 24y.
+    PICKUP POINT (before, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
     p3 + g1 + f1-f5 fixed, no word lists left in answer reading or step chat, step spinner fix; nothing published after
     0.1.27. Next: 0.1.28 (publish asks the owner first), then 24n or 24y. Test window and test masters stopped; scratch
     project p2proj (session 6b80dfe9).
