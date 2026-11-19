@@ -88,6 +88,7 @@ export function nameMachines(names: (master: string) => string): void {
  */
 const WINDOW_ONLY = new Set([
   "app_info",
+  "screen_usage",
   "app_restart",
   "data_test_build",
   "startup_path",

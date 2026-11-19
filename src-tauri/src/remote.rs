@@ -693,6 +693,22 @@ impl Remotes {
         }
     }
 
+    /// The processes this window started for its links (`qanuvi-master --stdio`, ssh), for its own measure (u2).
+    pub fn link_pids(&self) -> Vec<u32> {
+        self.map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .filter_map(|c| {
+                c.child
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                    .map(|k| k.id())
+            })
+            .collect()
+    }
+
     pub fn disconnect_all(&self) {
         self.forwards
             .lock()

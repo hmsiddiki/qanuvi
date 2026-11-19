@@ -710,11 +710,26 @@ runs on or off; with it off nothing is sent anywhere.
     total of master (core + watcher) + screen, tooltip split "master N MB · screen N MB · agents, shells, language
     servers"; a server shown -> that machine's master as now plus "screen N MB" in the tooltip (the screen always runs
     on this PC); the screen part measured by the window itself, so any master version works.
+    u2 BUILT + DRIVEN LIVE (2026-11-19): usage.rs measures two halves. A master (qanuvi_usage) counts its core, its
+    watcher (the core's parent when that is qanuvi-master) and all the core started, and says `own` (the master
+    program's processes). The window's new screen_usage (window-only) counts the window's tree; of qanuvi-master
+    processes only its own link helpers (Remotes::link_pids) stay, any other one (This PC's watcher and core, or a
+    service a link helper started for a local test master) is cut off with all under it. The status bar (usage.bar):
+    This PC shown -> master + screen, tooltip "master N MB · screen N MB · agents, shells, language servers N MB" then
+    one line per program (same names merged); a server shown -> its master's numbers, "On this computer, the screen:
+    N MB" last; a master before u2 (no `own`) shows "master N MB" only. Driven in the release test build against
+    Win32_Process counted apart: This PC 730 MB shown vs 733 MB counted (screen 453/456, master own 30/30); the local
+    test master shown 175 MB vs 175 MB (own 28/28), screen line present. The same-name merge is unit-tested, not yet
+    seen in a build. Seen: the native tooltip is cut at the screen's right edge when the window fills the screen (as
+    before; the split line is the longest).
     Stats line (owner, 2026-11-19, in 0.1.26): "in 503k (178k/200k) · cache 11.2M · ...": the context now against the
     handover limit it follows in brackets beside the session's "in" total, same grey, amber from 90%; the tooltip says
     what each number is (contextLimit in agent/handover.ts: a step's session the run's limit, other chats the chat
     handover's, none when off or never in this chat).
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 16:45): M9 DONE, 0.1.26 published (the first migrated
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 18:45): u2 DONE (built + driven live, above). Next: n1,
+    then t1, c1 when the owner agrees; 0.1.27 publish waits for the owner's yes. Test state: the release test window
+    runs on the u2 build (This PC shown); test state to put back (listed below) still open.
+    PICKUP POINT (before, 2026-11-19 16:45): M9 DONE, 0.1.26 published (the first migrated
     release; the owner runs it). Next: u2 (status bar total) for 0.1.27, then n1, then t1 (as M9 said), c1 when the
     owner agrees. Test state to put back (listed below) still open.
     PICKUP POINT (before, 2026-11-19 16:00): M9b DONE (R5, coding tools on a shown master,

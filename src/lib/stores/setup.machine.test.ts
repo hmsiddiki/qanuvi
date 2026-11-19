@@ -82,7 +82,7 @@ describe("the status bar's usage (24z3 D2)", () => {
 
     // This PC's answer arrives late, after the master is shown: dropped.
     let late: (u: unknown) => void = () => {};
-    answers[""] = () => new Promise((r) => (late = r));
+    answers[""] = (cmd) => (cmd === "qanuvi_usage" ? new Promise((r) => (late = r)) : null);
     const slow = usage.look();
     showMachine("vps");
     usage.switched();
@@ -97,6 +97,54 @@ describe("the status bar's usage (24z3 D2)", () => {
     answers.vps = () => Promise.reject("This master does not know the command qanuvi_usage.");
     await usage.look();
     expect(usage.now).toBe(null);
+  });
+
+  it("adds the screen in on This PC and only tells it for a server (u2)", async () => {
+    const MB = 1024 ** 2;
+    answers[""] = (cmd) =>
+      cmd === "qanuvi_usage"
+        ? {
+            memory: 100 * MB,
+            cpu: 2,
+            processes: 4,
+            own: 60 * MB,
+            parts: [{ name: "qanuvi-master", count: 2, memory: 60 * MB }],
+          }
+        : cmd === "screen_usage"
+          ? {
+              memory: 630 * MB,
+              cpu: 1,
+              processes: 6,
+              parts: [
+                { name: "msedgewebview2", count: 5, memory: 600 * MB },
+                { name: "qanuvi-master", count: 1, memory: 20 * MB },
+              ],
+            }
+          : null;
+    await usage.look();
+    await usage.lookScreen();
+    expect(usage.bar?.text).toBe("730 MB · 3%");
+    expect(usage.bar?.title.split("\n")).toEqual([
+      "Qanuvi in all on this computer (10 processes):",
+      "master 60 MB · screen 630 MB · agents, shells, language servers 40 MB",
+      "msedgewebview2 ×5: 600 MB",
+      "qanuvi-master ×3: 80 MB",
+    ]);
+    // The screen is asked of the window, never routed to a master.
+    expect(calls.filter((c) => c.cmd === "screen_usage").every((c) => c.where === "here")).toBe(true);
+
+    // A server shown: its master's numbers, the screen told apart; an older master has no split.
+    answers.vps = (cmd) => (cmd === "qanuvi_usage" ? used(900 * MB) : null);
+    showMachine("vps");
+    usage.switched();
+    await usage.look();
+    await usage.lookScreen();
+    expect(usage.bar?.text).toBe("900 MB · 1%");
+    expect(usage.bar?.title.split("\n")).toEqual([
+      "Qanuvi in all on VPS (2 processes):",
+      "master 900 MB",
+      "On this computer, the screen: 630 MB",
+    ]);
   });
 });
 

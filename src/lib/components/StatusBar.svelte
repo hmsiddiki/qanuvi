@@ -5,7 +5,7 @@
    */
   import { masterUpdate } from "$lib/stores/masterUpdate.svelte";
   import { startup } from "$lib/stores/startup.svelte";
-  import { bytes, usage } from "$lib/stores/usage.svelte";
+  import { usage } from "$lib/stores/usage.svelte";
   import { connectionName, omni } from "$lib/stores/omniroute.svelte";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import UserRound from "@lucide/svelte/icons/user-round";
@@ -226,14 +226,10 @@
 
   <span class="spacer"></span>
 
-  <!-- What Qanuvi uses in all: itself, its window's processes, the agents and start-up commands it started. -->
-  {#if usage.now}
-    <span
-      class="item static"
-      title={`Qanuvi in all on ${usage.place} (${usage.now.processes} processes):\n` +
-        usage.now.parts.map((p) => `${p.name}${p.count > 1 ? ` ×${p.count}` : ""}: ${bytes(p.memory)}`).join("\n")}
-    >
-      <span>{bytes(usage.now.memory)} · {usage.now.cpu.toFixed(0)}%</span>
+  <!-- What Qanuvi uses in all (u2): This PC shown, its master and this screen; a server shown, its master. -->
+  {#if usage.bar}
+    <span class="item static" title={usage.bar.title}>
+      <span>{usage.bar.text}</span>
     </span>
   {/if}
 

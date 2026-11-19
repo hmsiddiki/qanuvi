@@ -810,7 +810,7 @@ impl Master {
                     .insert(id.clone());
                 Ok(json!(id))
             }
-            "qanuvi_usage" => to(Ok(crate::usage::usage())),
+            "qanuvi_usage" => to(Ok(crate::usage::usage(watch::watched()))),
             // Start-up and Claude Code updates (24z3 D4): this master's own list, started with the master.
             "startup_start" => {
                 let items: Vec<crate::startup::Item> =
@@ -4052,6 +4052,7 @@ mod tests {
         "account_wait",
         "account_cancel",
         "app_info",
+        "screen_usage",
         "app_restart",
         "startup_path",
         "data_location_move",

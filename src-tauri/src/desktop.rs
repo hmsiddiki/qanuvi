@@ -55,6 +55,15 @@ fn app_info() -> AppInfo {
     AppInfo::current()
 }
 
+/// u2: this screen's half of Qanuvi's use (the window, its WebView2 processes and link helpers), measured here
+/// whatever master is shown, every master's service left out; the master's half comes from the master
+/// (qanuvi_usage).
+#[tauri::command]
+async fn screen_usage(state: State<'_, AppState>) -> Res<Option<crate::usage::Usage>> {
+    let links = state.remotes.link_pids();
+    blocking(move || Ok(crate::usage::screen_usage(&links))).await
+}
+
 /// The folder given on the command line (`qanuvi path/to/project` or `qanuvi .`), if it is a folder.
 pub fn startup_folder(args: impl Iterator<Item = String>, cwd: &std::path::Path) -> Option<String> {
     args.skip(1)
@@ -816,6 +825,7 @@ pub fn run() {
             app_quitting,
             notify_item,
             app_info,
+            screen_usage,
             browser_agent_shot,
             inspector_show,
             inspector_scroll,
