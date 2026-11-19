@@ -75,7 +75,15 @@ export function renderMarkdown(text: string): string {
         out.push(start !== 1 ? `<ol start="${start}">` : `<${kind}>`);
         list = kind;
       }
-      out.push(`<li>${inline(bullet ? bullet[1] : numbered![2])}</li>`);
+      // A checklist line ("[x] done", "[ ] open") shows a tick or an empty box (A5): agents write their to-do
+      // lists this way when they have no to-do tool.
+      const body = bullet ? bullet[1] : numbered![2];
+      const box = /^\[([ xX])\]\s+(.*)$/.exec(body);
+      out.push(
+        box
+          ? `<li class="task${box[1] === " " ? "" : " done"}"><span class="box" aria-label="${box[1] === " " ? "open" : "done"}">${box[1] === " " ? "☐" : "☑"}</span> ${inline(box[2])}</li>`
+          : `<li>${inline(body)}</li>`,
+      );
     } else if (quote) {
       flushPara();
       closeList();

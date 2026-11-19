@@ -3743,6 +3743,20 @@ runs on or off; with it off nothing is sent anywhere.
     what broke; (b) export a conversation (Markdown file); (c) a short "what changed" summary at the end of each task
     (files, +/- lines, Open); (d) a virtual list so long sessions stay fast and light; (e) stored images no
     conversation uses any more are removed.
+    (a) DRIVEN LIVE 2026-11-20 (0.1.28 release build as the test window, This PC, scratch p2proj, Claude Code Sonnet
+    5.5, Manual mode): step cards with IN/OUT, diff on an Edit card, approval card (Approve, Allow for this session,
+    Decline), "Searched 3 times" grouping, times on messages, folded Thinking, Ctrl+F search ("1 of 42", hits marked,
+    cards with a hit open), Rewind (preview dialog, file put back on disk, "Rewound 1 file" with Redo), Edit and
+    send again (new session "... (branch)"), @ mention picker (files from the shown master), right-click Paste of an
+    image (thumbnail in the box, x removes). Not driven: files dropped onto the box (needs a real Explorer drag).
+    Findings: A1 the "chat is heavy" bar at 28k: the test copy's limit was 20k from an earlier drive (default 150k),
+    set back to 150k, no bug. A2 Claude Code 2.1.318 in -p mode has no to-do tool (its own tool list: Task, Bash,
+    Edit, ... no TodoWrite), so the live checklist card cannot show with Claude Code now; not a Qanuvi bug. A3 FIXED:
+    after a rewind the edit box still offered "Also undo the file changes from here on"; now it says they are
+    already rewound. A4 FIXED: the settings search only filtered the parts; now it opens the first matching part
+    and scrolls to the matching words and marks them (settingsFind.ts + test). A5 FIXED: "[x]" / "[ ]" lines in an
+    answer (how Claude Code writes its to-do list now) show as ticks and empty boxes (markdown.ts + test). A3-A5 not
+    driven yet (next test build, together with b-e).
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
 - [x] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their

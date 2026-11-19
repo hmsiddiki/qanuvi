@@ -32,6 +32,14 @@ describe("agent answer markdown", () => {
     expect(renderMarkdown("1. a\n\n- b")).toBe("<ol><li>a</li></ol><ul><li>b</li></ul>");
   });
 
+  it("shows checklist lines as ticks and empty boxes (A5)", () => {
+    expect(renderMarkdown("1. [x] Read **a**\n2. [ ] Run it")).toBe(
+      '<ol><li class="task done"><span class="box" aria-label="done">☑</span> Read <strong>a</strong></li>' +
+        '<li class="task"><span class="box" aria-label="open">☐</span> Run it</li></ol>',
+    );
+    expect(renderMarkdown("- [link](x) stays")).not.toContain("task");
+  });
+
   it("keeps lines of a paragraph and leaves snake_case and 2*3*4 alone", () => {
     expect(renderMarkdown("one\ntwo")).toBe("<p>one<br>two</p>");
     expect(renderMarkdown("grant_minutes and 2*3*4")).toBe("<p>grant_minutes and 2*3*4</p>");

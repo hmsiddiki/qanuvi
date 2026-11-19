@@ -34,6 +34,7 @@
   import LanguagesSettings from "./LanguagesSettings.svelte";
   import NotificationsSettings from "./NotificationsSettings.svelte";
   import Bell from "@lucide/svelte/icons/bell";
+  import { firstMatch } from "$lib/settingsFind";
 
   const TABS: { id: SettingsTab; label: string; icon: typeof Bot; words: string }[] = [
     {
@@ -121,6 +122,41 @@
   );
   let tab = $derived(ui.settings ?? "agents");
 
+  // A4: the search box takes you to what it found: the first matching part opens when the one shown does not match,
+  // and the page scrolls to the setting's words and marks them (CSS Highlight API, the page's markup untouched).
+  let page = $state<HTMLElement>();
+  $effect(() => {
+    const q = query.trim();
+    if (q && shown.length && !shown.some((t) => t.id === tab)) ui.openSettings(shown[0].id);
+  });
+  $effect(() => {
+    const q = query.trim();
+    void tab;
+    const el = page;
+    if (!el || typeof CSS === "undefined" || !("highlights" in CSS)) return;
+    const timer = setTimeout(() => {
+      CSS.highlights.delete("settings-find");
+      if (!q) return;
+      const nodes: Text[] = [];
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) if (n.textContent?.trim()) nodes.push(n as Text);
+      const hit = firstMatch(
+        nodes.map((n) => n.textContent ?? ""),
+        q,
+      );
+      if (!hit) return;
+      const range = document.createRange();
+      range.setStart(nodes[hit.index], hit.start);
+      range.setEnd(nodes[hit.index], hit.end);
+      CSS.highlights.set("settings-find", new Highlight(range));
+      nodes[hit.index].parentElement?.scrollIntoView({ block: "center" });
+    }, 250);
+    return () => clearTimeout(timer);
+  });
+  $effect(() => () => {
+    if (typeof CSS !== "undefined" && "highlights" in CSS) CSS.highlights.delete("settings-find");
+  });
+
   function keydown(e: KeyboardEvent) {
     if (e.key !== "Escape" || !ui.settings) return;
     // Esc in the search box first clears it.
@@ -173,7 +209,7 @@
     >
       <X size={16} />
     </button>
-    <div class="page">
+    <div class="page" bind:this={page}>
       {#if settings.error}<p class="machine-error" role="alert">Settings: {settings.error}</p>{/if}
       {#if tab === "agents"}
         <AgentsView team={false} ownModels={false} />
@@ -214,6 +250,10 @@
 </div>
 
 <style>
+  :global(::highlight(settings-find)) {
+    background: color-mix(in srgb, var(--qx-accent, #3b82f6) 45%, transparent);
+    color: inherit;
+  }
   .machine-error {
     margin: 0 0 12px;
     padding: 8px 10px;

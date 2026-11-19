@@ -551,11 +551,14 @@
   const undone = new Map<string, Undone[]>();
   /** The last rewind in this chat, offered as Redo above the message box. */
   let rewound = $state<Undone[] | null>(null);
+  /** Where the last rewind started (the message's place in the chat): edits from there on are already undone. */
+  let rewoundAt = $state<number | null>(null);
   $effect(() => {
     void agent.selectedId;
     untrack(() => {
       undone.clear();
       rewound = null;
+      rewoundAt = null;
     });
   });
 
@@ -587,6 +590,7 @@
     const files = rewound;
     if (!files) return;
     rewound = null;
+    rewoundAt = null;
     const left = await putBack(files);
     const done = files.length - left.length;
     agent.notice(
@@ -686,7 +690,10 @@
       }
     }
     const done = ready.length - failed.length;
-    if (written.length) rewound = written;
+    if (written.length) {
+      rewound = written;
+      rewoundAt = i;
+    }
     agent.notice(
       `Rewound ${done} file${done === 1 ? "" : "s"} to before this point.` +
         (failed.length || left.length ? ` Not undone: ${[...failed, ...left].join("; ")}.` : ""),
@@ -1246,7 +1253,9 @@ With the agent now: a message it has cannot be taken back.`}
           aria-label="The message, changed"
           autofocus
           onkeydown={editKeys}></textarea>
-        {#if c.steps}
+        {#if c.steps && rewoundAt !== null && rewoundAt <= indexOfItem(item.id)}
+          <span class="dim">The file changes from here on are already rewound.</span>
+        {:else if c.steps}
           <label class="check"
             ><input type="checkbox" bind:checked={editing.rewind} /> Also undo the file changes made from here on ({c.steps}
             step{c.steps === 1 ? "" : "s"} in {c.files} file{c.files === 1 ? "" : "s"})</label
@@ -1642,6 +1651,12 @@ With the agent now: a message it has cannot be taken back.`}
   }
 
   .text.md :global(p),
+  .text.md :global(li.task .box) {
+    color: var(--qx-text-secondary);
+  }
+  .text.md :global(li.task.done .box) {
+    color: var(--qx-status-done, #22c55e);
+  }
   .text.md :global(ul),
   .text.md :global(ol),
   .text.md :global(pre),
