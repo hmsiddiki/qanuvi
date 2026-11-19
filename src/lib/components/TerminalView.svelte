@@ -9,7 +9,7 @@
   import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
   import { linkEndedText, onLinkEnd, shownMachine } from "$lib/remote";
   import { openUrl } from "@tauri-apps/plugin-opener";
-  import { opensLink, osc52Copy, pasteText, urlsIn } from "$lib/terminalText";
+  import { EarlyInput, opensLink, osc52Copy, pasteText, urlsIn } from "$lib/terminalText";
 
   interface Props {
     projectId: string;
@@ -63,6 +63,8 @@
   let id: string | null = null;
   let observer: ResizeObserver | null = null;
   let exited = false;
+  /** What the screen sends before the shell's id is known (v3): held, then sent once it is. */
+  const early = new EarlyInput();
   /** Old output is being played back into a new screen (24z3 Part B2). */
   let replaying = false;
   let played = false;
@@ -152,7 +154,8 @@
       // Answers the screen gives to old output played back (a cursor question the shell asked long ago) are not
       // typed into the shell.
       if (replaying) return;
-      if (id && !exited) api.term.write(id, data).catch(() => {});
+      if (exited || early.hold(id, data)) return;
+      api.term.write(id!, data).catch(() => {});
     });
     term.onTitleChange((title) => ontitle?.(title));
     // Every paste (Ctrl+V, Shift+Insert, the browser's own) goes through here once, before xterm's own handler.
@@ -162,7 +165,7 @@
         e.preventDefault();
         e.stopPropagation();
         const text = e.clipboardData?.getData("text/plain") ?? "";
-        if (text && id && !exited) term?.paste(pasteText(text));
+        if (text && !exited) term?.paste(pasteText(text));
       },
       true,
     );
@@ -227,8 +230,14 @@
         .then((newId) => {
           id = newId;
           if (tab) terminals.started(tab.key, newId);
+          // Typed, pasted or answered while it was starting: sent now, in order.
+          const held = early.take();
+          if (held && !exited) api.term.write(newId, held).catch(() => {});
         })
-        .catch((e) => term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`));
+        .catch((e) => {
+          early.take();
+          term?.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`);
+        });
 
     observer = new ResizeObserver(() => resize());
     observer.observe(host);

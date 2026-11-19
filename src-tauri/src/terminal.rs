@@ -146,7 +146,8 @@ pub fn keep_recent(
 
 struct Term {
     outlet: Arc<Mutex<Outlet>>,
-    writer: Box<dyn Write + Send>,
+    /// Shared with the output reader, which answers the pseudo-console's opening cursor question (v3).
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
     master: Box<dyn MasterPty + Send>,
     child: SharedChild,
     project_id: String,
@@ -280,6 +281,34 @@ pub fn take_utf8(pending: &mut Vec<u8>) -> String {
     }
 }
 
+/// Windows' pseudo-console asks where the cursor is (ESC[6n) before it starts the program, and the program says
+/// nothing until it is answered. The master answers it itself (v3): a screen that only got the question before it
+/// knew the terminal's id, a slow link, or no screen at all (a terminal nobody shows yet) left the shell silent for
+/// ever. A new terminal's cursor is at its top left.
+const CURSOR_QUESTION: &str = "\x1b[6n";
+const CURSOR_ANSWER: &str = "\x1b[1;1R";
+
+#[derive(Debug, PartialEq, Eq)]
+enum Opening {
+    /// The output starts with the question: answered here, the rest goes on to the screen.
+    Asked(String),
+    /// Only the question's first bytes so far.
+    Partial,
+    /// No question: the output goes on as it is.
+    None,
+}
+
+/// Looks at a terminal's very first output for the pseudo-console's cursor question.
+fn opening_question(data: &str) -> Opening {
+    if let Some(rest) = data.strip_prefix(CURSOR_QUESTION) {
+        Opening::Asked(rest.to_string())
+    } else if CURSOR_QUESTION.starts_with(data) {
+        Opening::Partial
+    } else {
+        Opening::None
+    }
+}
+
 impl Terminals {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn(
@@ -349,7 +378,9 @@ impl Terminals {
         drop(pair.slave);
         let child: SharedChild = Arc::new(Mutex::new(child));
         let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-        let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+        let writer = Arc::new(Mutex::new(
+            pair.master.take_writer().map_err(|e| e.to_string())?,
+        ));
         // The end is told once: by the reader when the output closes, or (a watched program) when it exits.
         let told = Arc::new(AtomicBool::new(false));
 
@@ -358,18 +389,41 @@ impl Terminals {
             sink: Some(channel),
             ..Outlet::default()
         }));
-        let (out, told_r, child_r) = (outlet.clone(), told.clone(), child.clone());
+        let (out, told_r, child_r, answer_to) =
+            (outlet.clone(), told.clone(), child.clone(), writer.clone());
         std::thread::Builder::new()
             .name(format!("term-{id}"))
             .spawn(move || {
                 let mut buf = [0u8; 16 * 1024];
                 let mut pending = Vec::new();
+                // Only the very first output can be the opening question, and only Windows' pseudo-console asks it
+                // (elsewhere a program's own question is the screen's to answer).
+                let mut opening = cfg!(windows);
                 loop {
                     match reader.read(&mut buf) {
                         Ok(0) | Err(_) => break,
                         Ok(n) => {
                             pending.extend_from_slice(&buf[..n]);
-                            let data = take_utf8(&mut pending);
+                            let mut data = take_utf8(&mut pending);
+                            if opening && !data.is_empty() {
+                                match opening_question(&data) {
+                                    Opening::Partial => {
+                                        // Its first bytes only: wait for the rest.
+                                        pending.splice(0..0, data.into_bytes());
+                                        continue;
+                                    }
+                                    Opening::Asked(rest) => {
+                                        let mut w =
+                                            answer_to.lock().unwrap_or_else(|e| e.into_inner());
+                                        let _ = w
+                                            .write_all(CURSOR_ANSWER.as_bytes())
+                                            .and_then(|_| w.flush());
+                                        data = rest;
+                                    }
+                                    Opening::None => {}
+                                }
+                                opening = false;
+                            }
                             if !data.is_empty() {
                                 out.lock().unwrap_or_else(|e| e.into_inner()).data(data);
                             }
@@ -428,10 +482,11 @@ impl Terminals {
     pub fn write(&self, id: &str, data: &str) -> Result<(), String> {
         let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
         let term = map.get_mut(id).ok_or("That terminal has closed.")?;
-        term.writer
+        let mut writer = term.writer.lock().unwrap_or_else(|e| e.into_inner());
+        writer
             .write_all(data.as_bytes())
             .map_err(|e| e.to_string())?;
-        term.writer.flush().map_err(|e| e.to_string())
+        writer.flush().map_err(|e| e.to_string())
     }
 
     pub fn resize(&self, id: &str, cols: u16, rows: u16) -> Result<(), String> {
@@ -594,19 +649,17 @@ mod tests {
                 .recv_timeout(Duration::from_secs(8))
                 .unwrap_or_else(|_| panic!("no end told; output {out:?}"))
             {
-                TermEvent::Data { data } => {
-                    // Windows' pseudo-console asks where the cursor is before it starts the program; the window's
-                    // terminal (xterm.js) answers that itself.
-                    if data.contains("\x1b[6n") {
-                        terms.write(&id, "\x1b[1;1R").unwrap();
-                    }
-                    out.push_str(&data)
-                }
+                // Nobody answers the pseudo-console's cursor question here: the master does (v3).
+                TermEvent::Data { data } => out.push_str(&data),
                 TermEvent::Exit { code } => break code,
             }
         };
         assert_eq!(code, Some(3));
         assert!(out.contains("hi"), "{out:?}");
+        assert!(
+            !out.contains(CURSOR_QUESTION),
+            "the question reached the screen: {out:?}"
+        );
         // Told once only.
         assert!(!matches!(
             rx.recv_timeout(Duration::from_millis(800)),
@@ -704,15 +757,8 @@ mod tests {
                 first,
             )
             .unwrap();
-        // The pseudo-console's cursor question (Windows only) is answered while the first window listens. Elsewhere
-        // nothing is waited for: the first event there is the program's own output, and waiting for it let the end
-        // reach the first window before it went away (Linux CI).
-        if cfg!(windows)
-            && let Ok(TermEvent::Data { data }) = rx.recv_timeout(Duration::from_secs(5))
-            && data.contains("\x1b[6n")
-        {
-            terms.write(&id, "\x1b[1;1R").unwrap();
-        }
+        // Gone at once: the pseudo-console's cursor question (Windows) is the master's to answer (v3), so the program
+        // runs on with no window at all.
         terms.detach(&id);
         // The window is away: the program ends meanwhile, nothing reaches the first window.
         std::thread::sleep(Duration::from_secs(4));
@@ -741,6 +787,20 @@ mod tests {
         );
         terms.kill(&id);
         assert!(terms.attach(&id, Sink::new(|_| true)).is_err());
+    }
+
+    #[test]
+    fn v3_the_opening_cursor_question_is_answered_here_and_not_passed_on() {
+        assert_eq!(
+            opening_question("\x1b[6n\x1b[?9001h"),
+            Opening::Asked("\x1b[?9001h".into())
+        );
+        assert_eq!(opening_question("\x1b[6n"), Opening::Asked(String::new()));
+        assert_eq!(opening_question("\x1b["), Opening::Partial);
+        assert_eq!(opening_question("\x1b"), Opening::Partial);
+        // A shell elsewhere starts with its own output; a question later on is the program's and the screen's.
+        assert_eq!(opening_question("$ "), Opening::None);
+        assert_eq!(opening_question("hi\x1b[6n"), Opening::None);
     }
 
     #[test]

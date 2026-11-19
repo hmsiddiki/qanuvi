@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { opensLink, osc52Copy, pasteText, urlsIn } from "./terminalText";
+import { EarlyInput, opensLink, osc52Copy, pasteText, urlsIn } from "./terminalText";
 
 const b64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 
@@ -42,5 +42,19 @@ describe("pasted text", () => {
     expect(pasteText("echo hi\n\n")).toBe("echo hi");
     expect(pasteText("echo hi")).toBe("echo hi");
     expect(pasteText("a\nb\n")).toBe("a\nb\n");
+  });
+});
+
+describe("input before the terminal is known (v3)", () => {
+  it("is held in order and given once, then nothing is held", () => {
+    const early = new EarlyInput();
+    // The shell's cursor question answered before the spawn's answer, then a key.
+    expect(early.hold(null, "\x1b[1;1R")).toBe(true);
+    expect(early.hold(null, "l")).toBe(true);
+    expect(early.take()).toBe("\x1b[1;1Rl");
+    expect(early.take()).toBe("");
+    // Known: straight on.
+    expect(early.hold("t-1", "s")).toBe(false);
+    expect(early.take()).toBe("");
   });
 });

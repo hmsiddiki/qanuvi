@@ -675,12 +675,29 @@ runs on or off; with it off nothing is sent anywhere.
     (in order) and writes it once the spawn answers; a test for an answer that comes before the id. Optional: a
     tab whose shell said nothing in 5 s after an unanswered ESC[6n is told "\x1b[1;1R" by the master (only if the
     owner wants a belt for other clients too).
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 15:40): M9b: R5, coding tools on a shown master, depth 3,
-    Part F all PASS; v3 cause found, proposal waits for the owner. After the owner's yes: v3 fix + drive (cold start
-    with two restored tabs, a few times), then M9c, M9d (publish only with the owner's yes). Test state: the test
-    window is closed; This PC's test master runs (started by v3repro.js); test state to put back after M9 as below.
-    Drive tools: u.sh, cycle.sh, wmem.ps1, cold.ps1, stopmaster.ps1, v3repro.js in the scratchpad of session
-    146414de (u.sh calls ui.ps1 in session 13a854a0's scratchpad).
+    v3 FIXED + DRIVEN LIVE (owner: "do as propose, but pick the best for user interactivity and real-life
+    compatible", 2026-11-19). Two layers. Master (terminal.rs, Windows only): the output reader looks at a terminal's
+    very first output; when it starts with the pseudo-console's ESC[6n the master answers ESC[1;1R itself (a new
+    terminal's cursor is at its top left) and the question is not passed on, so a shell starts the same with any
+    screen, a slow link or relay, or none at all (a split question waits for its rest); the writer is shared with the
+    reader for that. Elsewhere a program's own question stays the screen's. Window (TerminalView + terminalText
+    EarlyInput): what is typed, pasted or answered before the spawn's id comes is held in order and sent once it does
+    (paste no longer needs the id), dropped only when the start fails. Tests: the Windows terminal tests now run with
+    nobody answering and check the question never reaches the screen; opening_question cases; EarlyInput order.
+    Rust 529 (+1), clippy, vitest 513 (+1), svelte-check 0, prettier, fmt clean. Drive (release test build): 3 cold
+    starts (window closed, This PC's test master stopped, window started) with 3 PowerShell tabs restored: every tab
+    came back titled by PowerShell with its prompt, typing echoed in each, every time (before: blank, the first try).
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 16:00): M9b DONE (R5, coding tools on a shown master,
+    depth 3, Part F, v3 fixed). Next M9c then M9d. NOTE: the owner's installed 0.1.25 was built from branch
+    old-infrastructure (7d39517; its two fixes are on main too: d2799fe, 9be8f8e), so 0.1.26 from main is the first
+    migrated release the owner's install gets, through its old app updater (tauri-plugin-updater reads
+    qanuvi-updates/dev/latest.json, which publish-update.mjs writes) running the 0.1.26 installer. M9c proves exactly
+    that on the owner's machine before publishing: needs the owner's yes, since it installs over D:\qanuvi (back up the
+    data folder and D:\qanuvi first; 0.1.25 can be put back from the channel folder as in M8d). Owner said "then
+    release" (2026-11-19): publish after M9c passes, with the release rule. Test state: the test window runs (This PC
+    shown); the local test master is stopped; test state to put back after M9 as below. Drive tools: u.sh, cycle.sh,
+    wmem.ps1, cold.ps1, stopmaster.ps1, tabs3.sh, v3repro.js in the scratchpad of session 146414de (u.sh calls ui.ps1
+    in session 13a854a0's scratchpad).
     PICKUP POINT (before, 2026-11-19 14:30): z3, z4, z5-z8 fixed and driven live; R5 done on
     This PC and the VPS; the VPS has Claude Code signed in (Max) and runs the 036eb6a server build. Next in M9b:
     coding tools on a shown master, Part F (window memory with several masters shown in turn and nested ones), v3

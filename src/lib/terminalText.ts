@@ -57,3 +57,26 @@ export function pasteText(text: string): string {
   const trimmed = text.replace(/(\r?\n)+$/, "");
   return /[\r\n]/.test(trimmed) ? text : trimmed;
 }
+
+/**
+ * What the screen sends before its terminal is known (v3): typing, a paste or the screen's own answers while the
+ * shell is still being started (a slow link, a busy cold start). Held in order and sent as one once the id comes,
+ * never dropped; once the id is known everything goes straight on.
+ */
+export class EarlyInput {
+  private held: string[] = [];
+
+  /** Holds `data` while there is no id; answers whether it was held. */
+  hold(id: string | null, data: string): boolean {
+    if (id) return false;
+    this.held.push(data);
+    return true;
+  }
+
+  /** Everything held, in order (empty when nothing was), and nothing held after. */
+  take(): string {
+    const all = this.held.join("");
+    this.held = [];
+    return all;
+  }
+}
