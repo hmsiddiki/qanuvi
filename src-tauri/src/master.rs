@@ -32,6 +32,9 @@ mod cli_plan;
 mod cli_status;
 #[path = "master_inbox.rs"]
 mod inbox_cmds;
+#[path = "master_quit.rs"]
+mod quit_question;
+pub use quit_question::QUESTION_FLAG;
 #[path = "master_runs.rs"]
 mod plan_runs;
 #[path = "master_servers.rs"]
@@ -77,6 +80,8 @@ pub struct Master {
     remote_watchers: inbox_cmds::InboxWatchers,
     /// The desktop app's links to This PC's master (migration M4c): the tray's Open and Quit reach the app on them.
     app_links: inbox_cmds::InboxWatchers,
+    /// The tray's Quit question while it is up (t1): asked in Qanuvi's own dialog, answered on `app_quit_answer`.
+    quit_question: quit_question::QuitQuestion,
     remote_errors: Mutex<std::collections::HashMap<String, String>>,
     /// Servers disconnected on purpose (finding z2): not connected again every minute until a connect asks for them
     /// (their "connect by itself" setting stays as it is; the next start of the master tries them again).
@@ -229,6 +234,7 @@ impl Master {
             remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
             app_links: inbox_cmds::InboxWatchers::default(),
+            quit_question: Default::default(),
             remote_errors: Mutex::default(),
             held_off: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
@@ -290,6 +296,9 @@ impl Master {
                 }
                 Ok(json!({"tray": self.app_data}))
             }
+            // t1: the tray's Quit question, read by the app's question window and answered by the app's dialog.
+            "app_quit_question" => Ok(self.quit_question_now()),
+            "app_quit_answer" => Ok(self.quit_question_answer(args)),
             // "Start Qanuvi when Windows starts" (M4c, renamed in M5b): only This PC's master starts at sign-in.
             "sign_in_start" => to(if self.app_data {
                 crate::sign_in_start::is_on()
@@ -791,6 +800,8 @@ impl Master {
             )),
             "setup_tools" => to(Ok(crate::local_servers::tools())),
             "setup_install_plan" => to(crate::local_servers::install_plan(&s(args, "tool"))),
+            // c1: Claude Code on this machine, installed and signed in from the window.
+            "setup_claude" => to(Ok(crate::local_servers::claude_status())),
             "setup_install_start" => {
                 let sink = stream(&s(args, "onEvent"));
                 let term = Sink::new(move |e: terminal::TermEvent| {
@@ -1427,7 +1438,7 @@ impl Master {
             "They"
         };
         if let Some(what) = work_text((agents, runs))
-            && !confirm_quit(&format!(
+            && !self.ask_quit(&format!(
                 "Quitting Qanuvi stops {what} on this computer. {they} can be resumed afterwards.\n\nQuit anyway?"
             ))
         {
@@ -1741,7 +1752,8 @@ pub fn work_text((agents, runs): (i64, usize)) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join(" and "))
 }
 
-/// Asks before the tray's Quit stops work (M5a). Yes quits; anything else keeps it all running.
+/// Asks before the tray's Quit stops work (M5a). Yes quits; anything else keeps it all running. Since t1 only when
+/// Qanuvi's own question window cannot start (the app's program is missing).
 #[cfg(all(windows, feature = "desktop"))]
 fn confirm_quit(text: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -1761,7 +1773,7 @@ fn confirm_quit(text: &str) -> bool {
     answer == IDYES
 }
 
-/// No box to ask with here: the tray's Quit goes on (Linux and macOS trays come with M5b's watcher).
+/// No box to ask with here when Qanuvi's own question window cannot start: the tray's Quit goes on.
 #[cfg(not(all(windows, feature = "desktop")))]
 fn confirm_quit(_text: &str) -> bool {
     true

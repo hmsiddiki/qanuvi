@@ -749,7 +749,46 @@ runs on or off; with it off nothing is sent anywhere.
     nginx.conf" through `qanuvi-master inbox answer` made the agent add the block there and finish (Done line says the
     live server still needs it deployed). Fixed after the drive: the one-line box cut the hint off (now two lines),
     the box's accessible name was its tooltip (aria-label "Your answer"), a snippet label ending in "." got ".:".
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 20:15): u2 + n1 DONE (both built + driven live, above).
+    t1 BUILT + DRIVEN LIVE (2026-11-19, owner: "yes go on"): the tray's Quit question is Qanuvi's own dialog, no
+    longer a Windows MessageBox. master_quit.rs: quit_all asks through ask_quit; with the app linked it sends
+    {"do": "ask-quit", id, text}, the desktop brings the main window forward and emits "qanuvi-quit-question" to it,
+    the window asks with ConfirmDialog (title "Quit Qanuvi", Quit / Keep running) and answers with the new command
+    quit_question_answer -> master "app_quit_answer" {id, yes}. No window (no app link, or the app says noWindow):
+    the master starts the app with --quit-question <id>; desktop::run_quit_question opens only a small frameless
+    always-on-top window "quit-question" (route src/routes/quit-question, the same look and words), no master
+    started, no restore applied, no single-instance lock; it reads the text (app_quit_question), answers and exits.
+    No answer (the window closed, the app went, the question window ended) keeps everything running. Quit again
+    while one is up only brings it forward (one dialog). The system MessageBox is left only for when the app's program
+    cannot start; Linux and macOS trays now ask too (before: quit without asking). One embedded context for both
+    paths. Tests: two unit tests (answer by id, old id ignored, Quit again, window gone = keep running). Driven live on
+    the release test build with fake work (one test session set "waiting" after start, put back after): window path
+    (dialog over the app, second Quit gave no second dialog, Keep running kept all), no-window path (small window
+    on top in Qanuvi's look; Quit ended This PC's test master, the local test master stayed; Escape kept all; closed
+    without an answer kept all, no question left up).
+    c1 BUILT (2026-11-19, owner: "go on following c1 too"), DRIVEN on This PC (status only): Claude Code on the
+    shown machine from the window, suggested, never required. local_servers: install_plan "claude" = Claude Code's
+    own native installer (Windows: powershell "irm https://claude.ai/install.ps1 | iex"; Linux/macOS:
+    "curl -fsSL https://claude.ai/install.sh | bash", needs curl + bash, else link:
+    https://code.claude.com/docs/en/setup), "claude-sign-in" = `claude auth login` in the same setup terminal (claude
+    found off PATH too, z8); new master command setup_claude -> {installed, version, signedIn (claude auth status
+    --json loggedIn, 15 s cap), method ("Login method:" line only, never e-mail/organisation)}. Screen:
+    ClaudeCodeSetup.svelte (install asks first with the exact line; sign-in terminal shown, the sign-in page's
+    address taken from the terminal (OSC 8 link first, else plain text; only claude.ai / claude.com / anthropic.com)
+    -> "Open the sign-in page" in this computer's browser, a "Code from the sign-in page" box typed into the
+    terminal + Enter; after the end it looks again and reloads agent info). Used as step 5 of the setup wizard
+    (Claude Code checkbox, unticked by default) and in the Agents card for Claude Code (compact: says nothing once
+    installed and signed in). Tests: 2 unit tests (plans, reading auth status). Driven on This PC: setup_claude says
+    installed 2.1.318, signed in (Claude Max account); Agents card unchanged when signed in; wizard step 5 shows the
+    status. NOT DRIVEN YET: the install and the sign-in themselves (This PC and the VPS are already signed in): needs
+    a machine without Claude Code, the Linux laptop (none there; curl + bash there) with a new server build, and the
+    owner's own sign-in in the browser (owner's yes asked).
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 22:00): t1 DONE (built + driven live), c1 BUILT and its
+    status part driven; next: c1 install + sign-in driven on the Linux laptop when the owner says yes (new server
+    build there; the owner signs in), then 0.1.27 (u2, n1, t1, c1) publish waits for the owner's yes. Test state: the
+    release test window runs the c1 build; test state to put back (listed below) still open. Drive tools: tray.js
+    (tells the test core "quit"/"open" as the tray does), fakework.js on|off, stoptest.ps1, procs.ps1 in the
+    scratchpad of session 264fab3e; ui.ps1/go.ps1/mcall.js as before.
+    PICKUP POINT (before, 2026-11-19 20:15): u2 + n1 DONE (both built + driven live, above).
     Next: t1, c1 when the owner agrees; 0.1.27 publish waits for the owner's yes. Test state: the release test window
     runs on the n1 build (Inbox open); scratch E:\qc-scratch\n1-plan is in the test master's projects; test state to
     put back (listed below) still open.

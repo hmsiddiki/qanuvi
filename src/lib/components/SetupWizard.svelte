@@ -12,6 +12,7 @@
   import { api } from "$lib/api";
   import { ask } from "$lib/stores/confirm.svelte";
   import TerminalView from "./TerminalView.svelte";
+  import ClaudeCodeSetup from "./ClaudeCodeSetup.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { errorText } from "$lib/api";
   import { localVerdict, recommend } from "$lib/agents/guides";
@@ -33,8 +34,9 @@
 
   let tools = $state<Tools | null>(null);
   let room = $state<[number, number] | null>(null);
-  let want = $state({ local: false, openrouter: true, omniroute: true });
-  let step = $state<"pc" | "local" | "openrouter" | "omniroute" | "done">("pc");
+  // c1: Claude Code is suggested, never required (unticked).
+  let want = $state({ local: false, openrouter: true, omniroute: true, claude: false });
+  let step = $state<"pc" | "local" | "openrouter" | "omniroute" | "claude" | "done">("pc");
   let busy = $state("");
   let error = $state("");
   /** Where to get a tool by hand when there is no install command for it on the machine. */
@@ -64,7 +66,7 @@
     want.local = verdict?.level !== "none" && settings.value.brain.local;
   });
 
-  const order = ["pc", "local", "openrouter", "omniroute", "done"] as const;
+  const order = ["pc", "local", "openrouter", "omniroute", "claude", "done"] as const;
   function next() {
     // An earlier step's install result stays only while its terminal is still shown.
     if (!installing) outcome = "";
@@ -257,6 +259,10 @@
         ><input type="checkbox" bind:checked={want.omniroute} /> OmniRoute (free Claude and Gemini through your Google account;
         Qanuvi installs and runs it)</label
       >
+      <label class="check"
+        ><input type="checkbox" bind:checked={want.claude} /> Claude Code (paid: a Claude subscription or an Anthropic
+        Console account; Qanuvi installs it on {place} and you sign in from here)</label
+      >
       <button type="button" class="btn primary" onclick={next}>Next</button>
     {:else}
       <p class="muted">Looking at {place}…</p>
@@ -339,6 +345,10 @@
       >
     {/if}
     <button type="button" class="link" onclick={next}>Skip</button>
+  {:else if step === "claude"}
+    <h4>5. Claude Code</h4>
+    <ClaudeCodeSetup />
+    <button type="button" class="btn primary" onclick={next}>Next</button>
   {:else}
     <h4>Done</h4>
     <p>

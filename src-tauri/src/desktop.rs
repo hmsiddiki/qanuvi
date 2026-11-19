@@ -606,6 +606,76 @@ fn app_quitting() -> bool {
     QUITTING.load(std::sync::atomic::Ordering::SeqCst)
 }
 
+/// t1: started only to ask the tray's Quit question (`--quit-question <id>`): one small window, nothing else.
+static QUESTION_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+// t1: the tray's Quit question up now ({id, text}, or null), for the question window.
+#[tauri::command]
+async fn quit_question_text() -> Res<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(|| {
+        crate::master::this_pc_call(
+            &crate::paths::data_dir(),
+            "app_quit_question",
+            serde_json::json!({}),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// t1: the answer to the tray's Quit question goes to This PC's master; the question window then ends.
+#[tauri::command]
+async fn quit_question_answer(app: tauri::AppHandle, id: u64, yes: bool) -> Res<()> {
+    let sent = tauri::async_runtime::spawn_blocking(move || {
+        crate::master::this_pc_call(
+            &crate::paths::data_dir(),
+            "app_quit_answer",
+            serde_json::json!({"id": id, "yes": yes}),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if QUESTION_ONLY.load(std::sync::atomic::Ordering::SeqCst) {
+        app.exit(0);
+    }
+    sent.map(|_| ())
+}
+
+/// t1: the app as the tray's Quit question alone, in a small window of Qanuvi's own look. No master starts here, no
+/// single-instance lock is taken (a Qanuvi opened meanwhile opens as always), and it ends once it has answered.
+fn run_quit_question(data: std::path::PathBuf, mut context: tauri::Context<tauri::Wry>) {
+    QUESTION_ONLY.store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::paths::set_data_dir(data);
+    context.config_mut().app.windows.clear();
+    tauri::Builder::default()
+        .setup(|app| {
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "quit-question",
+                tauri::WebviewUrl::App("quit-question".into()),
+            )
+            .title("Quit Qanuvi")
+            .inner_size(440.0, 196.0)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .decorations(false)
+            .always_on_top(true)
+            .center()
+            .focused(true)
+            .background_color(tauri::webview::Color(20, 20, 22, 255))
+            .theme(Some(tauri::Theme::Dark))
+            .build()?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            quit_question_text,
+            quit_question_answer
+        ])
+        .run(context)
+        .expect("error while running Qanuvi's Quit question");
+}
+
 // A new item in a connected master's Inbox (24z R2d part 3): every window that follows the master asks, it is shown once.
 // The window sends that master's Notifications settings with it (24z3 D2); an older window sends none: This PC's.
 #[tauri::command]
@@ -639,6 +709,18 @@ pub fn run() {
         eprintln!("{note}");
     }
     let data = crate::data_location::resolve(&defaults);
+    let context = tauri::generate_context!();
+    // t1: the tray's Quit question alone (no restore applied, no master started): the window's look and storage are
+    // the app's own.
+    if std::env::args().any(|a| a == crate::master::QUESTION_FLAG) {
+        if (data != defaults.base || crate::data_location::from_source())
+            && let Some(web) = defaults.webview_for(&data)
+        {
+            // SAFETY: start-up, before the window or any other thread exists (as for the app below).
+            unsafe { std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &web) };
+        }
+        return run_quit_question(data, context);
+    }
     // A restore booked in Settings, Backups: applied now, before the database and the window open.
     if let Some(note) = crate::backups::apply_pending(
         &defaults.base,
@@ -760,6 +842,32 @@ pub fn run() {
                                     let _ = w.set_focus();
                                 }
                             }
+                            // t1: the tray's Quit question, in Qanuvi's own dialog in the window brought forward;
+                            // with no window here the master opens a question window of its own.
+                            Some("ask-quit") => {
+                                if let Some(w) =
+                                    windows.get("main").or_else(|| windows.values().next())
+                                {
+                                    let _ = w.unminimize();
+                                    let _ = w.show();
+                                    let _ = w.set_focus();
+                                    let _ = tauri::Emitter::emit_to(
+                                        &handle,
+                                        w.label(),
+                                        "qanuvi-quit-question",
+                                        &ask,
+                                    );
+                                } else {
+                                    let id = ask["id"].clone();
+                                    std::thread::spawn(move || {
+                                        let _ = crate::master::this_pc_call(
+                                            &crate::paths::data_dir(),
+                                            "app_quit_answer",
+                                            serde_json::json!({"id": id, "noWindow": true}),
+                                        );
+                                    });
+                                }
+                            }
                             Some("quit") => {
                                 QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
                                 // A window that cancelled its closing keeps everything running (master: 20 s).
@@ -823,6 +931,7 @@ pub fn run() {
             notify_test,
             notify_notice,
             app_quitting,
+            quit_question_answer,
             notify_item,
             app_info,
             screen_usage,
@@ -864,7 +973,7 @@ pub fn run() {
             dap_stop,
             dap_stop_window,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running Qanuvi");
 }
 

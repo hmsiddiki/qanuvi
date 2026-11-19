@@ -1,0 +1,225 @@
+// t1: the tray's "Quit Qanuvi" question, asked in Qanuvi's own dialog instead of a system box (the master has no
+// window). With a window open, the app shows it there (brought forward); with none, the app starts a small window of
+// its own for it (`--quit-question <id>`) that answers and ends. The answer comes back as `app_quit_answer`. No answer
+// (the window closed, the question window ended) keeps everything running. While one question is up, Quit again only
+// brings it forward.
+
+use super::{Master, b};
+use serde_json::{Value, json};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::time::Duration;
+
+/// What the app's answer says: Some(yes) from the dialog, None when the app has no window to ask in.
+type Answer = Option<bool>;
+
+/// The question up now, if any.
+#[derive(Default)]
+pub struct QuitQuestion {
+    up: Mutex<Option<Up>>,
+    next: AtomicU64,
+}
+
+struct Up {
+    id: u64,
+    text: String,
+    tx: mpsc::Sender<Answer>,
+}
+
+impl QuitQuestion {
+    fn lock(&self) -> std::sync::MutexGuard<'_, Option<Up>> {
+        self.up.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+impl Master {
+    /// Asks "Quit anyway?" in Qanuvi's own dialog and waits for the answer: true quits. A question already up is
+    /// brought forward instead, and this Quit says no (the first one goes on with the answer).
+    pub(super) fn ask_quit(&self, text: &str) -> bool {
+        let rx = {
+            let mut up = self.quit_question.lock();
+            if let Some(u) = up.as_ref() {
+                let _ = self
+                    .app_links
+                    .reach(&json!({"do": "ask-quit", "id": u.id, "text": u.text}));
+                return false;
+            }
+            let id = self.quit_question.next.fetch_add(1, Ordering::SeqCst) + 1;
+            let (tx, rx) = mpsc::channel();
+            *up = Some(Up {
+                id,
+                text: text.to_string(),
+                tx,
+            });
+            rx
+        };
+        let yes = self.quit_answer_wait(text, &rx);
+        *self.quit_question.lock() = None;
+        yes
+    }
+
+    fn quit_answer_wait(&self, text: &str, rx: &mpsc::Receiver<Answer>) -> bool {
+        let id = self.quit_question.lock().as_ref().map_or(0, |u| u.id);
+        if self
+            .app_links
+            .reach(&json!({"do": "ask-quit", "id": id, "text": text}))
+            > 0
+        {
+            loop {
+                match rx.recv_timeout(Duration::from_millis(500)) {
+                    Ok(Some(yes)) => return yes,
+                    // The app has no window to ask in: the question gets its own below.
+                    Ok(None) => break,
+                    Err(RecvTimeoutError::Timeout) => {
+                        // The app went (its windows closed) with no answer: everything keeps running.
+                        if self.app_links.reach(&json!({"do": "wait"})) == 0 {
+                            return false;
+                        }
+                    }
+                    Err(RecvTimeoutError::Disconnected) => return false,
+                }
+            }
+        }
+        let Some(mut window) = start_question_window(id) else {
+            return super::confirm_quit(text);
+        };
+        loop {
+            match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(answer) => {
+                    // The question window ends by itself once it has answered.
+                    let _ = window.wait();
+                    return answer.unwrap_or(false);
+                }
+                Err(RecvTimeoutError::Timeout) => {
+                    if !matches!(window.try_wait(), Ok(None)) {
+                        // Closed without an answer (or the answer came just as it ended).
+                        return rx.try_recv().ok().flatten().unwrap_or(false);
+                    }
+                }
+                Err(RecvTimeoutError::Disconnected) => return false,
+            }
+        }
+    }
+
+    /// `app_quit_question`: the question up now ({id, text}), or null; the question window reads it.
+    pub(super) fn quit_question_now(&self) -> Value {
+        match self.quit_question.lock().as_ref() {
+            Some(u) => json!({"id": u.id, "text": u.text}),
+            None => Value::Null,
+        }
+    }
+
+    /// `app_quit_answer` {id, yes, noWindow}: the app's answer to the question up now. One for another question
+    /// (an old one) is ignored.
+    pub(super) fn quit_question_answer(&self, args: &Value) -> Value {
+        let up = self.quit_question.lock();
+        let Some(u) = up.as_ref().filter(|u| Some(u.id) == args["id"].as_u64()) else {
+            return json!(false);
+        };
+        let answer = if b(args, "noWindow") {
+            None
+        } else {
+            Some(b(args, "yes"))
+        };
+        json!(u.tx.send(answer).is_ok())
+    }
+}
+
+/// The app's flag for the small question window (t1).
+pub const QUESTION_FLAG: &str = "--quit-question";
+
+/// Starts the app as the question window alone; None when it cannot start (the system box asks then).
+fn start_question_window(id: u64) -> Option<std::process::Child> {
+    let exe = crate::sign_in_start::app_exe()
+        .map_err(|e| eprintln!("{e}"))
+        .ok()?;
+    std::process::Command::new(exe)
+        .args([QUESTION_FLAG, &id.to_string()])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| eprintln!("Qanuvi's Quit question could not open: {e}"))
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sink::Sink;
+    use std::sync::Arc;
+
+    /// A window's link: what the master sends it comes out of the receiver.
+    fn linked(m: &Master) -> mpsc::Receiver<Value> {
+        let (tx, rx) = mpsc::channel();
+        let tx = Mutex::new(tx);
+        m.app_links.add(Sink::new(move |v: Value| {
+            tx.lock().unwrap().send(v).is_ok()
+        }));
+        rx
+    }
+
+    fn asked(rx: &mpsc::Receiver<Value>) -> Value {
+        loop {
+            let v = rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("no question came");
+            if v["do"] == "ask-quit" {
+                return v;
+            }
+        }
+    }
+
+    #[test]
+    fn the_windows_answer_decides_and_quit_again_only_brings_it_forward() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Arc::new(Master::open(data.path()).unwrap());
+        let rx = linked(&m);
+        let asker = {
+            let m = m.clone();
+            std::thread::spawn(move || m.ask_quit("Quitting Qanuvi stops 1 plan run."))
+        };
+        let q = asked(&rx);
+        assert_eq!(q["text"], "Quitting Qanuvi stops 1 plan run.");
+        assert_eq!(m.quit_question_now()["id"], q["id"]);
+        // Quit again while it is up: the same question once more, and this Quit says no.
+        assert!(!m.ask_quit("other"));
+        assert_eq!(asked(&rx)["id"], q["id"]);
+        // An answer to another question is ignored.
+        let other = q["id"].as_u64().unwrap() + 7;
+        assert_eq!(
+            m.quit_question_answer(&json!({"id": other, "yes": true})),
+            json!(false)
+        );
+        assert_eq!(
+            m.quit_question_answer(&json!({"id": q["id"], "yes": true})),
+            json!(true)
+        );
+        assert!(asker.join().unwrap());
+        assert_eq!(m.quit_question_now(), Value::Null);
+        // The next one asks anew, and "Keep running" keeps it all.
+        let asker = {
+            let m = m.clone();
+            std::thread::spawn(move || m.ask_quit("again"))
+        };
+        let q2 = asked(&rx);
+        assert_ne!(q2["id"], q["id"]);
+        m.quit_question_answer(&json!({"id": q2["id"], "yes": false}));
+        assert!(!asker.join().unwrap());
+    }
+
+    #[test]
+    fn a_window_that_goes_without_answering_keeps_everything_running() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Arc::new(Master::open(data.path()).unwrap());
+        let rx = linked(&m);
+        let asker = {
+            let m = m.clone();
+            std::thread::spawn(move || m.ask_quit("text"))
+        };
+        asked(&rx);
+        drop(rx);
+        assert!(!asker.join().unwrap());
+    }
+}

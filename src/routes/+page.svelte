@@ -42,6 +42,7 @@
   import { inbox } from "$lib/stores/inbox.svelte";
   import { planData } from "$lib/plan/planData.svelte";
   import { startNotifications } from "$lib/stores/notify.svelte";
+  import { startQuitQuestion } from "$lib/stores/quitQuestion";
   import { ui } from "$lib/stores/ui.svelte";
   import { untrack } from "svelte";
   import { editor as editorStore, tabKey } from "$lib/stores/editor.svelte";
@@ -119,6 +120,7 @@
     startWatch();
     inbox.start().catch(() => {});
     startNotifications().catch(() => {});
+    startQuitQuestion().catch(() => {});
     updates.start();
     // M8d: the status bar's update button is the shown machine's own update, This PC's whole install too.
     masterUpdate.switched();

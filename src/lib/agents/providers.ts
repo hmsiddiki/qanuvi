@@ -94,7 +94,8 @@ export const CLAUDE_CODE: AgentProvider = {
   defaultEffort: "medium",
   supportsBaseUrl: true,
   baseUrlHint: "A proxy such as Headroom, for example http://127.0.0.1:8787. Empty: the agent's own setting.",
-  installHint: "Install Claude Code and make sure the claude command works in a terminal.",
+  installHint:
+    "Not on the shown machine yet: Qanuvi installs it below, or install it yourself so the claude command works in a terminal.",
 };
 
 /** The paid agent the user has: any agent that is not Qanuvi's own (Claude Code today, others as they come). */

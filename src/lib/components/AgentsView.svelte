@@ -13,6 +13,7 @@
   import RoutingSettings from "./RoutingSettings.svelte";
   import OwnModelsPanel from "./OwnModelsPanel.svelte";
   import TeamPanel from "./TeamPanel.svelte";
+  import ClaudeCodeSetup from "./ClaudeCodeSetup.svelte";
 
   /** In the settings page, Team and Models and providers are tabs of their own. */
   let { team = true, ownModels = true }: { team?: boolean; ownModels?: boolean } = $props();
@@ -92,6 +93,8 @@
         {/if}
       </header>
       {#if !available(p)}<p class="hint">{p.installHint}</p>{/if}
+      <!-- c1: installed and signed in on the shown machine from here. -->
+      {#if p.id === "claude-code"}<ClaudeCodeSetup compact />{/if}
       {#if p.id === "claude-code" && agent.info?.path}<p class="path">{agent.info.path}</p>{/if}
       {#if p.id === "claude-code" && available(p)}
         <div class="cc-update">

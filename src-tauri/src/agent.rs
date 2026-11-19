@@ -315,7 +315,7 @@ pub fn info() -> AgentInfo {
     }
 }
 
-fn no_window(cmd: &mut Command) {
+pub(crate) fn no_window(cmd: &mut Command) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

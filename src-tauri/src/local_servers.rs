@@ -359,13 +359,85 @@ pub struct InstallPlan {
 fn link(tool: &str) -> String {
     let url = match tool {
         "ollama" => "https://ollama.com/download",
+        "claude" => "https://code.claude.com/docs/en/setup",
         _ => "https://nodejs.org",
     };
     format!("link:{url}")
 }
 
 fn found(program: &str) -> Option<String> {
+    if program == "claude" {
+        // Off PATH too, where its installer puts it (z8), so a sign-in right after the install finds it.
+        return crate::agent::find_claude().map(|p| p.to_string_lossy().to_string());
+    }
     find(program).map(|p| p.to_string_lossy().to_string())
+}
+
+/// c1: Claude Code on this machine, as the window shows it.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeStatus {
+    pub installed: bool,
+    pub version: String,
+    /// From `claude auth status`; None when it could not tell.
+    pub signed_in: Option<bool>,
+    /// How it is signed in, in its own words (for example "Claude Max account").
+    pub method: String,
+}
+
+pub fn claude_status() -> ClaudeStatus {
+    let info = crate::agent::info();
+    let Some(claude) = crate::agent::find_claude().filter(|_| info.available) else {
+        return ClaudeStatus {
+            installed: false,
+            version: String::new(),
+            signed_in: None,
+            method: String::new(),
+        };
+    };
+    // Its answer within 15 seconds, else not known.
+    let ask = |what: &str| {
+        let mut c = std::process::Command::new(&claude);
+        c.args(["auth", "status", what])
+            .stdin(std::process::Stdio::null());
+        crate::agent::no_window(&mut c);
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(c.output());
+        });
+        let out = rx
+            .recv_timeout(std::time::Duration::from_secs(15))
+            .ok()?
+            .ok()?;
+        Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    };
+    let signed_in = ask("--json").and_then(|out| signed_in_from(&out));
+    let method = if signed_in == Some(true) {
+        ask("--text").map(|t| method_from(&t)).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    ClaudeStatus {
+        installed: true,
+        version: info.version.trim_end_matches(" (Claude Code)").to_string(),
+        signed_in,
+        method,
+    }
+}
+
+/// `claude auth status --json`'s "loggedIn".
+fn signed_in_from(out: &str) -> Option<bool> {
+    let start = out.find('{')?;
+    let v: serde_json::Value = serde_json::from_str(out[start..].trim()).ok()?;
+    v["loggedIn"].as_bool()
+}
+
+/// The "Login method: …" line of `claude auth status --text` (never the e-mail or organisation lines).
+fn method_from(text: &str) -> String {
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("Login method:"))
+        .map(|m| m.trim().to_string())
+        .unwrap_or_default()
 }
 
 /// The install of `tool` on this machine, or why there is none: "link:<url>" to get it by hand, or a sentence.
@@ -413,8 +485,38 @@ fn plan_for(
         args,
     };
     let words = |s: &str| s.split(' ').map(String::from).collect::<Vec<_>>();
-    if !matches!(tool, "ollama" | "node" | "omniroute") {
+    if !matches!(
+        tool,
+        "ollama" | "node" | "omniroute" | "claude" | "claude-sign-in"
+    ) {
         return Err("Qanuvi does not install that.".into());
+    }
+    // c1: Claude Code's own native installer (for the user, no admin prompt), and its sign-in in the same terminal.
+    if tool == "claude-sign-in" {
+        let claude = found("claude").ok_or("Claude Code is not installed here yet.")?;
+        return Ok(plan(
+            "claude auth login",
+            claude,
+            words("auth login"),
+            false,
+        ));
+    }
+    if tool == "claude" {
+        if os == "windows" {
+            let line = "irm https://claude.ai/install.ps1 | iex";
+            let mut args = words("-NoProfile -ExecutionPolicy Bypass -Command");
+            args.push(line.into());
+            return Ok(plan(line, "powershell.exe".into(), args, false));
+        }
+        found("curl").ok_or_else(|| link(tool))?;
+        found("bash").ok_or_else(|| link(tool))?;
+        let line = "curl -fsSL https://claude.ai/install.sh | bash";
+        return Ok(plan(
+            line,
+            "/bin/sh".into(),
+            vec!["-c".into(), line.into()],
+            false,
+        ));
     }
     if tool == "omniroute" {
         let npm = found("npm").ok_or("OmniRoute needs Node.js first (npm was not found).")?;
@@ -474,6 +576,45 @@ fn plan_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installs_claude_code_with_its_own_installer_and_signs_in_in_the_same_terminal() {
+        let none = |_: &str| None;
+        let all = |p: &str| Some(format!("/usr/bin/{p}"));
+        let win = plan_for("claude", "windows", &none).unwrap();
+        assert_eq!(win.line, "irm https://claude.ai/install.ps1 | iex");
+        assert_eq!(win.program, "powershell.exe");
+        assert_eq!(win.args.last().unwrap(), &win.line);
+        assert!(!win.admin);
+        let linux = plan_for("claude", "linux", &all).unwrap();
+        assert_eq!(linux.line, "curl -fsSL https://claude.ai/install.sh | bash");
+        assert_eq!(linux.args, vec!["-c".to_string(), linux.line.clone()]);
+        assert!(
+            plan_for("claude", "linux", &none)
+                .unwrap_err()
+                .starts_with("link:")
+        );
+        let sign_in = plan_for("claude-sign-in", "linux", &all).unwrap();
+        assert_eq!(
+            (sign_in.program.as_str(), sign_in.args.join(" ")),
+            ("/usr/bin/claude", "auth login".into())
+        );
+        assert!(plan_for("claude-sign-in", "linux", &none).is_err());
+    }
+
+    #[test]
+    fn reads_claude_codes_sign_in_without_its_e_mail() {
+        assert_eq!(
+            signed_in_from(r#"{"loggedIn": true, "email": "x"}"#),
+            Some(true)
+        );
+        assert_eq!(signed_in_from("note\n{\"loggedIn\": false}"), Some(false));
+        assert_eq!(signed_in_from("Not logged in"), None);
+        let text =
+            "Login method: Claude Max account\nOrganization: Someone\nEmail: someone@example.com";
+        assert_eq!(method_from(text), "Claude Max account");
+        assert_eq!(method_from("Email: someone@example.com"), "");
+    }
 
     fn ep(id: &str, kind: Kind, url: &str) -> Endpoint {
         Endpoint {
