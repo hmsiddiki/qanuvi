@@ -18,6 +18,7 @@ import { contextSize } from "$lib/plan/guidance";
 import {
   chainOf,
   chatHandoverDue,
+  contextLimit,
   planInfoOf,
   TurnUsage,
   type PlanSessionInfo,
@@ -117,6 +118,17 @@ class AgentStore {
   #clearTurn(): void {
     this.#turn.clear();
     this.turnUsage = null;
+  }
+
+  /**
+   * The handover limit the selected session follows, for the stats line: a plan step's (the run's limit), else the
+   * chat handover's; null when no handover applies (off, this chat set to never, or no limit).
+   */
+  get contextLimit(): number | null {
+    const s = this.selected;
+    if (!s) return null;
+    const plan = planInfoOf(s, this.sessions, this.planSessionInfo);
+    return contextLimit(plan.limit, settings.value.chatHandover, !!s.handover_off);
   }
 
   /** Whether to offer or start a handover now (after a model call's size is known, or a turn's end). */

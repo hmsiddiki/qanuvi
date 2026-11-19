@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   REOPEN_FRESH_FROM,
   TurnUsage,
+  contextLimit,
   STEP_HANDOVER_DEFAULT,
   planInfoOf,
   runSessionInfo,
@@ -262,5 +263,19 @@ describe("a turn's usage while it runs", () => {
     expect(t.take("not json usage assistant")).toBe(false);
     t.clear();
     expect(t.sums()).toEqual({ inn: 0, cache: 0, out: 0 });
+  });
+});
+
+describe("the stats line's handover limit", () => {
+  const chat = { when: "auto" as const, limit: 150_000 };
+  it("is the run's for a plan step, the chat handover's otherwise", () => {
+    expect(contextLimit(200_000, chat, false)).toBe(200_000);
+    expect(contextLimit(null, chat, false)).toBe(150_000);
+  });
+  it("is none when no handover applies", () => {
+    expect(contextLimit(0, chat, false)).toBeNull();
+    expect(contextLimit(null, { ...chat, when: "off" }, false)).toBeNull();
+    expect(contextLimit(null, chat, true)).toBeNull();
+    expect(contextLimit(null, { ...chat, limit: 0 }, false)).toBeNull();
   });
 });

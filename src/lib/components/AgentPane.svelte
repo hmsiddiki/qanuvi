@@ -906,11 +906,16 @@
   {/if}
   {#if session}
     {@const live = agent.turnUsage?.sessionId === session.id ? agent.turnUsage : null}
+    {@const limit = agent.contextLimit}
     <div
       class="usage"
-      title={`Tokens sent (including cache writes), tokens read from cache, tokens received, and cost${live ? ". The running turn is counted as it goes; its cost comes when it ends" : ""}`}
+      title={`Context: what the last model call read, against the handover limit (the session hands over when it reaches it). Then the whole session's totals over all its model calls: tokens sent (including cache writes), read from cache, received, and cost${live ? ". The running turn is counted as it goes; its cost comes when it ends" : ""}`}
     >
-      in {formatTokens(session.input_tokens + (live?.inn ?? 0))} · cache {formatTokens(
+      {#if agent.context > 0}<span class="ctx" class:near={limit !== null && agent.context >= limit * 0.9}
+          >context {formatTokens(agent.context)}{limit !== null ? ` / ${formatTokens(limit)}` : ""}</span
+        >
+        ·
+      {/if}session: in {formatTokens(session.input_tokens + (live?.inn ?? 0))} · cache {formatTokens(
         session.cache_read_tokens + (live?.cache ?? 0),
       )} · out {formatTokens(session.output_tokens + (live?.out ?? 0))}
       · {formatCost(session.cost_usd)}{live ? " +…" : ""} · {(session.duration_ms / 1000).toFixed(0)} s{working
@@ -1992,6 +1997,15 @@ With the agent now: a message it has cannot be taken back.`}
     color: var(--qx-text-muted);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+  }
+
+  .usage .ctx {
+    color: var(--qx-text);
+  }
+
+  /* Near its handover limit (90% or more). */
+  .usage .ctx.near {
+    color: var(--qx-warning);
   }
 
   .composer {

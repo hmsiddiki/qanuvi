@@ -27,6 +27,19 @@ export function chatHandoverDue(
   return !notNowAt || context >= notNowAt + OFFER_AGAIN_AFTER;
 }
 
+/**
+ * The handover limit a session follows, for the stats line: a plan step's session the run's limit (0: off), any other
+ * chat the chat handover's; null when no handover applies (off, this chat set to never, or no limit).
+ */
+export function contextLimit(
+  planLimit: number | null,
+  setting: { when: "ask" | "auto" | "off"; limit: number },
+  chatOff: boolean,
+): number | null {
+  if (planLimit !== null) return planLimit > 0 ? planLimit : null;
+  return setting.when === "off" || chatOff || setting.limit <= 0 ? null : setting.limit;
+}
+
 /** What the agent is told: finish the edit in hand, then answer with a note a new session can work from. */
 export function chatHandoverRequest(context: number): string {
   return (
