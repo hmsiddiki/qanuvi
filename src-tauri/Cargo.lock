@@ -3428,7 +3428,7 @@ dependencies = [
 
 [[package]]
 name = "qanuvi"
-version = "0.1.23"
+version = "0.1.26"
 dependencies = [
  "argon2",
  "base64 0.23.1",

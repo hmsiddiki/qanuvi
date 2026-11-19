@@ -687,7 +687,37 @@ runs on or off; with it off nothing is sent anywhere.
     Rust 529 (+1), clippy, vitest 513 (+1), svelte-check 0, prettier, fmt clean. Drive (release test build): 3 cold
     starts (window closed, This PC's test master stopped, window started) with 3 PowerShell tabs restored: every tab
     came back titled by PowerShell with its prompt, typing echoed in each, every time (before: blank, the first try).
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 16:00): M9b DONE (R5, coding tools on a shown master,
+    M9c DONE + M9d 0.1.26 PUBLISHED (owner: "continue to m9c release ... release anyway for the rules", 2026-11-19;
+    release rule skipped with QANUVI_RELEASE_ANYWAY=1). Built once, signed, into E:\qc-scratch\release-0.1.26\chan
+    (publish-update.mjs with QANUVI_UPDATES_DIR; latest.json already names the real channel URLs), tested there, then
+    the same files copied into qanuvi-updates/dev (old latest.json kept in E:\Backups\qanuvi\channel-before-0.1.26);
+    https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.26, installer and Linux master served (200, sizes
+    match). M9c on the owner's real install: the owner's session in qpfixbase was idle (its turn ended 16:01) before
+    the window was closed; D:\qanuvi and %APPDATA%\dev.qanuvi.desktop backed up to
+    E:\Backups\qanuvi\pre-0.1.26-2026-11-19 (14878 + 5 files, row counts in counts-before.json); the 0.1.26 installer
+    run as the 0.1.25 updater runs it (/P /R /UPDATE) over 0.1.25 (built from old-infrastructure): exit 0, Qanuvi
+    started again by itself in the new layout (window + link + This PC's master serve/core on the real data), every
+    table's row count the same (3 projects, 252 sessions, 48307 session events, 48 plan runs, 24 settings), projects,
+    sessions and the EMAIL-CONTENT-PLAN run (13/13) shown as before. Account: not signed in before either (only the
+    test site's account:aloelo.dev entry is in the credential store). Servers: none before or after. Two rebuilds
+    before publishing (the stats line's spacing, then the owner's compact form), the final one installed over the same
+    way, master byte-identical to the build. Inbox: the 7 items (6 notes, 1 answered question) came through the first
+    install and were gone by 16:34; only Clear or removing deletes such items, so most likely cleared in the new
+    window; they are in the backup. v0.1.26 tagged on main.
+    FOR 0.1.27 (owner, 2026-11-19): u2 the status bar's "35 MB · 0%" is only the shown master's core and what it
+    started (usage.rs counts the process that answers, now the master); the window (WebView2, about 630 MB) and the
+    master's watcher (about 26 MB) are left out, so it no longer says Qanuvi's total. Agreed: This PC shown -> the
+    total of master (core + watcher) + screen, tooltip split "master N MB · screen N MB · agents, shells, language
+    servers"; a server shown -> that machine's master as now plus "screen N MB" in the tooltip (the screen always runs
+    on this PC); the screen part measured by the window itself, so any master version works.
+    Stats line (owner, 2026-11-19, in 0.1.26): "in 503k (178k/200k) · cache 11.2M · ...": the context now against the
+    handover limit it follows in brackets beside the session's "in" total, same grey, amber from 90%; the tooltip says
+    what each number is (contextLimit in agent/handover.ts: a step's session the run's limit, other chats the chat
+    handover's, none when off or never in this chat).
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 16:45): M9 DONE, 0.1.26 published (the first migrated
+    release; the owner runs it). Next: u2 (status bar total) for 0.1.27, then n1, then t1 (as M9 said), c1 when the
+    owner agrees. Test state to put back (listed below) still open.
+    PICKUP POINT (before, 2026-11-19 16:00): M9b DONE (R5, coding tools on a shown master,
     depth 3, Part F, v3 fixed). Next M9c then M9d. NOTE: the owner's installed 0.1.25 was built from branch
     old-infrastructure (7d39517; its two fixes are on main too: d2799fe, 9be8f8e), so 0.1.26 from main is the first
     migrated release the owner's install gets, through its old app updater (tauri-plugin-updater reads
