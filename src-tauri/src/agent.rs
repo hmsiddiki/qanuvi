@@ -616,6 +616,70 @@ fn plan_session_ids(v: &Value, out: &mut std::collections::HashSet<String>) {
 /// Removed at once, the database file is compacted afterwards (VACUUM); fewer lines are not worth the rewrite.
 const VACUUM_AFTER_EVENTS: i64 = 5_000;
 
+/// Stored images no message uses any more (24n): sent images are kept in the data folder's `attachments` (see
+/// `user_line`); once their chats are cleaned up or deleted, nothing shows them. Removes the image files that no
+/// stored line names, and half-written `.part` files, when older than `min_age` (an image is stored just before
+/// its line is written). Only plain stored-image names are touched. Gives back how many files were removed.
+pub fn remove_unused_images(
+    db: &Db,
+    dir: &std::path::Path,
+    min_age: Duration,
+) -> Result<usize, String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Ok(0);
+    };
+    let mut used = std::collections::HashSet::new();
+    {
+        let conn = db.conn();
+        let mut stmt = conn
+            .prepare("SELECT line FROM session_events WHERE line LIKE '%\"images\"%'")
+            .map_err(|e| e.to_string())?;
+        let lines = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        for line in lines.flatten() {
+            if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                for img in v["images"].as_array().into_iter().flatten() {
+                    if let Some(file) = img["file"].as_str() {
+                        used.insert(file.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let stored = |name: &str| {
+        let name = name.strip_suffix(".part").unwrap_or(name);
+        name.rsplit_once('.').is_some_and(|(stem, ext)| {
+            !stem.is_empty()
+                && stem.chars().all(|c| c.is_ascii_hexdigit())
+                && matches!(ext, "png" | "jpg" | "gif" | "webp")
+        })
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !stored(&name) || used.contains(&name) {
+            continue;
+        }
+        let old_enough = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age >= min_age);
+        if old_enough
+            && entry.file_type().is_ok_and(|t| t.is_file())
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+/// How old an unused stored image must be before it is removed.
+pub const UNUSED_IMAGE_AGE: Duration = Duration::from_secs(3600);
+
 /// Chat clean-up (24t): deletes chats not used for `days` days. A chat is its handover chain (`continues_from`),
 /// judged by its newest session's last use and removed whole. Kept: starred chats, plan-step sessions, sessions
 /// running, waiting or idle, and the chats in `keep` (open now). One transaction; events go with their sessions.
@@ -1705,6 +1769,55 @@ mod tests {
         assert!((t.turn_cost_usd - 0.03).abs() < 1e-9);
         assert_eq!(t.duration_ms, 1200);
         assert_eq!(totals_from_result(&json!({}), 0.0), Totals::default());
+    }
+
+    #[test]
+    fn unused_stored_images_are_removed_and_used_ones_kept() {
+        let db = Db::open_in_memory().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let project = crate::projects::add(&db, &dir.path().to_string_lossy()).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, project_id, title, agent, model, mode, status, created_at, updated_at)
+                 VALUES ('s1', ?1, 'First', 'claude-code', 'm', 'default', 'ended', 1, 1)",
+                [&project.id],
+            )
+            .unwrap();
+        let line = json!({"type": "qanuvi_user", "text": "see", "images": [{"name": "a.png", "file": "ab12.png"}]});
+        db.conn()
+            .execute(
+                "INSERT INTO session_events (session_id, seq, line) VALUES ('s1', 1, ?1)",
+                [line.to_string()],
+            )
+            .unwrap();
+        let att = dir.path().join("attachments");
+        std::fs::create_dir_all(&att).unwrap();
+        for name in [
+            "ab12.png",
+            "cd34.jpg",
+            "ef56.webp.part",
+            "notes.txt",
+            "zz.png",
+        ] {
+            std::fs::write(att.join(name), b"x").unwrap();
+        }
+        // Too new: nothing goes yet.
+        assert_eq!(
+            remove_unused_images(&db, &att, UNUSED_IMAGE_AGE).unwrap(),
+            0
+        );
+        assert_eq!(remove_unused_images(&db, &att, Duration::ZERO).unwrap(), 2);
+        let mut left: Vec<String> = std::fs::read_dir(&att)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["ab12.png", "notes.txt", "zz.png"]);
+        // No folder yet: nothing to do.
+        assert_eq!(
+            remove_unused_images(&db, &att.join("none"), Duration::ZERO).unwrap(),
+            0
+        );
     }
 
     #[test]

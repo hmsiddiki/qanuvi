@@ -932,12 +932,19 @@ impl Master {
             "agent_clean_up" => {
                 let keep: Vec<String> =
                     serde_json::from_value(args["keep"].clone()).unwrap_or_default();
-                to(agent::clean_up_chats(
+                let removed = agent::clean_up_chats(
                     db,
                     args["days"].as_i64().unwrap_or(0),
                     &keep,
                     crate::store::now(),
-                ))
+                );
+                // Images only the removed chats showed go with them (24n).
+                let _ = agent::remove_unused_images(
+                    db,
+                    &self.dir.join("attachments"),
+                    agent::UNUSED_IMAGE_AGE,
+                );
+                to(removed)
             }
             // OmniRoute (24z3 D5): the one on this master's machine, with this master's keys.
             "omniroute_connect" => {
@@ -1100,7 +1107,14 @@ impl Master {
             )),
             "agent_delete" => {
                 self.agents.stop(&s(args, "sessionId"));
-                to(agent::delete(db, &s(args, "sessionId")))
+                let done = agent::delete(db, &s(args, "sessionId"));
+                // Its images go too when no other message shows them (24n).
+                let _ = agent::remove_unused_images(
+                    db,
+                    &self.dir.join("attachments"),
+                    agent::UNUSED_IMAGE_AGE,
+                );
+                to(done)
             }
             "agent_usage_since" => to(agent::usage_since(db, args["since"].as_i64().unwrap_or(0))),
             // What the chat attaches: a web page, an image kept with a message (migration M5a).

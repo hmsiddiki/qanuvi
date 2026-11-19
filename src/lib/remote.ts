@@ -119,6 +119,7 @@ const WINDOW_ONLY = new Set([
   "inspector_scroll",
   "inspector_show",
   "attachment_file",
+  "export_save",
   // Coding tools are the interface's (migration M1); a master's are reached through the app's lsp_* with `master`.
   "lsp_statuses",
   "lsp_install",

@@ -3757,6 +3757,21 @@ runs on or off; with it off nothing is sent anywhere.
     and scrolls to the matching words and marks them (settingsFind.ts + test). A5 FIXED: "[x]" / "[ ]" lines in an
     answer (how Claude Code writes its to-do list now) show as ticks and empty boxes (markdown.ts + test). A3-A5 not
     driven yet (next test build, together with b-e).
+    (b) BUILT 3c6eba2: Export in the chat footer (beside search): a Save box on this computer (the screen the user
+    sits at, like a download, whichever machine is shown), a .md file named from the title and date; the owner's
+    messages and answers in full, a line per step, edits as diff blocks, shell commands as code, failed output cut to
+    20 lines; thinking, approvals and notices left out (agent/exportChat.ts + test; window command export_save, .md
+    only, in INTERFACE; dialog:allow-save).
+    (c) BUILT db92871: under each finished task, "Changed N files:" with each file (opens in the editor), +added
+    -removed, or "written" for a whole-file write; failed and stopped steps count nothing; a message sent while the
+    agent works stays in the same task (sessionTools.turnChanges + test).
+    (d) BUILT 7aeaac3: not a true virtual list (variable heights, follow-to-bottom and search marks make that risky);
+    instead a reopened chat draws its newest 120 rows, "Show 120 earlier (N in all)" adds more above and keeps the
+    reader's place, Ctrl+F shows all first. The first row shown is fixed once the chat's own items arrive, so live
+    activity never moves what is being read.
+    (e) BUILT: stored images no message names any more are removed (older than an hour; half-written .part files
+    too; only stored-image names) after a chat clean-up and after a chat is deleted, on the master that keeps them
+    (agent::remove_unused_images + test). Next: one test build, drive A3-A5 and b-e live, then 24y.
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
 - [x] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their
