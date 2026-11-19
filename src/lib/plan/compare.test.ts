@@ -515,6 +515,10 @@ const cases: [string, unknown[]][] = [
   ["parseAnswerReadings", ["} {", ["a"]]],
   ["unsettledWhy", ["X (A)", "what?", "It is the key. \n"]],
   ["unsettledWhy", ["X (A)", "é".repeat(200), ""]],
+  ["unsettledWhy", ["The password of the MySQL user (A)", "what?", "", true]],
+  ["unsettledWhy", ["MySQL login (A)", "x", "Not here."]],
+  ["unsettledWhy", ["your answer to: Which bank?", "x", ""]],
+  ["unsettledWhy", ["Éa (A)", "x", ""]],
   ["readAnswers", [RA_CHECK, RA_SECRETS, RA_ANSWERS, RA_TOUCHED, RA_READINGS, {}, "1"]],
   [
     "readAnswers",

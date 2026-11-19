@@ -775,8 +775,30 @@ pub struct ReadAnswers {
     pub offered: Vec<FoundValue>,
 }
 
-/// The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox.
-pub fn unsettled_why(ask: &str, typed: &str, reply: &str) -> String {
+/// "The password ..." mid-sentence reads "the password ..."; a name such as MySQL, API or NOTES_DB stays as written
+/// (`midSentence`).
+fn mid_sentence(text: &str) -> String {
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    let word: String = chars
+        .clone()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect();
+    if first.is_ascii_uppercase()
+        && !word.is_empty()
+        && word.chars().all(|c| c.is_ascii_lowercase())
+    {
+        format!("{}{}", first.to_ascii_lowercase(), chars.as_str())
+    } else {
+        text.to_string()
+    }
+}
+
+/// The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox. `choice`:
+/// an open choice (answered in words), else a login or value (given, or where Qanuvi can find it).
+pub fn unsettled_why(ask: &str, typed: &str, reply: &str, choice: bool) -> String {
     let said = clip_reason(typed, 120);
     let more = reply.trim_end_matches(|c: char| {
         c == '.' || (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
@@ -786,19 +808,34 @@ pub fn unsettled_why(ask: &str, typed: &str, reply: &str) -> String {
     } else {
         format!("; {more}")
     };
-    format!(
-        "it needs {ask}. Before the run you wrote \"{said}\"{more}. Give the value, or say where Qanuvi can find it"
-    )
+    let end = if choice {
+        "Answer it in your own words"
+    } else {
+        "Give the value, or say where Qanuvi can find it"
+    };
+    let ask = mid_sentence(ask);
+    let stop = if ask.ends_with(['.', '?', '!']) {
+        ""
+    } else {
+        "."
+    };
+    format!("it needs {ask}{stop} Before the run you wrote \"{said}\"{more}. {end}")
 }
 
+/// A step held twice (a login and a choice both unsettled) asks both: the second need is added, never dropped.
 fn hold_once(out: &mut ReadAnswers, steps: &[String], why: &str) {
     for step in steps {
-        if !step.is_empty() && !out.holds.iter().any(|h| &h.step == step) {
-            out.holds.push(Hold {
+        if step.is_empty() {
+            continue;
+        }
+        match out.holds.iter_mut().find(|h| &h.step == step) {
+            None => out.holds.push(Hold {
                 step: step.clone(),
                 why: why.to_string(),
                 by: HoldBy::Default,
-            });
+            }),
+            Some(had) if !had.why.contains(why) => had.why = format!("{}; also {why}", had.why),
+            Some(_) => {}
         }
     }
 }
@@ -879,13 +916,13 @@ pub fn read_answers(
                                 secret: true,
                             });
                         }
-                        hold_once(&mut out, &steps, &unsettled_why(&ask, v, &r.reply));
+                        hold_once(&mut out, &steps, &unsettled_why(&ask, v, &r.reply, false));
                     }
                 }
             }
             r => {
                 let reply = r.map(|r| r.reply.as_str()).unwrap_or("");
-                hold_once(&mut out, &steps, &unsettled_why(&ask, v, reply));
+                hold_once(&mut out, &steps, &unsettled_why(&ask, v, reply, false));
             }
         }
     }
@@ -930,7 +967,12 @@ pub fn read_answers(
             });
         }
         out.answers.insert(i, String::new());
-        let why = unsettled_why(&format!("your answer to: {}", q.question), a, &r.reply);
+        let why = unsettled_why(
+            &format!("your answer to: {}", q.question),
+            a,
+            &r.reply,
+            true,
+        );
         hold_once(&mut out, std::slice::from_ref(&q.step), &why);
     }
     out

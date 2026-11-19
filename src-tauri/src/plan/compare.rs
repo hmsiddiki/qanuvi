@@ -405,7 +405,12 @@ fn run_2b(name: &str, a: &[Value]) -> Value {
             &s(0),
             &de::<Vec<String>>(&a[1]),
         )),
-        "unsettledWhy" => json!(preflight::unsettled_why(&s(0), &s(1), &s(2))),
+        "unsettledWhy" => json!(preflight::unsettled_why(
+            &s(0),
+            &s(1),
+            &s(2),
+            a.get(3).and_then(|v| v.as_bool()).unwrap_or(false)
+        )),
         "readAnswers" => to(preflight::read_answers(
             &preflight::parse_preflight(&s(0)),
             &de(&a[1]),

@@ -877,7 +877,32 @@ runs on or off; with it off nothing is sent anywhere.
     Scenarios: the_inbox_reads_every_reply_by_meaning_..., a_held_steps_typed_answer_is_read_too, no-model scenario
     rewritten. Also fixed two master tests failing since t1 (ab2c1b0): the handler-list test read the quit-question
     window's small list; quit_question_answer added to INTERFACE and remote.ts WINDOW_ONLY.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20): p2 + n2 BUILT (not driven live), nothing published
+    p1 + p2 + n2 + 24q(a) + SETTINGS SCROLL DRIVEN LIVE (2026-11-20, release test build of b2f3c71, then of the p3 fix;
+    scratch project p2proj in the session scratchpad, Node, MySQL password in env, host/port in config; model calls
+    about $0.60 in all). p1: the check asked only NOTES_DB_PASSWORD (host, port, user already in config, not asked),
+    in plain words with what, example and "if you leave it empty"; it also found that step 3 had no database tests to
+    run. p2: "look for it in the config file" in the password box was read as an instruction, looked in
+    config/db.example.json + README.md, "no password" -> not saved, step held with what was tried; "what is mysql2?"
+    typed into a choice got its plain answer ($0.0032 call). n2 in the Inbox on a held choice (company name for a CSV
+    footer): "huh? dont get it" -> plainer card with a new headline; "where would i even find that?? i just run the
+    shop" -> plain answer first (invoices, receipts, shop sign; example), then one smaller question and an offer to
+    look; "oh ok, its Test Shop Ltd" -> step ran, footer "Test Shop Ltd". 24q(a): planner (Sonnet, $0.07) split a
+    7-part tags feature into 9 steps of 1-2 files each, each with its own tests and Validate line. Settings scroll:
+    window 560 high, dialog fits, scrolls inside, Cancel/Save pinned.
+    Findings: p3 FIXED (readAnswers/read_answers): a step held by an unsettled login AND an unsettled choice kept only
+    the first hold; the choice, the owner's question back and its plain answer were dropped silently (seen: step 3's
+    mysql2 question). Now the second need is added ("...; also it needs ..."), TS + Rust, compare.json refreshed, test
+    replays the drive. g1 FIXED: "it needs The password ..." -> "the password" (a capitalised first word only; MySQL,
+    API, NOTES_DB, single letters stay); a choice's hold ends "Answer it in your own words" (was "Give the value");
+    no "?." after a question. Driven live on the rebuilt test build. NOT fixed, for the owner: f1 a plan written as a
+    plain numbered list (no "- [ ]") shows an empty Plan pane with no hint; f2 Project settings filled Run command
+    "npm run dev" for a Node project with no dev script; f3 the hold label "Qanuvi's default: it needs ..." reads odd
+    for a hold; f4 n2's example used the Windows user's first name ("<name>'s Corner Shop", likely from the folder path).
+    Verify: vitest 526, svelte-check 0, clippy clean, Rust plan tests 222.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
+    p3 + g1 fixed and driven; nothing published after 0.1.27. Next: 0.1.28 (publish asks the owner first); owner
+    picks f1-f4 and 24n or 24y. Test window and test masters stopped; scratch project p2proj (session 6b80dfe9).
+    PICKUP POINT (before, 2026-11-20 03:00): p2 + n2 BUILT (not driven live), nothing published
     after 0.1.27. Next: drive p1 + p2 + n2 + 24q(a) + the Project settings scroll in a test build on a scratch project
     (owner away from mouse/keyboard; a few cents of model calls), then 0.1.28 (publish asks the owner first).
     PICKUP POINT (before, 2026-11-20 02:15): p1 fixed 67fb643, 24q(a) 8654849, nothing

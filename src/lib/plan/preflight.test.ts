@@ -13,6 +13,7 @@ import {
   settleCheck,
   typedAnswers,
   withReadHolds,
+  unsettledWhy,
   type AnswerReading,
 } from "./preflight";
 
@@ -120,7 +121,7 @@ describe("p2: the check's answers read by meaning", () => {
     expect(r.offered.map((f) => f.id)).toEqual(["secret:DB_HOST", "secret:SHOP_KEY"]);
     expect(r.holds.map((h) => h.step)).toEqual(["2a", "1", "3", "4b"]);
     expect(r.holds[1].why).toBe(
-      'it needs The test key (API_KEY). Before the run you wrote "what is this?"; It is the key from the test dashboard, like sk_test_123. Give the value, or say where Qanuvi can find it',
+      'it needs the test key (API_KEY). Before the run you wrote "what is this?"; It is the key from the test dashboard, like sk_test_123. Give the value, or say where Qanuvi can find it',
     );
     expect(r.answers[1]).toBe("");
     expect(r.answers[2]).toBe("dark");
@@ -154,7 +155,7 @@ describe("p2: the check's answers read by meaning", () => {
     expect(r.holds).toEqual([
       {
         step: "2a",
-        why: 'it needs Where the test database is (DB_HOST). Before the run you wrote "the usual one". Give the value, or say where Qanuvi can find it',
+        why: 'it needs where the test database is (DB_HOST). Before the run you wrote "the usual one". Give the value, or say where Qanuvi can find it',
         by: "default",
       },
     ]);
@@ -173,6 +174,45 @@ describe("p2: the check's answers read by meaning", () => {
     );
     expect(v.save).toEqual([{ name: "DB_HOST", value: "localhost:3306" }]);
     expect(v.answers[2]).toBe("light");
+  });
+
+  it("asks both when a login and a choice hold the same step (p3, driven live)", () => {
+    const both = parsePreflight(
+      JSON.stringify({
+        secrets: [{ name: "NOTES_DB_PASSWORD", what: "The password of the MySQL user", steps: ["3"] }],
+        questions: [{ step: "3", question: "Should step 3 connect to MySQL?", sort: "you" }],
+      }),
+    );
+    const r = readAnswers(
+      both,
+      { NOTES_DB_PASSWORD: "look for it in the config file" },
+      { 0: "what is mysql2?" },
+      { 0: true },
+      [
+        reading("secret:NOTES_DB_PASSWORD", "instruction", { reply: "the config has no password." }),
+        reading("question:0", "unclear", { reply: "mysql2 is a free add-on library." }),
+      ],
+      {},
+      "1",
+    );
+    expect(r.holds).toEqual([
+      {
+        step: "3",
+        why:
+          'it needs the password of the MySQL user (NOTES_DB_PASSWORD). Before the run you wrote "look for it in the ' +
+          'config file"; the config has no password. Give the value, or say where Qanuvi can find it; also it needs ' +
+          'your answer to: Should step 3 connect to MySQL? Before the run you wrote "what is mysql2?"; mysql2 is a ' +
+          "free add-on library. Answer it in your own words",
+        by: "default",
+      },
+    ]);
+  });
+
+  it("keeps names such as MySQL or API as written mid-sentence", () => {
+    expect(unsettledWhy("MySQL login (A)", "x", "")).toContain("it needs MySQL login");
+    expect(unsettledWhy("API key (A)", "x", "")).toContain("it needs API key");
+    expect(unsettledWhy("A_KEY", "x", "")).toContain("it needs A_KEY.");
+    expect(unsettledWhy("Password (A)", "x", "")).toContain("it needs password (A)");
   });
 
   it("puts the read holds in place of the default ones", () => {

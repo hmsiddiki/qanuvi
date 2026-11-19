@@ -447,11 +447,21 @@ export interface ReadAnswers {
   offered: FoundValue[];
 }
 
-/** The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox. */
-export function unsettledWhy(ask: string, typed: string, reply: string): string {
+/** "The password ..." mid-sentence reads "the password ..."; a name such as MySQL, API or NOTES_DB stays as written. */
+function midSentence(text: string): string {
+  return /^[A-Z][a-z]+(?![A-Za-z0-9_])/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+}
+
+/**
+ * The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox. `choice`:
+ * an open choice (answered in words), else a login or value (given, or where Qanuvi can find it).
+ */
+export function unsettledWhy(ask: string, typed: string, reply: string, choice = false): string {
   const said = clipReason(typed, 120);
   const more = reply.replace(/[.\s]+$/, "");
-  return `it needs ${ask}. Before the run you wrote "${said}"${more ? `; ${more}` : ""}. Give the value, or say where Qanuvi can find it`;
+  const end = choice ? "Answer it in your own words" : "Give the value, or say where Qanuvi can find it";
+  const need = midSentence(ask);
+  return `it needs ${need}${/[.?!]$/.test(need) ? "" : "."} Before the run you wrote "${said}"${more ? `; ${more}` : ""}. ${end}`;
 }
 
 /**
@@ -477,9 +487,14 @@ export function readAnswers(
     offered: [],
   };
   const reading = (id: string) => readings.find((r) => r.id === id);
+  // A step held twice (a login and a choice both unsettled) asks both: the second need is added, never dropped.
   const hold = (steps: string[], why: string) => {
-    for (const step of steps)
-      if (step && !out.holds.some((h) => h.step === step)) out.holds.push({ step, why, by: "default" });
+    for (const step of steps) {
+      if (!step) continue;
+      const had = out.holds.find((h) => h.step === step);
+      if (!had) out.holds.push({ step, why, by: "default" });
+      else if (!had.why.includes(why)) had.why = `${had.why}; also ${why}`;
+    }
   };
   for (const s of check.secrets) {
     const v = secretValues[s.name]?.trim() ?? "";
@@ -529,7 +544,7 @@ export function readAnswers(
     if (r.kind === "instruction" && r.value && used[id] === undefined)
       out.offered.push({ id, ask: q.question, value: r.value, where: r.where, copyFrom: null, secret: false });
     out.answers[i] = "";
-    hold([q.step], unsettledWhy(`your answer to: ${q.question}`, a, r.reply));
+    hold([q.step], unsettledWhy(`your answer to: ${q.question}`, a, r.reply, true));
   });
   return out;
 }
