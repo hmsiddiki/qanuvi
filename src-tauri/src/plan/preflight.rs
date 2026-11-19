@@ -28,9 +28,21 @@ pub enum AskSort {
     You,
 }
 
+/// A login, key or address the steps need; `what`, `example` and `if_empty` are written for someone who does not know
+/// the code.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PreflightSecret {
     pub name: String,
+    /// What it is, in plain words.
+    #[serde(default)]
+    pub what: String,
+    /// An example value (never a real password).
+    #[serde(default)]
+    pub example: String,
+    /// What happens if it is left empty.
+    #[serde(default)]
+    pub if_empty: String,
     pub why: String,
     pub steps: Vec<String>,
 }
@@ -151,13 +163,19 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         list,
         String::new(),
         "Answer with JSON only, in this shape (empty lists when nothing is needed):".into(),
-        r#"{"secrets":[{"name":"ENV_NAME","why":"...","steps":["82e"]}],"#.into(),
+        r#"{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],"#.into(),
         r#" "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],"#.into(),
         r#" "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],"#.into(),
         r#" "setup":[{"what":"something that must run or be set","why":"..."}],"#.into(),
         r#" "order":[{"step":"85b","after":["85c"],"why":"..."}]}"#.into(),
-        "Rules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);".into(),
-        "questions only for real choices the steps leave open, not for things you can decide from the code; risky only".into(),
+        "Rules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not".into(),
+        "already known. Before asking, look at how the project's test command or test runner reads its settings (its docs".into(),
+        "say what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a".into(),
+        "need a known secret already covers is not asked again.".into(),
+        "Write every secret, question and risky item for someone who does not know the code: plain words, what it is for".into(),
+        "and what each answer changes, with one concrete example; never quote a plan line or a code name without saying".into(),
+        "what it means.".into(),
+        "Questions only for real choices the steps leave open, not for things you can decide from the code; risky only".into(),
         "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps".into(),
         "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items".into(),
         "in each list.".into(),
@@ -235,6 +253,9 @@ pub fn parse_preflight(answer: &str) -> Preflight {
             .into_iter()
             .map(|s| PreflightSecret {
                 name: text(&s["name"]),
+                what: text(&s["what"]),
+                example: text(&s["example"]),
+                if_empty: text(&s["ifEmpty"]),
                 why: text(&s["why"]),
                 steps: s["steps"]
                     .as_array()

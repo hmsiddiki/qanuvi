@@ -810,6 +810,26 @@ runs on or off; with it off nothing is sent anywhere.
     matched and ended the remote shell twice); put the commands in a script sent with `bash -s`. Owner's install still
     0.1.26: after the PC restart nginx was down, so qlopy.top did not answer and no update showed; the owner started
     Wnmp again (channel answers 200 with 0.1.27).
+    24q(a) BUILT 8654849 (2026-11-20, owner: "do the a"): the size rule (one feature or change, at most 4-5 files,
+    about 30-40 tool calls; why: every tool call re-reads the whole conversation) in the planner (2 to 15 steps now),
+    the task-list request, the session brief and the replan request. Not measured on a run yet; splitting an oversized
+    step before it runs left for later. (b) pacing and (c) light browser steps stay later: the handover limit and the
+    usage-limit wait already cover most of it.
+    FINDING p1 FIXED (2026-11-20, owner, angry and right: "if the dev building it cannot understand the question, how
+    would a general user?"): the pre-run check on qpfixbase QC-MODUL-SETTING-PLAN.md asked for QCOMMERCE_TEST_DSN
+    ("Only the user and password are known now ...") though the project's secrets already had
+    QCOMMERCE_TEST_SERVER_DSN; qCommerce's tests/run.php makes its own throwaway qctest_ database from the server login
+    and fills QCOMMERCE_TEST_DSN in itself, so nothing was missing, and typing an address into that box would have
+    made run.php skip its own database. The question was also written in code names. Its Reports question quoted two
+    plan lines ("'every optional module off' contradicts 'Reports on by default'") without saying what they mean.
+    Fix: the check is told to look at how the project's test command or runner reads its settings (its docs) before
+    asking, never to ask for a variable the runner fills in itself or one a known secret covers, and to write every
+    secret, question and risky item for someone who does not know the code (plain words, what each answer changes, one
+    example, no quoted plan lines or code names unexplained). Each secret now comes with what (plain words), example
+    and ifEmpty; the Run panel shows them (example also as the box's placeholder, "Leave one empty to run without
+    it"). Same aim as n1 (blocked-step questions that stand on their own). TS + Rust (comparison cases rewritten from
+    the TS), tests added. Also: Project settings dialog never taller than the window, scrolls inside, Cancel/Save
+    pinned at the bottom (owner could not reach Save). Not driven live yet.
     PICKUP POINT (fresh conversation starts here, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:
     the owner's install updating to 0.1.27 (then check it); then ask the owner what comes next (24v stays LATER, owner
     2026-11-20).

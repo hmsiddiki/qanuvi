@@ -195,7 +195,11 @@
 
   .dialog {
     width: min(480px, calc(100% - 32px));
-    padding: var(--qx-space-6);
+    /* Never taller than the window: the form scrolls inside, Cancel and Save stay in view (owner, 2026-11-20). */
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--qx-space-6) var(--qx-space-6) 0;
     background: var(--qx-bg-raised);
     border: 1px solid var(--qx-border);
     border-radius: var(--qx-radius-panel);
@@ -299,10 +303,15 @@
   }
 
   .actions {
+    position: sticky;
+    bottom: 0;
     display: flex;
     justify-content: flex-end;
     gap: var(--qx-space-2);
     margin-top: var(--qx-space-4);
+    padding: var(--qx-space-3) 0 var(--qx-space-6);
+    border-top: 1px solid var(--qx-border);
+    background: var(--qx-bg-raised);
   }
 
   .actions button {

@@ -115,6 +115,34 @@ describe("the check before a run", () => {
     expect(n).toContain("not hard-coded");
   });
 
+  it("asks for secrets the test runner really reads, explained in plain words with an example", () => {
+    const p = preflightPrompt("PLAN.md", [], { secrets: ["DB_USER"], testCommand: "", previewUrl: "", notes: [] });
+    expect(p).toContain("look at how the project's test command or test runner reads its settings");
+    expect(p).toContain("a variable the runner fills in by itself is not missing");
+    expect(p).toContain("for someone who does not know the code");
+    const c = parsePreflight(
+      JSON.stringify({
+        secrets: [
+          {
+            name: "QC_TEST_SERVER_DSN",
+            what: "Where the test database server is",
+            example: "mysql:host=127.0.0.1;port=3306",
+            ifEmpty: "the database tests are skipped",
+            why: "the runner makes its own throwaway database there",
+            steps: ["2"],
+          },
+          { name: "OLD_STYLE", why: "an answer without the new parts still reads", steps: [] },
+        ],
+      }),
+    );
+    expect(c.secrets[0]).toMatchObject({
+      what: "Where the test database server is",
+      example: "mysql:host=127.0.0.1;port=3306",
+      ifEmpty: "the database tests are skipped",
+    });
+    expect(c.secrets[1]).toMatchObject({ name: "OLD_STYLE", what: "", example: "", ifEmpty: "" });
+  });
+
   it("ends a long reason at a word with an ellipsis", () => {
     const long = "word ".repeat(80).trim();
     const c = clipReason(long);

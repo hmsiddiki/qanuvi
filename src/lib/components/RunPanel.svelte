@@ -897,12 +897,26 @@
       <div class="check-list">
         <strong>Before the run</strong>
         {#if check.secrets.length}
-          <p class="hint">Logins and keys the steps need (saved as project secrets; no model sees them):</p>
+          <p class="hint">
+            Logins and keys the steps need. They are saved as this project's secrets; no model sees them. Leave one
+            empty to run without it.
+          </p>
           {#each check.secrets as s (s.name)}
-            <label class="row-input"
-              ><code>{s.name}</code><span class="dim">{s.why}{s.steps.length ? ` (${s.steps.join(", ")})` : ""}</span>
-              <input type="password" autocomplete="off" placeholder="value" bind:value={secretValues[s.name]} /></label
-            >
+            <label class="secret">
+              <span class="secret-what">{s.what || s.why}</span>
+              {#if s.example}<span class="dim">For example: <code>{s.example}</code></span>{/if}
+              {#if s.ifEmpty}<span class="dim">If you leave it empty: {s.ifEmpty}</span>{/if}
+              {#if s.what && s.why}<span class="dim small">Why: {s.why}</span>{/if}
+              <span class="dim small"
+                >Saved as <code>{s.name}</code>{s.steps.length ? ` · steps ${s.steps.join(", ")}` : ""}</span
+              >
+              <input
+                type="password"
+                autocomplete="off"
+                placeholder={s.example ? `for example ${s.example}` : "value"}
+                bind:value={secretValues[s.name]}
+              />
+            </label>
           {/each}
         {/if}
         {#if check.questions.length || check.risky.length}
@@ -1478,7 +1492,29 @@
     color: var(--qx-text);
   }
 
-  .row-input input {
+  .secret {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 8px 0 10px;
+    color: var(--qx-text);
+  }
+
+  .secret-what {
+    font-weight: 600;
+  }
+
+  .secret .small {
+    font-size: 0.9em;
+  }
+
+  .secret input {
+    max-width: 420px;
+    margin-top: 4px;
+  }
+
+  .row-input input,
+  .secret input {
     height: 28px;
     padding: 0 8px;
     border: 1px solid var(--qx-border);

@@ -34,8 +34,24 @@ export interface PreflightRisk {
   because: string;
 }
 
+/**
+ * A login, key or address the steps need. `what`, `example` and `ifEmpty` are written for someone who does not know
+ * the code (owner, 2026-11-20: "if the dev building it cannot understand the question, how would a general user?").
+ */
+export interface PreflightSecret {
+  name: string;
+  /** What it is, in plain words. */
+  what: string;
+  /** An example value (never a real password). */
+  example: string;
+  /** What happens if it is left empty. */
+  ifEmpty: string;
+  why: string;
+  steps: string[];
+}
+
 export interface Preflight {
-  secrets: { name: string; why: string; steps: string[] }[];
+  secrets: PreflightSecret[];
   questions: PreflightQuestion[];
   risky: PreflightRisk[];
   setup: { what: string; why: string }[];
@@ -78,13 +94,19 @@ export function preflightPrompt(
     list,
     "",
     "Answer with JSON only, in this shape (empty lists when nothing is needed):",
-    '{"secrets":[{"name":"ENV_NAME","why":"...","steps":["82e"]}],',
+    '{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],',
     ' "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],',
     ' "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],',
     ' "setup":[{"what":"something that must run or be set","why":"..."}],',
     ' "order":[{"step":"85b","after":["85c"],"why":"..."}]}',
-    "Rules: secrets only for logins, keys and passwords not already known (use the names the code or tests read);",
-    "questions only for real choices the steps leave open, not for things you can decide from the code; risky only",
+    "Rules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not",
+    "already known. Before asking, look at how the project's test command or test runner reads its settings (its docs",
+    "say what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a",
+    "need a known secret already covers is not asked again.",
+    "Write every secret, question and risky item for someone who does not know the code: plain words, what it is for",
+    "and what each answer changes, with one concrete example; never quote a plan line or a code name without saying",
+    "what it means.",
+    "Questions only for real choices the steps leave open, not for things you can decide from the code; risky only",
     "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps",
     "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items",
     "in each list.",
@@ -131,6 +153,9 @@ export function parsePreflight(text: string): Preflight {
     secrets: arr(raw.secrets)
       .map((s) => ({
         name: str(s.name),
+        what: str(s.what),
+        example: str(s.example),
+        ifEmpty: str(s.ifEmpty),
         why: str(s.why),
         steps: Array.isArray(s.steps) ? (s.steps as unknown[]).map(str).filter(Boolean).slice(0, 20) : [],
       }))
