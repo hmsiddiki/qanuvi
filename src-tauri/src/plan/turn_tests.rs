@@ -565,3 +565,105 @@ fn a_session_that_goes_on_into_the_next_step_takes_that_steps_title() {
     assert_eq!(reqs[0].session_id.as_deref(), Some("s-1"));
     assert_eq!(reqs[0].title.as_deref(), Some("Step 2: Second"));
 }
+
+fn background(n: usize) -> String {
+    let tasks: Vec<_> = (0..n)
+        .map(|i| json!({"task_id": format!("b{i}")}))
+        .collect();
+    json!({"type": "system", "subtype": "background_tasks_changed", "tasks": tasks}).to_string()
+}
+
+#[test]
+fn reads_the_number_of_background_commands() {
+    assert_eq!(background_tasks(&background(2)), Some(2));
+    assert_eq!(background_tasks(&background(0)), Some(0));
+    assert_eq!(background_tasks(&usage(10)), None);
+}
+
+#[test]
+fn a_turn_that_ends_while_its_background_command_runs_is_held_until_the_session_wakes() {
+    let env = FakeEnv::new();
+    env.set_agent(|call| {
+        if call.turn == 1 {
+            AgentReply {
+                lines: vec![background(1)],
+                wake_after: Some(45),
+                ..Default::default()
+            }
+        } else {
+            AgentReply {
+                lines: vec![background(0)],
+                result: Some("done".into()),
+                ..Default::default()
+            }
+        }
+    });
+    let c = Controls::default();
+    let mut w = watch(&env);
+    let mut said = Vec::new();
+    let end = attempt(&env, &c, &mut w, &setup(), &ask(""), &mut |e| {
+        if let AgentEvent::Line { line } = e {
+            said.push(line.clone());
+        }
+    });
+    // One attempt in one session: the finish woke it; nothing was sent and nothing stopped.
+    let prompts = env.prompts();
+    assert_eq!(prompts.len(), 2);
+    assert_eq!(prompts[1].1, crate::plan::runner::fake::WOKE);
+    assert!(env.sent().is_empty());
+    assert!(env.stopped().is_empty());
+    assert!(end.idle);
+    assert_eq!(
+        said.iter()
+            .filter(|l| l.contains(BACKGROUND_WAIT_LINE))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn a_background_command_that_never_ends_is_given_up_after_the_wait() {
+    let env = FakeEnv::new();
+    env.set_agent(|call| AgentReply {
+        lines: if call.turn == 1 {
+            vec![background(1)]
+        } else {
+            vec![]
+        },
+        result: Some("stopped waiting".into()),
+        ..Default::default()
+    });
+    let c = Controls::default();
+    let mut w = watch(&env);
+    let started = env.now_ms();
+    let end = run(&env, &c, &mut w, &ask(""));
+    assert!(env.now_ms() - started >= BACKGROUND_WAIT_MS);
+    assert_eq!(env.sent().len(), 1);
+    assert_eq!(env.sent()[0].1, BACKGROUND_GIVE_UP);
+    // The command still runs, but the turn is not held again.
+    assert_eq!(env.prompts().len(), 2);
+    assert!(end.idle);
+}
+
+#[test]
+fn a_stop_while_held_for_a_background_command_stops_the_turn() {
+    let env = FakeEnv::new();
+    let c = Arc::new(Controls::default());
+    let cc = c.clone();
+    env.set_agent(|_| AgentReply {
+        lines: vec![background(1)],
+        ..Default::default()
+    });
+    // The owner presses Stop a minute into the wait.
+    let from = env.now_ms();
+    env.set_tick(move |e| {
+        if e.now_ms() - from >= 60_000 {
+            cc.stop_now();
+        }
+    });
+    let mut w = watch(&env);
+    let end = run(&env, &c, &mut w, &ask(""));
+    assert!(env.now_ms() - from < BACKGROUND_WAIT_MS);
+    assert_eq!(env.stopped().len(), 1);
+    assert!(!end.idle);
+}

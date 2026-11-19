@@ -601,6 +601,23 @@ runs on or off; with it off nothing is sent anywhere.
     that ends while its own background command still runs is told to wait and goes on in the same session, not
     counted as a failed try. R5 on the VPS NOT driven: no agent on the VPS (`claude` not installed; only
     ~/.local/bin/qanuvi-master); needs the owner (Claude Code installed and signed in there, or free models set up).
+    z4 FIXED + DRIVEN LIVE (owner: "z4 proposal approved", 2026-11-19). Real cause (step 1's transcript): Claude Code
+    itself blocks a foreground `sleep 45` ("use Monitor ... or run_in_background"; no user hook does it) and the lean
+    sessions have no Monitor, so the agent ran it with run_in_background and ended its turn to wait for "you will be
+    notified"; Qanuvi took that idle as the try's end. Probe (headless stream-json, kept stdin): Claude Code writes
+    system/background_tasks_changed (the running list) and, when the command ends, wakes the session itself (a new
+    init + turn). Fix (plan/turn.rs): background_tasks() reads that line; an idle end while the list is not empty is
+    held (Flow::Hold, chat line "Waiting for the step's background command to finish; the agent goes on when it
+    does."), not a failed try; a pause, stop or handover is not held; after BACKGROUND_WAIT_MS (30 min) the agent is
+    told to stop waiting (BACKGROUND_GIVE_UP) and the turn is not held again. The stand-in agent can wake itself
+    (AgentReply::wake_after). Rust 527 (+4), clippy, fmt clean. Drive (release build): PLAN-Z4 (sleep 45) done on
+    Haiku try 1 (that agent polled in its turn); PLAN-Z4B (told to background it and end its turn): turn ended at
+    14 s, the wait line showed, the finish woke the agent, step done on Haiku try 1, $0.0043 (R5's step 1: $0.34 on
+    Sonnet 2x + Opus 1x).
+    Proposal c1 (owner leaning yes, not agreed as a build step yet; after M9): the setup wizard's installer
+    (local_servers::install_plan, ollama/node/omniroute today) also installs Claude Code on the shown machine
+    (native installer, the command shown first), and its sign-in runs from the window: the login link shown as a
+    button opening the owner's browser, a box for the code. Works for a shown VPS too. Suggested, never required.
     PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
     if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
     then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested

@@ -41,7 +41,13 @@ pub struct AgentReply {
     pub lines: Vec<String>,
     /// Quiet seconds before the end (the clock moves one second each).
     pub ticks: u32,
+    /// Held at its end, the session starts its next turn by itself after this many quiet seconds (a background
+    /// command of the agent finished); the next prompt is WOKE.
+    pub wake_after: Option<u32>,
 }
+
+/// The prompt of a turn the stand-in session started by itself (`AgentReply::wake_after`).
+pub const WOKE: &str = "(background command finished)";
 
 type AgentScript = Arc<dyn Fn(&AgentCall) -> AgentReply + Send + Sync>;
 type CheckScript = Arc<dyn Fn(&str) -> (bool, String) + Send + Sync>;
@@ -554,14 +560,23 @@ impl RunEnv for FakeEnv {
             let mut flow = on_event(Some(&session(&end.status)));
             // Held at its end (an interrupt, the owner being asked): quiet seconds until the runner sends, stops or
             // ends the turn.
+            let mut woke = false;
             if flow == Flow::Hold {
-                for _ in 0..2000 {
+                for quiet in 1..=2000u32 {
                     self.tick();
+                    if reply.wake_after == Some(quiet) {
+                        woke = true;
+                        break;
+                    }
                     flow = on_event(None);
                     if !matches!(flow, Flow::Go | Flow::Hold) {
                         break;
                     }
                 }
+            }
+            if woke {
+                prompt = WOKE.into();
+                continue;
             }
             match flow {
                 Flow::Send(text) if end.status == "idle" => {

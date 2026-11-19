@@ -35,6 +35,27 @@ pub const LATE_STOP_MS: i64 = 180_000;
 pub const GENTLE_STOP_MS: i64 = 60_000;
 /// The longest test failure summary sent back to the agent.
 pub const FAILURE_CHARS: usize = 3000;
+/// A turn that ends while its own background commands run is held this long at most for them (z4); the agent's
+/// session wakes by itself when they finish.
+pub const BACKGROUND_WAIT_MS: i64 = 30 * 60_000;
+/// Shown in the step's chat when the turn is held for the agent's background commands.
+pub const BACKGROUND_WAIT_LINE: &str =
+    "Waiting for the step's background command to finish; the agent goes on when it does.";
+/// Sent when the background commands still run after BACKGROUND_WAIT_MS: the agent stops waiting for them.
+pub const BACKGROUND_GIVE_UP: &str = "(Qanuvi: your background command is still running after 30 minutes. Do not wait for it any longer: stop it if it is stuck, finish what you can of the step, and say in the step's log where it stands.)";
+
+/// How many background commands the agent's session has running, from Claude Code's
+/// `background_tasks_changed` line (None: another line).
+pub fn background_tasks(line: &str) -> Option<usize> {
+    if !line.contains("background_tasks_changed") {
+        return None;
+    }
+    let msg: serde_json::Value = serde_json::from_str(line).ok()?;
+    if msg["type"] != "system" || msg["subtype"] != "background_tasks_changed" {
+        return None;
+    }
+    Some(msg["tasks"].as_array().map_or(0, Vec::len))
+}
 
 /// What the owner says to a run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -428,6 +449,11 @@ pub fn turn(
     let mut gentle_sent = false;
     let mut late: Vec<i64> = Vec::new();
     let mut interrupt_wait: Option<i64> = None;
+    // The agent's own background commands (z4): how many run, since when the turn waits for them, and whether it
+    // stopped waiting.
+    let mut background = 0usize;
+    let mut background_since: Option<i64> = None;
+    let mut background_given_up = false;
     let mut last_limit_check = env.now_ms();
     let mut cost_seen = 0.0f64;
     let mut exited = false;
@@ -454,6 +480,11 @@ pub fn turn(
         if let Some(AgentEvent::Session { session }) = event {
             id = Some(session.id.clone());
             cost_seen = session.cost_usd;
+        }
+        if let Some(AgentEvent::Line { line }) = event
+            && let Some(n) = background_tasks(line)
+        {
+            background = n;
         }
         match stop {
             Some(StopAsk::Now) => return Flow::Stop,
@@ -639,6 +670,13 @@ pub fn turn(
         }
         match event {
             None => {
+                if let Some(since) = background_since
+                    && now - since >= BACKGROUND_WAIT_MS
+                {
+                    background_since = None;
+                    background_given_up = true;
+                    return Flow::Send(BACKGROUND_GIVE_UP.into());
+                }
                 if let Some(at) = interrupt_wait
                     && now >= at
                 {
@@ -670,6 +708,7 @@ pub fn turn(
                 let st = session.status.as_str();
                 if st == "running" {
                     interrupt_wait = None;
+                    background_since = None;
                 }
                 // The agent waits for the owner's answer to a change question.
                 if asking.is_some() && st == "idle" {
@@ -681,6 +720,23 @@ pub fn turn(
                     return Flow::Hold;
                 }
                 if interrupt_wait.is_some() && st == "idle" {
+                    return Flow::Hold;
+                }
+                // Its own background commands still run (z4): not the step's end, and no failed try. The session
+                // wakes by itself when they finish; a pause, a stop or a handover asked meanwhile is not held.
+                if st == "idle"
+                    && background > 0
+                    && !background_given_up
+                    && !watch.pause_now
+                    && watch.handover == 0
+                    && stop.is_none()
+                {
+                    if background_since.is_none() {
+                        background_since = Some(now);
+                        forward(&AgentEvent::Line {
+                            line: ownermsg::chat_line(BACKGROUND_WAIT_LINE),
+                        });
+                    }
                     return Flow::Hold;
                 }
                 Flow::Go
