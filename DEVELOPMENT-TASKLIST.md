@@ -648,7 +648,40 @@ runs on or off; with it off nothing is sent anywhere.
     no window step 1 was marked done and step 2 wrote its note by 14:22:28; reopened 14:22:55 straight on the VPS
     with step 3's live output; "Run finished · 3 of 3 done" at 14:23, each step done on its first try (the agents
     backgrounded the sleep and waited in their turn), $0.13 on the Max subscription. R5 DONE on both machines.
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 14:30): z3, z4, z5-z8 fixed and driven live; R5 done on
+    CODING TOOLS ON A SHOWN MASTER DRIVEN LIVE, PASS (2026-11-19 15:00, release test build of 036eb6a, window shows
+    basevm378 directly, project m1b-vps). Language server: Intelephense run by the VPS's serve; index.php flags
+    undefined_call(), Problems 1; an unsaved new call made it 2 at once, undone -> 1. PHP Debug: F5 paused at
+    index.php:3 ($name "42", call stack greet, {main}); Continue -> "Hello 42", the fatal error, exit code 255,
+    "Debugging ended.", no adapter or php left on the VPS. js-debug (Node 26 there): paused at app.js:3 (a 2, b 3),
+    Continue -> "total is 5", nothing left. Preview: `php -S 127.0.0.1:8765` in a Server terminal on the VPS ->
+    Preview localhost:8765 showed "Hello 42" through the tunnel (bar: machine dot + the master's address), the
+    terminal logged the GET; Ctrl+C closed the port. Open for the owner: app.js offers the TypeScript server
+    "on that machine" (install on the VPS not pressed; needs the owner's yes).
+    PART F MEASURED, PASS (window tree = qanuvi.exe + WebView2 + links, working set): 4 rounds of This PC -> test
+    master -> Laptop (depth 2) -> Second (depth 3) -> basevm378, 12 s each: every switch landed on the right machine;
+    495-515 MB with This PC, the test master or the nested ones shown, 563-570 MB with the VPS (its editor, preview
+    and terminal come back); no growth over 20 switches (round 1 511/508/495/494/568, round 4 514/502/505/504/570).
+    The VPS kept one Intelephense (restarted on each show, as designed); its screen came back whole each time.
+    v3 REPRODUCED AND CAUSE FOUND (cold start: window closed, This PC's test master stopped, window started; two
+    PowerShell tabs open before): both restored tabs blank, typing not echoed, a new tab fine; switching away and
+    back did not help. Reproduced without the window (scratchpad v3repro.js: serve + a --stdio link at once, hello +
+    two term_spawn): each shell's first output is ESC[6n (ConPTY asks the cursor position at start) and the shell
+    prints nothing more, typing included, until it is answered; answering one (ESC[1;1R) brought its prompt and
+    echo at once, the other stayed silent. In the window xterm answers by itself, but TerminalView's onData writes
+    only `if (id)`: on a busy cold start the question comes over the Channel before the spawn's answer gave the tab
+    its id, so the answer is dropped and ConPTY waits for ever. Coming back does not save it: the kept ESC[6n is
+    played back and answers to played-back output are never typed (by design).
+    Proposal v3 (owner to decide; front end only): TerminalView keeps what the screen sends before the id is known
+    (in order) and writes it once the spawn answers; a test for an answer that comes before the id. Optional: a
+    tab whose shell said nothing in 5 s after an unanswered ESC[6n is told "\x1b[1;1R" by the master (only if the
+    owner wants a belt for other clients too).
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 15:40): M9b: R5, coding tools on a shown master, depth 3,
+    Part F all PASS; v3 cause found, proposal waits for the owner. After the owner's yes: v3 fix + drive (cold start
+    with two restored tabs, a few times), then M9c, M9d (publish only with the owner's yes). Test state: the test
+    window is closed; This PC's test master runs (started by v3repro.js); test state to put back after M9 as below.
+    Drive tools: u.sh, cycle.sh, wmem.ps1, cold.ps1, stopmaster.ps1, v3repro.js in the scratchpad of session
+    146414de (u.sh calls ui.ps1 in session 13a854a0's scratchpad).
+    PICKUP POINT (before, 2026-11-19 14:30): z3, z4, z5-z8 fixed and driven live; R5 done on
     This PC and the VPS; the VPS has Claude Code signed in (Max) and runs the 036eb6a server build. Next in M9b:
     coding tools on a shown master, Part F (window memory with several masters shown in turn and nested ones), v3
     watch. Then M9c, M9d (publish only with the owner's yes). c1 (Claude Code install + sign-in from the window)
