@@ -4088,6 +4088,7 @@ mod tests {
         "data_location_remove_old",
         "data_test_build",
         "attachment_file",
+        "export_save",
         // The viewer side of the master's port links (M1).
         "port_forward",
         "port_unforward",

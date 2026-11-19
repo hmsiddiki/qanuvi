@@ -46,6 +46,9 @@
   } from "$lib/agent/events";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Search from "@lucide/svelte/icons/search";
+  import FileDown from "@lucide/svelte/icons/file-down";
+  import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import { exportFileName, exportMarkdown } from "$lib/agent/exportChat";
   import { renderMarkdown } from "$lib/agent/markdown";
   import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -701,6 +704,33 @@
     return done ? "done" : "nothing";
   }
 
+  // Export (24n): the conversation as a Markdown file, saved on this computer where the user picks.
+  async function exportChat() {
+    const s = agent.selected;
+    if (!s || !agent.items.length) return;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const path = await saveDialog({
+      title: "Export the conversation",
+      defaultPath: exportFileName(s.title, day),
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    }).catch(() => null);
+    if (!path) return;
+    const text = exportMarkdown(
+      agent.items,
+      s.title,
+      `${day} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      `${agent.provider.name} · ${modelLabel(agent.provider, s.model || agent.model)}`,
+    );
+    try {
+      await api.exportSave(/.md$/i.test(path) ? path : `${path}.md`, text);
+      agent.notice(`Exported the conversation to ${path}.`);
+    } catch (e) {
+      agent.notice(errorText(e));
+    }
+  }
+
   // Search in the conversation (24n part 6): Ctrl+F in the pane. Groups and folds with a hit open, step cards with a
   // hit show all; the words are marked with the CSS Highlight API (no change to the messages' own markup).
   let searchOpen = $state(false);
@@ -1192,6 +1222,16 @@ With the agent now: a message it has cannot be taken back.`}
       onclick={() => (searchOpen ? closeSearch() : openSearch())}
     >
       <Search size={13} />
+    </button>
+    <button
+      type="button"
+      class="gear"
+      title="Export the conversation (Markdown file)"
+      aria-label="Export the conversation"
+      disabled={!agent.items.length}
+      onclick={exportChat}
+    >
+      <FileDown size={13} />
     </button>
     <button
       type="button"

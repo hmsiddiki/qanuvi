@@ -487,6 +487,20 @@ async fn attachment_file(path: String) -> Res<agent::Attachment> {
     blocking(move || crate::attachments::read_file(std::path::Path::new(&path))).await
 }
 
+/// A conversation exported as Markdown (24n), saved on this computer where the Save box pointed: like a download, it
+/// stays with the screen the user sits at, whichever machine is shown. Only Markdown files.
+#[tauri::command]
+async fn export_save(path: String, text: String) -> Res<()> {
+    blocking(move || {
+        let p = std::path::PathBuf::from(&path);
+        if !p.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")) {
+            return Err("An export is saved as a .md file.".into());
+        }
+        std::fs::write(&p, text).map_err(|e| format!("The export could not be saved: {e}"))
+    })
+    .await
+}
+
 /// Pairs this device with a computer showing a pairing code; the key goes to the credential store.
 #[tauri::command]
 async fn remote_pair(relay: String, code: String, name: String) -> Res<serde_json::Value> {
@@ -949,6 +963,7 @@ pub fn run() {
             remote_list,
             remote_pair,
             attachment_file,
+            export_save,
             data_test_build,
             data_location_move,
             data_location_cancel,

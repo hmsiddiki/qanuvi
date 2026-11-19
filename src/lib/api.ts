@@ -519,6 +519,8 @@ export const api = {
     file: (path: string) => invoke<Attachment>("attachment_file", { path }),
     page: (url: string) => invoke<Attachment>("attachment_page", { url }),
   },
+  /** A conversation's Markdown export, saved on this computer (24n). */
+  exportSave: (path: string, text: string) => invoke<void>("export_save", { path, text }),
   /** Qanuvi's remote knowledge (24c): the signed file's text, its signature checked. */
   knowledge: {
     fetch: (url = "") => invoke<string>("knowledge_fetch", { url }),
