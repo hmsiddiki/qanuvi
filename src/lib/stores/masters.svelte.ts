@@ -377,8 +377,10 @@ class MastersStore {
     forgetMaster(id, held);
     // The machine on screen went away: This PC is shown again (forgetMaster already sends calls there).
     if (!held && (switcher.shown === id || projects.machine === id || settings.machine === id)) void show(null);
-    // Its terminals ended with the connection: their tabs go, and its projects open new ones when shown again.
-    terminals.forgetMachine(id);
+    // Its terminals ended with the connection. Ended by itself: their tabs stay and say so (j1, finding z1: a terminal
+    // three hops away vanished when the middle hop came back). Disconnected on purpose: their tabs go, and its
+    // projects open new ones when shown again.
+    if (!error) terminals.forgetMachine(id);
     const { [id]: _gone, ...counts } = this.projectCount;
     this.projectCount = counts;
     inbox.dropMaster(id);
@@ -863,15 +865,16 @@ class MastersStore {
    * Ends the connection to a machine: for a nested one its master's, for one of This PC's servers This PC's
    * master's (M5c part 2), else the app's own; the app's port links to it go in every case.
    */
-  async #letConnectionGo(id: string): Promise<void> {
+  async #letConnectionGo(id: string, held = false): Promise<void> {
     const parent = parentOf(id);
-    if (parent) await callMaster(parent, "remote_disconnect", { id: serverIdOf(id) }).catch(() => {});
-    else if (!this.#heldHere(id)) await callThisPc("remote_disconnect", { id }).catch(() => {});
+    // held: disconnected on purpose, so that master does not connect it again every minute (finding z2).
+    if (parent) await callMaster(parent, "remote_disconnect", { id: serverIdOf(id), held }).catch(() => {});
+    else if (!this.#heldHere(id)) await callThisPc("remote_disconnect", { id, held }).catch(() => {});
     await invoke("remote_disconnect", { id }).catch(() => {});
   }
 
   async disconnect(id: string): Promise<void> {
-    await this.#letConnectionGo(id);
+    await this.#letConnectionGo(id, true);
     // Disconnected on purpose (or removed): a held screen of it goes, This PC is shown.
     if (switcher.held?.id === id) this.#letGo();
     this.#dropped(id);

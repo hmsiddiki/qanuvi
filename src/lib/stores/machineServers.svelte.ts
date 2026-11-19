@@ -131,7 +131,8 @@ class MachineServersStore {
   }
 
   async disconnect(id: string): Promise<void> {
-    await this.#call("remote_disconnect", { id }).catch(() => {});
+    // On purpose: the shown master does not connect it again every minute (finding z2).
+    await this.#call("remote_disconnect", { id, held: true }).catch(() => {});
     this.#set(id, { state: "off" });
   }
 

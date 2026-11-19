@@ -140,6 +140,24 @@ describe("This PC's servers are held by This PC's master", () => {
     expect(masters.statusOf("vps").state).toBe("on");
   });
 
+  it("a link ended by itself keeps the terminal tabs; Disconnect takes them and holds the server off (z1, z2)", async () => {
+    const { terminals } = await import("./terminals.svelte");
+    const tab = (key: string) => ({ key, projectId: "p", machine: "vps", label: "Server terminal" }) as never;
+    await masters.followThisPc();
+    await masters.connect(vps);
+    terminals.tabs = [tab("t1")];
+    thisPcWatch!({ closed: "vps", error: "The connection ended." });
+    await flush();
+    // z1: the tab stays and says its shell ended (j1), instead of going without a word.
+    expect(terminals.tabs.map((t) => t.key)).toEqual(["t1"]);
+    thisPcWatch!({ connected: "vps", info: hello("m-vps", "vps") });
+    await flush();
+    // z2: Disconnect on purpose asks This PC's master to hold it off its minute retry, and the tabs go.
+    await masters.disconnect("vps");
+    expect(thisPcCalls.some((c) => c.cmd === "remote_disconnect" && c.args.id === "vps" && c.args.held)).toBe(true);
+    expect(terminals.tabs).toEqual([]);
+  });
+
   it("a shown server whose connection ended stays shown under cover and is tried again", async () => {
     await masters.followThisPc();
     await masters.connect(vps);

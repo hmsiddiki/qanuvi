@@ -78,6 +78,9 @@ pub struct Master {
     /// The desktop app's links to This PC's master (migration M4c): the tray's Open and Quit reach the app on them.
     app_links: inbox_cmds::InboxWatchers,
     remote_errors: Mutex<std::collections::HashMap<String, String>>,
+    /// Servers disconnected on purpose (finding z2): not connected again every minute until a connect asks for them
+    /// (their "connect by itself" setting stays as it is; the next start of the master tries them again).
+    held_off: Mutex<std::collections::HashSet<String>>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -227,6 +230,7 @@ impl Master {
             remote_watchers: inbox_cmds::InboxWatchers::default(),
             app_links: inbox_cmds::InboxWatchers::default(),
             remote_errors: Mutex::default(),
+            held_off: Mutex::default(),
             relay: crate::relay_client::RelayMaster::open(dir),
             me: std::sync::OnceLock::new(),
             cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
@@ -2548,6 +2552,36 @@ mod tests {
                 .unwrap_err()
                 .contains("does not know the command")
         );
+    }
+
+    // Finding z2: a server disconnected on purpose is not connected again every minute, until a connect asks for it.
+    #[test]
+    fn a_server_disconnected_on_purpose_stays_off_until_connected_again() {
+        let data = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap();
+        // A relay server without its pairing key fails at once, so each try leaves its reason.
+        let paired = json!({"id": "p1", "name": "", "target": "relay", "autoConnect": true,
+            "relay": {"url": "wss://relay.example", "masterId": "m", "pairing": "abc123"}});
+        call(&m, "servers_save", json!({"server": paired.clone()})).unwrap();
+        let state =
+            |m: &Master| call(m, "remote_states", json!({})).unwrap()["p1"]["state"].clone();
+        m.connect_away_servers();
+        assert_eq!(state(&m), "error");
+        // A restart's disconnect (no held): the minute's retry tries it again.
+        call(&m, "remote_disconnect", json!({"id": "p1"})).unwrap();
+        m.connect_away_servers();
+        assert_eq!(state(&m), "error");
+        // On purpose: left alone, and its "connect by itself" setting is unchanged.
+        call(&m, "remote_disconnect", json!({"id": "p1", "held": true})).unwrap();
+        m.connect_away_servers();
+        assert_ne!(state(&m), "error");
+        let kept = call(&m, "servers_list", json!({})).unwrap();
+        assert_eq!(kept["servers"][0]["autoConnect"], true);
+        // Connected again on purpose: the hold goes, and the retry tries it again.
+        assert!(call(&m, "remote_connect", paired).is_err());
+        call(&m, "remote_disconnect", json!({"id": "p1"})).unwrap();
+        m.connect_away_servers();
+        assert_eq!(state(&m), "error");
     }
 
     // Migration M3b: the terminal client reaches the running service with the window's own commands.

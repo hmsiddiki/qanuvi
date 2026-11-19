@@ -106,6 +106,21 @@ impl Master {
         Ok(Value::Object(out))
     }
 
+    /// Holds a server off the minute's retry (disconnected on purpose), or lets it be tried again.
+    fn hold_off(&self, id: &str, on: bool) {
+        let mut held = self.held_off.lock().unwrap_or_else(|e| e.into_inner());
+        if on {
+            held.insert(id.to_string());
+        } else {
+            held.remove(id);
+        }
+    }
+
+    fn is_held_off(&self, id: &str) -> bool {
+        let held = self.held_off.lock().unwrap_or_else(|e| e.into_inner());
+        held.contains(id)
+    }
+
     fn note_error(&self, id: &str, error: Option<&str>) {
         let mut errors = self.remote_errors.lock().unwrap_or_else(|e| e.into_inner());
         match error {
@@ -175,7 +190,8 @@ impl Master {
             if self.app_data && app_held(&server) {
                 continue;
             }
-            if server["autoConnect"] == true && !on.iter().any(|c| c == id) {
+            if server["autoConnect"] == true && !on.iter().any(|c| c == id) && !self.is_held_off(id)
+            {
                 let _ = self.connect_server(&server);
             }
         }
@@ -289,12 +305,17 @@ impl Master {
                 // Unpaired at once: its connection closes now, and whoever follows this master is told.
                 let id = s(args, "id");
                 let gone = crate::servers::remove(db, &id)?;
+                self.hold_off(&id, false);
                 self.remotes.disconnect(&id);
                 self.note_error(&id, None);
                 self.servers_changed(json!({"closed": id, "removed": true}));
                 to(Ok(gone))
             }
-            "remote_connect" => self.connect_server(args),
+            "remote_connect" => {
+                // Connected on purpose: a disconnect on purpose before it no longer holds it off.
+                self.hold_off(&s(args, "id"), false);
+                self.connect_server(args)
+            }
             "remote_call" => {
                 let route = self.route_for(args)?;
                 let events = if b(args, "streams") {
@@ -316,6 +337,11 @@ impl Master {
             }
             "remote_disconnect" => {
                 let id = s(args, "id");
+                // On purpose (the window's Disconnect, finding z2): it stays off until connected again. A restart's
+                // or a twin's disconnect leaves it to the minute's retry.
+                if b(args, "held") {
+                    self.hold_off(&id, true);
+                }
                 self.remotes.disconnect(&id);
                 self.note_error(&id, None);
                 self.servers_changed(json!({"closed": id}));
