@@ -69,6 +69,10 @@ export function recommendedRisk(sort: AskSort): RiskChoice {
 
 export const EMPTY_PREFLIGHT: Preflight = { secrets: [], questions: [], risky: [], setup: [], order: [] };
 
+/** f4: an example in the owner's questions never uses their own name (it once came from the folder path). */
+const NEUTRAL_EXAMPLES =
+  'Examples use made-up neutral names (for example "Example Shop Ltd"), never the owner\'s own name or a name taken from a folder path, user name or account.';
+
 export function preflightPrompt(
   file: string,
   steps: PreflightStep[],
@@ -106,6 +110,7 @@ export function preflightPrompt(
     "Write every secret, question and risky item for someone who does not know the code: plain words, what it is for",
     "and what each answer changes, with one concrete example; never quote a plan line or a code name without saying",
     "what it means.",
+    NEUTRAL_EXAMPLES,
     "Questions only for real choices the steps leave open, not for things you can decide from the code; risky only",
     "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps",
     "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items",
@@ -370,6 +375,7 @@ export function answersPrompt(
     '- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked',
     "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.",
     "Change nothing. Never guess a password.",
+    NEUTRAL_EXAMPLES,
     "",
     `Known secrets of this project (names only): ${known.secrets.join(", ") || "none"}`,
     "Other projects on this machine (their secrets, names only):",

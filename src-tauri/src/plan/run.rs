@@ -15,7 +15,9 @@ use super::decider::{
 use super::env::{MemoryUse, PlannerAsk, RunEnv, ask_planner, assistant_text};
 use super::finishing::is_plan_file;
 use super::guidance::{self as g, Carry, Recent};
-use super::holdask::{self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply};
+use super::holdask::{
+    self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply, sentence_start,
+};
 use super::housekeeping::{archive_path, done_numbers};
 use super::js;
 use super::limits::{limit_notice, limit_reset_at};
@@ -2905,7 +2907,7 @@ impl<'a> Loop<'a> {
         let text = card
             .as_ref()
             .map(ownerask::card_text)
-            .unwrap_or_else(|| why.to_string());
+            .unwrap_or_else(|| sentence_start(why));
         let mut form = hold_form(kind, why);
         form.card = card;
         let _ = self.env.inbox_add(&NewItem {

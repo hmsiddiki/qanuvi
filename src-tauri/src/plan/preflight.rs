@@ -118,6 +118,9 @@ pub struct Known {
     pub notes: Vec<String>,
 }
 
+/// f4: an example in the owner's questions never uses their own name (it once came from the folder path).
+pub const NEUTRAL_EXAMPLES: &str = "Examples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.";
+
 pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> String {
     let list = steps
         .iter()
@@ -175,6 +178,7 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         "Write every secret, question and risky item for someone who does not know the code: plain words, what it is for".into(),
         "and what each answer changes, with one concrete example; never quote a plan line or a code name without saying".into(),
         "what it means.".into(),
+        NEUTRAL_EXAMPLES.into(),
         "Questions only for real choices the steps leave open, not for things you can decide from the code; risky only".into(),
         "for steps that are hard to undo or reach outside this computer; order only when a step must run after steps".into(),
         "listed below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items".into(),
@@ -669,6 +673,7 @@ pub fn answers_prompt(file: &str, items: &[TypedAnswer], known: &KnownForAnswers
         r#"- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked"#.into(),
         "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.".into(),
         "Change nothing. Never guess a password.".into(),
+        NEUTRAL_EXAMPLES.into(),
         String::new(),
         format!(
             "Known secrets of this project (names only): {}",

@@ -154,7 +154,8 @@ export function savePlanState(projectId: string, file: string, state: PlanState)
 
 /** The hold's line, saying who set it. */
 export function holdWording(h: Pick<KeptHold, "why" | "by">): string {
-  return h.by === "you" ? `you asked to see it first (${h.why})` : `Qanuvi's default: ${h.why}`;
+  // Qanuvi's own hold says just what is needed (f3: "Qanuvi's default: it needs ..." read oddly).
+  return h.by === "you" ? `you asked to see it first (${h.why})` : h.why;
 }
 
 /**

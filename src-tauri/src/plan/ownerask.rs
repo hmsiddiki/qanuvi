@@ -122,6 +122,7 @@ short sentences; no step numbers, no tool names, no talk about agents or prompts
 - wanted: the exact change or information wanted, with file names, places and values when known.\n\
 - snippet: the exact text to copy (a config rule, a command, code) and where it goes; null when there is none. Never invent paths or values that are not in what you read; say what is unknown instead.\n\
 - canDo: what Qanuvi can do itself if the owner says so, and what it would need for that (for example the file's place); empty when nothing.\n\
+Examples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\n\
 Never put passwords, keys or tokens in any field.";
 
 fn step_block(f: &StepFacts) -> String {

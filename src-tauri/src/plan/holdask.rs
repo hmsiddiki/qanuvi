@@ -63,6 +63,15 @@ pub struct HoldForm {
     pub card: Option<super::ownerask::Card>,
 }
 
+/// A hold's reason as the start of the Inbox text: "it needs ..." reads "It needs ..." there (f3).
+pub fn sentence_start(why: &str) -> String {
+    let mut chars = why.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
 /// The answer form of a held step, worded like the run panel's.
 pub fn hold_form(kind: HeldKind, why: &str) -> HoldForm {
     let secret = asks_secret(why);

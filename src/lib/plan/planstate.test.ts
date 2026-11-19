@@ -19,7 +19,7 @@ describe("kept per plan (24u part 2)", () => {
       "you asked to see it first (pushes to the server)",
     );
     expect(holdWording({ why: "a question was left open (dash?)", by: "default" })).toBe(
-      "Qanuvi's default: a question was left open (dash?)",
+      "a question was left open (dash?)",
     );
   });
 

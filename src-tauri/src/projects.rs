@@ -53,6 +53,35 @@ fn has_ext(dir: &Path, ext: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// A Node project's run and test commands from the scripts its package.json really has: dev, else start, to run;
+/// test unless it is npm's "no test specified" stub. A command it lacks stays empty rather than guessed.
+fn node_commands(dir: &Path) -> (String, String) {
+    let scripts = std::fs::read_to_string(dir.join("package.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("scripts").cloned())
+        .unwrap_or_default();
+    let has = |name: &str| {
+        scripts
+            .get(name)
+            .and_then(|s| s.as_str())
+            .is_some_and(|s| !s.trim().is_empty())
+    };
+    let run = if has("dev") {
+        "npm run dev"
+    } else if has("start") {
+        "npm start"
+    } else {
+        ""
+    };
+    let stub = scripts
+        .get("test")
+        .and_then(|s| s.as_str())
+        .is_some_and(|s| s.contains("no test specified"));
+    let test = if has("test") && !stub { "npm test" } else { "" };
+    (run.to_string(), test.to_string())
+}
+
 /// Recognises a project from the files in its top folder. Order matters: the first match is the main type.
 pub fn detect(dir: &Path) -> Detection {
     let mut tags: Vec<&str> = Vec::new();
@@ -113,8 +142,9 @@ pub fn detect(dir: &Path) -> Detection {
             settings.test_command = "cargo test".into();
         }
         "node" => {
-            settings.run_command = "npm run dev".into();
-            settings.test_command = "npm test".into();
+            let (run, test) = node_commands(dir);
+            settings.run_command = run;
+            settings.test_command = test;
         }
         _ => {}
     }
@@ -327,13 +357,25 @@ pub fn touch(db: &Db, id: &str) -> Result<(), String> {
 pub fn redetect(db: &Db, id: &str) -> Result<Project, String> {
     let project = get(db, id)?;
     let found = detect(Path::new(&project.path));
+    // f2: commands the owner set stay; only the old guesses for a Node project ("npm run dev", "npm test", filled in
+    // before Qanuvi read package.json) give way to what package.json really has.
+    let mut settings = project.settings.clone();
+    if found.kind == "node" {
+        if settings.run_command == "npm run dev" {
+            settings.run_command = found.settings.run_command.clone();
+        }
+        if settings.test_command == "npm test" {
+            settings.test_command = found.settings.test_command.clone();
+        }
+    }
     db.conn()
         .execute(
-            "UPDATE projects SET kind = ?2, tags = ?3 WHERE id = ?1",
+            "UPDATE projects SET kind = ?2, tags = ?3, settings = ?4 WHERE id = ?1",
             params![
                 id,
                 found.kind,
-                serde_json::to_string(&found.tags).unwrap_or_default()
+                serde_json::to_string(&found.tags).unwrap_or_default(),
+                serde_json::to_string(&settings).unwrap_or_default()
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -388,6 +430,59 @@ mod tests {
         assert_eq!(found.tags, vec!["laravel", "node", "php"]);
         assert_eq!(found.settings.run_command, "php artisan serve");
         assert_eq!(found.settings.preview_url, "http://127.0.0.1:8000");
+    }
+
+    #[test]
+    fn a_node_project_gets_only_the_scripts_it_has() {
+        let cmds = |json: &str| {
+            let dir = folder(&[]);
+            fs::write(dir.path().join("package.json"), json).unwrap();
+            let s = detect(dir.path()).settings;
+            (s.run_command, s.test_command)
+        };
+        let both = |a: &str, b: &str| (a.to_string(), b.to_string());
+        assert_eq!(
+            cmds(r#"{"scripts":{"dev":"vite","start":"node s","test":"vitest"}}"#),
+            both("npm run dev", "npm test")
+        );
+        assert_eq!(
+            cmds(r#"{"scripts":{"start":"node s","test":"node test/run.js"}}"#),
+            both("npm start", "npm test")
+        );
+        // f2 (driven live): only a test script, so no run command is guessed.
+        assert_eq!(
+            cmds(r#"{"scripts":{"test":"node test/run.js"}}"#),
+            both("", "npm test")
+        );
+        assert_eq!(
+            cmds(r#"{"scripts":{"test":"echo \"Error: no test specified\" && exit 1"}}"#),
+            both("", "")
+        );
+        assert_eq!(cmds("not json"), both("", ""));
+    }
+
+    #[test]
+    fn look_again_replaces_only_the_old_node_guesses() {
+        let db = Db::open_in_memory().unwrap();
+        let dir = folder(&[]);
+        let pkg = dir.path().join("package.json");
+        fs::write(&pkg, r#"{"scripts":{"test":"node test/run.js"}}"#).unwrap();
+        let path = dir.path().to_string_lossy().to_string();
+        let added = add(&db, &path).unwrap();
+        // As saved before f2: the old guess for every Node project.
+        let mut old = added.settings.clone();
+        old.run_command = "npm run dev".into();
+        update(&db, &added.id, "p", &old).unwrap();
+        let again = redetect(&db, &added.id).unwrap();
+        assert_eq!(again.settings.run_command, "", "no dev or start script");
+        assert_eq!(again.settings.test_command, "npm test");
+        // A command the owner typed stays.
+        old.run_command = "node server.js".into();
+        update(&db, &added.id, "p", &old).unwrap();
+        assert_eq!(
+            redetect(&db, &added.id).unwrap().settings.run_command,
+            "node server.js"
+        );
     }
 
     #[test]

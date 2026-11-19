@@ -27,6 +27,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import { layout } from "$lib/layout/layout.svelte";
   import { taskListPrompt } from "$lib/plan/prompts";
+  import { listToSteps } from "$lib/plan/liststeps";
   import Play from "@lucide/svelte/icons/play";
   import RunPanel from "./RunPanel.svelte";
   import PlannerDialog from "./PlannerDialog.svelte";
@@ -209,6 +210,22 @@
     )
       return;
     void applyToStep(step, (t, line, title) => setStepStatus(t, line, next, title));
+  }
+
+  /** f1: a plan written as a plain list, and how many steps it would give; null when it has steps or no list. */
+  let listed = $derived(plan && !plan.sections.some((s) => s.steps.length) ? listToSteps(text) : null);
+
+  /** f1: turns the plan's plain list into checkbox steps, from the file as it is on disk now. */
+  async function makeSteps() {
+    try {
+      const now = await api.files.read(project.id, file);
+      const r = listToSteps(now.text);
+      if (!r) return load();
+      await api.files.write(project.id, file, r.text, now.hash);
+      await load();
+    } catch (e) {
+      error = `The list was not turned into steps (${errorText(e)}).`;
+    }
   }
 
   async function load() {
@@ -483,6 +500,23 @@
         </p>
         {#if settings.value.ai}
           <button type="button" class="ask" onclick={askAgent}><Sparkles size={13} /> Ask the agent to write one</button
+          >
+        {/if}
+      </div>
+    {:else if plan && !plan.sections.some((s) => s.steps.length)}
+      <div class="empty">
+        <p>No steps found in {file}.</p>
+        <p class="muted">
+          Qanuvi reads steps written as checkbox lines, for example <code>- [ ] 1. Add the export</code>.
+        </p>
+        {#if listed}
+          <button type="button" class="ask" onclick={makeSteps}>
+            Turn the {listed.count === 1 ? "list item" : `${listed.count} list items`} into steps
+          </button>
+          <p class="muted">Only the list lines change; the rest of the file stays as it is.</p>
+        {:else if settings.value.ai}
+          <button type="button" class="ask" onclick={askAgent}
+            ><Sparkles size={13} /> Ask the agent to write steps</button
           >
         {/if}
       </div>

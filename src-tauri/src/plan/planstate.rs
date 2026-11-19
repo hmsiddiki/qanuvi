@@ -167,7 +167,8 @@ impl PlanState {
 pub fn hold_wording(why: &str, by: HoldBy) -> String {
     match by {
         HoldBy::You => format!("you asked to see it first ({why})"),
-        HoldBy::Default => format!("Qanuvi's default: {why}"),
+        // Qanuvi's own hold says just what is needed (f3).
+        HoldBy::Default => why.to_string(),
     }
 }
 
@@ -400,7 +401,7 @@ mod tests {
         );
         assert_eq!(
             hold_wording("a question was left open (dash?)", HoldBy::Default),
-            "Qanuvi's default: a question was left open (dash?)"
+            "a question was left open (dash?)"
         );
     }
 

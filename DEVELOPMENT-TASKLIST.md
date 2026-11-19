@@ -899,7 +899,27 @@ runs on or off; with it off nothing is sent anywhere.
     "npm run dev" for a Node project with no dev script; f3 the hold label "Qanuvi's default: it needs ..." reads odd
     for a hold; f4 n2's example used the Windows user's first name ("<name>'s Corner Shop", likely from the folder path).
     Verify: vitest 526, svelte-check 0, clippy clean, Rust plan tests 222.
+    f1-f4 FIXED (owner: "make f1-f4 to fix", 2026-11-20). f1: a plan with no checkbox steps shows "No steps found in
+    <file>", how steps are written, and "Turn the N list items into steps" when it holds a plain list (liststeps.ts
+    listToSteps: top-level numbered items keep their numbers, bullets only when nothing is numbered, a lazy wrapped
+    line gets two spaces, code blocks and nested items untouched; written from the file as on disk); else "Ask the
+    agent to write steps". f2: a Node project's commands come from package.json's scripts (dev, else start; test
+    unless npm's "no test specified" stub; missing = empty, not guessed); Look again replaces only the old guesses
+    "npm run dev" / "npm test", a command the owner typed stays. f3: Qanuvi's own hold says just the need (no "Qanuvi's
+    default:"); its Inbox text starts with a capital (holdask::sentence_start); owner-set holds unchanged. f4: the
+    check, the answer reading and the Inbox card rules say examples use made-up neutral names, never the owner's name
+    or one from a folder path, user name or account (TS + Rust, compare.json refreshed). DRIVEN LIVE on the rebuilt
+    test build: f1 (PLAN-F1.md numbered list with a wrapped line -> 3 steps, numbers kept), f2 (p2proj: Look again
+    cleared "npm run dev", kept "npm test"); the new check's example was neutral (example-password-123). f3 not seen
+    live (unit tests only): the hold drive went another way, see f5. Verify: vitest 529, svelte-check 0, clippy clean,
+    Rust lib 550 + 2 new projects tests.
+    FINDING f5 (not fixed, owner decides): "i will tell you later" typed in the password box was read as "leave it"
+    (skip), so step 1 ran without the password and came back blocked ($0.10) instead of being held; "later" arguably
+    means hold the step and ask again.
     PICKUP POINT (fresh conversation starts here, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
+    p3 + g1 + f1-f4 fixed; nothing published after 0.1.27. Next: owner on f5, then 0.1.28 (publish asks the owner
+    first), then 24n or 24y. Test window and test masters stopped; scratch project p2proj (session 6b80dfe9).
+    PICKUP POINT (before, 2026-11-20 03:30): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
     p3 + g1 fixed and driven; nothing published after 0.1.27. Next: 0.1.28 (publish asks the owner first); owner
     picks f1-f4 and 24n or 24y. Test window and test masters stopped; scratch project p2proj (session 6b80dfe9).
     PICKUP POINT (before, 2026-11-20 03:00): p2 + n2 BUILT (not driven live), nothing published
