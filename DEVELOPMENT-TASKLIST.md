@@ -561,6 +561,36 @@ runs on or off; with it off nothing is sent anywhere.
     autoConnect server again within a minute (seen for the test master's Laptop and basevm378, and This PC's
     basevm378). Drive note: Input Leap on This PC (laptop as client) eats simulated mouse clicks and keys; drive the
     window with UI Automation (expand, item select, invoke) instead.
+    z1 + z2 FIXED (owner: "do as proposed", 2026-11-19; bf2ab95). z1: #dropped keeps a machine's terminal tabs when its
+    link ended by itself (they say "The connection to x ended, and this shell ended with it"), and takes them only on
+    a disconnect on purpose. z2: remote_disconnect with held:true (the window's Disconnect, the shown master's Servers
+    screen) puts the server on the master's held_off list; connect_away_servers skips it; remote_connect or
+    servers_remove clears it. Its saved "connect by itself" setting is not changed, so the next start of that master
+    tries it again (a restart's or a twin's disconnect sends no held). Rust 523 + 1 (+1), vitest 503 (+1), clippy,
+    svelte-check, fmt clean. Drive live next (release build + laptop master of bf2ab95).
+    z1 + z2 DRIVEN LIVE (2026-11-19, release build + laptop master of bf2ab95), all pass. z1: a terminal on the VPS
+    shown at depth 3, the middle hop's ssh killed: the tab stays with "[The connection to VPS ended, and this shell
+    ended with it. Close this tab or open a new terminal.]" and the VPS is shown again by itself. z2: the test master's
+    Servers screen, Disconnect on Laptop: still "not connected" after 2 min 13 s, no ssh to the laptop; its "Connect
+    when ... starts" box stays on; Connect brings it back; its ssh killed afterwards -> "away ... tried again in a
+    minute" -> connected again within 70 s (hold cleared). Drive note: Qanuvi's IconButtons expose Toggle, not
+    Invoke, to UI Automation (ui.ps1 tbtn/tbtnn).
+    Finding z3 (NOT fixed, owner decides): fast typing reaches a terminal out of order. Input Leap paused, SendKeys
+    "hostname" + Enter into the VPS terminal at depth 3 ran "sonhtmea" (command not found); "abcdefghijklmnop" (no
+    Enter) arrived as "cadefbghijklmnop". Cause: each keystroke is its own term_write call, and every hop runs calls
+    in parallel: the app's remote_call (desktop.rs, blocking pool) and each master's handle_connection (master.rs,
+    a thread per command). Any machine can be hit; more hops make it likelier. Proposal: one write queue per
+    terminal in the window (api.term.write): while one write is on its way, what is typed next is gathered and sent
+    as one write after it, so order holds on every hop, with no change on the masters.
+    PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
+    if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
+    then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested
+    ones), v3 watch. Then M9c, M9d (publish only with the owner's yes). Input Leap is paused by the owner for the
+    drive. Test state to put back after M9: autoConnect ON again for This PC's basevm378 (09484bb9) and the test
+    master's basevm378 (8396c116); remove the qanuvi-m9-test key from the VPS's and the laptop's authorized_keys and
+    ~/.ssh/m9_test_key* on the laptop; stop and delete the laptop's ~/src/m9 masters and data. Drive tools (ui.ps1 with
+    expand/item/uinvoke/focus, mcall.js, mjson.js, mproc.ps1, room.ps1, screen.ps1) are in the scratchpad of session
+    13a854a0.
     PICKUP POINT (2026-11-18, after M8c on all three machines): M8c DONE. Next M8d (docs/MIGRATION-VIEWER.md: This PC's
     master updates the whole install with one installer and one button; the screen's own updater goes).
     PICKUP POINT (before, 2026-11-18, after M8c driven live on Windows): next M8c on the Linux laptop and the VPS (ask first),
