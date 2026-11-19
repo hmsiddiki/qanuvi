@@ -799,7 +799,21 @@ runs on or off; with it off nothing is sent anywhere.
     https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.27; installer (8564028), Linux master (10453232) and
     Windows master (10371584) served 200 with matching sizes. Tagged v0.1.27. Not done: the owner's install updating
     to 0.1.27 (its updater offers it), the VPS server build swap to 0.1.27.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 00:40): t1 + c1 DONE (both driven live), 0.1.27
+    TEST STATE PUT BACK + VPS ON 0.1.27 (2026-11-20, owner: "vps yes, keep it on in laptop"): autoConnect ON again for
+    This PC's basevm378 (09484bb9) and the local test master's basevm378 (8396c116); the local test master's Laptop
+    entry (~/src/m9/qm1) removed; test masters stopped. Laptop: ~/src/m9 masters stopped and deleted, ~/.ssh/m9_test_key*
+    deleted, the qanuvi-m9-test line out of authorized_keys (backup authorized_keys.bak-m9); Claude Code 2.1.328 kept
+    signed in (owner). VPS: the qanuvi-m9-test line out of authorized_keys (backup authorized_keys.bak-m9); 0.1.27
+    server build (cross-built 00:31 from v0.1.27, 10453232 bytes) swapped into ~/.local/bin while idle (036eb6a build
+    kept as qanuvi-master.prev), serve started again with setsid: status "Qanuvi master 0.1.27", 2 projects, Inbox 2.
+    Drive note: never `pgrep -f`/`pkill -f` over ssh with a pattern that also appears in the ssh command's own text (it
+    matched and ended the remote shell twice); put the commands in a script sent with `bash -s`. Owner's install still
+    0.1.26: after the PC restart nginx was down, so qlopy.top did not answer and no update showed; the owner started
+    Wnmp again (channel answers 200 with 0.1.27).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:
+    the owner's install updating to 0.1.27 (then check it); then ask the owner what comes next (24v stays LATER, owner
+    2026-11-20).
+    PICKUP POINT (before, 2026-11-20 00:40): t1 + c1 DONE (both driven live), 0.1.27
     PUBLISHED. Next: watch the owner's install update to 0.1.27; VPS server build swap when the owner wants; test state
     to put back (listed below) still open, plus the laptop's Claude Code (owner's choice) and its ~/src/m9 masters.
     PICKUP POINT (before, 2026-11-19 22:00): t1 DONE (built + driven live), c1 BUILT and its
