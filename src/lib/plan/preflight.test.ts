@@ -1,5 +1,200 @@
 import { describe, expect, it } from "vitest";
-import { clipReason, decidedNote, parsePreflight, preflightPrompt, recommendedRisk, settleCheck } from "./preflight";
+import {
+  answersPrompt,
+  clipReason,
+  decidedNote,
+  maskedValue,
+  parseAnswerReadings,
+  parsePreflight,
+  preflightPrompt,
+  readAnswers,
+  recommendedRisk,
+  secretNeedsReading,
+  settleCheck,
+  typedAnswers,
+  withReadHolds,
+  type AnswerReading,
+} from "./preflight";
+
+describe("p2: the check's answers read by meaning", () => {
+  const check = parsePreflight(
+    JSON.stringify({
+      secrets: [
+        { name: "DB_HOST", what: "Where the test database is", example: "localhost:3306", steps: ["2a"] },
+        { name: "DB_PASSWORD", what: "The test database password", steps: ["2a", "2b"] },
+        { name: "API_KEY", what: "The test key", steps: [] },
+        { name: "SHOP_KEY", what: "The shop key", steps: ["3"] },
+      ],
+      questions: [
+        { step: "4a", question: "Which currency format?", sort: "decide", recommended: "1,234.00" },
+        { step: "4b", question: "Which bank?", sort: "you" },
+        { step: "4c", question: "Which theme?", sort: "decide", recommended: "dark" },
+      ],
+    }),
+  );
+  const reading = (id: string, kind: AnswerReading["kind"], more: Partial<AnswerReading> = {}): AnswerReading => ({
+    id,
+    kind,
+    value: "",
+    where: "",
+    copyFrom: null,
+    skip: false,
+    reply: "",
+    ...more,
+  });
+
+  it("never sends a one-piece secret to a model", () => {
+    expect(secretNeedsReading("hunter2")).toBe(false);
+    expect(secretNeedsReading("  mysql:host=127.0.0.1  ")).toBe(false);
+    expect(secretNeedsReading("find the mysql address yourself")).toBe(true);
+    const items = typedAnswers(
+      check,
+      { DB_HOST: "find it in the config", DB_PASSWORD: "hunter2" },
+      { 0: "1,234.00", 1: "the test one", 2: "light" },
+      { 1: true, 2: true },
+    );
+    expect(items.map((x) => x.id)).toEqual(["secret:DB_HOST", "question:1", "question:2"]);
+    expect(items[0].ask).toBe("Where the test database is (DB_HOST)");
+    expect(JSON.stringify(items)).not.toContain("hunter2");
+  });
+
+  it("asks to sort each answer and to try instructions read-only", () => {
+    const p = answersPrompt(
+      "PLAN.md",
+      [{ id: "secret:DB_HOST", ask: "Where (DB_HOST)", example: "localhost", answer: 'use "the" same' }],
+      { secrets: ["DB_USER"], others: [{ name: "qchmmart", path: "E:/www/qchmmart", secrets: ["DB_HOST"] }] },
+    );
+    expect(p).toContain('answer: "use \\"the\\" same"');
+    expect(p).toContain("qchmmart (E:/www/qchmmart): DB_HOST");
+    expect(p).toContain("Known secrets of this project (names only): DB_USER");
+    expect(p).toContain("Change nothing");
+    expect(answersPrompt("P.md", [], { secrets: [], others: [] })).toContain("- none");
+  });
+
+  it("reads the answer, keeping only known ids", () => {
+    const r = parseAnswerReadings(
+      "Sure: " +
+        JSON.stringify({
+          answers: [
+            { id: "secret:DB_HOST", kind: "instruction", value: "localhost:3307", where: "config.php" },
+            { id: "secret:DB_HOST", kind: "value", value: "twice" },
+            { id: "question:1", kind: "unclear", reply: "A bank is where…", where: "x", skip: true },
+            { id: "question:2", kind: "maybe" },
+            { id: "other", kind: "value" },
+            { id: "secret:SHOP_KEY", kind: "instruction", copyFrom: { project: "qchmmart", name: "SHOP_KEY" } },
+            [1],
+          ],
+        }),
+      ["secret:DB_HOST", "question:1", "question:2", "secret:SHOP_KEY"],
+    );
+    expect(r.map((x) => [x.id, x.kind])).toEqual([
+      ["secret:DB_HOST", "instruction"],
+      ["question:1", "unclear"],
+      ["secret:SHOP_KEY", "instruction"],
+    ]);
+    expect(r[0].where).toBe("config.php");
+    expect(r[1]).toMatchObject({ where: "", skip: false });
+    expect(r[2].copyFrom).toEqual({ project: "qchmmart", name: "SHOP_KEY" });
+    expect(parseAnswerReadings("no json", ["a"])).toEqual([]);
+    expect(parseAnswerReadings("null {", ["a"])).toEqual([]);
+  });
+
+  it("saves values, offers what was found, and holds what is unclear", () => {
+    const secrets = {
+      DB_HOST: "find the mysql address yourself",
+      DB_PASSWORD: "hunter2",
+      API_KEY: "what is this?",
+      SHOP_KEY: "the same as qchmmart",
+    };
+    const answers = { 0: "1,234.00", 1: "dont get it", 2: "you pick" };
+    const touched = { 1: true, 2: true };
+    const readings = [
+      reading("secret:DB_HOST", "instruction", { value: "localhost:3307", where: "config.php" }),
+      reading("secret:API_KEY", "unclear", { reply: "It is the key from the test dashboard, like sk_test_123." }),
+      reading("secret:SHOP_KEY", "instruction", { copyFrom: { project: "qchmmart", name: "SHOP_KEY" } }),
+      reading("question:1", "unclear", { reply: "Which bank the payments go to" }),
+      reading("question:2", "instruction", { skip: true }),
+    ];
+    const r = readAnswers(check, secrets, answers, touched, readings, {}, "1");
+    expect(r.save).toEqual([{ name: "DB_PASSWORD", value: "hunter2" }]);
+    expect(r.offered.map((f) => f.id)).toEqual(["secret:DB_HOST", "secret:SHOP_KEY"]);
+    expect(r.holds.map((h) => h.step)).toEqual(["2a", "1", "3", "4b"]);
+    expect(r.holds[1].why).toBe(
+      'it needs The test key (API_KEY). Before the run you wrote "what is this?"; It is the key from the test dashboard, like sk_test_123. Answer here with the value, or say where Qanuvi can find it',
+    );
+    expect(r.answers[1]).toBe("");
+    expect(r.answers[2]).toBe("dark");
+    expect(r.answersTouched[2]).toBe(false);
+
+    const yes = readAnswers(
+      check,
+      secrets,
+      answers,
+      touched,
+      readings,
+      { "secret:DB_HOST": true, "secret:SHOP_KEY": true },
+      "1",
+    );
+    expect(yes.save).toEqual([
+      { name: "DB_HOST", value: "localhost:3307" },
+      { name: "DB_PASSWORD", value: "hunter2" },
+    ]);
+    expect(yes.copy).toEqual([{ name: "SHOP_KEY", project: "qchmmart", from: "SHOP_KEY" }]);
+    expect(yes.offered).toEqual([]);
+    expect(yes.holds.map((h) => h.step)).toEqual(["1", "4b"]);
+
+    const no = readAnswers(check, secrets, answers, touched, readings, { "secret:DB_HOST": false }, "1");
+    expect(no.offered.map((f) => f.id)).toEqual(["secret:SHOP_KEY"]);
+    expect(no.holds.map((h) => h.step)).toContain("2a");
+  });
+
+  it("holds a sentence nobody could read, and keeps a typed choice as before", () => {
+    const r = readAnswers(check, { DB_HOST: "the usual one" }, { 2: "light please" }, { 2: true }, [], {}, "1");
+    expect(r.save).toEqual([]);
+    expect(r.holds).toEqual([
+      {
+        step: "2a",
+        why: 'it needs Where the test database is (DB_HOST). Before the run you wrote "the usual one". Answer here with the value, or say where Qanuvi can find it',
+        by: "default",
+      },
+    ]);
+    expect(r.answers[2]).toBe("light please");
+    const v = readAnswers(
+      check,
+      { DB_HOST: "it is localhost 3306" },
+      { 2: "light please" },
+      { 2: true },
+      [
+        reading("secret:DB_HOST", "value", { value: "localhost:3306" }),
+        reading("question:2", "value", { value: "light" }),
+      ],
+      {},
+      "1",
+    );
+    expect(v.save).toEqual([{ name: "DB_HOST", value: "localhost:3306" }]);
+    expect(v.answers[2]).toBe("light");
+  });
+
+  it("puts the read holds in place of the default ones", () => {
+    const settled = settleCheck(check, { 0: "1,234.00", 1: "", 2: "dark" }, {}, {}, {});
+    const r = withReadHolds({ ...settled, holds: [...settled.holds, { step: "4c", why: "renames", by: "you" }] }, [
+      { step: "4b", why: "it needs a bank", by: "default" },
+      { step: "4c", why: "it needs a theme", by: "default" },
+      { step: "4a", why: "it needs a format", by: "default" },
+    ]);
+    expect(r.holds).toEqual([
+      { step: "4c", why: "renames; also it needs a theme", by: "you" },
+      { step: "4b", why: "it needs a bank", by: "default" },
+      { step: "4a", why: "it needs a format", by: "default" },
+    ]);
+    expect(r.cleared).toEqual([]);
+  });
+
+  it("shows only the start of a found secret", () => {
+    expect(maskedValue("abc")).toBe("•••");
+    expect(maskedValue("localhost:3307")).toBe("lo••••••••");
+  });
+});
 
 describe("the check before a run", () => {
   it("asks with what is known and the open steps", () => {

@@ -129,6 +129,23 @@ pub fn set(project_id: &str, name: &str, value: &str) -> Result<(), String> {
     save(project_id, &all)
 }
 
+/// p2: another project's secret saved under `name` in this one ("use the same as qchmmart"); the value never leaves
+/// the core.
+pub fn copy(
+    project_id: &str,
+    name: &str,
+    from_project: &str,
+    from_name: &str,
+) -> Result<(), String> {
+    let Some(value) = load(from_project).remove(from_name.trim()) else {
+        return Err(format!(
+            "That project has no secret named {}.",
+            from_name.trim()
+        ));
+    };
+    set(project_id, name, &value)
+}
+
 pub fn remove(project_id: &str, name: &str) -> Result<(), String> {
     if kind() == "environment" {
         return Err(env_only(name));

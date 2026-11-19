@@ -389,6 +389,42 @@ fn run_2b(name: &str, a: &[Value]) -> Value {
             &de(&a[3]),
             &de(&a[4]),
         )),
+        "secretNeedsReading" => json!(preflight::secret_needs_reading(&s(0))),
+        "typedAnswers" => to(preflight::typed_answers(
+            &preflight::parse_preflight(&s(0)),
+            &de(&a[1]),
+            &de(&a[2]),
+            &de(&a[3]),
+        )),
+        "answersPrompt" => json!(preflight::answers_prompt(
+            &s(0),
+            &de::<Vec<_>>(&a[1]),
+            &de(&a[2])
+        )),
+        "parseAnswerReadings" => to(preflight::parse_answer_readings(
+            &s(0),
+            &de::<Vec<String>>(&a[1]),
+        )),
+        "unsettledWhy" => json!(preflight::unsettled_why(&s(0), &s(1), &s(2))),
+        "readAnswers" => to(preflight::read_answers(
+            &preflight::parse_preflight(&s(0)),
+            &de(&a[1]),
+            &de(&a[2]),
+            &de(&a[3]),
+            &de::<Vec<_>>(&a[4]),
+            &de(&a[5]),
+            &s(6),
+        )),
+        "withReadHolds" => to(preflight::with_read_holds(
+            &preflight::settle_check(
+                &preflight::parse_preflight(&s(0)),
+                &de(&a[1]),
+                &de(&a[2]),
+                &de(&a[3]),
+                &de(&a[4]),
+            ),
+            &de::<Vec<_>>(&a[5]),
+        )),
         "waitsBefore" => {
             let wait: Option<Vec<preflight::StepWhy>> = de(&a[1]);
             to(preflight::waits_before(a[0].as_str(), wait.as_deref()))

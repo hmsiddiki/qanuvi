@@ -468,6 +468,14 @@ impl Master {
                 crate::secrets::set(&id, &s(args, "name"), &s(args, "value"))?;
                 Ok(Value::Null)
             }
+            "secrets_copy" => {
+                let id = s(args, "projectId");
+                let from = s(args, "fromProjectId");
+                projects::get(db, &id)?;
+                projects::get(db, &from)?;
+                crate::secrets::copy(&id, &s(args, "name"), &from, &s(args, "fromName"))?;
+                Ok(Value::Null)
+            }
             "secrets_remove" => {
                 let id = s(args, "projectId");
                 projects::get(db, &id)?;
@@ -2815,8 +2823,14 @@ mod tests {
             call(&m, "secrets_store", json!({})).unwrap(),
             json!(crate::secrets::kind())
         );
-        for cmd in ["secrets_names", "secrets_set", "secrets_remove"] {
-            let args = json!({"projectId": "not-a-project", "name": "DB_PASSWORD", "value": "x"});
+        for cmd in [
+            "secrets_names",
+            "secrets_set",
+            "secrets_remove",
+            "secrets_copy",
+        ] {
+            let args = json!({"projectId": "not-a-project", "name": "DB_PASSWORD", "value": "x",
+                "fromProjectId": "not-a-project", "fromName": "DB_PASSWORD"});
             assert!(call(&m, cmd, args).is_err(), "{cmd}");
         }
     }

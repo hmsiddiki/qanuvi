@@ -514,6 +514,469 @@ pub fn waits_before<'a>(step: Option<&str>, wait: Option<&'a [StepWhy]>) -> Opti
         .map(|w| w.why.as_str())
 }
 
+/// p2 (owner, 2026-11-20): the check's answers are read by meaning before anything is saved (`answersPrompt` and the
+/// functions after it in `preflight.ts`). One short call reads them together and sorts each: a value, an instruction
+/// (tried at once, read-only; what was found waits for the owner's yes) or unclear (not saved: the step that needs it
+/// waits and asks in the Inbox, the others go on).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypedAnswer {
+    /// "secret:NAME" or "question:<index>".
+    pub id: String,
+    pub ask: String,
+    pub example: String,
+    pub answer: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReadingKind {
+    Value,
+    Instruction,
+    Unclear,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CopyFrom {
+    pub project: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswerReading {
+    pub id: String,
+    pub kind: ReadingKind,
+    pub value: String,
+    pub r#where: String,
+    pub copy_from: Option<CopyFrom>,
+    pub skip: bool,
+    pub reply: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OtherProject {
+    pub name: String,
+    pub path: String,
+    pub secrets: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KnownForAnswers {
+    pub secrets: Vec<String>,
+    pub others: Vec<OtherProject>,
+}
+
+/// One piece without spaces is the value itself, saved as typed and never sent to a model (a password stays out of
+/// every session's record); anything with spaces is read.
+pub fn secret_needs_reading(typed: &str) -> bool {
+    js::trim(typed)
+        .chars()
+        .any(|c| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
+}
+
+fn secret_ask(s: &PreflightSecret) -> String {
+    let what = [&s.what, &s.why, &s.name]
+        .into_iter()
+        .find(|x| !x.is_empty())
+        .cloned()
+        .unwrap_or_default();
+    format!("{what} ({})", s.name)
+}
+
+fn answer_at(m: &HashMap<usize, String>, i: usize) -> &str {
+    m.get(&i).map(|a| js::trim(a)).unwrap_or("")
+}
+
+/// The answers the reading call reads: secrets with a sentence in them, and choices the owner typed or changed.
+pub fn typed_answers(
+    check: &Preflight,
+    secret_values: &HashMap<String, String>,
+    answers: &HashMap<usize, String>,
+    answers_touched: &HashMap<usize, bool>,
+) -> Vec<TypedAnswer> {
+    let mut out = Vec::new();
+    for s in &check.secrets {
+        let v = secret_values
+            .get(&s.name)
+            .map(|v| js::trim(v))
+            .unwrap_or("");
+        if !v.is_empty() && secret_needs_reading(v) {
+            out.push(TypedAnswer {
+                id: format!("secret:{}", s.name),
+                ask: secret_ask(s),
+                example: s.example.clone(),
+                answer: clip_reason(v, 600),
+            });
+        }
+    }
+    for (i, q) in check.questions.iter().enumerate() {
+        let a = answer_at(answers, i);
+        if !a.is_empty() && answers_touched.get(&i).copied().unwrap_or(false) && a != q.recommended
+        {
+            out.push(TypedAnswer {
+                id: format!("question:{i}"),
+                ask: q.question.clone(),
+                example: q.recommended.clone(),
+                answer: clip_reason(a, 600),
+            });
+        }
+    }
+    out
+}
+
+pub fn answers_prompt(file: &str, items: &[TypedAnswer], known: &KnownForAnswers) -> String {
+    let mut list: Vec<String> = Vec::new();
+    for x in items {
+        list.push(format!("- id: {}", x.id));
+        list.push(format!("  asked: {}", x.ask));
+        if !x.example.is_empty() {
+            list.push(format!("  example: {}", x.example));
+        }
+        list.push(format!(
+            "  answer: {}",
+            serde_json::to_string(&x.answer).unwrap_or_default()
+        ));
+    }
+    let mut others: Vec<String> = known
+        .others
+        .iter()
+        .take(20)
+        .map(|p| {
+            let names = p.secrets.join(", ");
+            format!(
+                "- {} ({}): {}",
+                p.name,
+                p.path,
+                if names.is_empty() { "none" } else { &names }
+            )
+        })
+        .collect();
+    if others.is_empty() {
+        others.push("- none".into());
+    }
+    let secrets = known.secrets.join(", ");
+    let mut out: Vec<String> = vec![
+        format!("Before a run of {file}, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,"),
+        "spelling or language, short or long), never word by word, and sort it:".into(),
+        r#"- "value": the answer itself (an address, a user name, a choice). Put it in value, without words around it"#.into(),
+        r#"  ("it is localhost:3306" gives "localhost:3306")."#.into(),
+        r#"- "instruction": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another"#.into(),
+        "  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's".into(),
+        "  docs, config and example files, or the other projects below): put what you found in value and the file or".into(),
+        "  place in where. When it is a known secret of another project, give copyFrom with that project's name and the".into(),
+        "  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.".into(),
+        "  Found nothing: value empty, and reply says in one sentence where you looked.".into(),
+        r#"- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked"#.into(),
+        "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.".into(),
+        "Change nothing. Never guess a password.".into(),
+        String::new(),
+        format!(
+            "Known secrets of this project (names only): {}",
+            if secrets.is_empty() { "none" } else { &secrets }
+        ),
+        "Other projects on this machine (their secrets, names only):".into(),
+    ];
+    out.extend(others);
+    out.push(String::new());
+    out.push("Answers:".into());
+    out.extend(list);
+    out.push(String::new());
+    out.push("Answer with JSON only, one entry per id:".into());
+    out.push(r#"{"answers":[{"id":"secret:DB_HOST","kind":"instruction","value":"localhost:3306","where":"config.php","copyFrom":null,"skip":false,"reply":""}]}"#.into());
+    out.join("\n")
+}
+
+/// Reads the reading call's answer: one reading per known id; anything unreadable is left out.
+pub fn parse_answer_readings(answer: &str, ids: &[String]) -> Vec<AnswerReading> {
+    let (Some(start), Some(end)) = (answer.find('{'), answer.rfind('}')) else {
+        return vec![];
+    };
+    if end <= start {
+        return vec![];
+    }
+    let Ok(raw) = serde_json::from_str::<Value>(&answer[start..=end]) else {
+        return vec![];
+    };
+    let mut out: Vec<AnswerReading> = Vec::new();
+    for r in raw
+        .get("answers")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|x| x.is_object())
+    {
+        let id = text(&r["id"]);
+        if !ids.contains(&id) || out.iter().any(|o| o.id == id) {
+            continue;
+        }
+        let kind = match r["kind"].as_str() {
+            Some("value") => ReadingKind::Value,
+            Some("instruction") => ReadingKind::Instruction,
+            Some("unclear") => ReadingKind::Unclear,
+            _ => continue,
+        };
+        let is_instruction = kind == ReadingKind::Instruction;
+        let c = &r["copyFrom"];
+        let copy_from = (is_instruction && c.is_object())
+            .then(|| CopyFrom {
+                project: text(&c["project"]),
+                name: text(&c["name"]),
+            })
+            .filter(|c| !c.project.is_empty() && !c.name.is_empty());
+        out.push(AnswerReading {
+            id,
+            kind,
+            value: text(&r["value"]),
+            r#where: if is_instruction {
+                text(&r["where"])
+            } else {
+                String::new()
+            },
+            copy_from,
+            skip: is_instruction && r["skip"] == Value::Bool(true),
+            reply: text(&r["reply"]),
+        });
+    }
+    out
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FoundValue {
+    pub id: String,
+    pub ask: String,
+    pub value: String,
+    pub r#where: String,
+    pub copy_from: Option<CopyFrom>,
+    pub secret: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretValue {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretCopy {
+    pub name: String,
+    pub project: String,
+    pub from: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadAnswers {
+    pub save: Vec<SecretValue>,
+    pub copy: Vec<SecretCopy>,
+    pub answers: HashMap<usize, String>,
+    pub answers_touched: HashMap<usize, bool>,
+    pub holds: Vec<Hold>,
+    pub offered: Vec<FoundValue>,
+}
+
+/// The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox.
+pub fn unsettled_why(ask: &str, typed: &str, reply: &str) -> String {
+    let said = clip_reason(typed, 120);
+    let more = reply.trim_end_matches(|c: char| {
+        c == '.' || (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
+    });
+    let more = if more.is_empty() {
+        String::new()
+    } else {
+        format!("; {more}")
+    };
+    format!(
+        "it needs {ask}. Before the run you wrote \"{said}\"{more}. Answer here with the value, or say where Qanuvi can find it"
+    )
+}
+
+fn hold_once(out: &mut ReadAnswers, steps: &[String], why: &str) {
+    for step in steps {
+        if !step.is_empty() && !out.holds.iter().any(|h| &h.step == step) {
+            out.holds.push(Hold {
+                step: step.clone(),
+                why: why.to_string(),
+                by: HoldBy::Default,
+            });
+        }
+    }
+}
+
+/// Applies the readings to the form (`readAnswers`): `used` is the owner's yes or no to each found value; one not
+/// answered yet is offered. A secret's sentence with no reading is not saved: its step waits and asks.
+pub fn read_answers(
+    check: &Preflight,
+    secret_values: &HashMap<String, String>,
+    answers: &HashMap<usize, String>,
+    answers_touched: &HashMap<usize, bool>,
+    readings: &[AnswerReading],
+    used: &HashMap<String, bool>,
+    first_step: &str,
+) -> ReadAnswers {
+    let mut out = ReadAnswers {
+        answers: answers.clone(),
+        answers_touched: answers_touched.clone(),
+        ..Default::default()
+    };
+    let reading = |id: &str| readings.iter().find(|r| r.id == id);
+    for s in &check.secrets {
+        let v = secret_values
+            .get(&s.name)
+            .map(|v| js::trim(v))
+            .unwrap_or("");
+        if v.is_empty() {
+            continue;
+        }
+        if !secret_needs_reading(v) {
+            out.save.push(SecretValue {
+                name: s.name.clone(),
+                value: v.to_string(),
+            });
+            continue;
+        }
+        let id = format!("secret:{}", s.name);
+        let steps = if s.steps.is_empty() {
+            vec![first_step.to_string()]
+        } else {
+            s.steps.clone()
+        };
+        let ask = secret_ask(s);
+        match reading(&id) {
+            Some(r) if r.kind == ReadingKind::Value => out.save.push(SecretValue {
+                name: s.name.clone(),
+                value: if r.value.is_empty() {
+                    v.to_string()
+                } else {
+                    r.value.clone()
+                },
+            }),
+            Some(r) if r.kind == ReadingKind::Instruction && r.skip => {}
+            Some(r)
+                if r.kind == ReadingKind::Instruction
+                    && (!r.value.is_empty() || r.copy_from.is_some()) =>
+            {
+                match used.get(&id) {
+                    Some(true) => match &r.copy_from {
+                        Some(c) => out.copy.push(SecretCopy {
+                            name: s.name.clone(),
+                            project: c.project.clone(),
+                            from: c.name.clone(),
+                        }),
+                        None => out.save.push(SecretValue {
+                            name: s.name.clone(),
+                            value: r.value.clone(),
+                        }),
+                    },
+                    said => {
+                        if said.is_none() {
+                            out.offered.push(FoundValue {
+                                id: id.clone(),
+                                ask: ask.clone(),
+                                value: r.value.clone(),
+                                r#where: r.r#where.clone(),
+                                copy_from: r.copy_from.clone(),
+                                secret: true,
+                            });
+                        }
+                        hold_once(&mut out, &steps, &unsettled_why(&ask, v, &r.reply));
+                    }
+                }
+            }
+            r => {
+                let reply = r.map(|r| r.reply.as_str()).unwrap_or("");
+                hold_once(&mut out, &steps, &unsettled_why(&ask, v, reply));
+            }
+        }
+    }
+    for (i, q) in check.questions.iter().enumerate() {
+        let a = answer_at(answers, i);
+        let id = format!("question:{i}");
+        if a.is_empty() || !answers_touched.get(&i).copied().unwrap_or(false) || a == q.recommended
+        {
+            continue;
+        }
+        // A typed choice with no reading stays the owner's answer, as before.
+        let Some(r) = reading(&id) else { continue };
+        if r.kind == ReadingKind::Value {
+            let v = if r.value.is_empty() {
+                a.to_string()
+            } else {
+                r.value.clone()
+            };
+            out.answers.insert(i, v);
+            continue;
+        }
+        let instruction = r.kind == ReadingKind::Instruction;
+        if instruction && r.skip {
+            // "You decide": the recommended answer, as Qanuvi's own choice; with none, the step waits.
+            out.answers.insert(i, q.recommended.clone());
+            out.answers_touched.insert(i, false);
+            continue;
+        }
+        let found = instruction && !r.value.is_empty();
+        if found && used.get(&id) == Some(&true) {
+            out.answers.insert(i, r.value.clone());
+            continue;
+        }
+        if found && !used.contains_key(&id) {
+            out.offered.push(FoundValue {
+                id,
+                ask: q.question.clone(),
+                value: r.value.clone(),
+                r#where: r.r#where.clone(),
+                copy_from: None,
+                secret: false,
+            });
+        }
+        out.answers.insert(i, String::new());
+        let why = unsettled_why(&format!("your answer to: {}", q.question), a, &r.reply);
+        hold_once(&mut out, std::slice::from_ref(&q.step), &why);
+    }
+    out
+}
+
+/// The settled check with the read answers' holds (`withReadHolds`): each replaces Qanuvi's default hold of the same
+/// step; one the owner set stays theirs with that need added; a step held this way is no longer cleared.
+pub fn with_read_holds(settled: &SettledCheck, holds: &[Hold]) -> SettledCheck {
+    // The last one of a step counts, as a JavaScript Map built from the list keeps it.
+    let mine = |step: &str| {
+        holds
+            .iter()
+            .rev()
+            .find(|h| h.step == step)
+            .map(|h| h.why.clone())
+    };
+    let kept: Vec<Hold> = settled
+        .holds
+        .iter()
+        .filter(|h| h.by == HoldBy::You || mine(&h.step).is_none())
+        .map(|h| match mine(&h.step) {
+            Some(why) => Hold {
+                why: format!("{}; also {why}", h.why),
+                ..h.clone()
+            },
+            None => h.clone(),
+        })
+        .collect();
+    let mut all = kept.clone();
+    for h in holds {
+        if !kept.iter().any(|k| k.step == h.step) {
+            all.push(h.clone());
+        }
+    }
+    SettledCheck {
+        holds: all,
+        cleared: settled
+            .cleared
+            .iter()
+            .filter(|s| mine(s).is_none())
+            .cloned()
+            .collect(),
+        ..settled.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

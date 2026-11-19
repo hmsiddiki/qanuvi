@@ -206,6 +206,15 @@ const fns: Record<string, (...a: any[]) => unknown> = {
   recommendedRisk: preflight.recommendedRisk,
   decidedNote: preflight.decidedNote,
   settleCheck: (answer, a, at, r, rt) => preflight.settleCheck(preflight.parsePreflight(answer), a, at, r, rt),
+  secretNeedsReading: preflight.secretNeedsReading,
+  typedAnswers: (answer, s, a, at) => preflight.typedAnswers(preflight.parsePreflight(answer), s, a, at),
+  answersPrompt: preflight.answersPrompt,
+  parseAnswerReadings: preflight.parseAnswerReadings,
+  unsettledWhy: preflight.unsettledWhy,
+  readAnswers: (answer, s, a, at, readings, used, first) =>
+    preflight.readAnswers(preflight.parsePreflight(answer), s, a, at, readings, used, first),
+  withReadHolds: (answer, a, at, r, rt, holds) =>
+    preflight.withReadHolds(preflight.settleCheck(preflight.parsePreflight(answer), a, at, r, rt), holds),
   holdWording: planstate.holdWording,
   keepHolds: planstate.keepHolds,
   keepAnswer: planstate.keepAnswer,
@@ -261,6 +270,49 @@ const saved = {
 };
 
 // R1 part 2b: preflight, packet, planstate, housekeeping, planner, guidance.
+// p2: the check's answers read by meaning.
+const RA_CHECK = JSON.stringify({
+  secrets: [
+    { name: "DB_HOST", what: "Where the test database is", example: "localhost:3306", steps: ["2a"] },
+    { name: "DB_PASSWORD", what: "The test database password", steps: ["2a", "2b"] },
+    { name: "API_KEY", why: "The test key", steps: [] },
+    { name: "SHOP_KEY", steps: ["3"] },
+  ],
+  questions: [
+    { step: "4a", question: "Which currency format?", sort: "decide", recommended: "1,234.00" },
+    { step: "4b", question: "Which bank?", sort: "you" },
+    { step: "4c", question: "Which theme?", sort: "decide", recommended: "dark" },
+    { step: "", question: "Which colour?", sort: "you" },
+  ],
+});
+const RA_SECRETS = {
+  DB_HOST: " find the mysql address yourself ",
+  DB_PASSWORD: " hunter2 ",
+  API_KEY: "what is this?",
+  SHOP_KEY: "the same as qchmmart",
+};
+const RA_ANSWERS = { 0: "use the shop one", 1: "dont get it", 2: "you pick", 3: "blue please" };
+const RA_TOUCHED = { 0: true, 1: true, 2: true, 3: true };
+const RA_READ = (id: string, kind: string, more: Record<string, unknown> = {}) => ({
+  id,
+  kind,
+  value: "",
+  where: "",
+  copyFrom: null,
+  skip: false,
+  reply: "",
+  ...more,
+});
+const RA_READINGS = [
+  RA_READ("secret:DB_HOST", "instruction", { value: "localhost:3307", where: "config.php" }),
+  RA_READ("secret:API_KEY", "unclear", { reply: "It is the key from the test dashboard." }),
+  RA_READ("secret:SHOP_KEY", "instruction", { copyFrom: { project: "qchmmart", name: "SHOP_KEY" } }),
+  RA_READ("question:0", "instruction", { value: "$1,234.00", where: "shop settings" }),
+  RA_READ("question:1", "unclear", { reply: "Which bank the payments go to" }),
+  RA_READ("question:2", "instruction", { skip: true }),
+  RA_READ("question:3", "value", { value: "blue" }),
+];
+
 const PF_ANSWER =
   "Checked:\n" +
   JSON.stringify({
@@ -422,6 +474,77 @@ const cases: [string, unknown[]][] = [
     ],
   ],
   ["settleCheck", [PF_ANSWER, {}, {}, {}, {}]],
+  ["secretNeedsReading", ["hunter2"]],
+  ["secretNeedsReading", ["  x\u00a0y "]],
+  ["secretNeedsReading", ["a\u0085b"]],
+  ["typedAnswers", [RA_CHECK, RA_SECRETS, RA_ANSWERS, RA_TOUCHED]],
+  ["typedAnswers", [RA_CHECK, { DB_HOST: "x ".repeat(400) }, {}, {}]],
+  [
+    "answersPrompt",
+    [
+      "PLAN.md",
+      [
+        { id: "secret:DB_HOST", ask: "Where (DB_HOST)", example: "localhost", answer: 'use "the" same é\n' },
+        { id: "question:1", ask: "Bank?", example: "", answer: "dont get it" },
+      ],
+      { secrets: ["DB_USER", "X"], others: [{ name: "qchmmart", path: "E:/www/q", secrets: [] }] },
+    ],
+  ],
+  ["answersPrompt", ["P.md", [], { secrets: [], others: [] }]],
+  [
+    "parseAnswerReadings",
+    [
+      "Read: " +
+        JSON.stringify({
+          answers: [
+            { id: " secret:DB_HOST ", kind: "instruction", value: " localhost:3307 ", where: "config.php", skip: 1 },
+            { id: "secret:DB_HOST", kind: "value", value: "twice" },
+            { id: "question:1", kind: "unclear", reply: "A bank is…", where: "x", skip: true },
+            { id: "question:2", kind: "maybe" },
+            { id: "secret:SHOP_KEY", kind: "instruction", copyFrom: { project: "q", name: "" } },
+            { id: "secret:API_KEY", kind: "instruction", copyFrom: { project: "q", name: "K" }, skip: true },
+            { id: "other", kind: "value" },
+            [1],
+            null,
+          ],
+        }),
+      ["secret:DB_HOST", "question:1", "question:2", "secret:SHOP_KEY", "secret:API_KEY"],
+    ],
+  ],
+  ["parseAnswerReadings", ['{"answers": {"a": 1}}', ["a"]]],
+  ["parseAnswerReadings", ["} {", ["a"]]],
+  ["unsettledWhy", ["X (A)", "what?", "It is the key. \n"]],
+  ["unsettledWhy", ["X (A)", "é".repeat(200), ""]],
+  ["readAnswers", [RA_CHECK, RA_SECRETS, RA_ANSWERS, RA_TOUCHED, RA_READINGS, {}, "1"]],
+  [
+    "readAnswers",
+    [
+      RA_CHECK,
+      RA_SECRETS,
+      RA_ANSWERS,
+      RA_TOUCHED,
+      RA_READINGS,
+      { "secret:DB_HOST": true, "secret:SHOP_KEY": true, "question:0": true },
+      "1",
+    ],
+  ],
+  ["readAnswers", [RA_CHECK, RA_SECRETS, RA_ANSWERS, RA_TOUCHED, RA_READINGS, { "secret:DB_HOST": false }, ""]],
+  ["readAnswers", [RA_CHECK, RA_SECRETS, RA_ANSWERS, RA_TOUCHED, [], {}, "1"]],
+  [
+    "withReadHolds",
+    [
+      PF_ANSWER,
+      {},
+      {},
+      { 1: "wait" },
+      { 1: true },
+      [
+        { step: "1b", why: "it needs a bank", by: "default" },
+        { step: "1a", why: "first", by: "default" },
+        { step: "1a", why: "second", by: "default" },
+      ],
+    ],
+  ],
   ["holdWording", [{ why: "pushes", by: "you" }]],
   ["holdWording", [{ why: "a question", by: "default" }]],
   [

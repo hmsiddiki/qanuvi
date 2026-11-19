@@ -589,6 +589,9 @@ export const api = {
     setSecret: (projectId: string, name: string, value: string) =>
       invoke<void>("secrets_set", { projectId, name, value }),
     removeSecret: (projectId: string, name: string) => invoke<void>("secrets_remove", { projectId, name }),
+    /** p2: another project's secret saved under `name` here; the value stays in the core. */
+    copySecret: (projectId: string, name: string, fromProjectId: string, fromName: string) =>
+      invoke<void>("secrets_copy", { projectId, name, fromProjectId, fromName }),
     /** Private details given during a plan's run, kept for that plan in the credential store. */
     planPrivate: (projectId: string, file: string) => invoke<string[]>("plan_private", { projectId, file }),
     planPrivateAdd: (projectId: string, file: string, text: string) =>

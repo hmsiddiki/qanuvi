@@ -850,7 +850,20 @@ runs on or off; with it off nothing is sent anywhere.
       case gets a runner scenario first (as R2 rule).
     Then: drive p1 + p2 + n2 + 24q(a) + the Project settings scroll in a test build on a scratch project, then 0.1.28
     (publish asks the owner first). Then 24n or 24y (owner picks).
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 02:15): p1 fixed 67fb643, 24q(a) 8654849, nothing
+    p2 BUILT 2026-11-20 (not driven live): at Start the check's typed answers are read by meaning in ONE short
+    read-only call (preflight.ts typedAnswers/answersPrompt/parseAnswerReadings/readAnswers/withReadHolds, Rust port
+    in preflight.rs, compare.json cases). The same call also carries out an instruction (finds the value in the
+    project's docs/config or names another project's known secret: copied in the core by the new secrets_copy, the
+    value never reaches the window or a model). Found values show under "Qanuvi read your answers" with Use this / No
+    (a found secret shows only its first two characters); Start again goes on. Unclear answers, not-found
+    instructions and No are not saved: the step that needs it is held (its Inbox question says what was asked, what
+    the owner wrote and the plain answer to their question back); a secret naming no step holds the run's first step.
+    "You decide" on a choice takes the recommended answer. PRIVACY RULE: a secret box answer in one piece without
+    spaces is the value itself, saved as typed and never sent to any model (so a password never lands in a session
+    record); only sentences are read. If the reading call fails: sentences in secret boxes are held, typed choices
+    stand as before. Not yet: an Inbox answer to such a hold is told to the step as text, not saved as a secret (n2
+    or later).
+    PICKUP POINT (before, 2026-11-20 02:15): p1 fixed 67fb643, 24q(a) 8654849, nothing
     published after 0.1.27. Next: build p2, then n2 (AGREED NEXT above), each driven live on a scratch project.
     PICKUP POINT (before, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:
     the owner's install updating to 0.1.27 (then check it); then ask the owner what comes next (24v stays LATER, owner

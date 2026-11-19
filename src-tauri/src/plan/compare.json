@@ -453,6 +453,886 @@
   }
  },
  {
+  "fn": "secretNeedsReading",
+  "args": [
+   "hunter2"
+  ],
+  "out": false
+ },
+ {
+  "fn": "secretNeedsReading",
+  "args": [
+   "  x y "
+  ],
+  "out": true
+ },
+ {
+  "fn": "secretNeedsReading",
+  "args": [
+   "ab"
+  ],
+  "out": false
+ },
+ {
+  "fn": "typedAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": " find the mysql address yourself ",
+    "DB_PASSWORD": " hunter2 ",
+    "API_KEY": "what is this?",
+    "SHOP_KEY": "the same as qchmmart"
+   },
+   {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   }
+  ],
+  "out": [
+   {
+    "id": "secret:DB_HOST",
+    "ask": "Where the test database is (DB_HOST)",
+    "example": "localhost:3306",
+    "answer": "find the mysql address yourself"
+   },
+   {
+    "id": "secret:API_KEY",
+    "ask": "The test key (API_KEY)",
+    "example": "",
+    "answer": "what is this?"
+   },
+   {
+    "id": "secret:SHOP_KEY",
+    "ask": "SHOP_KEY (SHOP_KEY)",
+    "example": "",
+    "answer": "the same as qchmmart"
+   },
+   {
+    "id": "question:0",
+    "ask": "Which currency format?",
+    "example": "1,234.00",
+    "answer": "use the shop one"
+   },
+   {
+    "id": "question:1",
+    "ask": "Which bank?",
+    "example": "",
+    "answer": "dont get it"
+   },
+   {
+    "id": "question:2",
+    "ask": "Which theme?",
+    "example": "dark",
+    "answer": "you pick"
+   },
+   {
+    "id": "question:3",
+    "ask": "Which colour?",
+    "example": "",
+    "answer": "blue please"
+   }
+  ]
+ },
+ {
+  "fn": "typedAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x "
+   },
+   {},
+   {}
+  ],
+  "out": [
+   {
+    "id": "secret:DB_HOST",
+    "ask": "Where the test database is (DB_HOST)",
+    "example": "localhost:3306",
+    "answer": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x…"
+   }
+  ]
+ },
+ {
+  "fn": "answersPrompt",
+  "args": [
+   "PLAN.md",
+   [
+    {
+     "id": "secret:DB_HOST",
+     "ask": "Where (DB_HOST)",
+     "example": "localhost",
+     "answer": "use \"the\" same é\n"
+    },
+    {
+     "id": "question:1",
+     "ask": "Bank?",
+     "example": "",
+     "answer": "dont get it"
+    }
+   ],
+   {
+    "secrets": [
+     "DB_USER",
+     "X"
+    ],
+    "others": [
+     {
+      "name": "qchmmart",
+      "path": "E:/www/q",
+      "secrets": []
+     }
+    ]
+   }
+  ],
+  "out": "Before a run of PLAN.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\nChange nothing. Never guess a password.\n\nKnown secrets of this project (names only): DB_USER, X\nOther projects on this machine (their secrets, names only):\n- qchmmart (E:/www/q): none\n\nAnswers:\n- id: secret:DB_HOST\n  asked: Where (DB_HOST)\n  example: localhost\n  answer: \"use \\\"the\\\" same é\\n\"\n- id: question:1\n  asked: Bank?\n  answer: \"dont get it\"\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
+ },
+ {
+  "fn": "answersPrompt",
+  "args": [
+   "P.md",
+   [],
+   {
+    "secrets": [],
+    "others": []
+   }
+  ],
+  "out": "Before a run of P.md, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,\nspelling or language, short or long), never word by word, and sort it:\n- \"value\": the answer itself (an address, a user name, a choice). Put it in value, without words around it\n  (\"it is localhost:3306\" gives \"localhost:3306\").\n- \"instruction\": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another\n  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's\n  docs, config and example files, or the other projects below): put what you found in value and the file or\n  place in where. When it is a known secret of another project, give copyFrom with that project's name and the\n  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.\n  Found nothing: value empty, and reply says in one sentence where you looked.\n- \"unclear\": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked\n  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.\nChange nothing. Never guess a password.\n\nKnown secrets of this project (names only): none\nOther projects on this machine (their secrets, names only):\n- none\n\nAnswers:\n\nAnswer with JSON only, one entry per id:\n{\"answers\":[{\"id\":\"secret:DB_HOST\",\"kind\":\"instruction\",\"value\":\"localhost:3306\",\"where\":\"config.php\",\"copyFrom\":null,\"skip\":false,\"reply\":\"\"}]}"
+ },
+ {
+  "fn": "parseAnswerReadings",
+  "args": [
+   "Read: {\"answers\":[{\"id\":\" secret:DB_HOST \",\"kind\":\"instruction\",\"value\":\" localhost:3307 \",\"where\":\"config.php\",\"skip\":1},{\"id\":\"secret:DB_HOST\",\"kind\":\"value\",\"value\":\"twice\"},{\"id\":\"question:1\",\"kind\":\"unclear\",\"reply\":\"A bank is…\",\"where\":\"x\",\"skip\":true},{\"id\":\"question:2\",\"kind\":\"maybe\"},{\"id\":\"secret:SHOP_KEY\",\"kind\":\"instruction\",\"copyFrom\":{\"project\":\"q\",\"name\":\"\"}},{\"id\":\"secret:API_KEY\",\"kind\":\"instruction\",\"copyFrom\":{\"project\":\"q\",\"name\":\"K\"},\"skip\":true},{\"id\":\"other\",\"kind\":\"value\"},[1],null]}",
+   [
+    "secret:DB_HOST",
+    "question:1",
+    "question:2",
+    "secret:SHOP_KEY",
+    "secret:API_KEY"
+   ]
+  ],
+  "out": [
+   {
+    "id": "secret:DB_HOST",
+    "kind": "instruction",
+    "value": "localhost:3307",
+    "where": "config.php",
+    "copyFrom": null,
+    "skip": false,
+    "reply": ""
+   },
+   {
+    "id": "question:1",
+    "kind": "unclear",
+    "value": "",
+    "where": "",
+    "copyFrom": null,
+    "skip": false,
+    "reply": "A bank is…"
+   },
+   {
+    "id": "secret:SHOP_KEY",
+    "kind": "instruction",
+    "value": "",
+    "where": "",
+    "copyFrom": null,
+    "skip": false,
+    "reply": ""
+   },
+   {
+    "id": "secret:API_KEY",
+    "kind": "instruction",
+    "value": "",
+    "where": "",
+    "copyFrom": {
+     "project": "q",
+     "name": "K"
+    },
+    "skip": true,
+    "reply": ""
+   }
+  ]
+ },
+ {
+  "fn": "parseAnswerReadings",
+  "args": [
+   "{\"answers\": {\"a\": 1}}",
+   [
+    "a"
+   ]
+  ],
+  "out": []
+ },
+ {
+  "fn": "parseAnswerReadings",
+  "args": [
+   "} {",
+   [
+    "a"
+   ]
+  ],
+  "out": []
+ },
+ {
+  "fn": "unsettledWhy",
+  "args": [
+   "X (A)",
+   "what?",
+   "It is the key. \n"
+  ],
+  "out": "it needs X (A). Before the run you wrote \"what?\"; It is the key. Answer here with the value, or say where Qanuvi can find it"
+ },
+ {
+  "fn": "unsettledWhy",
+  "args": [
+   "X (A)",
+   "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   ""
+  ],
+  "out": "it needs X (A). Before the run you wrote \"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…\". Answer here with the value, or say where Qanuvi can find it"
+ },
+ {
+  "fn": "readAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": " find the mysql address yourself ",
+    "DB_PASSWORD": " hunter2 ",
+    "API_KEY": "what is this?",
+    "SHOP_KEY": "the same as qchmmart"
+   },
+   {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   },
+   [
+    {
+     "id": "secret:DB_HOST",
+     "kind": "instruction",
+     "value": "localhost:3307",
+     "where": "config.php",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "secret:API_KEY",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "It is the key from the test dashboard."
+    },
+    {
+     "id": "secret:SHOP_KEY",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": {
+      "project": "qchmmart",
+      "name": "SHOP_KEY"
+     },
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:0",
+     "kind": "instruction",
+     "value": "$1,234.00",
+     "where": "shop settings",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:1",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "Which bank the payments go to"
+    },
+    {
+     "id": "question:2",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": true,
+     "reply": ""
+    },
+    {
+     "id": "question:3",
+     "kind": "value",
+     "value": "blue",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    }
+   ],
+   {},
+   "1"
+  ],
+  "out": {
+   "save": [
+    {
+     "name": "DB_PASSWORD",
+     "value": "hunter2"
+    }
+   ],
+   "copy": [],
+   "answers": {
+    "0": "",
+    "1": "",
+    "2": "dark",
+    "3": "blue"
+   },
+   "answersTouched": {
+    "0": true,
+    "1": true,
+    "2": false,
+    "3": true
+   },
+   "holds": [
+    {
+     "step": "2a",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "1",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "3",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4a",
+     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4b",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    }
+   ],
+   "offered": [
+    {
+     "id": "secret:DB_HOST",
+     "ask": "Where the test database is (DB_HOST)",
+     "value": "localhost:3307",
+     "where": "config.php",
+     "copyFrom": null,
+     "secret": true
+    },
+    {
+     "id": "secret:SHOP_KEY",
+     "ask": "SHOP_KEY (SHOP_KEY)",
+     "value": "",
+     "where": "",
+     "copyFrom": {
+      "project": "qchmmart",
+      "name": "SHOP_KEY"
+     },
+     "secret": true
+    },
+    {
+     "id": "question:0",
+     "ask": "Which currency format?",
+     "value": "$1,234.00",
+     "where": "shop settings",
+     "copyFrom": null,
+     "secret": false
+    }
+   ]
+  }
+ },
+ {
+  "fn": "readAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": " find the mysql address yourself ",
+    "DB_PASSWORD": " hunter2 ",
+    "API_KEY": "what is this?",
+    "SHOP_KEY": "the same as qchmmart"
+   },
+   {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   },
+   [
+    {
+     "id": "secret:DB_HOST",
+     "kind": "instruction",
+     "value": "localhost:3307",
+     "where": "config.php",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "secret:API_KEY",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "It is the key from the test dashboard."
+    },
+    {
+     "id": "secret:SHOP_KEY",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": {
+      "project": "qchmmart",
+      "name": "SHOP_KEY"
+     },
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:0",
+     "kind": "instruction",
+     "value": "$1,234.00",
+     "where": "shop settings",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:1",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "Which bank the payments go to"
+    },
+    {
+     "id": "question:2",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": true,
+     "reply": ""
+    },
+    {
+     "id": "question:3",
+     "kind": "value",
+     "value": "blue",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    }
+   ],
+   {
+    "secret:DB_HOST": true,
+    "secret:SHOP_KEY": true,
+    "question:0": true
+   },
+   "1"
+  ],
+  "out": {
+   "save": [
+    {
+     "name": "DB_HOST",
+     "value": "localhost:3307"
+    },
+    {
+     "name": "DB_PASSWORD",
+     "value": "hunter2"
+    }
+   ],
+   "copy": [
+    {
+     "name": "SHOP_KEY",
+     "project": "qchmmart",
+     "from": "SHOP_KEY"
+    }
+   ],
+   "answers": {
+    "0": "$1,234.00",
+    "1": "",
+    "2": "dark",
+    "3": "blue"
+   },
+   "answersTouched": {
+    "0": true,
+    "1": true,
+    "2": false,
+    "3": true
+   },
+   "holds": [
+    {
+     "step": "1",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\"; It is the key from the test dashboard. Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4b",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    }
+   ],
+   "offered": []
+  }
+ },
+ {
+  "fn": "readAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": " find the mysql address yourself ",
+    "DB_PASSWORD": " hunter2 ",
+    "API_KEY": "what is this?",
+    "SHOP_KEY": "the same as qchmmart"
+   },
+   {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   },
+   [
+    {
+     "id": "secret:DB_HOST",
+     "kind": "instruction",
+     "value": "localhost:3307",
+     "where": "config.php",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "secret:API_KEY",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "It is the key from the test dashboard."
+    },
+    {
+     "id": "secret:SHOP_KEY",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": {
+      "project": "qchmmart",
+      "name": "SHOP_KEY"
+     },
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:0",
+     "kind": "instruction",
+     "value": "$1,234.00",
+     "where": "shop settings",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    },
+    {
+     "id": "question:1",
+     "kind": "unclear",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": "Which bank the payments go to"
+    },
+    {
+     "id": "question:2",
+     "kind": "instruction",
+     "value": "",
+     "where": "",
+     "copyFrom": null,
+     "skip": true,
+     "reply": ""
+    },
+    {
+     "id": "question:3",
+     "kind": "value",
+     "value": "blue",
+     "where": "",
+     "copyFrom": null,
+     "skip": false,
+     "reply": ""
+    }
+   ],
+   {
+    "secret:DB_HOST": false
+   },
+   ""
+  ],
+  "out": {
+   "save": [
+    {
+     "name": "DB_PASSWORD",
+     "value": "hunter2"
+    }
+   ],
+   "copy": [],
+   "answers": {
+    "0": "",
+    "1": "",
+    "2": "dark",
+    "3": "blue"
+   },
+   "answersTouched": {
+    "0": true,
+    "1": true,
+    "2": false,
+    "3": true
+   },
+   "holds": [
+    {
+     "step": "2a",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "3",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4a",
+     "why": "it needs your answer to: Which currency format?. Before the run you wrote \"use the shop one\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "4b",
+     "why": "it needs your answer to: Which bank?. Before the run you wrote \"dont get it\"; Which bank the payments go to. Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    }
+   ],
+   "offered": [
+    {
+     "id": "secret:SHOP_KEY",
+     "ask": "SHOP_KEY (SHOP_KEY)",
+     "value": "",
+     "where": "",
+     "copyFrom": {
+      "project": "qchmmart",
+      "name": "SHOP_KEY"
+     },
+     "secret": true
+    },
+    {
+     "id": "question:0",
+     "ask": "Which currency format?",
+     "value": "$1,234.00",
+     "where": "shop settings",
+     "copyFrom": null,
+     "secret": false
+    }
+   ]
+  }
+ },
+ {
+  "fn": "readAnswers",
+  "args": [
+   "{\"secrets\":[{\"name\":\"DB_HOST\",\"what\":\"Where the test database is\",\"example\":\"localhost:3306\",\"steps\":[\"2a\"]},{\"name\":\"DB_PASSWORD\",\"what\":\"The test database password\",\"steps\":[\"2a\",\"2b\"]},{\"name\":\"API_KEY\",\"why\":\"The test key\",\"steps\":[]},{\"name\":\"SHOP_KEY\",\"steps\":[\"3\"]}],\"questions\":[{\"step\":\"4a\",\"question\":\"Which currency format?\",\"sort\":\"decide\",\"recommended\":\"1,234.00\"},{\"step\":\"4b\",\"question\":\"Which bank?\",\"sort\":\"you\"},{\"step\":\"4c\",\"question\":\"Which theme?\",\"sort\":\"decide\",\"recommended\":\"dark\"},{\"step\":\"\",\"question\":\"Which colour?\",\"sort\":\"you\"}]}",
+   {
+    "DB_HOST": " find the mysql address yourself ",
+    "DB_PASSWORD": " hunter2 ",
+    "API_KEY": "what is this?",
+    "SHOP_KEY": "the same as qchmmart"
+   },
+   {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   },
+   [],
+   {},
+   "1"
+  ],
+  "out": {
+   "save": [
+    {
+     "name": "DB_PASSWORD",
+     "value": "hunter2"
+    }
+   ],
+   "copy": [],
+   "answers": {
+    "0": "use the shop one",
+    "1": "dont get it",
+    "2": "you pick",
+    "3": "blue please"
+   },
+   "answersTouched": {
+    "0": true,
+    "1": true,
+    "2": true,
+    "3": true
+   },
+   "holds": [
+    {
+     "step": "2a",
+     "why": "it needs Where the test database is (DB_HOST). Before the run you wrote \"find the mysql address yourself\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "1",
+     "why": "it needs The test key (API_KEY). Before the run you wrote \"what is this?\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    },
+    {
+     "step": "3",
+     "why": "it needs SHOP_KEY (SHOP_KEY). Before the run you wrote \"the same as qchmmart\". Answer here with the value, or say where Qanuvi can find it",
+     "by": "default"
+    }
+   ],
+   "offered": []
+  }
+ },
+ {
+  "fn": "withReadHolds",
+  "args": [
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   {},
+   {},
+   {
+    "1": "wait"
+   },
+   {
+    "1": true
+   },
+   [
+    {
+     "step": "1b",
+     "why": "it needs a bank",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "first",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "second",
+     "by": "default"
+    }
+   ]
+  ],
+  "out": {
+   "holds": [
+    {
+     "step": "1d",
+     "why": "a question was left open (Format?)",
+     "by": "default"
+    },
+    {
+     "step": "1e",
+     "why": "a question was left open (Column?)",
+     "by": "default"
+    },
+    {
+     "step": "1f",
+     "why": "a question was left open (Bank login?)",
+     "by": "default"
+    },
+    {
+     "step": "2b",
+     "why": "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww…",
+     "by": "you"
+    },
+    {
+     "step": "1b",
+     "why": "it needs a bank",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "first",
+     "by": "default"
+    },
+    {
+     "step": "1a",
+     "why": "second",
+     "by": "default"
+    }
+   ],
+   "cleared": [
+    "2a",
+    "2c"
+   ],
+   "notes": [],
+   "decided": [
+    {
+     "step": "2a",
+     "what": "migrates",
+     "answer": "go ahead with extra checks",
+     "because": "test db"
+    },
+    {
+     "step": "2c",
+     "what": "clears cache",
+     "answer": "go ahead",
+     "because": ""
+    }
+   ],
+   "extraChecks": [
+    {
+     "step": "2a",
+     "why": "migrates"
+    }
+   ]
+  }
+ },
+ {
   "fn": "holdWording",
   "args": [
    {

@@ -270,3 +270,288 @@ export function settleCheck(
   out.cleared = out.cleared.filter((s) => !out.holds.some((h) => h.step === s));
   return out;
 }
+
+/**
+ * p2 (owner, 2026-11-20): the check's answers are read by meaning before anything is saved. One short call reads
+ * them all together and sorts each: a value (saved as now), an instruction ("find it yourself", "skip", "use the same
+ * as qchmmart": tried at once, read-only, and what was found is shown for a one-click yes) or unclear / a question back
+ * (not saved: the run starts anyway, the step that needs it waits and asks in the Inbox, the others go on).
+ */
+export interface TypedAnswer {
+  /** "secret:NAME" or "question:<index>". */
+  id: string;
+  /** What was asked, in plain words. */
+  ask: string;
+  example: string;
+  answer: string;
+}
+
+export type ReadingKind = "value" | "instruction" | "unclear";
+
+export interface AnswerReading {
+  id: string;
+  kind: ReadingKind;
+  /** A value: the value itself; an instruction: what Qanuvi found (empty when nothing). */
+  value: string;
+  /** Where an instruction's value was found. */
+  where: string;
+  /** The value is another project's known secret (copied by Qanuvi, never shown). */
+  copyFrom: { project: string; name: string } | null;
+  /** The owner said to leave it ("skip", "you decide"). */
+  skip: boolean;
+  /** For the owner: the plain answer to their question back, or where Qanuvi looked. */
+  reply: string;
+}
+
+/** A project the reader may look in for "the same as <project>" (names of its secrets only). */
+export interface OtherProject {
+  name: string;
+  path: string;
+  secrets: string[];
+}
+
+/**
+ * Whether a secret's typed answer is read by a model. One piece without spaces is the value itself and is saved as
+ * typed, so a password never reaches a model or a session's record; anything with spaces (a sentence: an instruction
+ * or a question back) is read.
+ */
+export function secretNeedsReading(typed: string): boolean {
+  return /\s/.test(typed.trim());
+}
+
+function secretAsk(s: PreflightSecret): string {
+  return `${s.what || s.why || s.name} (${s.name})`;
+}
+
+/** The answers the reading call reads: secrets with a sentence in them, and choices the owner typed or changed. */
+export function typedAnswers(
+  check: Preflight,
+  secretValues: Record<string, string>,
+  answers: Record<number, string>,
+  answersTouched: Record<number, boolean>,
+): TypedAnswer[] {
+  const out: TypedAnswer[] = [];
+  for (const s of check.secrets) {
+    const v = secretValues[s.name]?.trim() ?? "";
+    if (v && secretNeedsReading(v))
+      out.push({ id: `secret:${s.name}`, ask: secretAsk(s), example: s.example, answer: clipReason(v, 600) });
+  }
+  check.questions.forEach((q, i) => {
+    const a = answers[i]?.trim() ?? "";
+    if (a && answersTouched[i] && a !== q.recommended)
+      out.push({ id: `question:${i}`, ask: q.question, example: q.recommended, answer: clipReason(a, 600) });
+  });
+  return out;
+}
+
+export function answersPrompt(
+  file: string,
+  items: TypedAnswer[],
+  known: { secrets: string[]; others: OtherProject[] },
+): string {
+  const list = items.flatMap((x) => [
+    `- id: ${x.id}`,
+    `  asked: ${x.ask}`,
+    ...(x.example ? [`  example: ${x.example}`] : []),
+    `  answer: ${JSON.stringify(x.answer)}`,
+  ]);
+  const others = known.others.slice(0, 20).map((p) => `- ${p.name} (${p.path}): ${p.secrets.join(", ") || "none"}`);
+  return [
+    `Before a run of ${file}, Qanuvi asked the owner a few things. Read each answer by what it means (any wording,`,
+    "spelling or language, short or long), never word by word, and sort it:",
+    '- "value": the answer itself (an address, a user name, a choice). Put it in value, without words around it',
+    '  ("it is localhost:3306" gives "localhost:3306").',
+    '- "instruction": the owner tells Qanuvi what to do instead (find it, look somewhere, use the same as another',
+    "  project, leave it, you decide). Carry it out now, read-only and quick (a few looks at most: this project's",
+    "  docs, config and example files, or the other projects below): put what you found in value and the file or",
+    "  place in where. When it is a known secret of another project, give copyFrom with that project's name and the",
+    "  secret's name and leave value empty (Qanuvi copies it; you never see it). Leave it or you decide: skip true.",
+    "  Found nothing: value empty, and reply says in one sentence where you looked.",
+    '- "unclear": the owner asks back, is unsure, or you cannot tell what they mean. In reply, answer what they asked',
+    "  in one or two plain sentences with an example, for someone who does not know code; it is asked again later.",
+    "Change nothing. Never guess a password.",
+    "",
+    `Known secrets of this project (names only): ${known.secrets.join(", ") || "none"}`,
+    "Other projects on this machine (their secrets, names only):",
+    ...(others.length ? others : ["- none"]),
+    "",
+    "Answers:",
+    ...list,
+    "",
+    "Answer with JSON only, one entry per id:",
+    '{"answers":[{"id":"secret:DB_HOST","kind":"instruction","value":"localhost:3306","where":"config.php","copyFrom":null,"skip":false,"reply":""}]}',
+  ].join("\n");
+}
+
+/** Reads the reading call's answer: one reading per known id; anything unreadable is left out. */
+export function parseAnswerReadings(text: string, ids: string[]): AnswerReading[] {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return [];
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  if (!raw || typeof raw !== "object") return [];
+  const str = (v: unknown) => (typeof v === "string" ? clipReason(v.trim()) : "");
+  const list = Array.isArray(raw.answers)
+    ? (raw.answers as Record<string, unknown>[]).filter((x) => x && typeof x === "object" && !Array.isArray(x))
+    : [];
+  const out: AnswerReading[] = [];
+  for (const r of list) {
+    const id = str(r.id);
+    if (!ids.includes(id) || out.some((o) => o.id === id)) continue;
+    const kind = r.kind === "value" || r.kind === "instruction" || r.kind === "unclear" ? r.kind : null;
+    if (!kind) continue;
+    const c = r.copyFrom as Record<string, unknown> | null | undefined;
+    const copyFrom =
+      kind === "instruction" && c && typeof c === "object" && !Array.isArray(c) && str(c.project) && str(c.name)
+        ? { project: str(c.project), name: str(c.name) }
+        : null;
+    out.push({
+      id,
+      kind,
+      value: str(r.value),
+      where: kind === "instruction" ? str(r.where) : "",
+      copyFrom,
+      skip: kind === "instruction" && r.skip === true,
+      reply: str(r.reply),
+    });
+  }
+  return out;
+}
+
+/** What Qanuvi found for an instruction, offered for a one-click yes. */
+export interface FoundValue {
+  id: string;
+  /** What it is for (the ask). */
+  ask: string;
+  value: string;
+  where: string;
+  copyFrom: { project: string; name: string } | null;
+  /** A secret: the value is never shown in full. */
+  secret: boolean;
+}
+
+/** What the read answers come to: secrets to save or copy, the choices' answers, holds, and found values to offer. */
+export interface ReadAnswers {
+  save: { name: string; value: string }[];
+  copy: { name: string; project: string; from: string }[];
+  answers: Record<number, string>;
+  answersTouched: Record<number, boolean>;
+  /** Steps that wait (their question goes to the Inbox), replacing the check's default hold of the same step. */
+  holds: { step: string; why: string; by: "default" }[];
+  /** Found by an instruction and not yet said yes or no to. */
+  offered: FoundValue[];
+}
+
+/** The hold's question for an answer that did not give what was needed: it stands on its own in the Inbox. */
+export function unsettledWhy(ask: string, typed: string, reply: string): string {
+  const said = clipReason(typed, 120);
+  const more = reply.replace(/[.\s]+$/, "");
+  return `it needs ${ask}. Before the run you wrote "${said}"${more ? `; ${more}` : ""}. Answer here with the value, or say where Qanuvi can find it`;
+}
+
+/**
+ * Applies the readings to the form. `used`: the owner's yes (true) or no (false) to each offered found value; one
+ * not answered yet is offered (and counts as no if the run starts anyway). A secret's sentence with no reading (the
+ * call failed) is not saved: its step waits and asks. `firstStep` is held for a secret that names no step.
+ */
+export function readAnswers(
+  check: Preflight,
+  secretValues: Record<string, string>,
+  answers: Record<number, string>,
+  answersTouched: Record<number, boolean>,
+  readings: AnswerReading[],
+  used: Record<string, boolean>,
+  firstStep: string,
+): ReadAnswers {
+  const out: ReadAnswers = {
+    save: [],
+    copy: [],
+    answers: { ...answers },
+    answersTouched: { ...answersTouched },
+    holds: [],
+    offered: [],
+  };
+  const reading = (id: string) => readings.find((r) => r.id === id);
+  const hold = (steps: string[], why: string) => {
+    for (const step of steps)
+      if (step && !out.holds.some((h) => h.step === step)) out.holds.push({ step, why, by: "default" });
+  };
+  for (const s of check.secrets) {
+    const v = secretValues[s.name]?.trim() ?? "";
+    if (!v) continue;
+    if (!secretNeedsReading(v)) {
+      out.save.push({ name: s.name, value: v });
+      continue;
+    }
+    const id = `secret:${s.name}`;
+    const r = reading(id);
+    const steps = s.steps.length ? s.steps : [firstStep];
+    const ask = secretAsk(s);
+    if (r?.kind === "value") out.save.push({ name: s.name, value: r.value || v });
+    else if (r?.kind === "instruction" && r.skip) continue;
+    else if (r?.kind === "instruction" && (r.value || r.copyFrom)) {
+      if (used[id] === true) {
+        if (r.copyFrom) out.copy.push({ name: s.name, project: r.copyFrom.project, from: r.copyFrom.name });
+        else out.save.push({ name: s.name, value: r.value });
+      } else {
+        if (used[id] === undefined)
+          out.offered.push({ id, ask, value: r.value, where: r.where, copyFrom: r.copyFrom, secret: true });
+        hold(steps, unsettledWhy(ask, v, r.reply));
+      }
+    } else hold(steps, unsettledWhy(ask, v, r?.reply ?? ""));
+  }
+  check.questions.forEach((q, i) => {
+    const a = answers[i]?.trim() ?? "";
+    const id = `question:${i}`;
+    if (!a || !answersTouched[i] || a === q.recommended) return;
+    const r = reading(id);
+    // A typed choice with no reading stays the owner's answer, as before.
+    if (!r) return;
+    if (r.kind === "value") {
+      out.answers[i] = r.value || a;
+      return;
+    }
+    if (r.kind === "instruction" && r.skip) {
+      // "You decide": the recommended answer, as Qanuvi's own choice; with none, the step waits.
+      out.answers[i] = q.recommended;
+      out.answersTouched[i] = false;
+      return;
+    }
+    if (r.kind === "instruction" && r.value && used[id] === true) {
+      out.answers[i] = r.value;
+      return;
+    }
+    if (r.kind === "instruction" && r.value && used[id] === undefined)
+      out.offered.push({ id, ask: q.question, value: r.value, where: r.where, copyFrom: null, secret: false });
+    out.answers[i] = "";
+    hold([q.step], unsettledWhy(`your answer to: ${q.question}`, a, r.reply));
+  });
+  return out;
+}
+
+/**
+ * The settled check with the read answers' holds: each replaces Qanuvi's default hold of the same step (its wording
+ * says what the owner wrote and what is needed); one the owner set stays theirs and gets that need added. A step held
+ * this way is no longer cleared.
+ */
+export function withReadHolds(settled: SettledCheck, holds: ReadAnswers["holds"]): SettledCheck {
+  const mine = new Map(holds.map((h) => [h.step, h.why]));
+  const kept = settled.holds
+    .filter((h) => h.by === "you" || !mine.has(h.step))
+    .map((h) => (mine.has(h.step) ? { ...h, why: `${h.why}; also ${mine.get(h.step)}` } : h));
+  return {
+    ...settled,
+    holds: [...kept, ...holds.filter((h) => !kept.some((k) => k.step === h.step))],
+    cleared: settled.cleared.filter((s) => !mine.has(s)),
+  };
+}
+
+/** A found secret as shown for the yes: its start only, never the whole value. */
+export function maskedValue(v: string): string {
+  return v.length <= 4 ? "•".repeat(v.length) : `${v.slice(0, 2)}${"•".repeat(Math.min(8, v.length - 2))}`;
+}

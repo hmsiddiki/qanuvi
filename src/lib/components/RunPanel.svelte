@@ -44,12 +44,20 @@
     type KeptHold,
   } from "$lib/plan/planstate";
   import {
+    answersPrompt,
     decidedNote,
+    maskedValue,
+    parseAnswerReadings,
     parsePreflight,
     preflightPrompt,
+    readAnswers,
     recommendedRisk,
     settleCheck,
+    typedAnswers,
+    withReadHolds,
+    type AnswerReading,
     type AskSort,
+    type OtherProject,
     type Preflight,
     type RiskChoice,
   } from "$lib/plan/preflight";
@@ -362,6 +370,77 @@
   let riskyChoice = $state<Record<number, RiskChoice>>({});
   /** Risky steps whose choice the owner set (a hold left at the default is Qanuvi's, not theirs). */
   let riskyTouched = $state<Record<number, boolean>>({});
+  /** p2: the typed answers read by meaning (null: not read yet, or changed since). */
+  let readings = $state<AnswerReading[] | null>(null);
+  let readingAnswers = $state(false);
+  /** The owner's yes or no to each value Qanuvi found for an instruction. */
+  let used = $state<Record<string, boolean>>({});
+  /** The other projects the reading could look in (kept for copying a secret from one by name). */
+  let otherProjects: (OtherProject & { id: string })[] = [];
+
+  /** The run's first step key (a secret that names no step holds it). */
+  function firstStepKey(): string {
+    const s = coveredSteps()[0];
+    return s ? (s.number ?? s.title) : "";
+  }
+  /** What the read answers come to now (found values to offer, steps that will wait). */
+  let readNow = $derived(
+    check && readings
+      ? readAnswers(check, secretValues, answers, answersTouched, readings, used, firstStepKey())
+      : null,
+  );
+  /** Every found value, said yes or no to or not yet (the buttons stay to change one's mind). */
+  let foundList = $derived(
+    check && readings
+      ? readAnswers(check, secretValues, answers, answersTouched, readings, {}, firstStepKey()).offered
+      : [],
+  );
+  /** An answer changed: it is read again at Start. */
+  function answerChanged() {
+    readings = null;
+    used = {};
+  }
+
+  /** p2: one short read-only call reads the typed answers together (and tries what an instruction asks). */
+  async function readTyped(c: Preflight): Promise<AnswerReading[]> {
+    const items = typedAnswers(c, secretValues, answers, answersTouched);
+    if (!items.length) return [];
+    readingAnswers = true;
+    try {
+      const all = await api.projects.list().catch(() => [] as Project[]);
+      otherProjects = await Promise.all(
+        all
+          .filter((p) => p.id !== project.id)
+          .slice(0, 20)
+          .map(async (p) => ({
+            id: p.id,
+            name: p.name,
+            path: p.path,
+            secrets: await api.agent.secretNames(p.id).catch(() => [] as string[]),
+          })),
+      );
+      const known = {
+        secrets: await api.agent.secretNames(project.id).catch(() => [] as string[]),
+        others: otherProjects,
+      };
+      const r = await planner.ask(
+        project,
+        answersPrompt(file, items, known),
+        oneModel || settings.agent(provider.id).model || defaultPlannerModel(provider),
+        "Before the run: reading your answers",
+        { agentId: provider.id, lean: true, quiet: true },
+      );
+      return parseAnswerReadings(
+        r.text,
+        items.map((x) => x.id),
+      );
+    } catch {
+      // Nobody could read them: sentences in secret boxes are not saved (their steps wait and ask), choices stand.
+      return [];
+    } finally {
+      readingAnswers = false;
+    }
+  }
 
   /** The open steps the run would cover, for the check. */
   function coveredSteps() {
@@ -456,6 +535,7 @@
     answersTouched = all ? Object.fromEntries(c.questions.map((q, i) => [i, q.sort === "you"])) : {};
     riskyChoice = Object.fromEntries(c.risky.map((x, i) => [i, recommendedRisk(x.sort)]));
     riskyTouched = {};
+    answerChanged();
   }
 
   const SORT_LABEL: Record<AskSort, string> = {
@@ -468,12 +548,34 @@
   async function startChecked() {
     const c = check;
     if (!c) return go();
-    for (const s of c.secrets) {
-      const v = secretValues[s.name]?.trim();
-      if (v) await api.agent.setSecret(project.id, s.name, v).catch(() => {});
+    // p2: the answers are read by meaning first; what Qanuvi found for an instruction waits for the owner's yes.
+    const firstStep = firstStepKey();
+    if (readings === null) {
+      readings = await readTyped(c);
+      if (readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep).offered.length) return;
+    }
+    const read = readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep);
+    for (const s of read.save) await api.agent.setSecret(project.id, s.name, s.value).catch(() => {});
+    for (const x of read.copy) {
+      const from = otherProjects.find((p) => p.name.toLowerCase() === x.project.toLowerCase());
+      const done = from
+        ? await api.agent.copySecret(project.id, x.name, from.id, x.from).then(
+            () => true,
+            () => false,
+          )
+        : false;
+      if (!done)
+        read.holds.push({
+          step: c.secrets.find((s) => s.name === x.name)?.steps[0] || firstStep,
+          why: `it needs ${x.name}; Qanuvi could not copy ${x.from} from ${x.project}. Answer here with the value`,
+          by: "default",
+        });
     }
     // Sorted (24u part 3): Qanuvi's own choices, steps with extra checks, and holds only where the owner is needed.
-    const settled = settleCheck(c, answers, answersTouched, riskyChoice, riskyTouched);
+    const settled = withReadHolds(
+      settleCheck(c, read.answers, read.answersTouched, riskyChoice, riskyTouched),
+      read.holds.filter((h) => h.step),
+    );
     const notes = [...loadPlanNotes(project.id, file), ...settled.notes, ...settled.decided.map(decidedNote)];
     // Holds are kept per plan (24u part 2): a later run holds the same steps, saying who set each hold.
     const holds: Omit<KeptHold, "at">[] = settled.holds;
@@ -898,8 +1000,9 @@
         <strong>Before the run</strong>
         {#if check.secrets.length}
           <p class="hint">
-            Logins and keys the steps need. They are saved as this project's secrets; no model sees them. Leave one
-            empty to run without it.
+            Logins and keys the steps need. A value is saved as this project's secret; no model sees it. Leave one empty
+            to run without it. Not sure? Write a sentence instead (for example "find it in the config" or "the same as
+            in another project"): Qanuvi reads it and tries it.
           </p>
           {#each check.secrets as s (s.name)}
             <label class="secret">
@@ -915,6 +1018,7 @@
                 autocomplete="off"
                 placeholder={s.example ? `for example ${s.example}` : "value"}
                 bind:value={secretValues[s.name]}
+                oninput={answerChanged}
               />
             </label>
           {/each}
@@ -945,7 +1049,10 @@
                 type="text"
                 placeholder={q.recommended ? `recommended: ${q.recommended}` : "your answer"}
                 bind:value={answers[i]}
-                oninput={() => (answersTouched[i] = true)}
+                oninput={() => {
+                  answersTouched[i] = true;
+                  answerChanged();
+                }}
               /></label
             >
           {/each}
@@ -983,12 +1090,51 @@
               </li>{/each}
           </ul>
         {/if}
+        {#if readNow && (foundList.length || readNow.holds.length)}
+          <div class="read-answers">
+            <strong>Qanuvi read your answers</strong>
+            {#each foundList as f (f.id)}
+              <div class="row-input">
+                <span
+                  >{f.ask}:
+                  <strong
+                    >{f.copyFrom
+                      ? `the same as ${f.copyFrom.name} in ${f.copyFrom.project}`
+                      : f.secret
+                        ? maskedValue(f.value)
+                        : f.value}</strong
+                  >{#if f.where}<span class="dim"> · found in {f.where}</span>{/if}</span
+                >
+                <span class="choice">
+                  <button
+                    type="button"
+                    class:primary={used[f.id] === true}
+                    onclick={() => (used = { ...used, [f.id]: true })}>Use this</button
+                  >
+                  <button
+                    type="button"
+                    class:primary={used[f.id] === false}
+                    onclick={() => (used = { ...used, [f.id]: false })}>No</button
+                  >
+                </span>
+              </div>
+            {/each}
+            {#each readNow.holds.filter((h) => h.step) as h (h.step)}
+              <p class="dim small">
+                Step {h.step} waits and asks you in the Inbox when the run gets there (the other steps go on): {h.why}.
+              </p>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/if}
     <div class="row">
       <span class="spacer"></span>
-      <button type="submit" class="primary" disabled={openSteps.length === 0 || !!rangeError}
-        >{#if checking}<LoaderCircle size={13} class="spin" /> Checking…{:else}<Play size={13} />
+      <button type="submit" class="primary" disabled={openSteps.length === 0 || !!rangeError || readingAnswers}
+        >{#if checking}<LoaderCircle size={13} class="spin" /> Checking…{:else if readingAnswers}<LoaderCircle
+            size={13}
+            class="spin"
+          /> Reading your answers…{:else}<Play size={13} />
           {check ? "Start the run" : checkFirst ? "Check and start" : "Start"}{/if}</button
       >
     </div>
@@ -1481,6 +1627,16 @@
     padding: var(--qx-space-3);
     border: 1px solid color-mix(in srgb, var(--qx-accent) 40%, var(--qx-border));
     border-radius: var(--qx-radius-card);
+  }
+  .read-answers {
+    margin-top: var(--qx-space-3);
+    padding-top: var(--qx-space-2);
+    border-top: 1px solid var(--qx-border);
+  }
+  .read-answers .choice {
+    display: inline-flex;
+    gap: var(--qx-space-1);
+    flex-shrink: 0;
   }
 
   .row-input {
