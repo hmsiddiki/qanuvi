@@ -830,7 +830,29 @@ runs on or off; with it off nothing is sent anywhere.
     it"). Same aim as n1 (blocked-step questions that stand on their own). TS + Rust (comparison cases rewritten from
     the TS), tests added. Also: Project settings dialog never taller than the window, scrolls inside, Cancel/Save
     pinned at the bottom (owner could not reach Save). Not driven live yet.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:
+    AGREED NEXT (owner, 2026-11-20: "use the intelligence, handle it whether it is a question or the answer; keep it
+    simple for the runner; the Inbox has to be way smarter"):
+    - p2 (pre-run check reads its answers, kept simple): today a login/key box saves whatever is typed word for word as
+      the secret (an instruction like "find the mysql ..." would become the database address) and choice answers go
+      in as plan notes unread. Build: one short model call reads all the answers together and sorts each as a value
+      (saved as now), an instruction ("find it yourself", "skip", "use the same as qchmmart": Qanuvi tries it, e.g.
+      finds the address in the docs/config/known secrets, and shows what it found for a one-click yes) or unclear / a
+      question back ("what?", "dont get it"): not saved; the run starts anyway and that item becomes an Inbox question
+      for later, the step needing it waits, the others go on. No back-and-forth in the check itself.
+    - n2 (the Inbox talks like a person; builds on n1): today read_answer has a model reading (reading_prompt) that
+      only knows "I don't understand", and the no-model fallback hears a few fixed phrases (sounds_unsure). Build:
+      every reply read by meaning, never by phrase lists ("dont get it", "what?", "what do you mean??", "huh", any
+      language or spelling); sorted as an answer, a question back (answered plainly first, e.g. "what is a DSN?",
+      then the need asked again), or an instruction (done, the result shown for the owner's yes); when it cannot tell,
+      it asks again more plainly; when the owner is still stuck, it guides: one small question at a time, where to
+      find the thing (e.g. "open Wnmp, look at MySQL's port"), an example each time, and an offer to find it itself;
+      never the same wording twice. The whole talk is kept with the item so each round knows what was tried. Every
+      case gets a runner scenario first (as R2 rule).
+    Then: drive p1 + p2 + n2 + 24q(a) + the Project settings scroll in a test build on a scratch project, then 0.1.28
+    (publish asks the owner first). Then 24n or 24y (owner picks).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 02:15): p1 fixed 67fb643, 24q(a) 8654849, nothing
+    published after 0.1.27. Next: build p2, then n2 (AGREED NEXT above), each driven live on a scratch project.
+    PICKUP POINT (before, 2026-11-20 01:30): all M9 test state put back, VPS on 0.1.27. Next:
     the owner's install updating to 0.1.27 (then check it); then ask the owner what comes next (24v stays LATER, owner
     2026-11-20).
     PICKUP POINT (before, 2026-11-20 00:40): t1 + c1 DONE (both driven live), 0.1.27
