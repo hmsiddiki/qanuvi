@@ -9,6 +9,7 @@ import {
   rewindText,
   rowsToOpen,
   searchItems,
+  turnChanges,
 } from "./sessionTools";
 
 type Tool = Extract<Item, { kind: "tool" }>;
@@ -145,5 +146,42 @@ describe("search", () => {
   it("finds every place in a text", () => {
     expect(matchesIn("Aa aA", "aa")).toEqual([0, 3]);
     expect(matchesIn("abc", "")).toEqual([]);
+  });
+});
+
+describe("turnChanges (what changed, 24n)", () => {
+  const t = (id: string, file: string, over: object = {}): Item => ({
+    kind: "tool",
+    id,
+    name: "Edit",
+    summary: "",
+    file,
+    state: "done",
+    result: "",
+    input: "",
+    output: "",
+    edits: [{ old: "a\n", new: "b\nc\n" }],
+    ...over,
+  });
+  const done = (id: string): Item => ({ kind: "result", id, ok: true, seconds: 1, costUsd: 0, text: "" });
+  it("sums the changes per file for each task and leaves out failed steps and tasks without changes", () => {
+    const items: Item[] = [
+      { kind: "user", id: "u1", text: "go" },
+      t("1", "/p/a.js"),
+      t("2", "/p/a.js"),
+      t("3", "/p/b.js", { whole: true, edits: undefined }),
+      t("4", "/p/c.js", { state: "failed" }),
+      { kind: "user", id: "u2", text: "also this", during: true },
+      done("r1"),
+      { kind: "user", id: "u3", text: "next" },
+      t("5", "/p/a.js", { name: "Read", edits: undefined }),
+      done("r2"),
+    ];
+    const m = turnChanges(items);
+    expect(m.get("r1")).toEqual([
+      { file: "/p/a.js", added: 4, removed: 2, written: false },
+      { file: "/p/b.js", added: 0, removed: 0, written: true },
+    ]);
+    expect(m.has("r2")).toBe(false);
   });
 });

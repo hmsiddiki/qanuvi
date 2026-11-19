@@ -20,7 +20,15 @@
   import MentionPicker, { type Choice } from "./MentionPicker.svelte";
   import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
   import { revertEdits, type Edit } from "$lib/agent/diff";
-  import { matchesIn, laterChanges, rewindFrom, rewindText, rowsToOpen, searchItems } from "$lib/agent/sessionTools";
+  import {
+    matchesIn,
+    laterChanges,
+    rewindFrom,
+    rewindText,
+    rowsToOpen,
+    searchItems,
+    turnChanges,
+  } from "$lib/agent/sessionTools";
   import { tokensK } from "$lib/agent/handover";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Undo2 from "@lucide/svelte/icons/undo-2";
@@ -604,6 +612,8 @@
 
   /** Per step id: later steps that changed the same file (counted from the end, once per change of the list). */
   let laterById = $derived(laterChanges(agent.items));
+  /** What each finished task changed (24n): files with lines added and removed, under its end line. */
+  let changedBy = $derived(turnChanges(agent.items));
 
   // Edit and resend (24n part 6): the message as changed goes to a new session (a branch) that is told what was said
   // before it; the original session stays as it was. The file changes made from it on can be undone first.
@@ -1455,6 +1465,21 @@ With the agent now: a message it has cannot be taken back.`}
         <button type="button" class="to-auto" onclick={() => (agent.model = "auto")}>Switch to Auto</button>
       {/if}
     </div>
+    {@const changed = changedBy.get(item.id)}
+    {#if changed}
+      <div class="changed" aria-label="What changed">
+        <span class="dim">Changed {changed.length} file{changed.length === 1 ? "" : "s"}:</span>
+        {#each changed as c (c.file)}
+          <button type="button" class="link" title="Open {c.file}" onclick={() => openFile(c.file)}
+            >{(project && inProject(project.path, c.file)) ?? c.file}</button
+          >
+          {#if c.written && !c.added && !c.removed}<span class="dim">written</span>{:else}<span class="plus"
+              >+{c.added}</span
+            >
+            <span class="minus">−{c.removed}</span>{/if}
+        {/each}
+      </div>
+    {/if}
   {:else if item.kind === "notice" && item.note}
     <details class="handover-line">
       <summary>{item.text} · <span class="link">the note</span></summary>
@@ -2024,6 +2049,21 @@ With the agent now: a message it has cannot be taken back.`}
   .result {
     color: var(--qx-status-done);
     font-size: var(--qx-text-small);
+  }
+
+  .changed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    align-items: baseline;
+    margin-top: 2px;
+    font-size: var(--qx-text-small);
+  }
+  .changed .plus {
+    color: var(--qx-status-done);
+  }
+  .changed .minus {
+    color: var(--qx-status-failed);
   }
 
   .result.failed {

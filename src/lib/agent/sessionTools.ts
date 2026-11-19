@@ -6,7 +6,7 @@
  * was), so it works the same for every agent: Claude Code, Qanuvi's own and the free models.
  */
 import type { Item, Row } from "./events";
-import { revertEdits, type Edit } from "./diff";
+import { diffCounts, revertEdits, type Edit } from "./diff";
 
 type Tool = Extract<Item, { kind: "tool" }>;
 
@@ -175,3 +175,40 @@ export function matchesIn(text: string, query: string): number[] {
 }
 
 export type { Tool };
+
+/** One file a task changed, for the "what changed" line under its end (24n). */
+export interface Changed {
+  file: string;
+  added: number;
+  removed: number;
+  /** Written whole at least once (its old text is not known, so no line counts for that write). */
+  written: boolean;
+}
+
+/**
+ * The "what changed" summary (24n): per result (a task's end), the files the agent changed since the owner's message
+ * that started that task, with the lines added and removed. Failed and stopped steps changed nothing. Results of tasks
+ * that changed no file are left out.
+ */
+export function turnChanges(items: Item[]): Map<string, Changed[]> {
+  const out = new Map<string, Changed[]>();
+  let files = new Map<string, Changed>();
+  for (const x of items) {
+    if (x.kind === "user" && !x.during) files = new Map();
+    else if (x.kind === "tool" && x.file && (x.edits?.length || x.whole)) {
+      if (x.state === "failed" || x.state === "stopped") continue;
+      const c = files.get(x.file) ?? { file: x.file, added: 0, removed: 0, written: false };
+      if (x.whole) c.written = true;
+      else {
+        const n = diffCounts(x.edits ?? []);
+        c.added += n.added;
+        c.removed += n.removed;
+      }
+      files.set(x.file, c);
+    } else if (x.kind === "result") {
+      if (files.size) out.set(x.id, [...files.values()]);
+      files = new Map();
+    }
+  }
+  return out;
+}
