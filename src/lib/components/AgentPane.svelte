@@ -307,6 +307,38 @@
   );
 
   /**
+   * Long chats stay light (24n): a chat opened shows its newest rows only; "Show earlier" adds more above, keeping the
+   * reader's place, and search shows them all. The first row shown is fixed once the chat has rows, so new activity
+   * adds below and never moves what is being read.
+   */
+  const ROWS_SHOWN = 120;
+  let firstShown = $state<number | null>(null);
+  // The other chat's items stay until the chosen one's arrive: the window is set from the first new list after it.
+  let itemsAtSelect: Item[] | null = null;
+  $effect(() => {
+    void agent.selectedId;
+    untrack(() => {
+      firstShown = null;
+      itemsAtSelect = agent.items;
+    });
+  });
+  $effect(() => {
+    const n = rows.length;
+    const now = agent.items;
+    untrack(() => {
+      if (firstShown === null && n && now !== itemsAtSelect) firstShown = Math.max(0, n - ROWS_SHOWN);
+    });
+  });
+  let shownRows = $derived(firstShown && firstShown < rows.length ? rows.slice(firstShown) : rows);
+  async function showEarlier(all = false) {
+    if (!firstShown) return;
+    const before = scroller ? scroller.scrollHeight - scroller.scrollTop : 0;
+    firstShown = all ? 0 : Math.max(0, firstShown - ROWS_SHOWN);
+    await tick();
+    if (scroller) scroller.scrollTop = scroller.scrollHeight - before;
+  }
+
+  /**
    * The chat follows new activity only while the reader is at the bottom; scrolled up to read, the place is kept while
    * the agent goes on, and "New activity" brings them back down. Another chat, or a message sent, goes to the bottom.
    */
@@ -755,6 +787,7 @@
   let hitIds = $derived(searchOpen ? new Set(searchItems(agent.items, query)) : new Set<string>());
   async function openSearch() {
     searchOpen = true;
+    await showEarlier(true);
     const picked = window.getSelection()?.toString().trim() ?? "";
     if (picked && !picked.includes("\n")) query = picked;
     await tick();
@@ -928,7 +961,14 @@
         </p>
       </div>
     {:else}
-      {#each rows as item (item.id)}{@render row(item)}{/each}
+      {#if firstShown}
+        <button type="button" class="link earlier" onclick={() => showEarlier()}
+          >Show {Math.min(firstShown, ROWS_SHOWN)} earlier{firstShown > ROWS_SHOWN
+            ? " (" + firstShown + " in all)"
+            : ""}</button
+        >
+      {/if}
+      {#each shownRows as item (item.id)}{@render row(item)}{/each}
       {#if running}<div class="notice info working">
           <LoaderCircle size={12} class="spin" /> Working…{working ? ` · ${working}` : ""}
         </div>{/if}
@@ -2048,6 +2088,12 @@ With the agent now: a message it has cannot be taken back.`}
 
   .result {
     color: var(--qx-status-done);
+    font-size: var(--qx-text-small);
+  }
+
+  .earlier {
+    align-self: center;
+    margin: 4px 0 8px;
     font-size: var(--qx-text-small);
   }
 
