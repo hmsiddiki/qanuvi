@@ -764,6 +764,7 @@
       s.title,
       `${day} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
       `${agent.provider.name} · ${modelLabel(agent.provider, s.model || agent.model)}`,
+      project?.path ?? "",
     );
     try {
       await api.exportSave(/.md$/i.test(path) ? path : `${path}.md`, text);

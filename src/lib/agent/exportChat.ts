@@ -4,6 +4,7 @@
  * output only of steps that failed (cut short). Thinking, approvals and Qanuvi's own notices are left out.
  */
 import type { Item } from "./events";
+import { editDiff } from "./diff";
 
 /** Lines of a failed step's output an export keeps. */
 const FAILED_LINES = 20;
@@ -15,26 +16,17 @@ const fence = (lang: string, text: string) => {
   return `${f}${lang}\n${text.replace(/\n+$/, "")}\n${f}`;
 };
 
-function stepLines(item: Extract<Item, { kind: "tool" }>): string[] {
+function stepLines(item: Extract<Item, { kind: "tool" }>, short: (t: string) => string): string[] {
   const state = item.state === "failed" ? " (failed)" : item.state === "stopped" ? " (stopped)" : "";
-  const out = [`- **${item.name}** ${item.summary}${state}`.trimEnd()];
+  const out = [`- **${item.name}** ${short(item.summary)}${state}`.trimEnd()];
   if (item.edits?.length) {
+    const mark = { add: "+ ", del: "- ", ctx: "  ", gap: "…" } as const;
     const diff = item.edits
-      .map((e) => [
-        ...e.old
-          .split("\n")
-          .filter((l, i, all) => l || i < all.length - 1)
-          .map((l) => `- ${l}`),
-        ...e.new
-          .split("\n")
-          .filter((l, i, all) => l || i < all.length - 1)
-          .map((l) => `+ ${l}`),
-      ])
-      .flat()
+      .flatMap((e) => editDiff(e.old, e.new).map((l) => (l.type === "gap" ? mark.gap : mark[l.type] + l.text)))
       .join("\n");
     if (diff) out.push("", fence("diff", diff), "");
   } else if (/^(Bash|PowerShell|shell|run_command)$/i.test(item.name) && item.input.trim()) {
-    out.push("", fence("sh", item.input.trim()), "");
+    out.push("", fence("sh", short(item.input.trim())), "");
   }
   if (item.state === "failed" && item.output.trim()) {
     const lines = item.output.trim().split("\n");
@@ -50,9 +42,23 @@ function stepLines(item: Extract<Item, { kind: "tool" }>): string[] {
 
 /**
  * The conversation as Markdown. `title` heads the file; `when` and `agent` (for example "Claude Code · Sonnet 5.5")
- * go in the line under it.
+ * go in the line under it; `root` (the project's folder) is left out of the paths in steps.
  */
-export function exportMarkdown(items: Item[], title: string, when: string, agent: string): string {
+export function exportMarkdown(items: Item[], title: string, when: string, agent: string, root = ""): string {
+  // Paths inside the project read from its folder ("src/notes.js"), whichever slashes the agent used.
+  const base = root.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  const short = (t: string) => {
+    if (!base) return t;
+    // Compared with forward slashes and case aside; the text keeps its own characters elsewhere.
+    const flat = t.replace(/\\/g, "/").toLowerCase();
+    let out = "";
+    let from = 0;
+    for (let at = flat.indexOf(`${base}/`); at >= 0; at = flat.indexOf(`${base}/`, from)) {
+      out += t.slice(from, at);
+      from = at + base.length + 1;
+    }
+    return out + t.slice(from);
+  };
   const out: string[] = [`# ${title.trim() || "Conversation"}`, "", `Exported from Qanuvi, ${when}. Agent: ${agent}.`];
   let last: "user" | "agent" | null = null;
   const head = (who: "user" | "agent") => {
@@ -76,7 +82,7 @@ export function exportMarkdown(items: Item[], title: string, when: string, agent
         break;
       case "tool":
         head("agent");
-        out.push(...stepLines(item));
+        out.push(...stepLines(item, short));
         break;
       case "todos":
         head("agent");

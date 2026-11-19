@@ -947,7 +947,12 @@ runs on or off; with it off nothing is sent anywhere.
     https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.28; installer (8569135), Linux master (10458224) and
     Windows master (10373632) served 200 with matching sizes. Tagged v0.1.28. Not done: the owner's install updating
     to 0.1.28 (its updater offers it), the VPS server build swap to 0.1.28 (asks the owner).
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 05:20): 0.1.28 PUBLISHED. Next: owner's install update,
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 06:05): 0.1.28 PUBLISHED; owner: 24n first, then 24y
+    (decisions under 24y: git branch only when asked, few plain questions for normal users, detail for advanced
+    ones). 24n DONE and driven live (see 24n "WHAT IS LEFT" notes; small drives left for the next test build).
+    Unpublished since 0.1.28: A3-A5, export, what changed, Show earlier, image clean-up. Next: plan 24y in detail
+    with the owner before building (what the runner lacks, listed under 24y). Test window and test masters stopped.
+    PICKUP POINT (before, 2026-11-20 05:20): 0.1.28 PUBLISHED. Next: owner's install update,
     VPS swap when the owner wants, then 24n or 24y.
     PICKUP POINT (before, 2026-11-20): p1 + p2 + n2 + 24q(a) + settings scroll DRIVEN LIVE,
     p3 + g1 + f1-f5 fixed, no word lists left in answer reading or step chat, step spinner fix; nothing published after
@@ -3772,6 +3777,16 @@ runs on or off; with it off nothing is sent anywhere.
     (e) BUILT: stored images no message names any more are removed (older than an hour; half-written .part files
     too; only stored-image names) after a chat clean-up and after a chat is deleted, on the master that keeps them
     (agent::remove_unused_images + test). Next: one test build, drive A3-A5 and b-e live, then 24y.
+    DRIVEN LIVE 2026-11-20 (release test build of 4d570c9, This PC, p2proj): A5 the agent's "[x]/[ ]" list shows
+    ticks and empty boxes; A4 searching "chat handover" opened Agents, scrolled to Chat handover and marked it; (c)
+    "Changed 1 file: src/notes.js +1 -0" under Finished, the file opens; (b) Export: the Save box opened on this
+    computer with the name make-a-to-do-list-of-3-items-...-2026-11-20.md, the file was written and reads well; (e)
+    Clean up now kept the 2 stored images messages still show (removal of unused ones: Rust test). Caught by the
+    command test before the drive: export_save had to be kept on the window in remote.ts (WINDOW_ONLY). Export
+    improved after reading the file (B2, B3): edits as a real line diff (only changed lines, with context), paths
+    inside the project written from its folder (unit-tested; not yet seen in a build). Not driven: A3 (needs a fresh
+    rewind in one sitting), (d) Show earlier (no chat over 120 rows in the test copy), files dropped onto the box.
+    24n DONE apart from those small drives (do them with the next test build).
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
 - [x] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their

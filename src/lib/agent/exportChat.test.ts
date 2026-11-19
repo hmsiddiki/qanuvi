@@ -43,9 +43,8 @@ describe("exportMarkdown (24n)", () => {
         "- **Edit** src/notes.js",
         "",
         "```diff",
-        "- a",
         "+ // hi",
-        "+ a",
+        "  a",
         "```",
         "",
         "- **Bash** check",
@@ -71,6 +70,21 @@ describe("exportMarkdown (24n)", () => {
     expect(md).toContain("line 20\n… (5 more lines)");
     expect(md).not.toContain("line 21");
     expect(md.startsWith("# Conversation")).toBe(true);
+  });
+
+  it("writes paths inside the project from its folder, whichever slashes the agent used", () => {
+    const md = exportMarkdown(
+      [
+        tool({ summary: "C:\\Work\\Shop\\src\\a.js" }),
+        tool({ name: "Bash", input: 'cd "c:/work/shop" && ls c:/work/shop/src' }),
+      ],
+      "t",
+      "d",
+      "a",
+      "C:\\Work\\Shop\\",
+    );
+    expect(md).toContain("- **Read** src\\a.js");
+    expect(md).toContain('cd "c:/work/shop" && ls src');
   });
 
   it("names the file from the title and date", () => {
