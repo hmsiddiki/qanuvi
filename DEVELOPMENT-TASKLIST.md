@@ -582,6 +582,14 @@ runs on or off; with it off nothing is sent anywhere.
     a thread per command). Any machine can be hit; more hops make it likelier. Proposal: one write queue per
     terminal in the window (api.term.write): while one write is on its way, what is typed next is gathered and sent
     as one write after it, so order holds on every hop, with no change on the masters.
+    z3 FIXED + DRIVEN LIVE (owner: "ok go on", 2026-11-19). src/lib/termWriteQueue.ts, used by api.term.write: per
+    terminal at most one term_write on its way; what is typed meanwhile is joined into one write after it; a failed
+    batch rejects every writer in it, the next one still goes. A lone keystroke goes at once (no added wait); the tail
+    of a burst waits at most one round trip. vitest 507 (+4), svelte-check 0/0, Rust unchanged. Drive (release window
+    build, VPS shown at depth 3 through the test master and the laptop): SendKeys "hostname" + Enter ran hostname,
+    the alphabet + digits arrived whole, a long echo line came back whole; no lag seen. Round trip on this chain:
+    PC -> laptop Wi-Fi 2-130 ms (avg 52), laptop -> VPS 5 ms. If clumps ever show on slow links: sequence numbers per
+    terminal on the masters, so writes need not wait (owner decides).
     PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
     if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
     then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested

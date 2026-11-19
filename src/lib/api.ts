@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 // Calls for a server's projects go to that server (Milestone 16); the rest to this PC.
 import { routed as invoke } from "./remote";
 import type { PhpInfo } from "./dap/protocol";
+import { termWriteQueue } from "./termWriteQueue";
 
 export interface ProjectSettings {
   run_command: string;
@@ -439,7 +440,8 @@ export const api = {
       channel.onmessage = onEvent;
       return invoke<string>("setup_install_start", { tool, cols, rows, onEvent: channel });
     },
-    write: (id: string, data: string) => invoke<void>("term_write", { id, data }),
+    /** In order on every hop (z3): one write on its way per terminal, what is typed meanwhile goes as one after it. */
+    write: termWriteQueue((id, data) => invoke<void>("term_write", { id, data })),
     resize: (id: string, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
     kill: (id: string) => invoke<void>("term_kill", { id }),
     /** The switcher hides the terminal's machine (24z3 Part B2): the shell goes on there, its output is kept. */
