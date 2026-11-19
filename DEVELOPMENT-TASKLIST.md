@@ -3667,6 +3667,21 @@ runs on or off; with it off nothing is sent anywhere.
 - [ ] **1e. Task Manager lists WebView2 apart from Qanuvi (owner, 2026-11-11, later)**: the WebView2 processes are
   Qanuvi's children (checked), but Task Manager shows them under "WebView2 Manager". Try giving the window and its
   processes Qanuvi's app id so Windows groups them; cosmetic.
+- [ ] **1h. Window memory: trim WebView2 now, a native window much later (owner, 2026-11-20, LATER, like 24v; start
+  only when the owner asks)**: owner asked why the screen takes 531 MB (status-bar tooltip, 0.1.27: master 33 MB,
+  screen 531 MB, msedgewebview2 x6 483 MB). Measured 2026-11-20 on the owner's install: renderer 202 MB in RAM (150 MB
+  own), browser main 119 (33), GPU 86 (98), network 42 (12), storage 20 (7), crashpad 13 (3); own memory about 300 MB.
+  In-RAM numbers count the shared Edge engine files once per process, so the tooltip overstates the screen by about
+  180 MB. Owner's view: Qanuvi already takes little for what it does next to VS Code (VS Code here 1.5-2.6 GB).
+  - Part 1, small (an evening or two): the tooltip and status bar count each process's own memory (private bytes)
+    instead of in-RAM sizes added up; hidden pages and closed-view terminals unloaded; WebView2's own memory-saving
+    level (MemoryUsageTargetLevel low) while the window is in the background. Aim: tens of MB, measured before/after.
+  - Part 2, much later: a native window (Rust UI, e.g. GPUI as in Zed, or Slint/iced) instead of WebView2. Size:
+    the window is about 46,000 lines (67 Svelte files + TS, tests left out) and leans on CodeMirror and xterm.js,
+    which a native window must replace (editor features, IME, accessibility, clipboard, three systems). Estimate: a
+    basic native shell (sidebar, tabs, simple editor, terminal via a Rust terminal crate) about 2-3 weeks; everything
+    the window does today several months. Gain: about 300 MB to maybe 80-150 MB (estimate). Not worth it before the
+    core is done.
 - [ ] **1b. Updates: update channels, signed updates and a smooth update popup** (added 2026-11-10; moved by the owner on 2026-11-10 to after the app shell is usable, so it is built after Milestone 8; moved later again by the owner on 2026-11-10 while other milestones go first; originally planned right after
   Milestone 1 because the app will be updated very often during development)
   - Tauri updater plugin: the app checks an update address for a small manifest (`latest.json`: version, notes, date,
