@@ -640,7 +640,23 @@ runs on or off; with it off nothing is sent anywhere.
     "osc52-z7-check" on this PC's clipboard; OSC 8 link: plain click nothing, right-click Qanuvi's menu, hover title,
     Ctrl+click opened it in the default browser (Vivaldi, "Example Domains"); plain address Ctrl+click opened too.
     z8 not driven yet: needs the new server build on the VPS (owner's yes), then R5 on the VPS.
-    PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
+    VPS server build of 036eb6a swapped in (owner: "go on", 2026-11-19; zigbuild -j 2, 10.4 MB, the 2026-11-18 build
+    kept as qanuvi-master.prev; idle first; serve restarted with setsid and the plain PATH). z8 DRIVEN LIVE: the
+    master (PATH without ~/.local/bin) started Claude Code from ~/.local/bin/claude for the plan run.
+    R5 on the VPS DRIVEN LIVE, PASS (window shows basevm378 directly; project m1b-vps, PLAN-R5V.md: 3 steps, sleep 40
+    then a note): started 14:20:39 (Auto = Sonnet 5.5 there, no history yet); window closed 14:21:25 in step 1; with
+    no window step 1 was marked done and step 2 wrote its note by 14:22:28; reopened 14:22:55 straight on the VPS
+    with step 3's live output; "Run finished · 3 of 3 done" at 14:23, each step done on its first try (the agents
+    backgrounded the sleep and waited in their turn), $0.13 on the Max subscription. R5 DONE on both machines.
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 14:30): z3, z4, z5-z8 fixed and driven live; R5 done on
+    This PC and the VPS; the VPS has Claude Code signed in (Max) and runs the 036eb6a server build. Next in M9b:
+    coding tools on a shown master, Part F (window memory with several masters shown in turn and nested ones), v3
+    watch. Then M9c, M9d (publish only with the owner's yes). c1 (Claude Code install + sign-in from the window)
+    after M9, owner leaning yes. Test state to put back after M9 (as listed below) plus: scratch E:\qc-scratch\r5-plan
+    (in This PC's test project list), ~/qanuvi-test/m1b-vps/PLAN-R5V.md + notes/ on the VPS. Drive tools: ui.ps1,
+    go.ps1, mcall.js in the scratchpad of session 13a854a0; u.sh + ctrlkey.ps1 (Ctrl down/up for Ctrl+click) in the
+    scratchpad of session d6980e1a. The VPS is reached directly with ~/.ssh/vps_key (root@165.99.219.195).
+    PICKUP POINT (before, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
     if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
     then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested
     ones), v3 watch. Then M9c, M9d (publish only with the owner's yes). Input Leap is paused by the owner for the
