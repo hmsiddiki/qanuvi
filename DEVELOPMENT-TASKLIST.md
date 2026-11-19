@@ -3541,6 +3541,15 @@ runs on or off; with it off nothing is sent anywhere.
   - Health watch: the proxy or a provider down pauses the run and notifies; it goes on when things are back.
   - A report at the end: done, set aside and why, waiting for the owner.
   Build these into the Rust runner (after R2), then run a plan of R1 to R5's size as the benchmark.
+  OWNER DECISIONS (2026-11-20; order: 24y after 24n):
+  - R1 to R5 is done (built by hand); it is only the yardstick for what the runner must manage alone.
+  - Git is the user's: a branch per plan only after the pre-run check asks ("keep this plan's work on its own branch
+    in git?"). No, or no git: Qanuvi's own snapshots undo a failed step instead, nothing goes into git. Rolling back
+    undoes only that step's own changes. Merging to main and publishing stay the user's, always.
+  - Room for normal users: someone who is not an expert must not be buried in questions. Sensible defaults, the
+    fewest questions that are really needed, asked together in plain words before the run (not scattered through it),
+    and "do what is best" accepted as an answer. Advanced users can set the policy, allowlist and checks in detail so
+    a big plan runs alone. Both kinds of user get the same runner; only how much is asked differs.
 - [ ] **24v. Qanuvi's own context compression, for any AI, no Python (owner, 2026-11-14; agreed 2026-11-14; later: owner said
   it can wait while bigger steps toward a developer-friendly assistant go first; start only when the owner asks)**: the
   owner runs Headroom (headroom-ai 0.42, Python, Apache-2.0) in Qanuvi's terminal as a proxy at 127.0.0.1:8787 for
@@ -3729,6 +3738,11 @@ runs on or off; with it off nothing is sent anywhere.
     agent/sessionTools.ts (+ tests), agent.branch, AgentPane. Export, the "what changed" summary and the virtual list
     stay open. Not driven in the running app yet.
   - Fast with long sessions (virtual list) and light on memory, as the rest of Qanuvi.
+  - WHAT IS LEFT (2026-11-20, owner: "24n first, then 24y"): parts 1-6 are built but none were driven in the window
+    since the viewer migration. Order: (a) drive parts 1-6 live on a scratch project through the shown master, fix
+    what broke; (b) export a conversation (Markdown file); (c) a short "what changed" summary at the end of each task
+    (files, +/- lines, Open); (d) a virtual list so long sessions stay fast and light; (e) stored images no
+    conversation uses any more are removed.
   - The aim (owner, 2026-11-12): chatting with a paid agent directly (not the task runner) should feel like working in
     the best agent panels: the same agent and model, so the gap is mostly what the user can see and steer.
 - [x] **24o. A finishing pass at the end of a plan run (owner, 2026-11-12, later)**: the steps follow their
