@@ -590,6 +590,17 @@ runs on or off; with it off nothing is sent anywhere.
     the alphabet + digits arrived whole, a long echo line came back whole; no lag seen. Round trip on this chain:
     PC -> laptop Wi-Fi 2-130 ms (avg 52), laptop -> VPS 5 ms. If clumps ever show on slow links: sequence numbers per
     terminal on the masters, so writes need not wait (owner decides).
+    R5 on This PC DRIVEN LIVE, PASS (2026-11-19, release window build of 3c1f6a6). Scratch project E:\qc-scratch\r5-plan
+    (git, PLAN-R5.md: 3 steps, each `sleep 45` then a line in notes/), Claude Code, Haiku per step, budget $1, the
+    "needs from me" check off. Started 12:29:24; window closed 12:30:01 during step 1 (the window's process ended, the
+    masters ran on); with no window, step 1 finished 12:31 and step 2 wrote its file 12:33; window reopened 12:33:33
+    straight on the running step 3 with its live output, steps 1-2 green with cost, the session list kept; "Run
+    finished · 3 of 3 done" at 12:34, $0.34. Finding z4 (owner decides): step 1 cost $0.34 of that because Haiku put
+    `sleep 45` in the background and ended its turn twice; each such try counted as failed, so the run moved up to
+    Sonnet (2x) and Opus (1x). Steps 2-3 (session kept, notes read) waited in the same turn, $0.003 each. Idea: a try
+    that ends while its own background command still runs is told to wait and goes on in the same session, not
+    counted as a failed try. R5 on the VPS NOT driven: no agent on the VPS (`claude` not installed; only
+    ~/.local/bin/qanuvi-master); needs the owner (Claude Code installed and signed in there, or free models set up).
     PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
     if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
     then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested
