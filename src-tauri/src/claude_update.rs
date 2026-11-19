@@ -54,7 +54,7 @@ fn hidden(cmd: &mut Command) {
 }
 
 fn installed() -> Result<String, String> {
-    let path = crate::terminal::find_on_path("claude").ok_or("Claude Code is not installed.")?;
+    let path = crate::agent::find_claude().ok_or("Claude Code is not installed.")?;
     let mut cmd = Command::new(path);
     cmd.arg("--version");
     hidden(&mut cmd);
@@ -142,7 +142,7 @@ pub fn auto_update(db: &crate::store::Db) {
 
 /// Runs Claude Code's own update; answers what it printed.
 pub fn update() -> Result<String, String> {
-    let path = crate::terminal::find_on_path("claude").ok_or("Claude Code is not installed.")?;
+    let path = crate::agent::find_claude().ok_or("Claude Code is not installed.")?;
     let mut cmd = Command::new(path);
     cmd.arg("update");
     hidden(&mut cmd);

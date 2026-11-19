@@ -8,6 +8,8 @@
   import { api, errorText, type TermEvent } from "$lib/api";
   import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
   import { linkEndedText, onLinkEnd, shownMachine } from "$lib/remote";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import { opensLink, osc52Copy, pasteText, urlsIn } from "$lib/terminalText";
 
   interface Props {
     projectId: string;
@@ -43,7 +45,9 @@
           disabled: !id || exited,
           action: async () => {
             const text = await clipboardText();
-            if (text && id) await api.term.write(id, text);
+            // As typed by xterm (z5): a shell that asks for bracketed paste gets it, so a line break in the
+            // text does not run the line; the owner edits it and presses Enter.
+            if (text && id) t.paste(pasteText(text));
             t.focus();
           },
         },
@@ -83,6 +87,16 @@
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: false,
+      // Links a program prints as such (OSC 8, Claude Code's sign-in link): Ctrl+click opens them in the owner's
+      // browser (z6); a selection or right-click that ends over one does nothing.
+      linkHandler: {
+        activate: (e, uri) => {
+          if (opensLink(e)) void openUrl(uri);
+        },
+        hover: (_e, uri) => (host.title = `Ctrl+click to open ${uri}`),
+        leave: () => (host.title = ""),
+        allowNonHttpProtocols: false,
+      },
       theme: {
         background: "#141416",
         foreground: "#e4e4e8",
@@ -110,6 +124,29 @@
     term.loadAddon(fit);
     term.open(host);
     resize();
+    // Plain addresses in the output, one screen line each: the same Ctrl+click (z6).
+    term.registerLinkProvider({
+      provideLinks: (y, callback) => {
+        const line = term?.buffer.active.getLine(y - 1)?.translateToString(true) ?? "";
+        const links = urlsIn(line).map((u) => ({
+          range: { start: { x: u.start + 1, y }, end: { x: u.end, y } },
+          text: u.url,
+          activate: (e: MouseEvent) => {
+            if (opensLink(e)) void openUrl(u.url);
+          },
+          hover: () => (host.title = `Ctrl+click to open ${u.url}`),
+          leave: () => (host.title = ""),
+        }));
+        callback(links.length ? links : undefined);
+      },
+    });
+    // A program's "copy this" (OSC 52; Claude Code's "c to copy" on a server): onto this PC's clipboard (z7).
+    // Reading the clipboard is never answered.
+    term.parser.registerOscHandler(52, (data) => {
+      const text = osc52Copy(data);
+      if (text !== null) void copyText(text);
+      return true;
+    });
 
     term.onData((data) => {
       // Answers the screen gives to old output played back (a cursor question the shell asked long ago) are not
@@ -118,6 +155,17 @@
       if (id && !exited) api.term.write(id, data).catch(() => {});
     });
     term.onTitleChange((title) => ontitle?.(title));
+    // Every paste (Ctrl+V, Shift+Insert, the browser's own) goes through here once, before xterm's own handler.
+    host.addEventListener(
+      "paste",
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = e.clipboardData?.getData("text/plain") ?? "";
+        if (text && id && !exited) term?.paste(pasteText(text));
+      },
+      true,
+    );
     // Ctrl+C copies when text is selected; Ctrl+V pastes (the shell gets them otherwise).
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown" || !e.ctrlKey) return true;
@@ -125,15 +173,8 @@
         navigator.clipboard.writeText(term.getSelection()).catch(() => {});
         return false;
       }
-      if (e.key === "v") {
-        navigator.clipboard
-          .readText()
-          .then((text) => {
-            if (id) api.term.write(id, text);
-          })
-          .catch(() => {});
-        return false;
-      }
+      // The paste itself comes as the paste event below (one paste, not two); the shell does not get ^V.
+      if (e.key === "v") return false;
       return true;
     });
 

@@ -256,8 +256,27 @@ pub struct Agents {
     grants: Grants,
 }
 
-fn find_claude() -> Option<std::path::PathBuf> {
-    crate::terminal::find_on_path("claude")
+/// The `claude` program: on PATH, else where Claude Code's installers put it (z8: a master started over ssh, or as a
+/// service, has a short PATH without the user's ~/.local/bin, though the user's own shell finds it).
+pub fn find_claude() -> Option<std::path::PathBuf> {
+    crate::terminal::find_on_path("claude").or_else(|| {
+        let home = crate::agent_config::home_dir()?;
+        claude_places(&home, cfg!(windows))
+            .into_iter()
+            .find(|p| p.is_file())
+    })
+}
+
+/// Where Claude Code's installers put `claude` in a home folder: the native installer, then the older local install.
+fn claude_places(home: &std::path::Path, windows: bool) -> Vec<std::path::PathBuf> {
+    if windows {
+        vec![home.join(".local").join("bin").join("claude.exe")]
+    } else {
+        vec![
+            home.join(".local").join("bin").join("claude"),
+            home.join(".claude").join("local").join("claude"),
+        ]
+    }
 }
 
 /// Why a run on `provider` cannot work on this machine: its program is not installed. Qanuvi's own agent is
@@ -1587,6 +1606,22 @@ pub fn mark_stopped(db: &Db, id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn claude_is_looked_for_where_its_installers_put_it() {
+        let home = std::path::Path::new("/root");
+        assert_eq!(
+            claude_places(home, false),
+            [
+                home.join(".local/bin/claude"),
+                home.join(".claude/local/claude")
+            ]
+        );
+        assert_eq!(
+            claude_places(home, true),
+            [home.join(".local").join("bin").join("claude.exe")]
+        );
+    }
 
     #[test]
     fn standing_approvals_cover_their_kind_until_they_end_and_never_risky_commands() {

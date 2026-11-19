@@ -618,6 +618,28 @@ runs on or off; with it off nothing is sent anywhere.
     (local_servers::install_plan, ollama/node/omniroute today) also installs Claude Code on the shown machine
     (native installer, the command shown first), and its sign-in runs from the window: the login link shown as a
     button opening the owner's browser, a box for the code. Works for a shown VPS too. Suggested, never required.
+    VPS SIGNED IN (2026-11-19, by the owner through Qanuvi's terminal on the shown VPS): Claude Code 2.1.328 in
+    /root/.local/bin (native installer; PATH added to ~/.bashrc), Claude account (Max); `claude -p "say ok"` answers.
+    The owner found z5-z8 doing it ("terminal behaviour needs a huge improvement"; owner go):
+    z5: a paste ran at once (raw write, no bracketed paste) and Ctrl+V pasted TWICE (Qanuvi's Ctrl+V and xterm's
+    own paste event). z6: clicking a terminal link (OSC 8, Claude Code's sign-in link) showed xterm's "Do you want to
+    navigate" box and then nothing; letting go of a selection or a right-click over the link did the same. z7:
+    Claude Code's "c to copy" on a server (OSC 52) never reached this PC's clipboard. z8: the VPS master (started over
+    non-interactive ssh, PATH /usr/local/bin:/usr/bin:...) cannot find ~/.local/bin/claude, so a run there would say
+    Claude Code is missing. Not a bug: arrows print ^[[A while a command runs (as in any terminal).
+    z5-z8 FIXED (src/lib/terminalText.ts + TerminalView.svelte; agent.rs find_claude + claude_update.rs). z5: one
+    paste path, a capture paste listener on the screen -> term.paste (bracketed paste when the shell asks, line ends
+    as xterm types them); Ctrl+V only stops ^V; pasteText drops the line break after a single line (several lines
+    stay). z6: linkHandler (OSC 8) and a link provider for plain http(s) addresses; Ctrl/Cmd+left click opens in the
+    owner's browser (openUrl); hover title "Ctrl+click to open <url>"; a plain click or right-click does nothing.
+    z7: OSC 52 handler: a copy request goes to the clipboard (copyText); a read request (?) is never answered.
+    z8: find_claude falls back to ~/.local/bin/claude and ~/.claude/local/claude (Windows: ~/.local/bin/claude.exe);
+    claude_update uses it too. Rust 528 (+1), vitest 512 (+5), clippy, svelte-check, fmt clean.
+    z5-z7 DRIVEN LIVE (release build, terminal on the VPS shown directly): a one-line paste with CRLF waited on the
+    prompt once (before the fix: ran twice), edited with Left x3 + "X" -> "pasted-Xz5b"; OSC 52 from the VPS put
+    "osc52-z7-check" on this PC's clipboard; OSC 8 link: plain click nothing, right-click Qanuvi's menu, hover title,
+    Ctrl+click opened it in the default browser (Vivaldi, "Example Domains"); plain address Ctrl+click opened too.
+    z8 not driven yet: needs the new server build on the VPS (owner's yes), then R5 on the VPS.
     PICKUP POINT (fresh conversation starts here, 2026-11-19): M9a done, M9b depth 3 done, z1/z2 fixed (drive them live
     if not yet noted below). Next in M9b: R5 (scratch plan run, close the window, reopen, progress intact; This PC,
     then the VPS), coding tools on a shown master, Part F (window memory with several masters shown in turn and nested
