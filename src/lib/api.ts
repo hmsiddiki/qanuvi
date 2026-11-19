@@ -680,7 +680,7 @@ export const api = {
     stop: (projectId: string) => invoke<void>("plan_run_stop", { projectId }),
     pause: (projectId: string) => invoke<void>("plan_run_pause", { projectId }),
     finishWithout: (projectId: string) => invoke<void>("plan_run_finish_without", { projectId }),
-    answer: (projectId: string, step: string, choice: "go" | "skip", text: string) =>
+    answer: (projectId: string, step: string, choice: "go" | "skip" | "end", text: string) =>
       invoke<void>("plan_run_answer", { projectId, step, choice, text }),
     /** The owner typed into the running step's chat: the runner sorts it first. */
     message: (projectId: string, text: string) => invoke<void>("plan_run_message", { projectId, text }),

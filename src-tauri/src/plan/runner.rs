@@ -4,6 +4,7 @@
 use super::costs::ToolKinds;
 use super::decider::{DecisionRecord, TeamMode};
 use super::finishing::{FINISHER, FinishAuto, FinishPass};
+use super::ownerask::{Card, Exchange};
 use super::routing::{AgentModel, JobType};
 use super::setaside::HeldKind;
 use super::tasklist::{Step, StepStatus, parse_plan};
@@ -209,6 +210,9 @@ pub enum RunStepStatus {
 pub struct Held {
     pub kind: HeldKind,
     pub why: String,
+    /// n1: the question as the owner sees it (a blocked or unfinished step).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<Card>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -229,6 +233,12 @@ pub struct StepRun {
     /// The owner's answer to a held step: the next try is told it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<String>,
+    /// n1: what the owner's last answer means for the next try, as the reading call put it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<String>,
+    /// n1: what the owner was asked about this step and what they said, in order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub talk: Option<Vec<Exchange>>,
     /// Tries before this index were before the owner's answer: the model ladder starts again after it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_from: Option<usize>,
@@ -743,7 +753,10 @@ pub fn step_prompt(file: &str, step: &Step, done: &[StepName]) -> String {
     ));
     lines.push(
         "- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, \
-         mark it \"- [!]\" and add the reason under it."
+         mark it \"- [!]\" and add a \"  - Blocked: ...\" line under it. Then, in your last message, explain it for \
+         someone reading on a phone without this chat: what failed, why only they can act, and the exact change or \
+         information you need (any rule, command or code they must add in a fenced code block, with the file it goes \
+         in)."
             .into(),
     );
     lines.join("\n")

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { agent } from "$lib/stores/agent.svelte";
+  import { ANSWER_HINT } from "$lib/plan/holdask";
+  import HoldCardView from "./HoldCardView.svelte";
   import Play from "@lucide/svelte/icons/play";
   import Square from "@lucide/svelte/icons/square";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
@@ -650,7 +652,7 @@
   function waitingFor(s: StepRun): StepRun[] {
     return (run?.steps ?? []).filter((x) => x.status === "set-aside" && x.waitsFor?.step === heldKey(s));
   }
-  function reply(s: StepRun, choice: "go" | "skip") {
+  function reply(s: StepRun, choice: "go" | "skip" | "end") {
     runner.answer(s, choice, replies[heldKey(s)] ?? "");
     delete replies[heldKey(s)];
   }
@@ -1051,6 +1053,7 @@
         <strong>Needs your answer ({heldSteps.length})</strong>
         {#each heldSteps as s (heldKey(s))}
           {@const others = waitingFor(s)}
+          {@const typed = !!replies[heldKey(s)]?.trim()}
           <div class="ask">
             <div>
               Step {s.number ? `${s.number}. ` : ""}{s.title}
@@ -1061,18 +1064,35 @@
                   : ""}</span
               >
             </div>
+            <!-- n1: the question laid out, so it is answered without reading the chat. -->
+            {#if s.held?.card}<HoldCardView card={s.held.card} />{/if}
             <div class="row">
-              <input
-                type="text"
-                placeholder={s.held?.kind === "hold" ? "Your answer (optional)" : "What to do differently (optional)"}
+              <textarea
+                rows={typed ? 3 : 2}
+                aria-label="Your answer"
+                placeholder={s.held?.kind === "hold" ? "Your answer (optional)" : ANSWER_HINT}
+                title="Enter sends, Shift+Enter starts a new line"
                 bind:value={replies[heldKey(s)]}
-              />
+                onkeydown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && typed) {
+                    e.preventDefault();
+                    reply(s, "go");
+                  }
+                }}></textarea>
               <button type="button" class="primary" onclick={() => reply(s, "go")}
-                >{s.held?.kind === "hold" ? "Go ahead" : "Try again"}</button
+                >{typed ? "Send answer" : s.held?.kind === "hold" ? "Go ahead" : "Try again"}</button
               >
               <button type="button" onclick={() => reply(s, "skip")} title="Leave it, and the steps waiting for it"
                 >Skip this step</button
               >
+              {#if s.held?.kind !== "hold"}
+                <button
+                  type="button"
+                  onclick={() => reply(s, "end")}
+                  title="The run finishes what it still can, then ends; this step stays open for the next run"
+                  >End the run</button
+                >
+              {/if}
             </div>
           </div>
         {/each}
@@ -1271,9 +1291,16 @@
     flex-direction: column;
     gap: 6px;
   }
-  .ask .row input {
+  .ask .row textarea {
     flex: 1;
     min-width: 0;
+    resize: vertical;
+    padding: 4px 8px;
+    border: 1px solid var(--qx-border);
+    border-radius: 6px;
+    background: var(--qx-bg-window);
+    color: inherit;
+    font: inherit;
   }
   .finish {
     margin-top: 6px;

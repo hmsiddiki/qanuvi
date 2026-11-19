@@ -645,6 +645,225 @@ fn a_step_blocked_again_after_the_answer_asks_again_as_a_new_question() {
     );
 }
 
+/// n1: a step blocked on a server change (the agent's last message holds the nginx rule).
+fn nginx_blocker(c: &AgentCall) -> AgentReply {
+    c.env.mark(FILE, "20", '!');
+    let text = c.env.text(FILE).replace(
+        "**20. Serve uploads**",
+        "**20. Serve uploads**\n  - Blocked: needs an nginx rule on the server",
+    );
+    c.env.put(FILE, &text);
+    AgentReply {
+        result: Some(
+            "Uploads return 404: nginx does not serve /files/. Add this to the server's nginx.conf, inside the \
+             server block:\n```nginx\nlocation /files/ {\n    alias /srv/app/files/;\n}\n```\nThen reload nginx."
+                .into(),
+        ),
+        ..Default::default()
+    }
+}
+
+fn wait_until(what: &str, f: &dyn Fn() -> bool) {
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while !f() {
+        assert!(std::time::Instant::now() < until, "{what}");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
+fn open_question(env: &FakeEnv) -> Option<crate::inbox::InboxItem> {
+    env.inbox()
+        .into_iter()
+        .find(|i| i.kind_of == "answer" && i.status == "open")
+}
+
+#[test]
+fn a_blocked_step_asks_a_question_that_stands_on_its_own_and_talks_until_the_need_is_met() {
+    let env = world("# Plan\n\n- [ ] **20. Serve uploads**\n");
+    let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let t = tries.clone();
+    env.set_agent(move |c| {
+        let title = c.title.unwrap_or("");
+        if title.starts_with("Question for you") {
+            assert!(c.prompt.contains("alias /srv/app/files/;"), "the card call reads the agent's message");
+            return AgentReply {
+                result: Some(r#"{"headline": "Add one rule to the web server", "happened": "Uploaded files give a 404 error.", "whyYou": "nginx.conf is on the server, outside the project.", "wanted": "Add the rule below to nginx.conf and reload nginx.", "snippet": {"label": "Add to nginx.conf, inside the server block", "text": "location /files/ {\n    alias /srv/app/files/;\n}"}, "canDo": "Say \"do it yourself\" and tell me where nginx.conf is."}"#.into()),
+                ..Default::default()
+            };
+        }
+        if title.starts_with("Your answer") {
+            let reply = if c.prompt.contains("<<<\nI don't understand\n>>>") {
+                r#"{"intent": "clarify", "card": {"headline": "The web server needs to be told where uploaded files are", "wanted": "Open nginx.conf on the server, paste the rule inside the server block, save, then run: sudo nginx -s reload", "snippet": {"label": "The rule", "text": "location /files/ {\n    alias /srv/app/files/;\n}"}}}"#
+            } else if c.prompt.contains("<<<\nlater maybe\n>>>") {
+                r#"{"intent": "followup", "card": {"headline": "Should I wait, or add the rule myself now?"}}"#
+            } else {
+                r#"{"intent": "act", "instruction": "Add the rule to /etc/nginx/nginx.conf yourself and reload nginx."}"#
+            };
+            return AgentReply { result: Some(reply.into()), ..Default::default() };
+        }
+        if planner(c) {
+            return ok_review(c);
+        }
+        if t.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            return nginx_blocker(c);
+        }
+        c.env.mark(FILE, "20", 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("the question never came", &|| open_question(&env).is_some());
+    let first = open_question(&env).unwrap();
+    // (a) The whole matter on its own: what failed, why the owner, the exact change to copy, what Qanuvi can do.
+    assert!(
+        first.text.starts_with("Add one rule to the web server"),
+        "{}",
+        first.text
+    );
+    assert!(
+        first
+            .text
+            .contains("Why it needs you: nginx.conf is on the server")
+    );
+    assert!(
+        first
+            .text
+            .contains("Add to nginx.conf, inside the server block:\nlocation /files/ {")
+    );
+    let form = first.form.clone().unwrap();
+    assert_eq!(
+        form["card"]["snippet"]["text"],
+        "location /files/ {\n    alias /srv/app/files/;\n}"
+    );
+    let ids: Vec<&str> = form["choices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["go", "skip", "end"]);
+    assert!(form["text"].as_str().unwrap().starts_with("Your answer"));
+
+    // (b) "I don't understand": a new, simpler question; the step does not run again.
+    env.answer(
+        first.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "I don't understand"}),
+    );
+    wait_until("no simpler question", &|| {
+        open_question(&env).is_some_and(|q| q.id != first.id)
+    });
+    let second = open_question(&env).unwrap();
+    assert!(
+        second
+            .text
+            .starts_with("The web server needs to be told where uploaded files are")
+    );
+    assert!(second.text.contains("sudo nginx -s reload"));
+    assert_eq!(
+        tries.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "no blind retry"
+    );
+
+    // An answer that does not settle the need: a follow-up question, still no retry.
+    env.answer(
+        second.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "later maybe"}),
+    );
+    wait_until("no follow-up", &|| {
+        open_question(&env).is_some_and(|q| q.id != second.id)
+    });
+    let third = open_question(&env).unwrap();
+    assert!(
+        third
+            .text
+            .starts_with("Should I wait, or add the rule myself now?")
+    );
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    // A real answer: the agent is told the talk and what to do, and acts on it.
+    env.answer(
+        third.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "insert the block yourself"}),
+    );
+    let r = running.wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(env.text(FILE).contains("- [x] **20. Serve uploads**"));
+    let last = env.prompts().last().unwrap().1.clone();
+    assert!(last.contains("Owner: \"I don't understand\""), "{last}");
+    assert!(last.contains("Owner: \"later maybe\""));
+    assert!(last.contains("insert the block yourself"));
+    assert!(last.contains(
+        "What their answer means for this try: Add the rule to /etc/nginx/nginx.conf yourself"
+    ));
+    assert!(last.contains("make the change yourself, make it now"));
+    let st = step(&r, "20");
+    assert_eq!(st.talk.as_ref().map(Vec::len), Some(3));
+}
+
+#[test]
+fn without_any_model_the_question_still_says_it_all_and_end_the_run_leaves_the_step_open() {
+    let env = world("# Plan\n\n- [ ] **20. Serve uploads**\n- [ ] **21. Other**\n");
+    let tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let t = tries.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            // No card, no reading: the review's answer is all any call gets.
+            return ok_review(c);
+        }
+        if step_of(c.prompt, &["20", "21"]) == "21" {
+            c.env.mark(FILE, "21", 'x');
+            return AgentReply::default();
+        }
+        t.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        nginx_blocker(c)
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("the question never came", &|| running.waiting_answers() > 0);
+    let first = open_question(&env).unwrap();
+    // The agent's own words and its snippet, never only "it needs you".
+    assert!(
+        first.text.contains("needs an nginx rule on the server"),
+        "{}",
+        first.text
+    );
+    assert!(first.text.contains("Uploads return 404"));
+    assert!(first.text.contains("alias /srv/app/files/;"));
+    // "I don't understand" is still heard: a fuller question, no retry.
+    env.answer(
+        first.key.as_deref().unwrap(),
+        json!({"choice": "go", "text": "I don't understand"}),
+    );
+    wait_until("no fuller question", &|| {
+        open_question(&env).is_some_and(|q| q.id != first.id)
+    });
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let second = open_question(&env).unwrap();
+    assert!(second.text.contains("Tell me what is unclear"));
+    // End the run: it ends, the step stays open for the next run.
+    env.answer(second.key.as_deref().unwrap(), json!({"choice": "end"}));
+    let r = running.wait();
+    assert_ne!(r.status, RunStatus::Running);
+    assert_eq!(tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(step(&r, "21").status, RunStepStatus::Done);
+    assert!(!env.text(FILE).contains("- [x] **20."));
+}
+
 #[test]
 fn failing_tests_go_back_to_the_same_session_with_only_the_failures_then_pass() {
     let env = world("# Plan\n\n- [ ] **5. Coupon rule**\n");

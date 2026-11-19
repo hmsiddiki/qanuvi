@@ -117,7 +117,9 @@ export interface StepRun {
    */
   status: "waiting" | "running" | "done" | "blocked" | "failed" | "skipped" | "held" | "set-aside";
   /** Why a held step waits for the owner: a hold from the check before the run, blocked, or not finished. */
-  held?: { kind: import("./setaside").HeldKind; why: string };
+  held?: { kind: import("./setaside").HeldKind; why: string; card?: import("./holdask").HoldCard };
+  /** n1: what the owner was asked about this step and what they said, in order. */
+  talk?: { asked: string; answer: string }[];
   /** The held step (number, else title) a set-aside step needs, and why it needs it. */
   waitsFor?: { step: string; why: string };
   /** The owner's answer to a held step: the next try is told it. */

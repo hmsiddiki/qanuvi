@@ -15,9 +15,9 @@ import { forgetNotifications, learnNotifications, notifyFor } from "./notify.sve
 import { listen } from "@tauri-apps/api/event";
 import type { Place } from "./ui.svelte";
 import { keepAnswer, loadPlanState, savePlanState } from "$lib/plan/planstate";
-import { DECIDE_TEXT, holdReply, type AnswerChoice, type InboxAnswer } from "$lib/plan/holdask";
+import { DECIDE_TEXT, holdReply, type AnswerChoice, type HoldCard, type InboxAnswer } from "$lib/plan/holdask";
 
-export { DECIDE_TEXT, holdReply, type AnswerChoice, type InboxAnswer };
+export { DECIDE_TEXT, holdReply, type AnswerChoice, type HoldCard, type InboxAnswer };
 
 /** Where the old per-window Inbox was kept (before 24u part 4); brought into the database once. */
 const OLD_KEY = "qanuvi.inbox.v1";
@@ -31,6 +31,8 @@ export interface AnswerForm {
   text?: string;
   /** It asks for a login or password: answered in the run panel only, so the value is kept as a private detail. */
   secret?: boolean;
+  /** n1: the question laid out (a blocked or unfinished plan step); `text` holds the same as plain text. */
+  card?: HoldCard;
 }
 
 /** What a question belongs to; "hold" is a plan step a run set aside for the owner. */

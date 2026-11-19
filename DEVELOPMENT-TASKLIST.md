@@ -726,7 +726,34 @@ runs on or off; with it off nothing is sent anywhere.
     handover limit it follows in brackets beside the session's "in" total, same grey, amber from 90%; the tooltip says
     what each number is (contextLimit in agent/handover.ts: a step's session the run's limit, other chats the chat
     handover's, none when off or never in this chat).
-    PICKUP POINT (fresh conversation starts here, 2026-11-19 18:45): u2 DONE (built + driven live, above). Next: n1,
+    n1 BUILT + DRIVEN LIVE (2026-11-19, owner: "start building it straight away, make it more realistic for user
+    friendly interaction"). Master: plan/ownerask.rs. A blocked or unfinished step (set_aside, kind != hold) gets a
+    card from one short call (owner_call: the run's model, else a free one; fallback_card from the agent's own words and
+    first fenced block when none answers): headline, what happened, why it needs you, what is needed, a snippet to copy
+    (label + text), what Qanuvi can do itself. Held.card keeps it; the Inbox item's text is card_text (phones, CLI,
+    notifications, older windows) and form.card the layout. A typed answer is read first (read_answer, one call;
+    without a model sounds_unsure hears "I don't understand"): act -> the next try gets next_try_note (the talk so far,
+    what the answer means, act on it, ask for exactly one missing thing instead of a blind retry); clarify -> a
+    simpler, fuller card, step stays held, no re-run; followup -> a question for what is still missing. StepRun.talk
+    keeps every exchange, StepRun.instruction the reading. New quick answer End ("The run finishes what it still can,
+    then ends; this step stays open"); End answers are not kept at the next run's start. The step rule now asks the
+    agent for a "Blocked:" line plus a phone-readable explanation with the exact change in a fenced block. Screen:
+    HoldCardView (Inbox and run panel), a two-line answer box (Enter sends, Shift+Enter new line, "Send answer" once
+    typed), End the run in the run panel too. compare.json: the 3 recorded cases (holdForm failed, stepPrompt x2)
+    updated on purpose. Tests: ownerask unit tests, two scenarios (talk until met; no model + End). Driven live on the
+    release test build with scratch E:\qc-scratch\n1-plan (PLAN-N1.md, step blocked on a live server's nginx rule) and
+    a stand-in E:\qc-scratch\n1-server\nginx.conf, Claude Code Auto (Sonnet 5.5), $0.11: the card stood on its own
+    (rule, reload command, 403 hint, "tell me where an nginx file is"), Copy put exactly the rule + command on the
+    clipboard, "I don't understand" typed in the Inbox (Enter) brought a plainer card (what nginx.conf is, forward to
+    whoever runs the server) with no re-run (2 attempts in all), "do it yourself: ... at E:/qc-scratch/n1-server/
+    nginx.conf" through `qanuvi-master inbox answer` made the agent add the block there and finish (Done line says the
+    live server still needs it deployed). Fixed after the drive: the one-line box cut the hint off (now two lines),
+    the box's accessible name was its tooltip (aria-label "Your answer"), a snippet label ending in "." got ".:".
+    PICKUP POINT (fresh conversation starts here, 2026-11-19 20:15): u2 + n1 DONE (both built + driven live, above).
+    Next: t1, c1 when the owner agrees; 0.1.27 publish waits for the owner's yes. Test state: the release test window
+    runs on the n1 build (Inbox open); scratch E:\qc-scratch\n1-plan is in the test master's projects; test state to
+    put back (listed below) still open.
+    PICKUP POINT (before, 2026-11-19 18:45): u2 DONE (built + driven live, above). Next: n1,
     then t1, c1 when the owner agrees; 0.1.27 publish waits for the owner's yes. Test state: the release test window
     runs on the u2 build (This PC shown); test state to put back (listed below) still open.
     PICKUP POINT (before, 2026-11-19 16:45): M9 DONE, 0.1.26 published (the first migrated

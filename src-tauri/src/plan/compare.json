@@ -11192,15 +11192,21 @@
    "choices": [
     {
      "id": "go",
-     "label": "Try again"
+     "label": "Try again",
+     "hint": "Run the step again as it is (when you changed something, say what in your answer)"
     },
     {
      "id": "skip",
      "label": "Skip this step",
      "hint": "Leave it, and the steps waiting for it"
+    },
+    {
+     "id": "end",
+     "label": "End the run",
+     "hint": "The run finishes what it still can, then ends; this step stays open for the next run"
     }
    ],
-   "text": "What to do differently (optional)"
+   "text": "Your answer, in your own words: \"do it yourself\", \"done, try again\", \"I don't understand\"…"
   }
  },
  {
@@ -12728,7 +12734,7 @@
     }
    ]
   ],
-  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nAlready done in this run (for context only):\n- 2. T2\n- T3\n- 4. T4\n- 5. T5\n- T6\n- 7. T7\n- 8. T8\n- T9\n- 10. T10\n- 11. T11\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add the reason under it."
+  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**2. Layout** (built)\n  - Three panes.\n  - model: second-ignored\n  - Needs: 1, docs/OTHER.md#4 x\n  - Skipped: needs step 1\n\nAlready done in this run (for context only):\n- 2. T2\n- T3\n- 4. T4\n- 5. T5\n- T6\n- 7. T7\n- 8. T8\n- T9\n- 10. T10\n- 11. T11\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add a \"  - Blocked: ...\" line under it. Then, in your last message, explain it for someone reading on a phone without this chat: what failed, why only they can act, and the exact change or information you need (any rule, command or code they must add in a fenced code block, with the file it goes in)."
  },
  {
   "fn": "stepPrompt",
@@ -12738,7 +12744,7 @@
    2,
    []
   ],
-  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**1b. Updates**\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add the reason under it."
+  "out": "You are working through the task list PLAN.md in this project, one step at a time. Your step:\n\n**1b. Updates**\n\nRules:\n- Work only on this step.\n- When the step is complete and checked, change its line in PLAN.md to \"- [x]\" and add a short \"  - Done: ...\" line under it saying what you did and how you checked it. Make these changes with your file edit tool, never a shell or regex replace: those can change text such as \"$45\" or \"$0\" in the note.\n- If you cannot finish it, leave it open and say why in your last message. If only the user can unblock it, mark it \"- [!]\" and add a \"  - Blocked: ...\" line under it. Then, in your last message, explain it for someone reading on a phone without this chat: what failed, why only they can act, and the exact change or information you need (any rule, command or code they must add in a fenced code block, with the file it goes in)."
  },
  {
   "fn": "nextModelFreeFirst",

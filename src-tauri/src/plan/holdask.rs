@@ -12,6 +12,8 @@ pub enum AnswerChoice {
     Go,
     Skip,
     Decide,
+    /// n1: end the run once what can still run is done; the step stays open for the next run.
+    End,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +54,9 @@ pub struct HoldForm {
     pub secret: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub text: Option<String>,
+    /// n1: the question laid out (what happened, why the owner, what is wanted, a snippet to copy).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub card: Option<super::ownerask::Card>,
 }
 
 /// The answer form of a held step, worded like the run panel's.
@@ -75,22 +80,35 @@ pub fn hold_form(kind: HeldKind, why: &str) -> HoldForm {
             Some("It picks the safer way and says what it chose"),
         ));
     }
+    if !hold {
+        choices[0].hint = Some(
+            "Run the step again as it is (when you changed something, say what in your answer)"
+                .into(),
+        );
+    }
     choices.push(choice(
         AnswerChoice::Skip,
         "Skip this step",
         Some("Leave it, and the steps waiting for it"),
     ));
+    if !hold {
+        choices.push(choice(
+            AnswerChoice::End,
+            "End the run",
+            Some("The run finishes what it still can, then ends; this step stays open for the next run"),
+        ));
+    }
     HoldForm {
         choices,
         secret: secret.then_some(true),
         text: (!secret).then(|| {
             if hold {
-                "Your answer (optional)"
+                "Your answer (optional)".to_string()
             } else {
-                "What to do differently (optional)"
+                super::ownerask::ANSWER_HINT.to_string()
             }
-            .into()
         }),
+        card: None,
     }
 }
 
@@ -106,6 +124,10 @@ pub fn hold_reply(answer: &InboxAnswer) -> HoldReply {
     match answer.choice {
         AnswerChoice::Skip => HoldReply {
             choice: AnswerChoice::Skip,
+            text,
+        },
+        AnswerChoice::End => HoldReply {
+            choice: AnswerChoice::End,
             text,
         },
         AnswerChoice::Decide => HoldReply {
@@ -154,7 +176,9 @@ mod tests {
     fn offers_try_again_and_skip_for_a_failed_step() {
         let f = hold_form(HeldKind::Failed, "the tests kept failing");
         let labels: Vec<&str> = f.choices.iter().map(|c| c.label.as_str()).collect();
-        assert_eq!(labels, ["Try again", "Skip this step"]);
+        assert_eq!(labels, ["Try again", "Skip this step", "End the run"]);
+        // n1: a real answer box, not "what to do differently".
+        assert_eq!(f.text.as_deref(), Some(super::super::ownerask::ANSWER_HINT));
     }
 
     #[test]

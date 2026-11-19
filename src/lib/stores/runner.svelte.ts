@@ -451,7 +451,7 @@ class RunnerStore {
    * The owner answers a held step: "go" lets it run (with the answer, if any, told to it), "skip" leaves it and the
    * steps waiting for it. Works while the run goes on (picked up after the step in hand) and while it waits.
    */
-  answer(step: StepRun, choice: "go" | "skip", text = ""): void {
+  answer(step: StepRun, choice: "go" | "skip" | "end", text = ""): void {
     const run = this.run;
     if (!run || !this.#running || step.status !== "held") return;
     api.planRun.answer(run.projectId, step.number ?? step.title, choice, text.trim()).catch(() => {});

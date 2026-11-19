@@ -19,6 +19,7 @@ use super::holdask::{self, HoldReply, InboxAnswer, hold_form, hold_key, hold_rep
 use super::housekeeping::{archive_path, done_numbers};
 use super::js;
 use super::limits::{limit_notice, limit_reset_at};
+use super::ownerask;
 use super::ownermsg;
 use super::packet::{self, Outline, packet_prompt};
 use super::planner;
@@ -456,6 +457,8 @@ impl<'a> Loop<'a> {
                     held: None,
                     waits_for: None,
                     answer: None,
+                    talk: None,
+                    instruction: None,
                     retry_from: None,
                     rerun_after: None,
                     job_type: None,
@@ -602,7 +605,10 @@ impl<'a> Loop<'a> {
             let mut state = self.load_state();
             // An answer given in the Inbox while no run went on counts as given (the window used to drop it).
             for k in &open {
-                if let Some((reply, _)) = self.inbox_answer(k) {
+                if let Some((reply, _)) = self
+                    .inbox_answer(k)
+                    .filter(|(r, _)| r.choice != holdask::AnswerChoice::End)
+                {
                     state = planstate::keep_answer(
                         &state,
                         k,
@@ -673,6 +679,7 @@ impl<'a> Loop<'a> {
                     st.held = Some(Held {
                         kind: HeldKind::Hold,
                         why: "it was held in an earlier run".into(),
+                        card: None,
                     });
                 }
             }
@@ -1496,7 +1503,19 @@ impl<'a> Loop<'a> {
                 Some(a) if !a.is_empty() => format!(" The owner answered: \"{a}\"."),
                 _ => String::new(),
             };
-            answer_note = if released.kind == HeldKind::Hold {
+            let talk = self.run.steps[i].talk.clone().unwrap_or_default();
+            answer_note = if released.kind != HeldKind::Hold && !talk.is_empty() {
+                let last = talk.last().cloned().unwrap_or_default();
+                format!(
+                    "\n\n{}",
+                    ownerask::next_try_note(
+                        &released.why,
+                        &talk,
+                        self.run.steps[i].answer.as_deref().unwrap_or(&last.answer),
+                        self.run.steps[i].instruction.as_deref().unwrap_or(""),
+                    )
+                )
+            } else if released.kind == HeldKind::Hold {
                 format!(
                     "\n\nThis step was held for the owner ({}); they said go ahead.{said}",
                     released.why
@@ -2779,6 +2798,43 @@ impl<'a> Loop<'a> {
         else {
             return false;
         };
+        // n1: "End the run": what can still run does, then the run ends; the step stays open for the next run.
+        if reply.choice == holdask::AnswerChoice::End {
+            self.sh.live().finish_without = true;
+            return false;
+        }
+        // n1: a typed answer to a blocked or unfinished step is read before anything runs again.
+        let kind = self.run.steps[i].held.as_ref().map(|h| h.kind);
+        let typed = reply.choice == holdask::AnswerChoice::Go && !reply.text.is_empty();
+        let mut instruction = None;
+        if typed && kind.is_some_and(|k| k != HeldKind::Hold) {
+            match self.read_answer(i, &reply.text) {
+                ownerask::Reading::Act { instruction: how } => {
+                    instruction = Some(how).filter(|h| !h.is_empty());
+                }
+                ownerask::Reading::Clarify(card) | ownerask::Reading::FollowUp(card) => {
+                    self.ask_again(i, &reply.text, card);
+                    return false;
+                }
+            }
+        }
+        if typed {
+            let asked = self.run.steps[i]
+                .held
+                .as_ref()
+                .and_then(|h| h.card.as_ref())
+                .map(|c| c.headline.clone());
+            if let Some(asked) = asked {
+                self.run.steps[i]
+                    .talk
+                    .get_or_insert_with(Vec::new)
+                    .push(ownerask::Exchange {
+                        asked,
+                        answer: reply.text.clone(),
+                    });
+            }
+        }
+        self.run.steps[i].instruction = instruction;
         // Kept for this plan: a run started again later does not ask again (24u part 2).
         let state = planstate::keep_answer(
             &self.load_state(),
@@ -2839,6 +2895,13 @@ impl<'a> Loop<'a> {
         if kind != HeldKind::Hold {
             let _ = self.env.inbox_resolve(&self.hold_key(&k));
         }
+        let card = st.held.as_ref().and_then(|h| h.card.clone());
+        let text = card
+            .as_ref()
+            .map(ownerask::card_text)
+            .unwrap_or_else(|| why.to_string());
+        let mut form = hold_form(kind, why);
+        form.card = card;
         let _ = self.env.inbox_add(&NewItem {
             kind_of: "answer".into(),
             kind: "run".into(),
@@ -2848,15 +2911,176 @@ impl<'a> Loop<'a> {
                 self.plan_name(),
                 st.title
             ),
-            text: why.to_string(),
+            text,
             key: Some(self.hold_key(&k)),
-            form: serde_json::to_value(hold_form(kind, why)).ok(),
+            form: serde_json::to_value(form).ok(),
             source: Some(
                 json!({"kind": "hold", "projectId": pid, "file": self.s.file, "runId": self.run.id,
                 "step": k, "held": kind}),
             ),
             open: Some(self.open_plan()),
         });
+    }
+
+    /// n1: the agent's last message in the step's latest try (its final answer, else its last text).
+    fn last_message(&self, i: usize) -> String {
+        let Some(a) = self.run.steps[i]
+            .attempts
+            .iter()
+            .rev()
+            .find(|a| !a.session_id.is_empty())
+        else {
+            return String::new();
+        };
+        let lines = self.env.session_lines(&a.session_id);
+        let last_text = lines
+            .iter()
+            .rev()
+            .find_map(|l| super::env::assistant_text(l))
+            .unwrap_or_default();
+        lines
+            .iter()
+            .rev()
+            .find_map(|l| super::env::result_of(l).filter(|(t, err)| !err && !t.trim().is_empty()))
+            .map(|(t, _)| super::env::final_text(t, &last_text))
+            .unwrap_or(last_text)
+    }
+
+    /// n1: one short call for the owner's question or the reading of their answer (the decider's way: the run's
+    /// model, else a free one); None when nobody could answer.
+    fn owner_call(&mut self, prompt: &str, title: &str) -> Option<String> {
+        let model = if self.s.default_model.is_empty() {
+            self.s.planner_model.clone()
+        } else {
+            self.s.default_model.clone()
+        };
+        match self.ask(prompt, &model, title, true) {
+            Ok((text, cost)) => {
+                self.decider_call(&model, cost);
+                Some(text)
+            }
+            Err(_) => self
+                .free_decide(
+                    "You write short, plain questions for a person who may not be a programmer. Answer with JSON only.",
+                    prompt,
+                )
+                .ok()
+                .map(|(_, t)| t),
+        }
+    }
+
+    /// n1: what the calls read about step `i`: (step, details, last message, files changed, talk).
+    fn facts_of(
+        &self,
+        i: usize,
+    ) -> (
+        String,
+        Vec<String>,
+        String,
+        Vec<String>,
+        Vec<ownerask::Exchange>,
+    ) {
+        let st = &self.run.steps[i];
+        let n = st
+            .number
+            .as_ref()
+            .map(|n| format!("{n}. "))
+            .unwrap_or_default();
+        let details = self
+            .plan()
+            .and_then(|now| find(&now.text, st.number.as_deref(), &st.title))
+            .map(|s| s.details)
+            .unwrap_or_default();
+        (
+            format!("{n}{}", st.title),
+            details,
+            self.last_message(i),
+            st.changed.clone().unwrap_or_default(),
+            st.talk.clone().unwrap_or_default(),
+        )
+    }
+
+    /// n1: the question for a blocked or unfinished step, standing on its own.
+    fn make_card(&mut self, i: usize, why: &str) -> ownerask::Card {
+        let (step, details, last, changed, talk) = self.facts_of(i);
+        let f = ownerask::StepFacts {
+            step: &step,
+            details: &details,
+            why,
+            last_message: &last,
+            changed: &changed,
+            talk: &talk,
+        };
+        let k = key(&self.run.steps[i]);
+        self.owner_call(
+            &ownerask::explain_prompt(&f),
+            &format!("Question for you: step {k}"),
+        )
+        .and_then(|t| ownerask::parse_card(&t))
+        .unwrap_or_else(|| ownerask::fallback_card(&f))
+    }
+
+    /// n1: what the owner's typed answer means. Without any model: "I don't understand" is heard, anything else is
+    /// acted on.
+    fn read_answer(&mut self, i: usize, answer: &str) -> ownerask::Reading {
+        let (step, details, last, changed, talk) = self.facts_of(i);
+        let held = self.run.steps[i].held.clone();
+        let why = held.as_ref().map(|h| h.why.clone()).unwrap_or_default();
+        let f = ownerask::StepFacts {
+            step: &step,
+            details: &details,
+            why: &why,
+            last_message: &last,
+            changed: &changed,
+            talk: &talk,
+        };
+        let card = held
+            .and_then(|h| h.card)
+            .unwrap_or_else(|| ownerask::fallback_card(&f));
+        let k = key(&self.run.steps[i]);
+        if let Some(r) = self
+            .owner_call(
+                &ownerask::reading_prompt(&f, &card, answer),
+                &format!("Your answer: step {k}"),
+            )
+            .and_then(|t| ownerask::parse_reading(&t))
+        {
+            return r;
+        }
+        if ownerask::sounds_unsure(answer) {
+            ownerask::Reading::Clarify(ownerask::fallback_clarify(&f, &card))
+        } else {
+            ownerask::Reading::Act {
+                instruction: String::new(),
+            }
+        }
+    }
+
+    /// n1: the answer did not settle the need: the talk is kept, the step stays held and asks `card` instead.
+    fn ask_again(&mut self, i: usize, answer: &str, card: ownerask::Card) {
+        let k = key(&self.run.steps[i]);
+        let st = &mut self.run.steps[i];
+        let asked = st
+            .held
+            .as_ref()
+            .and_then(|h| h.card.as_ref())
+            .map(|c| c.headline.clone())
+            .unwrap_or_else(|| st.held.as_ref().map(|h| h.why.clone()).unwrap_or_default());
+        st.talk
+            .get_or_insert_with(Vec::new)
+            .push(ownerask::Exchange {
+                asked,
+                answer: answer.to_string(),
+            });
+        let Some(h) = st.held.as_mut() else {
+            return;
+        };
+        h.card = Some(card);
+        let (kind, why) = (h.kind, h.why.clone());
+        // The answered question is closed and the new one asked (a new Inbox item, so it notifies).
+        let _ = self.env.inbox_resolve(&self.hold_key(&k));
+        self.ask_owner(i, kind, &why);
+        self.save();
     }
 
     /// Sets a step aside for the owner's answer (24u), and the open steps that need it: the plan says so first
@@ -2869,10 +3093,18 @@ impl<'a> Loop<'a> {
             st.held = Some(Held {
                 kind,
                 why: why.to_string(),
+                card: None,
             });
             st.answer = None;
         }
         let k = key(&self.run.steps[i]);
+        // n1: a blocked or unfinished step asks a question that stands on its own.
+        if kind != HeldKind::Hold {
+            let card = self.make_card(i, why);
+            if let Some(h) = self.run.steps[i].held.as_mut() {
+                h.card = Some(card);
+            }
+        }
         self.ask_owner(i, kind, why);
         let plan_steps = self
             .plan()
@@ -3337,6 +3569,8 @@ fn new_step_run(s: &Step, replaces: Option<&str>) -> StepRun {
         held: None,
         waits_for: None,
         answer: None,
+        talk: None,
+        instruction: None,
         retry_from: None,
         rerun_after: None,
         job_type: None,

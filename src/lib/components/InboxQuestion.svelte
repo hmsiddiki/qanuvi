@@ -4,6 +4,7 @@
    * notification opens, so a question is answered the same way everywhere. The first answer anywhere counts.
    */
   import { inbox, type AnswerChoice, type InboxItem } from "$lib/stores/inbox.svelte";
+  import HoldCardView from "./HoldCardView.svelte";
 
   let { item, onopen }: { item: InboxItem; onopen?: (item: InboxItem) => void } = $props();
 
@@ -17,21 +18,45 @@
     late = !(await inbox.answer(item.id, { choice, text: item.form?.secret ? "" : text.trim() }));
     busy = false;
   }
+
+  // n1: typed words are an answer of their own ("Send answer"); the quick answers stay beside it.
+  const typed = $derived(text.trim().length > 0);
+  const choices = $derived(item.form?.choices ?? []);
+  const shownChoices = $derived(typed ? choices.filter((c, i) => i !== 0) : choices);
+
+  function keydown(e: KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && typed && choices[0]) {
+      e.preventDefault();
+      void send(choices[0].id);
+    }
+  }
 </script>
 
 <div class="question">
-  {#if item.text}<p class="why">{item.text}</p>{/if}
+  {#if item.form?.card}
+    <HoldCardView card={item.form.card} />
+  {:else if item.text}<p class="why">{item.text}</p>{/if}
   {#if item.form?.secret}
     <p class="secret">
       This asks for a login or password. Type it in the run panel of the plan, so it is kept as a private detail and
       never shown here.
     </p>
   {:else if item.form?.text}
-    <input type="text" placeholder={item.form.text} bind:value={text} disabled={busy} />
+    <textarea
+      rows={typed ? 3 : 2}
+      aria-label="Your answer"
+      placeholder={item.form.text}
+      bind:value={text}
+      disabled={busy}
+      onkeydown={keydown}
+      title="Enter sends, Shift+Enter starts a new line"></textarea>
   {/if}
   <div class="choices">
-    {#each item.form?.choices ?? [] as c, i (c.id)}
-      <button type="button" class:primary={i === 0} title={c.hint} disabled={busy} onclick={() => send(c.id)}
+    {#if typed && choices[0]}
+      <button type="button" class="primary" disabled={busy} onclick={() => send(choices[0].id)}>Send answer</button>
+    {/if}
+    {#each shownChoices as c, i (c.id)}
+      <button type="button" class:primary={!typed && i === 0} title={c.hint} disabled={busy} onclick={() => send(c.id)}
         >{c.label}</button
       >
     {/each}
@@ -59,7 +84,9 @@
     color: var(--qx-status-waiting);
   }
 
-  input {
+  textarea {
+    display: block;
+    resize: vertical;
     width: 100%;
     box-sizing: border-box;
     padding: 4px 8px;
