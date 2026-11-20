@@ -20,6 +20,11 @@ use tungstenite::{Message, WebSocket};
 /// A WebSocket to the relay.
 pub struct Link {
     ws: WebSocket<MaybeTlsStream<TcpStream>>,
+    /// rl1: when the relay was last heard from, and last pinged; a link quiet for too long has died.
+    heard: Instant,
+    pinged: Instant,
+    ping_every: Duration,
+    silent: Duration,
 }
 
 pub fn check_relay_url(url: &str) -> Result<String, String> {
@@ -53,7 +58,21 @@ impl Link {
                 .map_err(|e| e.to_string())?,
             _ => {}
         }
-        Ok(Self { ws })
+        Ok(Self {
+            ws,
+            heard: Instant::now(),
+            pinged: Instant::now(),
+            ping_every: crate::relay_server::PING_EVERY,
+            silent: crate::relay_server::SILENT,
+        })
+    }
+
+    /// Other ping and silence times (rl1 tests).
+    #[cfg(test)]
+    fn timed(mut self, ping_every: Duration, silent: Duration) -> Self {
+        self.ping_every = ping_every;
+        self.silent = silent;
+        self
     }
 
     pub fn send(&mut self, m: &Msg) -> Result<(), String> {
@@ -62,12 +81,31 @@ impl Link {
             .map_err(|_| "The connection to the relay ended.".to_string())
     }
 
-    /// The next message, or None after a short wait.
+    /// The next message, or None after a short wait. rl1: the relay is pinged now and then, and a relay that has said
+    /// nothing at all (not even a pong) for too long counts as gone, so the caller connects again.
     pub fn poll(&mut self) -> Result<Option<Msg>, String> {
-        match crate::relay_server::read(&mut self.ws) {
-            Ok(Some(t)) => Ok(serde_json::from_str(&t).ok()),
-            Ok(None) => Ok(None),
-            Err(crate::relay_server::Gone) => Err("The connection to the relay ended.".into()),
+        use crate::relay_server::{Frame, Gone, read_frame};
+        const ENDED: &str = "The connection to the relay ended.";
+        if self.pinged.elapsed() >= self.ping_every {
+            self.pinged = Instant::now();
+            self.ws
+                .send(Message::Ping(Vec::new().into()))
+                .map_err(|_| ENDED.to_string())?;
+        }
+        match read_frame(&mut self.ws) {
+            Ok(Frame::Text(t)) => {
+                self.heard = Instant::now();
+                Ok(serde_json::from_str(&t).ok())
+            }
+            Ok(Frame::Other) => {
+                self.heard = Instant::now();
+                Ok(None)
+            }
+            Ok(Frame::Nothing) if self.heard.elapsed() > self.silent => {
+                Err("The relay stopped answering.".into())
+            }
+            Ok(Frame::Nothing) => Ok(None),
+            Err(Gone) => Err(ENDED.into()),
         }
     }
 
@@ -939,5 +977,94 @@ mod tests {
         rm.remove_device(&paired.pairing);
         assert!(open_session(&paired).is_err());
         rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// rl1: a handler whose link died quietly (it reads nothing, so it answers no ping) is dropped by the relay, and
+    /// the master forgets its session (the "Used from" ribbon goes); a link that keeps reading stays.
+    #[test]
+    fn a_handler_that_went_quiet_is_forgotten_and_a_live_one_stays() {
+        let relay = crate::relay_server::start_local_timed(
+            Duration::from_millis(100),
+            Duration::from_millis(800),
+        )
+        .unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !rm.status().connected {
+            assert!(
+                Instant::now() < deadline,
+                "the master did not reach the relay"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+
+        let mut live = open_session(&paired).unwrap();
+        let quiet = open_session(&paired).unwrap();
+        assert_eq!(rm.status().sessions.len(), 2);
+        // The live one keeps reading (and so answers pings) for well past the silence limit.
+        let until = Instant::now() + Duration::from_millis(2500);
+        while Instant::now() < until {
+            assert!(live.poll_line().is_ok(), "the live session was dropped");
+        }
+        let sessions = rm.status().sessions;
+        assert_eq!(sessions.len(), 1, "{sessions:?}");
+        drop(quiet);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// rl1: an older Qanuvi (0.1.32 and before) never pings, it only keeps reading; the relay's pings are answered by
+    /// its WebSocket on reading, so the new relay keeps it connected.
+    #[test]
+    fn an_older_client_that_only_reads_stays_connected() {
+        let relay = crate::relay_server::start_local_timed(
+            Duration::from_millis(100),
+            Duration::from_millis(600),
+        )
+        .unwrap();
+        let (mut ws, _) = tungstenite::connect(relay.as_str()).unwrap();
+        if let MaybeTlsStream::Plain(s) = ws.get_ref() {
+            s.set_read_timeout(Some(Duration::from_millis(50))).unwrap();
+        }
+        let until = Instant::now() + Duration::from_millis(2000);
+        while Instant::now() < until {
+            // The read loop of the older Link: text or nothing, never a ping of its own.
+            assert!(
+                crate::relay_server::read(&mut ws).is_ok(),
+                "the relay dropped a client that only reads"
+            );
+        }
+    }
+
+    /// rl1: a relay that says nothing at all (not even a pong) counts as gone on the client's side too.
+    #[test]
+    fn a_relay_that_stopped_answering_ends_the_link() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let held = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let ws = tungstenite::accept(stream).unwrap();
+            // Holds the connection open and never reads or writes again.
+            std::thread::sleep(Duration::from_secs(3));
+            drop(ws);
+        });
+        let mut link = Link::connect(&format!("ws://127.0.0.1:{port}"))
+            .unwrap()
+            .timed(Duration::from_millis(100), Duration::from_millis(500));
+        let start = Instant::now();
+        let e = loop {
+            match link.poll() {
+                Err(e) => break e,
+                Ok(_) => assert!(start.elapsed() < Duration::from_secs(2), "no end noticed"),
+            }
+        };
+        assert_eq!(e, "The relay stopped answering.");
+        held.join().unwrap();
     }
 }

@@ -16,6 +16,11 @@ use tungstenite::{Message, WebSocket};
 
 const SLOT_LIFE: Duration = Duration::from_secs(600);
 const MAX_MESSAGE: usize = 4 << 20;
+/// rl1: every connection is pinged this often, both ways, so a link that died quietly (wifi, sleep, a router that
+/// forgot it) is found.
+pub const PING_EVERY: Duration = Duration::from_secs(30);
+/// rl1: a connection nothing came from for this long is gone; its sessions end on the other side too.
+pub const SILENT: Duration = Duration::from_secs(90);
 
 #[derive(Default)]
 struct State {
@@ -37,6 +42,8 @@ pub struct Relay {
     state: Mutex<State>,
     next: AtomicU64,
     file: Option<PathBuf>,
+    ping_every: Duration,
+    silent: Duration,
 }
 
 fn hash(secret: &str) -> String {
@@ -66,6 +73,8 @@ impl Relay {
             }),
             next: AtomicU64::new(1),
             file,
+            ping_every: PING_EVERY,
+            silent: SILENT,
         })
     }
 
@@ -329,15 +338,29 @@ impl Relay {
             .conns
             .insert(me, tx);
         let mut master_of = None;
+        let mut heard = Instant::now();
+        let mut pinged = Instant::now();
         'conn: loop {
-            match read(&mut ws) {
-                Ok(Some(text)) => {
+            match read_frame(&mut ws) {
+                Ok(Frame::Text(text)) => {
+                    heard = Instant::now();
                     if let Ok(msg) = serde_json::from_str::<Msg>(&text) {
                         self.handle(me, msg, &mut master_of);
                     }
                 }
-                Ok(None) => {}
+                Ok(Frame::Other) => heard = Instant::now(),
+                Ok(Frame::Nothing) => {}
                 Err(Gone) => break,
+            }
+            // rl1: something (a pong at least) must come back; a quiet link is gone, and its sessions get a Close.
+            if heard.elapsed() > self.silent {
+                break;
+            }
+            if pinged.elapsed() >= self.ping_every {
+                pinged = Instant::now();
+                if ws.send(Message::Ping(Vec::new().into())).is_err() {
+                    break;
+                }
             }
             while let Ok(out) = rx.try_recv() {
                 if ws.send(Message::text(out)).is_err() {
@@ -353,21 +376,38 @@ impl Relay {
 #[derive(Debug)]
 pub struct Gone;
 
+/// What one read brought.
+pub enum Frame {
+    Text(String),
+    /// A ping, a pong or another frame: the other side is there.
+    Other,
+    /// Nothing within the short wait.
+    Nothing,
+}
+
 /// The next text message, None after a short wait, Err when the connection is gone.
 pub fn read<S: std::io::Read + std::io::Write>(
     ws: &mut WebSocket<S>,
 ) -> Result<Option<String>, Gone> {
+    Ok(match read_frame(ws)? {
+        Frame::Text(t) => Some(t),
+        _ => None,
+    })
+}
+
+/// The next frame of any kind (a ping read here is answered by the WebSocket itself).
+pub fn read_frame<S: std::io::Read + std::io::Write>(ws: &mut WebSocket<S>) -> Result<Frame, Gone> {
     match ws.read() {
-        Ok(Message::Text(t)) => Ok(Some(t.as_str().to_string())),
+        Ok(Message::Text(t)) => Ok(Frame::Text(t.as_str().to_string())),
         Ok(Message::Close(_)) => Err(Gone),
-        Ok(_) => Ok(None),
+        Ok(_) => Ok(Frame::Other),
         Err(tungstenite::Error::Io(e))
             if matches!(
                 e.kind(),
                 std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
             ) =>
         {
-            Ok(None)
+            Ok(Frame::Nothing)
         }
         Err(_) => Err(Gone),
     }
@@ -387,9 +427,18 @@ pub fn run(addr: &str, data: Option<&Path>) -> Result<(), String> {
 
 /// Starts a relay on a free local port (for tests); answers its ws:// address.
 pub fn start_local() -> Result<String, String> {
+    start_local_timed(PING_EVERY, SILENT)
+}
+
+/// A test relay with its own ping and silence times (rl1 tests).
+pub fn start_local_timed(ping_every: Duration, silent: Duration) -> Result<String, String> {
     let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let relay = Relay::new(None);
+    let mut relay = Relay::new(None);
+    if let Some(r) = Arc::get_mut(&mut relay) {
+        r.ping_every = ping_every;
+        r.silent = silent;
+    }
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
             let relay = relay.clone();
