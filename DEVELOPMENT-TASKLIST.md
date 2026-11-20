@@ -1272,6 +1272,8 @@ runs on or off; with it off nothing is sent anywhere.
       (ask the owner first).
     - Watch: one headless browser from the first `cargo test --lib live::` run (04:25) outlived the test process (its
       profile never removed, so its Drop never ran and the job did not end it); reruns leave nothing. Stopped by hand.
+    lx1 OWNER FOUND (2026-11-21, not looked into yet): on Linux a screen capture does not get pasted into the chat
+      (pasting an image from the clipboard into the chat box does nothing there). To check on the laptop after LM4.
     PICKUP POINT (newest, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
     (owner yes for the VPS server build swap), then LT Linux title bar, then 0.1.33 (ask).
     PICKUP POINT (before, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
