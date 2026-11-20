@@ -56,7 +56,7 @@ fn agent(env: &FakeEnv, finish: &'static str) {
         }
         if c.title == Some("Finishing pass") {
             let said = json!({"type": "assistant", "message": {"content": [{"type": "text",
-                "text": "Fixed the missing check.\n\nStill open:\n- The docs page"}]}});
+                "text": "Fixed the missing check.\n\nFindings:\n- 1. fixed: src/check.ts: added the missing check\n\nStill open:\n- The docs page"}]}});
             return AgentReply {
                 lines: vec![said.to_string()],
                 cost: Some(0.05),
@@ -210,12 +210,12 @@ fn the_full_finishing_pass_fixes_in_a_session_of_its_own_and_reads_its_still_ope
     assert_eq!(p.status, FinishStatus::Done);
     assert!(p.session_id.is_some());
     assert_eq!(p.still_open, vec!["The docs page".to_string()]);
+    // FC: no test command is no finding (the card offers to set it); each finding says what the pass did with it.
+    assert_eq!(p.findings, vec!["Review: A check is missing".to_string()]);
+    assert_eq!(p.outcomes.len(), 1);
     assert_eq!(
-        p.findings,
-        vec![
-            "Review: A check is missing".to_string(),
-            "No test command: the pass could not run the checks itself.".to_string()
-        ]
+        (p.outcomes[0].state.as_str(), p.outcomes[0].file.as_str()),
+        ("fixed", "src/check.ts")
     );
     assert!(
         p.cost_usd >= 0.06 - 1e-9,
@@ -316,6 +316,7 @@ fn a_run_record_left_running_when_qanuvi_closed_reads_as_stopped_and_can_be_resu
         checks: None,
         findings: vec![],
         still_open: vec![],
+        outcomes: vec![],
         session_id: None,
         note: None,
     });

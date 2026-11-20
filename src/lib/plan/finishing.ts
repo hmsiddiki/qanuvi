@@ -26,9 +26,21 @@ export interface FinishPass {
   findings: string[];
   /** Left for the owner. */
   stillOpen: string[];
+  /** FC: what the full pass did with each finding of the review (the card says "Fixed N of M"). */
+  outcomes?: FindingOutcome[];
   /** The full pass's session (to open it). */
   sessionId?: string;
   note?: string;
+}
+
+/** FC: what the full pass did with one finding. */
+export interface FindingOutcome {
+  finding: string;
+  state: "fixed" | "not-fixed" | "needs-you";
+  /** The file it changed (fixed), when it names one. */
+  file?: string;
+  /** What it changed, why it did not, or what the owner must do. */
+  note: string;
 }
 
 /** The key the pass's cost has in the run's lines per model. */

@@ -43,7 +43,7 @@
     "notes": []
    }
   ],
-  "out": "Before an unattended run of PLAN-D.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): DB_USER, DB_PASS\n- Test command: npm test\n- Preview address: http://localhost:5173\n\nOpen steps:\n- 82e. Short field set\n    - d0\n    - d1\n    - d2\n    - d3\n    - d4\n    - d5\n    - d6\n    - d7\n- Unnumbered\n- Empty number\n    x\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"what\":\"what it is, in plain words\",\"example\":\"an example value, never a real password\",\"ifEmpty\":\"what happens if it is left empty\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not\nalready known. Before asking, look at how the project's test command or test runner reads its settings (its docs\nsay what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a\nneed a known secret already covers is not asked again.\nWrite every secret, question and risky item for someone who does not know the code: plain words, what it is for\nand what each answer changes, with one concrete example; never quote a plan line or a code name without saying\nwhat it means.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\nQuestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+  "out": "Before an unattended run of PLAN-D.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): DB_USER, DB_PASS\n- Test command: npm test\n- Preview address: http://localhost:5173\n\nOpen steps:\n- 82e. Short field set\n    - d0\n    - d1\n    - d2\n    - d3\n    - d4\n    - d5\n    - d6\n    - d7\n- Unnumbered\n- Empty number\n    x\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"what\":\"what it is, in plain words\",\"example\":\"an example value, never a real password\",\"ifEmpty\":\"what happens if it is left empty\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\",\"about\":\"plan\",\"fromMemory\":false}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not\nalready known. Before asking, look at how the project's test command or test runner reads its settings (its docs\nsay what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a\nneed a known secret already covers is not asked again.\nWrite every secret, question and risky item for someone who does not know the code: plain words, what it is for\nand what each answer changes, with one concrete example; never quote a plan line or a code name without saying\nwhat it means.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\nQuestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money.\nA \"decide\" answer must be something the run may do under the run rules above (nothing they hold or refuse,\nsuch as a download, an install or an outside site); when only such a way exists, sort it \"you\".\n\"about\": \"project\" when the answer holds for the whole project beyond this plan (which site or address to test\non, how the tests run, how to get a test login, where something is), else \"plan\".\nA question the project memory or a known secret already answers is not asked of the owner: give it as \"decide\"\nwith the memory's answer as recommended and \"fromMemory\": true."
  },
  {
   "fn": "preflightPrompt",
@@ -60,12 +60,29 @@
     ]
    }
   ],
-  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- The owner's notes for this plan:\n  - one\n  - two\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"what\":\"what it is, in plain words\",\"example\":\"an example value, never a real password\",\"ifEmpty\":\"what happens if it is left empty\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\"}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not\nalready known. Before asking, look at how the project's test command or test runner reads its settings (its docs\nsay what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a\nneed a known secret already covers is not asked again.\nWrite every secret, question and risky item for someone who does not know the code: plain words, what it is for\nand what each answer changes, with one concrete example; never quote a plan line or a code name without saying\nwhat it means.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\nQuestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money."
+  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- The owner's notes for this plan:\n  - one\n  - two\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"what\":\"what it is, in plain words\",\"example\":\"an example value, never a real password\",\"ifEmpty\":\"what happens if it is left empty\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\",\"about\":\"plan\",\"fromMemory\":false}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not\nalready known. Before asking, look at how the project's test command or test runner reads its settings (its docs\nsay what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a\nneed a known secret already covers is not asked again.\nWrite every secret, question and risky item for someone who does not know the code: plain words, what it is for\nand what each answer changes, with one concrete example; never quote a plan line or a code name without saying\nwhat it means.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\nQuestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money.\nA \"decide\" answer must be something the run may do under the run rules above (nothing they hold or refuse,\nsuch as a download, an install or an outside site); when only such a way exists, sort it \"you\".\n\"about\": \"project\" when the answer holds for the whole project beyond this plan (which site or address to test\non, how the tests run, how to get a test login, where something is), else \"plan\".\nA question the project memory or a known secret already answers is not asked of the owner: give it as \"decide\"\nwith the memory's answer as recommended and \"fromMemory\": true."
+ },
+ {
+  "fn": "preflightPrompt",
+  "args": [
+   "P.md",
+   [],
+   {
+    "secrets": [],
+    "testCommand": "",
+    "previewUrl": "",
+    "notes": [],
+    "memory": [
+     "[fact] Test site: https://shop.example.test/"
+    ]
+   }
+  ],
+  "out": "Before an unattended run of P.md, read these open steps (and the code only where you must, read-only: at most\nabout ten quick looks; this check should take a minute or two, not a step's work) and list\nwhat the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.\n\nAlready known:\n- Project secrets (environment variables every step gets): none\n- Test command: none set\n- Preview address: none set\n- This project's memory (the owner's own facts about the project):\n  - [fact] Test site: https://shop.example.test/\n\nOpen steps:\n\n\nAnswer with JSON only, in this shape (empty lists when nothing is needed):\n{\"secrets\":[{\"name\":\"ENV_NAME\",\"what\":\"what it is, in plain words\",\"example\":\"an example value, never a real password\",\"ifEmpty\":\"what happens if it is left empty\",\"why\":\"...\",\"steps\":[\"82e\"]}],\n \"questions\":[{\"step\":\"83c\",\"question\":\"a choice the steps leave open\",\"sort\":\"decide\",\"recommended\":\"the answer you advise\",\"because\":\"...\",\"about\":\"plan\",\"fromMemory\":false}],\n \"risky\":[{\"step\":\"84a\",\"why\":\"deletes data / migrates / publishes / live payments / pushes\",\"sort\":\"checks\",\"because\":\"...\"}],\n \"setup\":[{\"what\":\"something that must run or be set\",\"why\":\"...\"}],\n \"order\":[{\"step\":\"85b\",\"after\":[\"85c\"],\"why\":\"...\"}]}\nRules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not\nalready known. Before asking, look at how the project's test command or test runner reads its settings (its docs\nsay what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a\nneed a known secret already covers is not asked again.\nWrite every secret, question and risky item for someone who does not know the code: plain words, what it is for\nand what each answer changes, with one concrete example; never quote a plan line or a code name without saying\nwhat it means.\nExamples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.\nQuestions only for real choices the steps leave open, not for things you can decide from the code; risky only\nfor steps that are hard to undo or reach outside this computer; order only when a step must run after steps\nlisted below it (the run goes in file order otherwise; each becomes a Needs line in the plan). At most 8 items\nin each list.\nSort every question and risky step (sort):\n- \"decide\": a sensible default exists that can be changed later (a setting, not hard-coded); give it as\n  recommended and say why. Most naming, format, layout and library choices are this.\n- \"checks\": it may go ahead if the decider reviews its diff and the tests pass first (migrations, deletions on\n  this computer or a test database, refactors of shared code).\n- \"you\": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail\n  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.\nJudge risk by where the step runs: money on a local or test database is not real money.\nA \"decide\" answer must be something the run may do under the run rules above (nothing they hold or refuse,\nsuch as a download, an install or an outside site); when only such a way exists, sort it \"you\".\n\"about\": \"project\" when the answer holds for the whole project beyond this plan (which site or address to test\non, how the tests run, how to get a test login, where something is), else \"plan\".\nA question the project memory or a known secret already answers is not asked of the owner: give it as \"decide\"\nwith the memory's answer as recommended and \"fromMemory\": true."
  },
  {
   "fn": "parsePreflight",
   "args": [
-   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all."
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1g\",\"question\":\"Test site?\",\"sort\":\"decide\",\"recommended\":\"https://shop.example.test/\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1h\",\"question\":\"Login?\",\"sort\":\"you\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all."
   ],
   "out": {
    "secrets": [
@@ -87,42 +104,72 @@
      "question": "Separator?",
      "sort": "decide",
      "recommended": "dash",
-     "because": "URLs"
+     "because": "URLs",
+     "about": "plan",
+     "fromMemory": false
+    },
+    {
+     "step": "1g",
+     "question": "Test site?",
+     "sort": "decide",
+     "recommended": "https://shop.example.test/",
+     "because": "",
+     "about": "project",
+     "fromMemory": true
+    },
+    {
+     "step": "1h",
+     "question": "Login?",
+     "sort": "you",
+     "recommended": "",
+     "because": "",
+     "about": "project",
+     "fromMemory": false
     },
     {
      "step": "1b",
      "question": "Bank?",
      "sort": "you",
      "recommended": "",
-     "because": ""
+     "because": "",
+     "about": "plan",
+     "fromMemory": false
     },
     {
      "step": "1d",
      "question": "Format?",
      "sort": "decide",
      "recommended": "ISO",
-     "because": ""
+     "because": "",
+     "about": "plan",
+     "fromMemory": false
     },
     {
      "step": "",
      "question": "Numbered step?",
      "sort": "checks",
      "recommended": "y",
-     "because": ""
+     "because": "",
+     "about": "plan",
+     "fromMemory": false
     },
     {
      "step": "1e",
      "question": "Column?",
      "sort": "checks",
      "recommended": "slug",
-     "because": ""
+     "because": "",
+     "about": "plan",
+     "fromMemory": false
     },
     {
      "step": "1f",
      "question": "Bank login?",
      "sort": "you",
      "recommended": "test bank",
-     "because": ""
+     "because": "",
+     "about": "plan",
+     "fromMemory": false
     }
    ],
    "risky": [
@@ -288,7 +335,7 @@
  {
   "fn": "settleCheck",
   "args": [
-   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1g\",\"question\":\"Test site?\",\"sort\":\"decide\",\"recommended\":\"https://shop.example.test/\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1h\",\"question\":\"Login?\",\"sort\":\"you\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
    {
     "0": "dash",
     "1": "  ",
@@ -312,8 +359,18 @@
   "out": {
    "holds": [
     {
-     "step": "1b",
-     "why": "a question was left open (Bank?)",
+     "step": "1g",
+     "why": "a question was left open (Test site?)",
+     "by": "default"
+    },
+    {
+     "step": "1e",
+     "why": "a question was left open (Column?)",
+     "by": "default"
+    },
+    {
+     "step": "1f",
+     "why": "a question was left open (Bank login?)",
      "by": "default"
     },
     {
@@ -328,15 +385,17 @@
     }
    ],
    "cleared": [
+    "1h",
+    "1b",
     "1d",
-    "1e",
-    "1f",
     "2a",
     "2c"
    ],
    "notes": [
-    "The owner's answer for step 1d: Format? → ISO",
-    "The owner's answer for step 1f: Bank login? → test bank"
+    "The owner's answer for step 1h: Login? → ISO",
+    "The owner's answer for step 1b: Bank? → y",
+    "The owner's answer for step 1d: Format? → slug",
+    "The owner's answer for step : Numbered step? → test bank"
    ],
    "decided": [
     {
@@ -344,18 +403,6 @@
      "what": "Separator?",
      "answer": "dash",
      "because": "URLs"
-    },
-    {
-     "step": "",
-     "what": "Numbered step?",
-     "answer": "y",
-     "because": ""
-    },
-    {
-     "step": "1e",
-     "what": "Column?",
-     "answer": "slug",
-     "because": ""
     },
     {
      "step": "2a",
@@ -370,18 +417,13 @@
      "because": ""
     }
    ],
-   "extraChecks": [
-    {
-     "step": "1e",
-     "why": "Column?"
-    }
-   ]
+   "extraChecks": []
   }
  },
  {
   "fn": "settleCheck",
   "args": [
-   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1g\",\"question\":\"Test site?\",\"sort\":\"decide\",\"recommended\":\"https://shop.example.test/\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1h\",\"question\":\"Login?\",\"sort\":\"you\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
    {},
    {},
    {},
@@ -392,6 +434,16 @@
     {
      "step": "1a",
      "why": "a question was left open (Separator?)",
+     "by": "default"
+    },
+    {
+     "step": "1g",
+     "why": "a question was left open (Test site?)",
+     "by": "default"
+    },
+    {
+     "step": "1h",
+     "why": "a question was left open (Login?)",
      "by": "default"
     },
     {
@@ -1292,7 +1344,7 @@
  {
   "fn": "withReadHolds",
   "args": [
-   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
+   "Checked:\n{\"secrets\":[{\"name\":\" DB_PASS \",\"why\":\"db\",\"steps\":[\"1\",\"\",3,\" 2 \"]},{\"name\":\"9bad\",\"why\":\"x\"},{\"name\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"},\"str\",null,[1]],\"questions\":[{\"step\":\"1a\",\"question\":\"Separator?\",\"sort\":\"decide\",\"recommended\":\"dash\",\"because\":\"URLs\"},{\"step\":\"1g\",\"question\":\"Test site?\",\"sort\":\"decide\",\"recommended\":\"https://shop.example.test/\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1h\",\"question\":\"Login?\",\"sort\":\"you\",\"about\":\"project\",\"fromMemory\":true},{\"step\":\"1b\",\"question\":\"Bank?\",\"sort\":\"checks\"},{\"step\":\"1c\",\"question\":\"  \",\"recommended\":\"x\"},{\"step\":\"1d\",\"question\":\"Format?\",\"recommended\":\"ISO\",\"sort\":\"odd\"},{\"step\":5,\"question\":\"Numbered step?\",\"recommended\":\"y\",\"sort\":\"checks\"},{\"step\":\"1e\",\"question\":\"Column?\",\"sort\":\"checks\",\"recommended\":\"slug\"},{\"step\":\"1f\",\"question\":\"Bank login?\",\"sort\":\"you\",\"recommended\":\"test bank\"}],\"risky\":[{\"step\":\"2a\",\"why\":\"migrates\",\"sort\":\"checks\",\"because\":\"test db\"},{\"step\":\"\",\"why\":\"no step\"},{\"step\":\"2b\",\"why\":\"wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\"},{\"step\":\"2c\",\"why\":\"clears cache\",\"sort\":\"decide\"},{\"step\":\"1a\",\"why\":\"renames files\",\"sort\":\"you\"}],\"setup\":[{\"what\":\" MySQL \",\"why\":\"tests\"},{\"why\":\"no what\"}]}\nThat is all.",
    {},
    {},
    {
@@ -1321,6 +1373,16 @@
   ],
   "out": {
    "holds": [
+    {
+     "step": "1g",
+     "why": "a question was left open (Test site?)",
+     "by": "default"
+    },
+    {
+     "step": "1h",
+     "why": "a question was left open (Login?)",
+     "by": "default"
+    },
     {
      "step": "1d",
      "why": "a question was left open (Format?)",
@@ -14080,7 +14142,7 @@
     "f61.ts"
    ]
   ],
-  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with a section headed exactly `Still open:` and one `- ` line per thing the owner still has\nto do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n- 3. Add the cart\n    - Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n    two\n    three\n    four\n- No number\n\nFiles the run changed:\n- f0.ts\n- f1.ts\n- f2.ts\n- f3.ts\n- f4.ts\n- f5.ts\n- f6.ts\n- f7.ts\n- f8.ts\n- f9.ts\n- f10.ts\n- f11.ts\n- f12.ts\n- f13.ts\n- f14.ts\n- f15.ts\n- f16.ts\n- f17.ts\n- f18.ts\n- f19.ts\n- f20.ts\n- f21.ts\n- f22.ts\n- f23.ts\n- f24.ts\n- f25.ts\n- f26.ts\n- f27.ts\n- f28.ts\n- f29.ts\n- f30.ts\n- f31.ts\n- f32.ts\n- f33.ts\n- f34.ts\n- f35.ts\n- f36.ts\n- f37.ts\n- f38.ts\n- f39.ts\n- f40.ts\n- f41.ts\n- f42.ts\n- f43.ts\n- f44.ts\n- f45.ts\n- f46.ts\n- f47.ts\n- f48.ts\n- f49.ts\n- f50.ts\n- f51.ts\n- f52.ts\n- f53.ts\n- f54.ts\n- f55.ts\n- f56.ts\n- f57.ts\n- f58.ts\n- f59.ts\n\nThe project's full checks (npm test) before this pass: FAILED\n2 failed\n\nThe review of the whole diff found:\n- a\n\nIt left open:\n- b\n- c"
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with two sections. First one headed exactly `Findings:`, one line per numbered finding\nof the review below, in its order: `- 1. fixed: path/to/file: what you changed`, `- 2. not fixed: why`, or\n`- 3. needs you: what the owner must do`. Then one headed exactly `Still open:` and one `- ` line per thing the\nowner still has to do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n- 3. Add the cart\n    - Done: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\n    two\n    three\n    four\n- No number\n\nFiles the run changed:\n- f0.ts\n- f1.ts\n- f2.ts\n- f3.ts\n- f4.ts\n- f5.ts\n- f6.ts\n- f7.ts\n- f8.ts\n- f9.ts\n- f10.ts\n- f11.ts\n- f12.ts\n- f13.ts\n- f14.ts\n- f15.ts\n- f16.ts\n- f17.ts\n- f18.ts\n- f19.ts\n- f20.ts\n- f21.ts\n- f22.ts\n- f23.ts\n- f24.ts\n- f25.ts\n- f26.ts\n- f27.ts\n- f28.ts\n- f29.ts\n- f30.ts\n- f31.ts\n- f32.ts\n- f33.ts\n- f34.ts\n- f35.ts\n- f36.ts\n- f37.ts\n- f38.ts\n- f39.ts\n- f40.ts\n- f41.ts\n- f42.ts\n- f43.ts\n- f44.ts\n- f45.ts\n- f46.ts\n- f47.ts\n- f48.ts\n- f49.ts\n- f50.ts\n- f51.ts\n- f52.ts\n- f53.ts\n- f54.ts\n- f55.ts\n- f56.ts\n- f57.ts\n- f58.ts\n- f59.ts\n\nThe project's full checks (npm test) before this pass: FAILED\n2 failed\n\nThe review of the whole diff found:\n- 1. a\n\nIt left open:\n- b\n- c"
  },
  {
   "fn": "finishFullPrompt",
@@ -14094,7 +14156,7 @@
    null,
    []
   ],
-  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with a section headed exactly `Still open:` and one `- ` line per thing the owner still has\nto do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n\nFiles the run changed:\n- (none found)\n\nThe project has no test command set.\n\nThe review of the whole diff found:\n- nothing"
+  "out": "A plan run in this project just finished the steps below of P.md. Each step was checked on its own. You do the\nfinishing pass over the whole run before it is called done:\n1. Fix what the review below found, where it is right (say so where it is not). Keep each fix small.\n2. Remove leftovers the steps added: debug output, commented-out code, temporary files.\n3. Check each Done note below against the code: what a note claims must be there. Correct a note in P.md that\n   says more than was built; do not reopen or re-mark steps.\n4. Live tests: only where the project or the plan defines them (a live-test folder, script or a plan rule), and\n   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live\n   sites. None defined: say so, and do not invent any.\n5. Run the project's full checks at the end.\nEnd your last message with two sections. First one headed exactly `Findings:`, one line per numbered finding\nof the review below, in its order: `- 1. fixed: path/to/file: what you changed`, `- 2. not fixed: why`, or\n`- 3. needs you: what the owner must do`. Then one headed exactly `Still open:` and one `- ` line per thing the\nowner still has to do or decide (`- none` when nothing is left).\n\nSteps done in this run:\n\nFiles the run changed:\n- (none found)\n\nThe project has no test command set.\n\nThe review of the whole diff found:\n- nothing"
  },
  {
   "fn": "stillOpenIn",

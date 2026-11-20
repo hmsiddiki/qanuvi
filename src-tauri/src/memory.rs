@@ -442,6 +442,127 @@ pub fn search(
         .collect())
 }
 
+/// The project's own entry with this title, active or suggested (a fact is kept once).
+fn same_title(db: &Db, project: &str, title: &str) -> Option<Entry> {
+    db.conn()
+        .query_row(
+            &format!(
+                "SELECT {COLS} FROM memory WHERE deleted = 0 AND part = 'project' AND scope = ?1
+                 AND lower(trim(title)) = lower(trim(?2)) ORDER BY status = 'active' DESC LIMIT 1"
+            ),
+            params![project, title],
+            from_row,
+        )
+        .optional()
+        .ok()
+        .flatten()
+}
+
+fn project_fact(project: &str, title: &str, body: &str, status: &str, source: &str) -> Entry {
+    Entry {
+        id: String::new(),
+        kind: "fact".into(),
+        part: "project".into(),
+        scope: project.into(),
+        title: js_cut(title.trim(), MAX_TITLE),
+        body: js_cut(body.trim(), MAX_BODY),
+        tags: String::new(),
+        status: status.into(),
+        source: source.into(),
+        created_at: 0,
+        updated_at: 0,
+        uses: 0,
+    }
+}
+
+fn js_cut(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
+}
+
+/// PM a (owner, 2026-11-21): what the owner answered about the project is theirs, so it goes into This project at
+/// once, active; an entry with the same title takes the new answer. Never a password or key.
+pub fn keep_owner_fact(db: &Db, project: &str, title: &str, body: &str) -> Result<Entry, String> {
+    if crate::plan::guidance::looks_secret(body) || crate::plan::guidance::looks_secret(title) {
+        return Err("A password or key is not kept in the memory.".into());
+    }
+    if let Some(mut e) = same_title(db, project, title) {
+        e.body = js_cut(body.trim(), MAX_BODY);
+        e.status = "active".into();
+        return save(db, &e);
+    }
+    save(db, &project_fact(project, title, body, "active", "user"))
+}
+
+/// PM b + e: a fact a run learned about the project, offered as a suggestion; None when the memory has it already
+/// (the same title, or the same text under another title).
+pub fn suggest_fact(
+    db: &Db,
+    project: &str,
+    title: &str,
+    body: &str,
+) -> Result<Option<Entry>, String> {
+    if title.trim().is_empty() || crate::plan::guidance::looks_secret(&format!("{title} {body}")) {
+        return Ok(None);
+    }
+    if same_title(db, project, title).is_some() {
+        return Ok(None);
+    }
+    let flat = |s: &str| {
+        s.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+    };
+    let text = flat(body);
+    if !text.is_empty()
+        && list(db, Some(project), true)?
+            .iter()
+            .any(|e| flat(&e.body) == text)
+    {
+        return Ok(None);
+    }
+    save(
+        db,
+        &project_fact(project, title, body, "suggested", "agent"),
+    )
+    .map(Some)
+}
+
+/// PM b: the owner kept a run's suggestions with one click (the Inbox's "Keep all"); answers how many became active.
+pub fn approve(db: &Db, ids: &[String]) -> usize {
+    let conn = db.conn();
+    let t = now();
+    ids.iter()
+        .map(|id| {
+            conn.execute(
+                "UPDATE memory SET status = 'active', updated_at = ?2
+                 WHERE id = ?1 AND deleted = 0 AND status = 'suggested'",
+                params![id, t],
+            )
+            .unwrap_or(0)
+        })
+        .sum()
+}
+
+/// PM c: what the memory knows that applies to the project, as lines for the check before a run and the calls that
+/// write the owner's questions: This project's entries first, then the account's, within `budget` characters.
+pub fn project_lines(db: &Db, project: &str, budget: usize) -> Vec<String> {
+    let mut all = list(db, Some(project), false).unwrap_or_default();
+    all.sort_by_key(|e| e.is_account());
+    let mut used = 0;
+    let mut out = vec![];
+    for e in &all {
+        let l = line(e);
+        let n = l.chars().count() + 1;
+        if used + n > budget {
+            continue;
+        }
+        used += n;
+        out.push(l.trim_start_matches("- ").to_string());
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518,6 +639,46 @@ mod tests {
         ok.status = "active".into();
         save(&db, &ok).unwrap();
         assert_eq!(list(&db, Some("p1"), false).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn owner_answers_are_kept_at_once_and_run_facts_wait_once_each() {
+        let db = Db::open_in_memory().unwrap();
+        let a = keep_owner_fact(&db, "p1", "Test site", "https://example.test/shop/").unwrap();
+        assert_eq!((a.status.as_str(), a.part.as_str()), ("active", "project"));
+        let b = keep_owner_fact(&db, "p1", "test site ", "https://example.test/new/").unwrap();
+        assert_eq!(b.id, a.id, "the same title takes the new answer");
+        assert_eq!(b.body, "https://example.test/new/");
+        assert!(keep_owner_fact(&db, "p1", "Admin", "password Xy7k9qLm2").is_err());
+        assert!(
+            suggest_fact(&db, "p1", "Test site", "other")
+                .unwrap()
+                .is_none()
+        );
+        let s = suggest_fact(&db, "p1", "How tests run", "php tests/run.php")
+            .unwrap()
+            .unwrap();
+        assert_eq!(s.status, "suggested");
+        assert!(
+            suggest_fact(&db, "p1", "Tests", " php  tests/run.php")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            project_lines(&db, "p1", 1000).len(),
+            1,
+            "suggestions are not used yet"
+        );
+        assert_eq!(approve(&db, &[s.id.clone(), "gone".into()]), 1);
+        assert_eq!(approve(&db, &[s.id]), 0, "already kept");
+        let lines = project_lines(&db, "p1", 1000);
+        assert_eq!(lines.len(), 2);
+        assert!(
+            lines
+                .iter()
+                .any(|l| l == "[fact] Test site: https://example.test/new/")
+        );
+        assert!(project_lines(&db, "p2", 1000).is_empty());
     }
 
     #[test]

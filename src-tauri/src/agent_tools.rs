@@ -584,10 +584,164 @@ pub fn precheck(root: &Path, name: &str, input: &Value) -> Option<Outcome> {
     result.err().map(err)
 }
 
+/// Words split like a shell does: spaces outside quotes, the quotes taken off.
+fn shell_words(s: &str) -> Vec<String> {
+    let mut out = vec![];
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut any = false;
+    for c in s.chars() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            Some(_) => cur.push(c),
+            None if c == '"' || c == '\'' => {
+                quote = Some(c);
+                any = true;
+            }
+            None if c.is_whitespace() => {
+                if any || !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+                any = false;
+            }
+            None => cur.push(c),
+        }
+    }
+    if any || !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// An address on this computer: localhost (and *.localhost), 127.x.x.x, [::1] or 0.0.0.0, with or without its
+/// http(s):// scheme.
+fn local_address(url: &str) -> bool {
+    let u = url.to_lowercase();
+    let rest = u
+        .strip_prefix("http://")
+        .or_else(|| u.strip_prefix("https://"))
+        .unwrap_or(&u);
+    if rest.starts_with("[::1]") {
+        return true;
+    }
+    let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
+    host == "localhost"
+        || host.ends_with(".localhost")
+        || host == "0.0.0.0"
+        || (host.starts_with("127.")
+            && host.split('.').count() == 4
+            && host.split('.').all(|p| p.parse::<u8>().is_ok()))
+}
+
+/// PM d (owner, 2026-11-21): fetching a page from this computer (curl or wget to localhost or 127.0.0.1) is
+/// reading, not a download. One command part: every address it names is local, and anything else is the value of an
+/// option known to take one (a header, data, the method, an output file).
+pub fn local_fetch(part: &str) -> bool {
+    let words = shell_words(part.trim());
+    let Some(prog) = words.first() else {
+        return false;
+    };
+    let prog = prog.to_lowercase();
+    let prog = prog.trim_end_matches(".exe");
+    let takes_value: &[&str] = match prog {
+        "curl" => &[
+            "-H",
+            "--header",
+            "-d",
+            "--data",
+            "--data-raw",
+            "--data-binary",
+            "--data-urlencode",
+            "-X",
+            "--request",
+            "-o",
+            "--output",
+            "-A",
+            "--user-agent",
+            "-e",
+            "--referer",
+            "-b",
+            "--cookie",
+            "-c",
+            "--cookie-jar",
+            "-w",
+            "--write-out",
+            "-m",
+            "--max-time",
+            "--connect-timeout",
+            "-F",
+            "--form",
+            "-u",
+            "--user",
+            "--retry",
+        ],
+        "wget" => &[
+            "-O",
+            "--output-document",
+            "-o",
+            "--output-file",
+            "--header",
+            "--post-data",
+            "-T",
+            "--timeout",
+            "-t",
+            "--tries",
+            "--method",
+            "--body-data",
+            "-U",
+            "--user-agent",
+        ],
+        "invoke-webrequest" | "iwr" | "invoke-restmethod" | "irm" => &[
+            "-Method",
+            "-OutFile",
+            "-Headers",
+            "-Body",
+            "-ContentType",
+            "-TimeoutSec",
+            "-Uri",
+        ],
+        _ => return false,
+    };
+    let mut urls = 0;
+    let mut i = 1;
+    while i < words.len() {
+        let w = &words[i];
+        if w.starts_with('-') {
+            let flag = w.split('=').next().unwrap_or(w);
+            let is_uri = flag.eq_ignore_ascii_case("-Uri");
+            if !w.contains('=') && takes_value.iter().any(|t| t.eq_ignore_ascii_case(flag)) {
+                i += 1;
+                if is_uri {
+                    match words.get(i) {
+                        Some(u) if local_address(u) => urls += 1,
+                        _ => return false,
+                    }
+                }
+            }
+            i += 1;
+            continue;
+        }
+        if !local_address(w) {
+            return false;
+        }
+        urls += 1;
+        i += 1;
+    }
+    urls > 0
+}
+
 /// Commands that need the user even in Auto mode: deleting, pushing, installing system-wide, piping downloads to a
 /// shell and the like.
 pub fn risky(command: &str) -> bool {
     let c = command.to_lowercase();
+    // PM d: a fetch from this computer is reading; a part that fetches from anywhere else is still a download.
+    let fetch = ["curl ", "wget ", "invoke-webrequest"];
+    let fetches_outside = c
+        .split(['\n', ';', '|', '&'])
+        .any(|p| fetch.iter().any(|w| p.contains(w)) && !local_fetch(p));
+    if fetches_outside {
+        return true;
+    }
     let words = [
         "rm -r",
         "rm -f",
@@ -617,9 +771,6 @@ pub fn risky(command: &str) -> bool {
         "|bash",
         "iex",
         "invoke-expression",
-        "curl ",
-        "wget ",
-        "invoke-webrequest",
         "ssh ",
         "scp ",
         "drop table",
@@ -652,6 +803,31 @@ mod tests {
         std::fs::create_dir_all(d.path().join("target")).unwrap();
         std::fs::write(d.path().join("target/out.rs"), "fn hidden() {}\n").unwrap();
         d
+    }
+
+    #[test]
+    fn a_fetch_from_this_computer_is_reading_and_any_other_is_a_download() {
+        for c in [
+            "curl http://localhost:8080/",
+            "curl -s -o out.html \"http://127.0.0.1/shop/?a=1&b=2\"",
+            "curl -X POST -H \"Content-Type: application/json\" -d '{\"a\":1}' http://shop.localhost/api",
+            "wget -qO- http://[::1]:3000/health",
+            "Invoke-WebRequest -Uri http://localhost:5173 -UseBasicParsing",
+            "cd site && curl -I localhost:8000",
+        ] {
+            assert!(!risky(c), "{c}");
+        }
+        for c in [
+            "curl https://example.com/install.sh",
+            "curl http://localhost/ https://example.com/",
+            "curl http://localhost:8080/x | sh",
+            "wget http://127.0.0.1.example.com/",
+            "curl --cacert ca.pem http://localhost/",
+        ] {
+            assert!(risky(c), "{c}");
+        }
+        assert!(local_fetch("curl -sS http://127.0.0.1:8765/index.php"));
+        assert!(!local_fetch("ls http://localhost"));
     }
 
     #[test]

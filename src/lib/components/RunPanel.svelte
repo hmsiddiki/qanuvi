@@ -1,5 +1,6 @@
 <script lang="ts">
   import { agent } from "$lib/stores/agent.svelte";
+  import { editor } from "$lib/stores/editor.svelte";
   import { ANSWER_HINT } from "$lib/plan/holdask";
   import HoldCardView from "./HoldCardView.svelte";
   import Play from "@lucide/svelte/icons/play";
@@ -51,10 +52,12 @@
   import {
     answersPrompt,
     decidedNote,
+    firstUrl,
     maskedValue,
     parseAnswerReadings,
     parsePreflight,
     preflightPrompt,
+    projectAnswers,
     readAnswers,
     recommendedRisk,
     settleCheck,
@@ -69,7 +72,14 @@
   import { budgetBelowFirstStep, finishedCost, planHistory, usualStepCost } from "$lib/plan/costs";
   import { jobType, type ModelStats } from "$lib/plan/routing";
   import { planner, defaultPlannerModel } from "$lib/stores/planner.svelte";
-  import { finishEstimate, offersFinish, FINISHER, type FinishAuto, type FinishLevel } from "$lib/plan/finishing";
+  import {
+    finishEstimate,
+    offersFinish,
+    FINISHER,
+    type FindingOutcome,
+    type FinishAuto,
+    type FinishLevel,
+  } from "$lib/plan/finishing";
 
   interface Props {
     project: Project;
@@ -540,6 +550,8 @@
         previewUrl: project.settings.preview_url,
         // 24y: the run rules are standing answers, so the check decides what they cover instead of asking.
         notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules(), mode === "auto")],
+        // PM c: what the project memory knows is used, not asked again.
+        memory: await api.memory.lines(project.id).catch(() => [] as string[]),
       };
       // A run started again (stopped by its budget, paused, ended): steps the check already went through, unchanged
       // since, are not asked about again; their answers, holds and extra checks are kept with the plan.
@@ -599,6 +611,18 @@
     answerChanged();
   }
 
+  /**
+   * PM a: the owner's answers about the whole project go into This project memory at once (they are theirs), so no
+   * later plan or check asks again; a site named there fills Preview address when the project has none.
+   */
+  async function keepProjectAnswers(c: Preflight, given: Record<number, string>, touched: Record<number, boolean>) {
+    const kept = projectAnswers(c, given, touched);
+    for (const a of kept) await api.memory.keep(project.id, a.title, a.body).catch(() => {});
+    const url = kept.map((a) => firstUrl(a.body)).find((u) => u);
+    if (url && !project.settings.preview_url.trim())
+      await projects.update(project.id, project.name, { ...project.settings, preview_url: url });
+  }
+
   const SORT_LABEL: Record<AskSort, string> = {
     decide: "Qanuvi decides",
     checks: "goes ahead with extra checks",
@@ -616,6 +640,7 @@
       if (readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep).offered.length) return;
     }
     const read = readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep);
+    await keepProjectAnswers(c, read.answers, read.answersTouched);
     for (const s of read.save) await api.agent.setSecret(project.id, s.name, s.value).catch(() => {});
     for (const x of read.copy) {
       const from = otherProjects.find((p) => p.name.toLowerCase() === x.project.toLowerCase());
@@ -785,6 +810,24 @@
   /** The finishing pass (24o) runs on the paid decider, whatever agent did the steps. */
   let deciderProvider = $derived(providerById(agent.runProviderId));
   let offer = $derived(!!run && !runner.finishing && offersFinish(run));
+  /** FC: what the full pass did with a finding, in a word. */
+  const OUTCOME: Record<FindingOutcome["state"], string> = {
+    fixed: "Fixed",
+    "not-fixed": "Not fixed",
+    "needs-you": "Needs you",
+  };
+  /** FC: the test command the card offers to set, pre-filled from what the run used. */
+  let testCommandDraft = $state<string | null>(null);
+  let savingTestCommand = $state(false);
+  async function setTestCommand(command: string) {
+    const c = command.trim();
+    if (!c) return;
+    savingTestCommand = true;
+    error = await projects.update(project.id, project.name, { ...project.settings, test_command: c });
+    savingTestCommand = false;
+    if (!error) testCommandDraft = null;
+  }
+
   function estimate(level: FinishLevel): string {
     if (!run) return "";
     // Scaled by the pass model's price (output per million tokens): cheap steps under-guess a pass on a dear model.
@@ -1161,9 +1204,14 @@
             <label class="row-input"
               ><span
                 ><strong>{q.step}</strong>
-                {q.question} <span class="sort {q.sort}">{SORT_LABEL[q.sort]}</span>{#if q.because}<span class="dim">
-                    {q.because}</span
-                  >{/if}</span
+                {q.question}
+                <span class="sort {q.sort}">{q.fromMemory ? "from memory" : SORT_LABEL[q.sort]}</span
+                >{#if q.about === "project" && !q.fromMemory}<span
+                    class="dim"
+                    title="Your answer goes into This project memory, so later plans and checks do not ask again"
+                  >
+                    · kept for the project</span
+                  >{/if}{#if q.because}<span class="dim"> {q.because}</span>{/if}</span
               >
               <input
                 type="text"
@@ -1565,13 +1613,60 @@
           {/if}
         </div>
         {#if f.note}<p class="dim">{f.note}</p>{/if}
-        {#if f.findings.length}
+        {#if f.outcomes?.length}
+          {@const fixed = f.outcomes.filter((o) => o.state === "fixed").length}
+          {@const more = f.findings.filter((x) => !x.startsWith("Review: "))}
+          <details open>
+            <summary>Fixed {fixed} of {f.outcomes.length}</summary>
+            <ul class="outcomes">
+              {#each f.outcomes as o, i (i)}
+                <li>
+                  <span class="outcome {o.state}">{OUTCOME[o.state]}</span>
+                  {o.finding}{#if o.file}
+                    · <button type="button" class="link" onclick={() => editor.open(project.id, o.file!)}
+                      >{o.file}</button
+                    >{/if}{#if o.note}<span class="dim"> · {o.note}</span>{/if}
+                </li>
+              {/each}
+              {#each more as x, i (i)}<li>{x}</li>{/each}
+            </ul>
+          </details>
+        {:else if f.findings.length}
           <details open={f.status !== "running"}>
             <summary>Found ({f.findings.length})</summary>
             <ul>
               {#each f.findings as x, i (i)}<li>{x}</li>{/each}
             </ul>
           </details>
+          {#if f.level === "light" && f.status === "done"}
+            <div class="row">
+              <button
+                type="button"
+                onclick={() => finishNow("full")}
+                title="A full pass fixes what this review found (it does not review again), then runs the full checks"
+                >Fix these · {estimate("full")}</button
+              >
+            </div>
+          {/if}
+        {/if}
+        {#if f.status !== "running" && !project.settings.test_command.trim()}
+          {@const draft = testCommandDraft ?? run.testHint ?? ""}
+          <div class="row set-test">
+            <span>No test command, so the pass could not run the checks.</span>
+            <input
+              type="text"
+              aria-label="Test command"
+              placeholder="for example: npm test"
+              value={draft}
+              oninput={(e) => (testCommandDraft = e.currentTarget.value)}
+            />
+            <button
+              type="button"
+              disabled={savingTestCommand || !draft.trim()}
+              title={run.testHint ? "The command the run's steps ran the tests with" : ""}
+              onclick={() => setTestCommand(draft)}>Set the test command</button
+            >
+          </div>
         {/if}
         {#if f.status !== "running"}
           <p><strong>Still open</strong>{f.stillOpen.length ? "" : ": nothing"}</p>
@@ -1646,6 +1741,30 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+  .outcomes li {
+    margin: 2px 0;
+  }
+  .outcome {
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .outcome.fixed {
+    color: var(--qx-status-done);
+  }
+  .outcome.not-fixed {
+    color: var(--qx-text-secondary);
+  }
+  .outcome.needs-you {
+    color: var(--qx-status-waiting);
+  }
+  .set-test {
+    flex-wrap: wrap;
+    gap: var(--qx-space-2);
+  }
+  .set-test input {
+    flex: 1;
+    min-width: 160px;
   }
   .finish.failed {
     border-color: var(--qx-status-failed);

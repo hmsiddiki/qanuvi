@@ -56,6 +56,17 @@ pub struct PreflightQuestion {
     pub recommended: String,
     /// Why that answer, or why the owner must answer.
     pub because: String,
+    /// PM a: "project" when the answer holds for the whole project (a test site, how tests run), so the owner's
+    /// answer goes into This project memory; "plan" when it is only this plan's choice.
+    #[serde(default = "plan_about")]
+    pub about: String,
+    /// PM c: the project memory already answers it: recommended is the memory's answer, shown "from memory".
+    #[serde(default, rename = "fromMemory")]
+    pub from_memory: bool,
+}
+
+fn plan_about() -> String {
+    "plan".into()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,6 +127,9 @@ pub struct Known {
     pub test_command: String,
     pub preview_url: String,
     pub notes: Vec<String>,
+    /// PM c: what This project's memory knows, one line per entry.
+    #[serde(default)]
+    pub memory: Vec<String>,
 }
 
 /// f4: an example in the owner's questions never uses their own name (it once came from the folder path).
@@ -160,6 +174,10 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         out.push("- The owner's notes for this plan:".into());
         out.extend(known.notes.iter().map(|n| format!("  - {n}")));
     }
+    if !known.memory.is_empty() {
+        out.push("- This project's memory (the owner's own facts about the project):".into());
+        out.extend(known.memory.iter().map(|m| format!("  - {m}")));
+    }
     out.extend([
         String::new(),
         "Open steps:".into(),
@@ -167,7 +185,7 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         String::new(),
         "Answer with JSON only, in this shape (empty lists when nothing is needed):".into(),
         r#"{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],"#.into(),
-        r#" "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],"#.into(),
+        r#" "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"...","about":"plan","fromMemory":false}],"#.into(),
         r#" "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],"#.into(),
         r#" "setup":[{"what":"something that must run or be set","why":"..."}],"#.into(),
         r#" "order":[{"step":"85b","after":["85c"],"why":"..."}]}"#.into(),
@@ -191,6 +209,12 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         r#"- "you": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail"#.into(),
         "  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.".into(),
         "Judge risk by where the step runs: money on a local or test database is not real money.".into(),
+        r#"A "decide" answer must be something the run may do under the run rules above (nothing they hold or refuse,"#.into(),
+        r#"such as a download, an install or an outside site); when only such a way exists, sort it "you"."#.into(),
+        r#""about": "project" when the answer holds for the whole project beyond this plan (which site or address to test"#.into(),
+        r#"on, how the tests run, how to get a test login, where something is), else "plan"."#.into(),
+        r#"A question the project memory or a known secret already answers is not asked of the owner: give it as "decide""#.into(),
+        r#"with the memory's answer as recommended and "fromMemory": true."#.into(),
     ]);
     out.join("\n")
 }
@@ -297,6 +321,12 @@ pub fn parse_preflight(answer: &str) -> Preflight {
                     } else {
                         sort
                     },
+                    about: if q["about"].as_str() == Some("project") {
+                        "project".into()
+                    } else {
+                        "plan".into()
+                    },
+                    from_memory: q["fromMemory"].as_bool() == Some(true) && !recommended.is_empty(),
                     recommended,
                     because: text(&q["because"]),
                 }
@@ -1058,6 +1088,7 @@ mod tests {
                 test_command: "php tests/run.php".into(),
                 preview_url: String::new(),
                 notes: vec!["use the shop currency".into()],
+                memory: vec![],
             },
         );
         assert!(p.contains("DB_USER"));

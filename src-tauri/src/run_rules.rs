@@ -289,7 +289,7 @@ impl Policy {
         }
         if parts
             .iter()
-            .all(|p| self.allow.iter().any(|a| matches(a, p)))
+            .all(|p| self.allow.iter().any(|a| matches(a, p)) || crate::agent_tools::local_fetch(p))
         {
             Verdict::Allow
         } else {
@@ -667,6 +667,15 @@ mod tests {
     fn edits_stay_inside_the_project_and_reading_tools_always_may() {
         let dir = tempfile::tempdir().unwrap();
         let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        // PM d: a page from this computer is reading; from anywhere else it is a download.
+        assert_eq!(
+            p.command("curl -s http://127.0.0.1:8765/shop/ | grep -c Cart"),
+            Verdict::Allow
+        );
+        assert!(matches!(
+            p.command("curl -s https://example.com/"),
+            Verdict::Never(_)
+        ));
         let inner = dir.path().join("src").join("a.ts");
         assert_eq!(
             p.decide("Edit", &json!({"file_path": inner.to_string_lossy()})),

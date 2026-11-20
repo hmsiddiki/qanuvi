@@ -1166,7 +1166,37 @@ runs on or off; with it off nothing is sent anywhere.
     - pa4 FIXED: step logs wrote UTC times ("Attempt ... 19:12" for 01:12 here); attempt_entry now uses the
       computer's time zone (attempt_entry_in(UTC) for the unit test and compare cases).
     - Not a bug: step 3 held on step 2 in run 2 was the decider's own reasoned choice (publishes src, step 2 unchecked).
-    PICKUP POINT (fresh conversation starts here, 2026-11-21 01:45, after 63166bc pushed): part 2 + check memory
+    PM a-e + FC BUILT (2026-11-21, owner "go for part 2"; NOT driven live, unpublished; pa1 drive still open):
+    - a. Check card: each question has "about" (project/plan); the owner's own answers about the project (typed,
+      changed, Accept all, or a "you" question) go into This project memory at once, one entry per title
+      (memory_keep core command, memory::keep_owner_fact; never a password/key); a site address fills Preview address
+      when empty. The row says "kept for the project". Inbox answers to held steps: the reading call may give a
+      "projectFact", kept the same way (run.rs keep_owner_fact, decision "memory" in the run record).
+    - b + e. At a run's end (Done / Needs you, not after Stop) plan/projectfacts.rs asks the free models (else the
+      run's model) for project facts in this plan's FACTS.md, and the first time in a project every plan's FACTS.md
+      (.qanuvi/plan-logs/*, settings.memory_read set once); each new one becomes a memory suggestion (no repeats by
+      title or text) and one Inbox question "N things learned about the project": Keep all (the core approves them,
+      any window/terminal) / Not now / Look first (Memory view).
+    - c. The check gets the project memory lines (memory_lines command); a question the memory answers comes back
+      "decide" with "fromMemory" and shows "from memory". Every new step session and the call that writes a held
+      step's question get the memory block (continued sessions have it already).
+    - d. curl/wget/Invoke-WebRequest to localhost, 127.x, [::1], 0.0.0.0, *.localhost = reading (agent_tools::
+      local_fetch, in risky() and the run rules); anything else still a download. The check's "decide" answers must
+      be doable under the run rules, else "you" (prompt rule; TS + Rust port, compare.json regenerated).
+    - FC. Full pass ends with a numbered `Findings:` section; FinishPass.outcomes (fixed + file / not fixed + why /
+      needs you); card "Fixed N of M", file opens in the editor. Light pass done with findings: "Fix these" runs the
+      full pass on those findings without a new review. No test command: no finding; the card offers "Set the test
+      command", pre-filled from run.testHint (the command the run's notes say runs the tests).
+    - Not done from the proposal: a held step whose need the memory answers is not retried by itself; its card asks
+      only for a yes to using the memory's answer (the step agent has the memory from the start now, so it should
+      not block on it).
+    - Checks: 574 Rust + 548 TS tests, clippy -D warnings, svelte-check, prettier clean.
+    PICKUP POINT (newest, 2026-11-21, after the PM + FC commit): next in order: (1) drive pa1 + PM + FC live on scratch
+    E:/qc-scratch/y24-part2 (owner off mouse/keyboard; fg.ps1 first): check card with a project question (answer it,
+    see Memory > This project + Preview address), a run end with FACTS.md (Inbox Keep all), a second check asking
+    nothing the memory answers, a light pass then "Fix these", "Set the test command"; (2) LT Linux title bar;
+    then 0.1.33 (ask).
+    PICKUP POINT (before, 2026-11-21 01:45, after 63166bc pushed): part 2 + check memory
     DRIVEN LIVE, pa1/pa2/pa4 fixed and built into target/release (pa1 NOT driven live yet: owner was on this PC).
     Next, in order: (1) drive pa1 on scratch E:/qc-scratch/y24-part2 (new step 6 "Add neg" is there: Run, Change,
     flip Branch, Check and start ONCE -> the check card must show at once); (2) PM a-e below + FC; (3) LT. Then

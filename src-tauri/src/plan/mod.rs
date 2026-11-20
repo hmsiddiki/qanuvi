@@ -20,6 +20,7 @@ pub mod picks;
 pub mod planner;
 pub mod planstate;
 pub mod preflight;
+pub mod projectfacts;
 pub mod prompts;
 pub mod routing;
 pub mod run;

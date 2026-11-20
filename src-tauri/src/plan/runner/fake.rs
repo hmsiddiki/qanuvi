@@ -123,6 +123,11 @@ impl Default for FakeEnv {
 }
 
 impl FakeEnv {
+    /// The project's memory entries (active and suggested), as the real module keeps them.
+    pub fn memory_entries(&self) -> Vec<crate::memory::Entry> {
+        crate::memory::list(&self.db, Some("p1"), true).unwrap_or_default()
+    }
+
     pub fn new() -> Self {
         FakeEnv {
             w: Mutex::new(World {
@@ -800,6 +805,36 @@ impl RunEnv for FakeEnv {
     fn memory_slice(&self, _request: &str, _budget: usize) -> Option<String> {
         self.call("memory_slice");
         self.memory.lock().unwrap().clone()
+    }
+
+    fn memory_keep(&self, title: &str, body: &str) -> Result<(), String> {
+        self.call("memory_keep");
+        crate::memory::keep_owner_fact(&self.db, "p1", title, body).map(|_| ())
+    }
+
+    fn memory_suggest(&self, title: &str, body: &str) -> Option<String> {
+        self.call("memory_suggest");
+        crate::memory::suggest_fact(&self.db, "p1", title, body)
+            .ok()
+            .flatten()
+            .map(|e| e.id)
+    }
+
+    fn memory_approve(&self, ids: &[String]) -> usize {
+        crate::memory::approve(&self.db, ids)
+    }
+
+    fn project_memory(&self) -> Vec<String> {
+        crate::memory::project_lines(&self.db, "p1", 3000)
+    }
+
+    fn plan_fact_files(&self) -> Vec<String> {
+        self.w()
+            .files
+            .keys()
+            .filter(|k| k.starts_with(".qanuvi/plan-logs/") && k.ends_with("/FACTS.md"))
+            .cloned()
+            .collect()
     }
 
     fn project_settings(&self) -> Result<ProjectSettings, String> {

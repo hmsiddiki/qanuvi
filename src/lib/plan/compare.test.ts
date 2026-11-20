@@ -326,6 +326,15 @@ const PF_ANSWER =
     ],
     questions: [
       { step: "1a", question: "Separator?", sort: "decide", recommended: "dash", because: "URLs" },
+      {
+        step: "1g",
+        question: "Test site?",
+        sort: "decide",
+        recommended: "https://shop.example.test/",
+        about: "project",
+        fromMemory: true,
+      },
+      { step: "1h", question: "Login?", sort: "you", about: "project", fromMemory: true },
       { step: "1b", question: "Bank?", sort: "checks" },
       { step: "1c", question: "  ", recommended: "x" },
       { step: "1d", question: "Format?", recommended: "ISO", sort: "odd" },
@@ -446,6 +455,20 @@ const LOGS = [
 const cases: [string, unknown[]][] = [
   ["preflightPrompt", ["PLAN-D.md", PF_STEPS, KNOWN]],
   ["preflightPrompt", ["P.md", [], { secrets: [], testCommand: "", previewUrl: "", notes: ["one", "two"] }]],
+  [
+    "preflightPrompt",
+    [
+      "P.md",
+      [],
+      {
+        secrets: [],
+        testCommand: "",
+        previewUrl: "",
+        notes: [],
+        memory: ["[fact] Test site: https://shop.example.test/"],
+      },
+    ],
+  ],
   ["parsePreflight", [PF_ANSWER]],
   ["parsePreflight", ["no json here"]],
   ["parsePreflight", ["} {"]],

@@ -16,6 +16,8 @@ pub struct ProjectSettings {
     pub changes_from: String,
     /// What a plan run may do while nobody is there (24y), set on the card before the run.
     pub run_rules: crate::run_rules::RunRules,
+    /// PM e: the plans' notes from before the project memory was used were read once into memory suggestions.
+    pub memory_read: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

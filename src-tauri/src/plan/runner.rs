@@ -340,6 +340,10 @@ pub struct PlanRun {
     /// The end report (24y Y5), once the run ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report: Option<RunReport>,
+    /// FC: the command the run's steps ran the tests with, when the project has no test command (the finishing card
+    /// offers it as "Set the test command").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_hint: Option<String>,
 }
 
 /// A finished step's commit on the plan's branch.

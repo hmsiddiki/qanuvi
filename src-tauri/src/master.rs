@@ -867,6 +867,19 @@ impl Master {
                 crate::memory::delete(db, &s(args, "id"))?;
                 Ok(Value::Null)
             }
+            // PM a: the owner's answer about the project, kept in This project at once (one entry per title).
+            "memory_keep" => to(crate::memory::keep_owner_fact(
+                db,
+                &s(args, "project"),
+                &s(args, "title"),
+                &s(args, "body"),
+            )),
+            // PM c: what the memory knows that applies to a project, one line per entry (for the check).
+            "memory_lines" => to(Ok(crate::memory::project_lines(
+                db,
+                &s(args, "project"),
+                3000,
+            ))),
             "memory_slice" => to(crate::memory::slice(
                 db,
                 opt(args, "project").as_deref(),
@@ -3260,6 +3273,28 @@ mod tests {
             slice.to_string().contains("Master memory test fact"),
             "{slice}"
         );
+        // PM a + c: an owner's answer about a project is kept once per title and read back as lines.
+        let mut kept = Value::Null;
+        for body in [
+            "https://shop.example.test/",
+            "https://shop.example.test/new/",
+        ] {
+            kept = call(
+                &m,
+                "memory_keep",
+                json!({"project": "p9", "title": "Test site", "body": body}),
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            call(&m, "memory_lines", json!({"project": "p9"})).unwrap(),
+            json!([
+                "[fact] Test site: https://shop.example.test/new/",
+                "[fact] Master memory test fact: kept on the master"
+            ]),
+            "the project's own first, then the account's"
+        );
+        call(&m, "memory_delete", json!({"id": kept["id"]})).unwrap();
         call(&m, "memory_delete", json!({"id": id})).unwrap();
         assert_eq!(
             call(

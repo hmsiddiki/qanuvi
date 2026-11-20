@@ -62,11 +62,30 @@ pub struct FinishPass {
     /// Left for the owner.
     #[serde(default)]
     pub still_open: Vec<String>,
+    /// FC (owner, 2026-11-21): what the full pass did with each finding, so the card says "Fixed N of M".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub outcomes: Vec<FindingOutcome>,
     /// The full pass's session (to open it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+}
+
+/// FC: what the full pass did with one finding of the review.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingOutcome {
+    /// The finding as the review wrote it.
+    pub finding: String,
+    /// "fixed", "not-fixed" or "needs-you".
+    pub state: String,
+    /// The file it changed (fixed), when it names one.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub file: String,
+    /// What it changed, why it did not, or what the owner must do.
+    #[serde(default)]
+    pub note: String,
 }
 
 /// The key the pass's cost has in the run's lines per model.
@@ -304,8 +323,10 @@ pub fn finish_full_prompt(
         "   only on a scratch copy or the test environment the plan names; never on the owner's real folders, data or live".into(),
         "   sites. None defined: say so, and do not invent any.".into(),
         "5. Run the project's full checks at the end.".into(),
-        "End your last message with a section headed exactly `Still open:` and one `- ` line per thing the owner still has".into(),
-        "to do or decide (`- none` when nothing is left).".into(),
+        "End your last message with two sections. First one headed exactly `Findings:`, one line per numbered finding".into(),
+        "of the review below, in its order: `- 1. fixed: path/to/file: what you changed`, `- 2. not fixed: why`, or".into(),
+        "`- 3. needs you: what the owner must do`. Then one headed exactly `Still open:` and one `- ` line per thing the".into(),
+        "owner still has to do or decide (`- none` when nothing is left).".into(),
         String::new(),
         "Steps done in this run:".into(),
     ];
@@ -328,7 +349,13 @@ pub fn finish_full_prompt(
     if review.findings.is_empty() {
         lines.push("- nothing".into());
     } else {
-        lines.extend(review.findings.iter().map(|f| format!("- {f}")));
+        lines.extend(
+            review
+                .findings
+                .iter()
+                .enumerate()
+                .map(|(i, f)| format!("- {}. {f}", i + 1)),
+        );
     }
     if !review.still_open.is_empty() {
         lines.push(String::new());
@@ -373,6 +400,73 @@ pub fn still_open_in(text: &str) -> Option<Vec<String>> {
     }
     items.truncate(20);
     Some(items)
+}
+
+/// FC: the `Findings:` section of the full pass's answer, one outcome per finding of the review (a finding the
+/// answer does not mention is "not fixed", saying so); empty when the answer has no such section.
+pub fn outcomes_in(text: &str, findings: &[String]) -> Vec<FindingOutcome> {
+    static HEAD: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^\s*(?:#+\s*)?\**\s*findings\s*:?\s*\**\s*:?\s*$").unwrap()
+    });
+    static ITEM: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^\s*[-*•]?\s*\**(\d+)[.)]\**\s*\**(fixed|not fixed|not-fixed|needs you|needs-you)\**\s*[:\-–]\s*(.*)$",
+        )
+        .unwrap()
+    });
+    static FILE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^`?([\w./\\-]+\.[A-Za-z0-9]{1,8})(?::\d+)?`?\s*[:\-–]\s*(.*)$").unwrap()
+    });
+    if findings.is_empty() {
+        return vec![];
+    }
+    let (lines, _) = super::tasklist::split_lines(text);
+    let Some(at) = lines.iter().rposition(|l| HEAD.is_match(l)) else {
+        return vec![];
+    };
+    let mut got: Vec<Option<(String, String, String)>> = vec![None; findings.len()];
+    for l in &lines[at + 1..] {
+        if super::finishing::still_open_in(l).is_some() {
+            break;
+        }
+        let Some(c) = ITEM.captures(l) else { continue };
+        let Ok(n) = c[1].parse::<usize>() else {
+            continue;
+        };
+        if n == 0 || n > findings.len() {
+            continue;
+        }
+        let state = match c[2].to_lowercase().as_str() {
+            "fixed" => "fixed",
+            "needs you" | "needs-you" => "needs-you",
+            _ => "not-fixed",
+        };
+        let rest = js::trim(&c[3]).to_string();
+        let (file, note) = match FILE.captures(&rest).filter(|_| state == "fixed") {
+            Some(f) => (f[1].replace('\\', "/"), js::trim(&f[2]).to_string()),
+            None => (String::new(), rest),
+        };
+        got[n - 1] = Some((state.into(), file, js::cut(&note, 400).to_string()));
+    }
+    findings
+        .iter()
+        .zip(got)
+        .map(|(f, g)| {
+            let (state, file, note) = g.unwrap_or_else(|| {
+                (
+                    "not-fixed".into(),
+                    String::new(),
+                    "The pass did not say what it did with this one.".into(),
+                )
+            });
+            FindingOutcome {
+                finding: f.clone(),
+                state,
+                file,
+                note,
+            }
+        })
+        .collect()
 }
 
 /// Done notes under a step's line ("- Done: ...").
@@ -576,7 +670,7 @@ mod tests {
         for part in [
             "never on the owner's real folders",
             "`Still open:`",
-            "- a.ts: debug log left",
+            "- 1. a.ts: debug log left",
             "- a.ts",
         ] {
             assert!(p.contains(part), "{part}");

@@ -27,6 +27,7 @@ use super::packet::{self, Outline, packet_prompt};
 use super::planner;
 use super::planstate::{self, PlanState};
 use super::preflight::{self, waits_before};
+use super::projectfacts;
 use super::routing::{
     AgentModel, Budget, BudgetState, ChooseOptions, JobType, Picked, Stats, budget_state,
     choose_model, job_type, learn,
@@ -496,6 +497,7 @@ impl<'a> Loop<'a> {
             branch: None,
             commits: None,
             report: None,
+            test_hint: None,
         };
         let known = parse_plan(&text)
             .steps
@@ -924,6 +926,148 @@ impl<'a> Loop<'a> {
                 decision: decision.into(),
                 why: why.into(),
             });
+    }
+
+    /// PM a: what the owner said about the project goes into This project memory at once (it is theirs); a site
+    /// address also fills Preview address when that is empty.
+    fn keep_owner_fact(&mut self, title: &str, text: &str) {
+        let kept = self.env.memory_keep(title, text).is_ok();
+        if let Some(url) = projectfacts::first_url(text)
+            && let Ok(mut ps) = self.env.project_settings()
+            && ps.preview_url.trim().is_empty()
+        {
+            ps.preview_url = url.clone();
+            if self.env.set_project_settings(&ps).is_ok() {
+                self.decide(
+                    "memory",
+                    "Qanuvi",
+                    "Preview address",
+                    &url,
+                    "your answer named the site to test on, and the project had no preview address",
+                );
+            }
+        }
+        if kept {
+            self.decide(
+                "memory",
+                "Qanuvi",
+                "This project memory",
+                &format!("{title}: {text}"),
+                "your answer is about the project, not only this step, so every later plan and check gets it",
+            );
+        }
+    }
+
+    /// PM b + e: at the run's end, the project facts its notes hold become memory suggestions, kept with one click
+    /// from the Inbox; the first time in a project, every plan's notes are read the same way. The test command the
+    /// run used is kept for the finishing card when the project has none.
+    fn learn_project_facts(&mut self) {
+        let Ok(mut ps) = self.env.project_settings() else {
+            return;
+        };
+        let mut files = vec![g::facts_path(&self.s.file)];
+        let first = !ps.memory_read;
+        if first {
+            for f in self.env.plan_fact_files() {
+                if !files.contains(&f) {
+                    files.push(f);
+                }
+            }
+        }
+        let notes: String = files
+            .iter()
+            .filter_map(|f| self.env.read(f).ok().map(|t| (f, t.text)))
+            .filter(|(_, t)| !js::trim(t).is_empty())
+            .map(|(f, t)| format!("From {f}:\n{t}\n"))
+            .collect();
+        if js::trim(&notes).is_empty() {
+            return;
+        }
+        let name = if self.s.project_name.is_empty() {
+            "this project".to_string()
+        } else {
+            self.s.project_name.clone()
+        };
+        let prompt =
+            projectfacts::prompt(&name, &notes, &self.env.project_memory(), &ps.test_command);
+        // Free models first (a small reading job); the run's own model when there are none.
+        let answer = match self.free_decide(projectfacts::SYSTEM, &prompt) {
+            Ok((_, t)) => Some(t),
+            Err(_) => {
+                let model = if self.s.default_model.is_empty() {
+                    self.s.planner_model.clone()
+                } else {
+                    self.s.default_model.clone()
+                };
+                match self.ask(
+                    &prompt,
+                    &model,
+                    "What the run learned about the project",
+                    true,
+                ) {
+                    Ok((t, cost)) => {
+                        self.decider_call(&model, cost);
+                        Some(t)
+                    }
+                    Err(_) => None,
+                }
+            }
+        };
+        let Some(learned) = answer.as_deref().and_then(projectfacts::parse) else {
+            return;
+        };
+        if first {
+            ps.memory_read = true;
+            let _ = self.env.set_project_settings(&ps);
+        }
+        if ps.test_command.trim().is_empty() && !learned.test_command.is_empty() {
+            self.run.test_hint = Some(learned.test_command.clone());
+        }
+        let mut kept: Vec<(String, String)> = vec![];
+        let mut ids: Vec<String> = vec![];
+        for (t, b) in &learned.facts {
+            if let Some(id) = self.env.memory_suggest(t, b) {
+                ids.push(id);
+                kept.push((t.clone(), b.clone()));
+            }
+        }
+        if ids.is_empty() {
+            return;
+        }
+        let pid = self.env.project_id().to_string();
+        let project = if self.s.project_name.is_empty() {
+            String::new()
+        } else {
+            format!("{}: ", self.s.project_name)
+        };
+        let _ = self.env.inbox_add(&NewItem {
+            kind_of: "answer".into(),
+            kind: "knowledge".into(),
+            title: format!(
+                "{project}{} {} learned about the project",
+                ids.len(),
+                if ids.len() == 1 { "thing" } else { "things" }
+            ),
+            text: projectfacts::inbox_text(&kept),
+            key: Some(format!("memory:{pid}:{}", self.run.id)),
+            open: Some(json!({"label": "Look first", "view": "memory", "projectId": pid})),
+            form: Some(json!({"choices": [
+                {"id": "keep", "label": "Keep all"},
+                {"id": "later", "label": "Not now"}
+            ]})),
+            source: Some(json!({"kind": "memory", "projectId": pid, "memoryIds": ids})),
+        });
+        self.decide(
+            "memory",
+            "Qanuvi",
+            "This project memory",
+            &format!("{} suggested", ids.len()),
+            if first {
+                "facts about the project from this run's notes and the earlier plans' notes; they wait for your yes in the Inbox"
+            } else {
+                "facts about the project from this run's notes; they wait for your yes in the Inbox"
+            },
+        );
     }
 
     fn open_plan(&self) -> Value {
@@ -1993,6 +2137,14 @@ impl<'a> Loop<'a> {
             } else {
                 None
             };
+            // PM c: a new session gets what the project memory knows (a continued one has it already), so a step
+            // never asks what the owner answered once.
+            if resume.is_none() {
+                let memory = projectfacts::memory_block(&self.env.project_memory());
+                if !memory.is_empty() {
+                    prompt = format!("{prompt}\n\n{memory}");
+                }
+            }
             let step_started = self.env.now_ms() - 2000;
             // The step's limits: what earlier attempts of it spent counts too.
             if st.attempts.is_empty() {
@@ -3063,8 +3215,14 @@ impl<'a> Loop<'a> {
         let mut instruction = None;
         if typed {
             match self.read_answer(i, &reply.text) {
-                ownerask::Reading::Act { instruction: how } => {
+                ownerask::Reading::Act {
+                    instruction: how,
+                    fact,
+                } => {
                     instruction = Some(how).filter(|h| !h.is_empty());
+                    if let Some(f) = fact {
+                        self.keep_owner_fact(&f.title, &f.text);
+                    }
                 }
                 ownerask::Reading::Clarify(card) | ownerask::Reading::FollowUp(card) => {
                     self.ask_again(i, &reply.text, card);
@@ -3266,12 +3424,18 @@ impl<'a> Loop<'a> {
             talk: &talk,
         };
         let k = key(&self.run.steps[i]);
-        self.owner_call(
-            &ownerask::explain_prompt(&f),
-            &format!("Question for you: step {k}"),
-        )
-        .and_then(|t| ownerask::parse_card(&t))
-        .unwrap_or_else(|| ownerask::fallback_card(&f))
+        let memory = projectfacts::memory_block(&self.env.project_memory());
+        let prompt = if memory.is_empty() {
+            ownerask::explain_prompt(&f)
+        } else {
+            format!(
+                "{}\n\n{memory}\nWhen the memory answers what the step needs, the card asks only for a yes to using it.",
+                ownerask::explain_prompt(&f)
+            )
+        };
+        self.owner_call(&prompt, &format!("Question for you: step {k}"))
+            .and_then(|t| ownerask::parse_card(&t))
+            .unwrap_or_else(|| ownerask::fallback_card(&f))
     }
 
     /// n1/n2: what the owner's typed answer means, read by meaning. Without any model it is acted on: the step's own
@@ -3311,6 +3475,7 @@ impl<'a> Loop<'a> {
             // n2: no model could read it, and no phrase list guesses: the step's own agent reads the owner's words.
             None => ownerask::Reading::Act {
                 instruction: String::new(),
+                fact: None,
             },
         }
     }
@@ -3790,6 +3955,11 @@ impl<'a> Loop<'a> {
                 self.finish(RunStatus::Done, &m);
             }
         }
+        // PM b + e: what the run learned about the project is offered to the memory (not after a Stop: the owner
+        // wanted it to end).
+        if matches!(self.run.status, RunStatus::Done | RunStatus::NeedsYou) {
+            self.learn_project_facts();
+        }
         // A run paused in a step keeps that step's session for Resume.
         if !(self.run.status == RunStatus::Paused && self.keep_for_resume) {
             self.drop_carry();
@@ -3883,6 +4053,21 @@ pub fn on_answer(env: &dyn RunEnv, item: &crate::inbox::InboxItem) {
         .as_ref()
         .and_then(|a| a.get("choice"))
         .and_then(Value::as_str);
+    // PM b: "Keep all" makes the run's memory suggestions active.
+    if kind == Some("memory") && choice == Some("keep") {
+        let ids: Vec<String> = item
+            .source
+            .as_ref()
+            .and_then(|s| s.get("memoryIds"))
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+        env.memory_approve(&ids);
+    }
     if kind == Some("changes-from")
         && choice == Some("qanuvi")
         && let Ok(mut s) = env.project_settings()

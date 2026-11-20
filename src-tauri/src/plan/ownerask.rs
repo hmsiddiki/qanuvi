@@ -53,11 +53,36 @@ pub struct Exchange {
     pub answer: String,
 }
 
+/// PM a: a lasting fact about the project in the owner's reply (a test site, how tests run, how to get a test
+/// login): a short title and the fact itself.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ProjectFact {
+    pub title: String,
+    pub text: String,
+}
+
+/// The project fact a reading call gave (`{"title": ..., "text": ...}`), when it has both.
+pub fn fact_of(v: Option<&Value>) -> Option<ProjectFact> {
+    let v = v?;
+    let get = |k: &str, n: usize| {
+        js::cut(v.get(k).and_then(Value::as_str).unwrap_or("").trim(), n).to_string()
+    };
+    let f = ProjectFact {
+        title: get("title", 120),
+        text: get("text", 600),
+    };
+    (!f.title.is_empty() && !f.text.is_empty()).then_some(f)
+}
+
 /// What the owner's typed answer means.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Reading {
-    /// Something to act on: the owner's words, made exact for the step (`instruction`, may be empty).
-    Act { instruction: String },
+    /// Something to act on: the owner's words, made exact for the step (`instruction`, may be empty), and what
+    /// the reply says about the project that holds beyond this step (PM a), kept in This project memory.
+    Act {
+        instruction: String,
+        fact: Option<ProjectFact>,
+    },
     /// "I don't understand": the same need asked again, simpler and in more detail.
     Clarify(Card),
     /// The answer does not settle the need: a follow-up question.
@@ -226,12 +251,19 @@ pub fn reading_prompt(f: &StepFacts, card: &Card, answer: &str) -> String {
         String::new(),
         CARD_RULES.into(),
         String::new(),
+        PROJECT_FACT_RULE.into(),
         format!(
-            "Answer with JSON only: {{\"intent\": \"act\" | \"question\" | \"tried\" | \"unclear\" | \"followup\", \"instruction\": \"...\", \"reply\": \"...\", \"card\": {CARD_SHAPE} or null}}"
+            "Answer with JSON only: {{\"intent\": \"act\" | \"question\" | \"tried\" | \"unclear\" | \"followup\", \"instruction\": \"...\", \"reply\": \"...\", \"card\": {CARD_SHAPE} or null, \"projectFact\": {{\"title\": \"...\", \"text\": \"...\"}} or null}}"
         ),
     ]);
     out.join("\n")
 }
+
+/// PM a: what the reading call keeps for the project besides the step.
+const PROJECT_FACT_RULE: &str = "\"projectFact\" (with \"act\" only): when the reply says something about this project \
+     that holds beyond this step and plan (which site or address to test on, how the tests run, how to get a test \
+     login, where something is), a short title and the fact in one plain sentence; never a password, key or other \
+     secret value (say where it is kept instead). null when the reply is only about this step.";
 
 /// n2: a new question never repeats an earlier one word for word (the question being answered and the talk's): it is
 /// asked another way, from what is needed, else plainly marked as put another way.
@@ -321,6 +353,7 @@ pub fn parse_reading(text: &str) -> Option<Reading> {
                 600,
             )
             .to_string(),
+            fact: fact_of(v.get("projectFact")),
         }),
         "clarify" | "question" | "unclear" => card.map(Reading::Clarify),
         "followup" | "tried" => card.map(Reading::FollowUp),
@@ -481,9 +514,19 @@ mod tests {
             ),
             Some(Reading::Act {
                 instruction: "Add the rule to /etc/nginx/nginx.conf yourself and reload nginx."
-                    .into()
+                    .into(),
+                fact: None,
             })
         );
+        // PM a: what the reply says about the project beyond this step comes with it.
+        let r = parse_reading(
+            r#"{"intent": "act", "instruction": "Test on the test site.", "projectFact": {"title": "Test site", "text": "Plan steps test on https://example.test/shop/"}}"#,
+        );
+        assert!(matches!(r, Some(Reading::Act { fact: Some(f), .. }) if f.title == "Test site"));
+        let r = parse_reading(
+            r#"{"intent": "act", "projectFact": {"title": "Test site", "text": ""}}"#,
+        );
+        assert!(matches!(r, Some(Reading::Act { fact: None, .. })));
         let r = parse_reading(
             r#"{"intent": "clarify", "card": {"headline": "The web server needs one more rule"}}"#,
         );

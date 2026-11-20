@@ -3,10 +3,12 @@ import {
   answersPrompt,
   clipReason,
   decidedNote,
+  firstUrl,
   maskedValue,
   parseAnswerReadings,
   parsePreflight,
   preflightPrompt,
+  projectAnswers,
   readAnswers,
   recommendedRisk,
   secretNeedsReading,
@@ -407,5 +409,60 @@ describe("the check before a run", () => {
     expect(clipReason("short")).toBe("short");
     const noSpace = "x".repeat(400);
     expect(clipReason(noSpace)).toBe("x".repeat(299) + "…");
+  });
+});
+
+describe("PM: the project memory in the check", () => {
+  it("asks about the project once: the owner's own answers about it are kept, a plan's choices are not", () => {
+    const c = parsePreflight(
+      JSON.stringify({
+        questions: [
+          { step: "1", question: "Which site should the run test on?", sort: "you", recommended: "", about: "project" },
+          { step: "2", question: "Which separator?", sort: "decide", recommended: "dash", about: "plan" },
+          {
+            step: "3",
+            question: "How do the tests run?",
+            sort: "decide",
+            recommended: "php tests/run.php",
+            about: "project",
+            fromMemory: true,
+          },
+          { step: "4", question: "Which test login?", sort: "decide", recommended: "the seed file", about: "project" },
+        ],
+      }),
+    );
+    expect(c.questions.map((q) => [q.about, q.fromMemory])).toEqual([
+      ["project", false],
+      ["plan", false],
+      ["project", true],
+      ["project", false],
+    ]);
+    const answers = { 0: "https://shop.example.test/base/", 1: "dash", 2: "php tests/run.php", 3: "the seed file" };
+    // Qanuvi's own defaults are not the owner's: only the answer only they could give is kept.
+    expect(projectAnswers(c, answers, {})).toEqual([
+      { title: "Which site should the run test on?", body: "https://shop.example.test/base/" },
+    ]);
+    // Changed by the owner (or Accept all): theirs; the memory's own answer changed is kept anew.
+    expect(
+      projectAnswers(c, { ...answers, 2: "composer test" }, { 1: true, 2: true, 3: true }).map((a) => a.body),
+    ).toEqual(["https://shop.example.test/base/", "composer test", "the seed file"]);
+    expect(projectAnswers(c, { ...answers, 0: " " }, {})).toEqual([]);
+  });
+
+  it("gives the check the memory and names a site in an answer", () => {
+    const p = preflightPrompt("P.md", [], {
+      secrets: [],
+      testCommand: "",
+      previewUrl: "",
+      notes: [],
+      memory: ["[fact] Test site: https://shop.example.test/"],
+    });
+    expect(p).toContain("- This project's memory (the owner's own facts about the project):\n  - [fact] Test site");
+    expect(p).toContain('"fromMemory": true');
+    expect(preflightPrompt("P.md", [], { secrets: [], testCommand: "", previewUrl: "", notes: [] })).not.toContain(
+      "This project's memory (",
+    );
+    expect(firstUrl("Test on https://shop.example.test/base/. Thanks")).toBe("https://shop.example.test/base/");
+    expect(firstUrl("the usual one")).toBeNull();
   });
 });

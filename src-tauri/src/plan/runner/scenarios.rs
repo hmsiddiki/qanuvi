@@ -2365,3 +2365,102 @@ fn y24_part_2_without_git_nothing_is_committed_and_a_failed_step_is_still_undone
         r.decisions
     );
 }
+
+#[test]
+fn pm_a_run_offers_what_it_learned_about_the_project_once_and_keep_all_makes_it_active() {
+    let env = world("# Plan\n\n- [ ] **1. Prices**\n");
+    env.set_settings(ProjectSettings {
+        test_command: String::new(),
+        ..settings("")
+    });
+    let facts = crate::plan::guidance::facts_path(FILE);
+    env.put(
+        &facts,
+        "- Tests: php tests/run.php --strict\n- Step 1 left the cart for step 2\n",
+    );
+    env.put(
+        ".qanuvi/plan-logs/OLD-PLAN/FACTS.md",
+        "- Test site: https://shop.example.test/ (start it with site.sh)\n",
+    );
+    env.set_decide(|prompt| {
+        assert!(prompt.contains("Pick out the facts"), "{prompt}");
+        assert!(prompt.contains("Step 1 left the cart"), "this plan's notes");
+        assert!(
+            prompt.contains("shop.example.test"),
+            "the first time, every plan's notes"
+        );
+        Ok((
+            "Free model".into(),
+            json!({"facts": [
+                {"title": "How tests run", "text": "php tests/run.php --strict"},
+                {"title": "Test site", "text": "https://shop.example.test/, started with site.sh"}
+            ], "testCommand": "php tests/run.php --strict"})
+            .to_string(),
+        ))
+    });
+    env.set_agent(|c| {
+        let n = if c.env.text(FILE).contains("**1. ") {
+            "1"
+        } else {
+            "2"
+        };
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = with_free(&env, options(), stop_button()).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(r.test_hint.as_deref(), Some("php tests/run.php --strict"));
+    let kept = env.memory_entries();
+    assert_eq!(kept.len(), 2);
+    assert!(
+        kept.iter()
+            .all(|e| e.status == "suggested" && e.part == "project")
+    );
+    assert!(env.settings().memory_read, "the plans' notes are read once");
+    let item = env
+        .inbox()
+        .into_iter()
+        .find(|i| i.kind == "knowledge")
+        .expect("an Inbox question");
+    assert_eq!(item.kind_of, "answer");
+    assert!(
+        item.title.contains("2 things learned about the project"),
+        "{}",
+        item.title
+    );
+    assert!(
+        item.text
+            .contains("- Test site: https://shop.example.test/")
+    );
+    // Keep all, answered anywhere: the core makes them active.
+    let answered = crate::inbox::InboxItem {
+        answer: Some(json!({"choice": "keep"})),
+        ..item
+    };
+    crate::plan::run::on_answer(env.as_ref(), &answered);
+    assert!(env.memory_entries().iter().all(|e| e.status == "active"));
+    assert_eq!(env.project_memory().len(), 2);
+
+    // A later run: only its own notes, nothing the memory has is offered again.
+    env.set_decide(|prompt| {
+        assert!(
+            !prompt.contains("site.sh)\n"),
+            "the old plans are not read again"
+        );
+        assert!(
+            prompt.contains("[fact] How tests run"),
+            "the memory is shown"
+        );
+        Ok((
+            "Free model".into(),
+            json!({"facts": [{"title": "How tests run", "text": "php tests/run.php --strict"}]})
+                .to_string(),
+        ))
+    });
+    env.put(FILE, "# Plan\n\n- [ ] **2. Cart**\n");
+    let before = env.inbox().len();
+    let r = with_free(&env, options(), stop_button()).wait();
+    assert_eq!(r.status, RunStatus::Done);
+    assert_eq!(env.memory_entries().len(), 2);
+    assert_eq!(env.inbox().len(), before + 1, "only the run's report");
+}

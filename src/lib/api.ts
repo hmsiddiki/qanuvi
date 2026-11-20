@@ -13,6 +13,8 @@ export interface ProjectSettings {
   changes_from?: string;
   /** What a plan run may do while nobody is there (24y), set on the card before the run. */
   run_rules?: import("./plan/runRules").RunRules;
+  /** PM e: the plans' notes from before the project memory were read once into suggestions (kept by the core). */
+  memory_read?: boolean;
 }
 
 /** Qanuvi's own record of a project's files (git or not). */
@@ -637,6 +639,11 @@ export const api = {
     slice: (project: string | null, query: string, budget: number, count = false) =>
       invoke<MemorySlice>("memory_slice", { project, query, budget, count }),
     search: (project: string | null, query: string) => invoke<MemoryEntry[]>("memory_search", { project, query }),
+    /** PM a: the owner's answer about a project, kept in This project at once (one entry per title). */
+    keep: (project: string, title: string, body: string) =>
+      invoke<MemoryEntry>("memory_keep", { project, title, body }),
+    /** PM c: what the memory knows that applies to a project, one line per entry. */
+    lines: (project: string) => invoke<string[]>("memory_lines", { project }),
   },
   checks: {
     run: (projectId: string, command: string, timeoutSecs: number) =>

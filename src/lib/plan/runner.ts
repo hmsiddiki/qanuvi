@@ -175,6 +175,8 @@ export interface PlanRun {
   commits?: { step: string; id: string }[];
   /** The end report (24y Y5), once the run ended. */
   report?: RunReport;
+  /** FC: the command the run's steps ran the tests with, when the project has no test command. */
+  testHint?: string;
 }
 
 /** One step in the end report: which, why, and the one thing the user does about it. */

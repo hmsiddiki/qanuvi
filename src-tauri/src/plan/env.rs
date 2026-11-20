@@ -261,6 +261,18 @@ pub trait RunEnv: Send + Sync {
     ) -> Result<(String, String), String>;
     /// The latest runs of every project (what earlier runs taught about models).
     fn list_all_runs(&self, limit: usize) -> Result<Vec<RunRecord>, String>;
+
+    // Project memory (PM, owner agreed 2026-11-21).
+    /// PM a: the owner's answer about the project, kept in This project memory at once (it is theirs).
+    fn memory_keep(&self, title: &str, body: &str) -> Result<(), String>;
+    /// PM b + e: a fact a run learned, offered as a suggestion; its id, None when the memory has it already.
+    fn memory_suggest(&self, title: &str, body: &str) -> Option<String>;
+    /// PM b: the owner kept a run's suggestions (the Inbox's "Keep all"); how many became active.
+    fn memory_approve(&self, ids: &[String]) -> usize;
+    /// PM c: what the memory knows that applies to this project, one line per entry.
+    fn project_memory(&self) -> Vec<String>;
+    /// PM e: the project's plan notes files (every plan's FACTS.md), relative to the project.
+    fn plan_fact_files(&self) -> Vec<String>;
 }
 
 use crate::plan::packet::{Location, OutlineItem};
@@ -706,6 +718,44 @@ impl RunEnv for CoreEnv<'_> {
         crate::memory::slice(&self.db, Some(&self.project.id), request, budget, true)
             .ok()
             .map(|s| s.text)
+    }
+
+    fn memory_keep(&self, title: &str, body: &str) -> Result<(), String> {
+        crate::memory::keep_owner_fact(&self.db, &self.project.id, title, body).map(|_| ())
+    }
+
+    fn memory_suggest(&self, title: &str, body: &str) -> Option<String> {
+        crate::memory::suggest_fact(&self.db, &self.project.id, title, body)
+            .ok()
+            .flatten()
+            .map(|e| e.id)
+    }
+
+    fn memory_approve(&self, ids: &[String]) -> usize {
+        crate::memory::approve(&self.db, ids)
+    }
+
+    fn project_memory(&self) -> Vec<String> {
+        crate::memory::project_lines(&self.db, &self.project.id, 3000)
+    }
+
+    fn plan_fact_files(&self) -> Vec<String> {
+        let dir = self.root().join(".qanuvi/plan-logs");
+        let mut out: Vec<String> = std::fs::read_dir(dir)
+            .map(|d| {
+                d.flatten()
+                    .filter(|e| e.path().join("FACTS.md").is_file())
+                    .map(|e| {
+                        format!(
+                            ".qanuvi/plan-logs/{}/FACTS.md",
+                            e.file_name().to_string_lossy()
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort();
+        out
     }
 
     fn session_lines(&self, session_id: &str) -> Vec<String> {

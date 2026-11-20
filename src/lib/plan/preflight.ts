@@ -25,6 +25,11 @@ export interface PreflightQuestion {
   recommended: string;
   /** Why that answer, or why the owner must answer. */
   because: string;
+  /** PM a: "project" when the answer holds for the whole project (a test site, how tests run), so the owner's answer
+   * goes into This project memory; "plan" when it is only this plan's choice. */
+  about: "project" | "plan";
+  /** PM c: the project memory already answers it: recommended is the memory's answer, shown "from memory". */
+  fromMemory: boolean;
 }
 
 export interface PreflightRisk {
@@ -76,8 +81,9 @@ const NEUTRAL_EXAMPLES =
 export function preflightPrompt(
   file: string,
   steps: PreflightStep[],
-  known: { secrets: string[]; testCommand: string; previewUrl: string; notes: string[] },
+  known: { secrets: string[]; testCommand: string; previewUrl: string; notes: string[]; memory?: string[] },
 ): string {
+  const memory = known.memory ?? [];
   const list = steps
     .map((s) =>
       [`- ${s.number ? s.number + ". " : ""}${s.title}`, ...s.details.slice(0, 8).map((d) => `    ${d}`)].join("\n"),
@@ -93,13 +99,16 @@ export function preflightPrompt(
     `- Test command: ${known.testCommand || "none set"}`,
     `- Preview address: ${known.previewUrl || "none set"}`,
     ...(known.notes.length ? ["- The owner's notes for this plan:", ...known.notes.map((n) => `  - ${n}`)] : []),
+    ...(memory.length
+      ? ["- This project's memory (the owner's own facts about the project):", ...memory.map((m) => `  - ${m}`)]
+      : []),
     "",
     "Open steps:",
     list,
     "",
     "Answer with JSON only, in this shape (empty lists when nothing is needed):",
     '{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],',
-    ' "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"..."}],',
+    ' "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"...","about":"plan","fromMemory":false}],',
     ' "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],',
     ' "setup":[{"what":"something that must run or be set","why":"..."}],',
     ' "order":[{"step":"85b","after":["85c"],"why":"..."}]}',
@@ -123,6 +132,12 @@ export function preflightPrompt(
     '- "you": truly needs the owner: secrets, actions on outside accounts (real payments, publishing, pushing, mail',
     "  to real people), or anything that leaves this computer. Still give a recommended answer when you have one.",
     "Judge risk by where the step runs: money on a local or test database is not real money.",
+    'A "decide" answer must be something the run may do under the run rules above (nothing they hold or refuse,',
+    'such as a download, an install or an outside site); when only such a way exists, sort it "you".',
+    '"about": "project" when the answer holds for the whole project beyond this plan (which site or address to test',
+    'on, how the tests run, how to get a test login, where something is), else "plan".',
+    'A question the project memory or a known secret already answers is not asked of the owner: give it as "decide"',
+    'with the memory\'s answer as recommended and "fromMemory": true.',
   ].join("\n");
 }
 
@@ -178,6 +193,8 @@ export function parsePreflight(text: string): Preflight {
           sort: !recommended ? ("you" as const) : sort,
           recommended,
           because: str(q.because),
+          about: q.about === "project" ? ("project" as const) : ("plan" as const),
+          fromMemory: q.fromMemory === true && !!recommended,
         };
       })
       .filter((q) => q.question)
@@ -584,4 +601,29 @@ export function withReadHolds(settled: SettledCheck, holds: ReadAnswers["holds"]
 /** A found secret as shown for the yes: its start only, never the whole value. */
 export function maskedValue(v: string): string {
   return v.length <= 4 ? "•".repeat(v.length) : `${v.slice(0, 2)}${"•".repeat(Math.min(8, v.length - 2))}`;
+}
+
+/**
+ * PM a (owner, 2026-11-21): the owner's answers to questions about the whole project (not only this plan) go into This
+ * project memory. Only the owner's own answers: typed or changed, accepted with "Accept all recommended", or a question
+ * only they could answer; an answer the memory gave and the owner left as it was is in the memory already.
+ */
+export function projectAnswers(
+  check: Preflight,
+  answers: Record<number, string>,
+  answersTouched: Record<number, boolean>,
+): { title: string; body: string }[] {
+  return check.questions.flatMap((q, i) => {
+    const body = (answers[i] ?? "").trim();
+    const owners = answersTouched[i] || (q.sort === "you" && !q.fromMemory);
+    if (q.about !== "project" || !body || !owners) return [];
+    if (q.fromMemory && !answersTouched[i] && body === q.recommended.trim()) return [];
+    return [{ title: clipReason(q.question.trim(), 200), body }];
+  });
+}
+
+/** PM a: the first web address in an answer (a test site fills Preview address when it is empty). */
+export function firstUrl(text: string): string | null {
+  const m = /https?:\/\/[^\s"'<>()[\]]+/.exec(text);
+  return m ? m[0].replace(/[.,;:!?]+$/, "") : null;
 }

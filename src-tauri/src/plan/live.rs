@@ -427,6 +427,25 @@ pub fn finish_pass(
     sh.begin();
     let model = setup.planner_model.clone();
     let started = env.now_ms() as f64;
+    // FC: "Fix these" after a light pass: the full pass fixes what that review found, without reviewing again.
+    let reviewed = run
+        .finish
+        .take()
+        .filter(|p| {
+            level == FinishLevel::Full
+                && p.level == FinishLevel::Light
+                && p.status == FinishStatus::Done
+                && !p.findings.is_empty()
+        })
+        .map(|p| super::finishing::FinishReview {
+            ok: false,
+            findings: p
+                .findings
+                .into_iter()
+                .filter(|f| !f.starts_with("The full checks fail:"))
+                .collect(),
+            still_open: p.still_open,
+        });
     run.finish = Some(FinishPass {
         level,
         status: FinishStatus::Running,
@@ -438,12 +457,13 @@ pub fn finish_pass(
         checks: None,
         findings: vec![],
         still_open: vec![],
+        outcomes: vec![],
         session_id: None,
         note: None,
     });
     save(env, sh, &run);
     let stop = || sh.controls.stop_asked().is_some();
-    let outcome = pass_work(env, sh, &setup, &mut run, level, &model, &stop);
+    let outcome = pass_work(env, sh, &setup, &mut run, level, &model, reviewed, &stop);
     let pass = run.finish.as_mut().expect("the pass was set above");
     match outcome {
         Ok(()) => {
@@ -515,6 +535,7 @@ fn save(env: &dyn RunEnv, sh: &Shared, run: &PlanRun) {
     sh.publish(run);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pass_work(
     env: &dyn RunEnv,
     sh: &Shared,
@@ -522,6 +543,7 @@ fn pass_work(
     run: &mut PlanRun,
     level: FinishLevel,
     model: &str,
+    reviewed: Option<super::finishing::FinishReview>,
     stop: &dyn Fn() -> bool,
 ) -> Result<(), String> {
     let command = env
@@ -569,39 +591,44 @@ fn pass_work(
         index_tools: false,
         setup: setup.turns.setups.get(&setup.provider).cloned(),
     };
-    let mut review = match ask_planner(env, setup.turns.memory, &ask, &mut |e| sh.forward(e)) {
-        Ok(a) => {
-            pass_of(run).cost_usd += a.cost_usd;
-            parse_finish_review(&a.text)
-        }
-        Err(e) => {
-            // The paid agent cannot answer now: the free models review instead, and the report says so.
-            let free = setup
-                .turns
-                .setups
-                .get("qanuvi")
-                .ok_or_else(|| "no free models are set up".to_string())
-                .and_then(|s| {
-                    env.free_decide(
-                        s,
-                        "You review code changes. Answer with JSON only.",
-                        &prompt,
-                    )
-                });
-            match free {
-                Ok((by, text)) => {
-                    let mut r = parse_finish_review(&text);
-                    r.findings.push(format!(
-                        "(Reviewed by {by}: {} could not answer: {e})",
-                        setup.provider_name
-                    ));
-                    r
+    // FC: "Fix these" brings the light pass's review along; else the whole run is reviewed now.
+    let mut review = if let Some(r) = reviewed {
+        r
+    } else {
+        match ask_planner(env, setup.turns.memory, &ask, &mut |e| sh.forward(e)) {
+            Ok(a) => {
+                pass_of(run).cost_usd += a.cost_usd;
+                parse_finish_review(&a.text)
+            }
+            Err(e) => {
+                // The paid agent cannot answer now: the free models review instead, and the report says so.
+                let free = setup
+                    .turns
+                    .setups
+                    .get("qanuvi")
+                    .ok_or_else(|| "no free models are set up".to_string())
+                    .and_then(|s| {
+                        env.free_decide(
+                            s,
+                            "You review code changes. Answer with JSON only.",
+                            &prompt,
+                        )
+                    });
+                match free {
+                    Ok((by, text)) => {
+                        let mut r = parse_finish_review(&text);
+                        r.findings.push(format!(
+                            "(Reviewed by {by}: {} could not answer: {e})",
+                            setup.provider_name
+                        ));
+                        r
+                    }
+                    Err(_) => super::finishing::FinishReview {
+                        ok: false,
+                        findings: vec![format!("The review did not answer ({e}).")],
+                        still_open: vec![],
+                    },
                 }
-                Err(_) => super::finishing::FinishReview {
-                    ok: false,
-                    findings: vec![format!("The review did not answer ({e}).")],
-                    still_open: vec![],
-                },
             }
         }
     };
@@ -686,14 +713,17 @@ fn pass_work(
         .iter()
         .map(|f| format!("Review: {f}"))
         .collect();
-    findings.push(if command.is_empty() {
-        "No test command: the pass could not run the checks itself.".into()
-    } else if a.tests_passed == Some(false) {
-        "After the pass the full checks still fail.".into()
-    } else {
-        "After the pass the full checks pass.".into()
-    });
+    // FC: no test command is no finding: the card offers "Set the test command" (pre-filled from what the run used).
+    if !command.is_empty() {
+        findings.push(if a.tests_passed == Some(false) {
+            "After the pass the full checks still fail.".into()
+        } else {
+            "After the pass the full checks pass.".into()
+        });
+    }
     p.findings = findings;
+    // FC: what was done with each finding, so the card says "Fixed N of M" instead of listing them only as found.
+    p.outcomes = super::finishing::outcomes_in(&answer, &review.findings);
     p.still_open = still_open_in(&answer).unwrap_or_else(|| {
         let mut v = review.still_open.clone();
         v.push("The pass's answer had no Still open list: read its session.".into());
