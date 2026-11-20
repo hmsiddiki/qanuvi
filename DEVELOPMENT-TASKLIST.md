@@ -1235,7 +1235,44 @@ runs on or off; with it off nothing is sent anywhere.
     ends the picture and the agent carries on headless; the agent may ask "watch this live?" when seeing it matters,
     else screenshots. (The Preview frame itself cannot be driven by the agent: other sites' pages in a frame cannot be
     scripted.) LATER (owner): the agent can also browse through Qanuvi's own interface.
-    PICKUP POINT (newest, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
+    PREVIEW LIVE MIRROR AGREED IN PARTS (owner "go on" 2026-11-21 04:20, with the proposed answers: watch only, no
+    taking over (taking over goes with "browse through Qanuvi's interface" LATER); Preview opens by itself on a yes;
+    full speed on This PC, about 5 pictures a second through a relay or SSH):
+    - LM1 machine side BUILT 1640e1f: browser.rs keeps the page's DevTools address (ws_url); the state file gets
+      "cdp". live.rs: browser_live_start {sessionId, onEvent} opens a SECOND DevTools connection to that page (only
+      ws://127.0.0.1|localhost:<port>/devtools/page/...), Page.startScreencast jpeg q60 max 1600; one picture on its
+      way at a time (the browser's frame is acked only when passed on, so it makes no new one meanwhile);
+      browser_live_ack {id} = window has it + still watches; browser_live_stop {id}; no word from the window for 20 s,
+      the browser closing, or a dead sink ends it with {ended: why}. The agent's own connection is untouched.
+      browser_agent_shot moved from the window to the master (works for the VPS / laptop now).
+    - LM2 window BUILT 1640e1f: Preview "Watch the agent's test browser live" (Cast icon): live picture, note "Live
+      from the agent's test browser: <title>" + Stop following; closed/not open: the reason + its last screenshot
+      (dimmed), and the picture starts again when the browser's address changes. stores/previewLive.svelte.ts
+      LiveWatch acks at once on This PC, at most every 200 ms remote, says "still watching" every 5 s. Leaving
+      Preview stops it.
+    - LM3 BUILT 1640e1f: browser tool browser_show_live (writes "watch" into the state file); the tools' instructions:
+      ask in chat whether to watch live when seeing it move matters, use the tool on a yes or when asked. The window
+      sees the tool call in the selected chat's stream and opens Preview on the live picture.
+    - Tests: live.rs streams a real browser (one picture per ack, agent's connection works meanwhile, stop ends it);
+      LiveWatch pacing / beat / end / early stop; asksToShowLive. 578 Rust + 555 TS, clippy both builds, svelte-check.
+      Flaky seen: checks::tests::kill_tree_stops_the_process_and_what_it_started failed once in the full run, passed
+      3/3 alone (the child's start timed out under load); watch.
+    LM4 ON THIS PC DRIVEN LIVE (2026-11-21 04:38-04:45, release test build, scratch E:/qc-scratch/lm-live: index.html
+    with a counter ticking 4/s and a form; Sonnet 5.5, about $0.32):
+    - PASS LM3: "let me watch it live" -> agent called browser_show_live, Preview opened by itself on the live
+      picture, "Live from the agent's test browser: Live check"; the agent typed hello + Save, seen as it happened.
+    - PASS LM1/LM2: counter 171 -> 184 in about 3 s (full speed); Stop following -> back to normal; the Cast button
+      starts it again by hand; the browser closed under it -> "The agent's test browser closed."; the agent opened
+      the page again -> the picture came back by itself (new browser, counter from the start). About 1% of all cores
+      for the browser while watched.
+    - lv1 FOUND + FIXED: after the browser closed, the agent's first browser_open failed ("connection closed") and the
+      agent had to try again; browser_open now starts a new browser and tries once more itself (real-browser test:
+      Browser.close then open passes; fails without the fix).
+    - NOT YET: the VPS over the relay (5/s cap) and the Linux laptop: the VPS needs a new server build swapped in
+      (ask the owner first).
+    PICKUP POINT (newest, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
+    (owner yes for the VPS server build swap), then LT Linux title bar, then 0.1.33 (ask).
+    PICKUP POINT (before, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
     owner, then build; LT Linux title bar; then 0.1.33 (ask).
     PICKUP POINT (before, 2026-11-21 03:25): pa1 + PM + FC DONE and driven live (above). Next: (1) LT Linux title bar
     (agreed design below, drive on the laptop: drag, double-click maximise, edge resize, snapping, shadow, X11 +

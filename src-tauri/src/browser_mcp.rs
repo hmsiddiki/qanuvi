@@ -649,11 +649,15 @@ impl Tools for BrowserTools {
             }
             self.tool(name, args)
         };
-        // A browser that closed or crashed is started again on the next call.
+        // A browser that closed or crashed is started again on the next call; an open starts it again at once (lv1).
+        let mut result = result;
         if let Err(e) = &result
             && e.contains("connection closed")
         {
             self.browser = None;
+            if name == "browser_open" {
+                result = self.tool(name, args);
+            }
         }
         // Files of the project are named by their path in the project, which keeps answers short.
         let prefix = self.file_prefix();
@@ -790,5 +794,12 @@ mod tests {
         );
         let missing = t.call("browser_click", &json!({"ref": "999"}));
         assert_eq!(missing["isError"], true);
+
+        // lv1: the browser closed (crashed, ended): the next open starts a new one by itself.
+        let _ = t.browser.as_mut().unwrap().call("Browser.close", json!({}));
+        std::thread::sleep(Duration::from_millis(500));
+        let again = t.call("browser_open", &json!({"url": "index.html"}));
+        assert_ne!(again["isError"], true, "{again}");
+        assert!(text(again).starts_with("Shop"));
     }
 }
