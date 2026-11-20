@@ -3542,6 +3542,25 @@ runs on or off; with it off nothing is sent anywhere.
     release") and feeds its findings into the same fix rounds; the project settings list it with Uninstall; an extra
     unused for a long time is offered for removal. Works only when that agent runs the step (on the user's own plan
     or key); free models and other agents get the checks above, which must always work without any extra.
+- [ ] **24rl. URGENT, right after 24y: connections that cost the project almost nothing (owner, 2026-11-20)**: Qanuvi
+  is free and open source, so the project cannot pay for everyone's traffic. Today's relay (relay_server.rs) keeps a
+  thread per connection that wakes 20 times a second; 50,000 devices would need 3-5 GB and several busy cores, and
+  10% of them active would mean hundreds of Mbit/s, far past one VPS (basevm376 also hosts other sites). The way
+  Syncthing and Tailscale stay free: devices talk directly, the server only introduces them. Parts, in order:
+  (1) direct on the same network (found on the LAN, no relay); (2) direct across the internet with NAT hole punching
+  and the relay only as fallback (study iroh, Rust, QUIC: about 80-90% connect directly); (3) the official relay as
+  an introducer plus a small capped fallback (a daily cap per user), rebuilt event-driven (no polling; idle
+  connections nearly free); (4) bring your own relay (already a setting), a VPS reached over SSH needs none, and
+  Tailscale / ZeroTier / Cloudflare Tunnel addresses used as they are; (5) community relays (volunteers, picked by
+  nearness, like Syncthing); (6) money only for what is left (GitHub Sponsors / Open Collective; maybe later an
+  optional paid hosted relay, everything staying free and self-hostable). Plan it in detail with the owner first.
+  Now (2026-11-20): the official relay runs for the owner's own devices on basevm376 (see "relay.qanuvi.com" below).
+  relay.qanuvi.com (2026-11-20, owner: "make subdomain and do it"): qanuvi-relay (Linux build of 12f7305, 678 KB)
+  in /usr/local/bin on basevm376 (109.123.234.13), systemd unit qanuvi-relay (system user qanuvi-relay, data
+  /var/lib/qanuvi-relay, listens 127.0.0.1:47300 only, LimitNOFILE 65536, hardened), 2 MB RAM, answers the
+  WebSocket handshake (101). Left for the owner in the ISPConfig panel (their notes: prefer the panel): DNS A record
+  relay -> 109.123.234.13 in zone qanuvi.com, and a subdomain site relay.qanuvi.com with Let's Encrypt and nginx
+  directives proxying / to 127.0.0.1:47300 with Upgrade headers. Then wss://relay.qanuvi.com is the relay address.
 - [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
   reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
   TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
