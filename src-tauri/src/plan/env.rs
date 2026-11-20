@@ -43,6 +43,10 @@ pub struct TurnRequest {
     pub setup: Option<String>,
     /// A new session's title in the agent list ("Decider: review step 3").
     pub title: Option<String>,
+    /// 24y: a plan run's turn, its permission requests answered by the run rules (nobody is asked).
+    pub ruled: bool,
+    /// The plan file's own "Run rules" section.
+    pub plan_rules: Option<crate::run_rules::RunRules>,
 }
 
 /// How a turn ended.
@@ -167,6 +171,10 @@ pub trait RunEnv: Send + Sync {
         on_event: &mut dyn FnMut(Option<&AgentEvent>) -> Flow,
     ) -> Result<TurnEnd, String>;
     fn agent_stop(&self, session_id: &str);
+    /// What the run rules refused in a session since the last call (24y): the commands, for setting the step aside.
+    fn agent_refused(&self, _session_id: &str) -> Vec<crate::run_rules::Refusal> {
+        Vec::new()
+    }
 
     /// Runs a command in the project's folder (the test command, a step's check).
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String>;
@@ -280,6 +288,8 @@ pub fn ask_planner(
         context: memory_context(env, memory, &ask.prompt),
         setup: ask.setup.clone(),
         title: Some(ask.title.clone()).filter(|t| !t.is_empty()),
+        ruled: false,
+        plan_rules: None,
     };
     let end = env.agent_turn(&req, &mut |e| {
         if let Some(e) = e {
@@ -431,6 +441,16 @@ impl RunEnv for CoreEnv<'_> {
         if let Some(title) = &req.title {
             let _ = crate::agent::rename(&self.db, &started.id, title);
         }
+        // 24y: a run's turn is answered by the run rules (the settings as they are now, the plan's section winning).
+        if req.ruled {
+            let mut project = self.project.clone();
+            if let Ok(s) = self.project_settings() {
+                project.settings = s;
+            }
+            let policy = crate::run_rules::Policy::new(&project, req.plan_rules.as_ref());
+            self.agents
+                .set_policy(&self.db, &started.id, Some(std::sync::Arc::new(policy)));
+        }
         let mut end = TurnEnd {
             session_id: started.id.clone(),
             status: started.status.clone(),
@@ -510,11 +530,19 @@ impl RunEnv for CoreEnv<'_> {
                 AgentEvent::Error { .. } => {}
             }
         }
+        // The turn is over: the user answers this session's requests again (the next run turn sets the rules anew).
+        if req.ruled {
+            self.agents.set_policy(&self.db, &end.session_id, None);
+        }
         Ok(end)
     }
 
     fn agent_stop(&self, session_id: &str) {
         self.agents.stop(session_id);
+    }
+
+    fn agent_refused(&self, session_id: &str) -> Vec<crate::run_rules::Refusal> {
+        self.agents.take_refused(session_id)
     }
 
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String> {

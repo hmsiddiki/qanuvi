@@ -81,6 +81,8 @@ struct World {
     lines: HashMap<String, Vec<String>>,
     /// The plan's private details.
     private: Vec<String>,
+    /// What the run rules refused per session (24y), as the core's agents keep it.
+    refused: HashMap<String, Vec<crate::run_rules::Refusal>>,
     n: u64,
     clock: i64,
 }
@@ -194,6 +196,18 @@ impl FakeEnv {
     }
 
     /// Ticks (or marks) a step by its number in a plan file, as an agent does.
+    /// The run rules refused a command in a session (24y): never (with why) or only not listed (empty why).
+    pub fn refuse(&self, session_id: &str, what: &str, never: &str) {
+        self.w()
+            .refused
+            .entry(session_id.into())
+            .or_default()
+            .push(crate::run_rules::Refusal {
+                what: what.into(),
+                never: never.into(),
+            });
+    }
+
     pub fn mark(&self, file: &str, number: &str, status: char) {
         let line = Regex::new(&format!(
             r"^ ?- \[[ xX!-]\] \*\*{}\.\s",
@@ -596,6 +610,10 @@ impl RunEnv for FakeEnv {
     fn agent_stop(&self, session_id: &str) {
         self.call("agent_stop");
         self.w().stopped.push(session_id.into());
+    }
+
+    fn agent_refused(&self, session_id: &str) -> Vec<crate::run_rules::Refusal> {
+        self.w().refused.remove(session_id).unwrap_or_default()
     }
 
     fn run_check(&self, command: &str, _timeout: Duration) -> Result<CheckResult, String> {

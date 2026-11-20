@@ -11,6 +11,8 @@ export interface ProjectSettings {
   preview_url: string;
   /** Where plan steps' changes come from for reviews: "" / "qanuvi" (own snapshots) or "git". */
   changes_from?: string;
+  /** What a plan run may do while nobody is there (24y), set on the card before the run. */
+  run_rules?: import("./plan/runRules").RunRules;
 }
 
 /** Qanuvi's own record of a project's files (git or not). */

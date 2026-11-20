@@ -10,6 +10,9 @@
   import { addOrderNeeds, setStepModel, type Plan } from "$lib/plan/tasklist";
   import { modelLabel, providerById, PROVIDERS } from "$lib/agents/providers";
   import { api, errorText } from "$lib/api";
+  import { untrack } from "svelte";
+  import { projects } from "$lib/stores/projects.svelte";
+  import { DEFAULT_RULES, parsePatterns, rulesFacts, rulesLine, rulesOf, type RunRules } from "$lib/plan/runRules";
   import { callThisPc, shownMachine } from "$lib/remote";
   import { offerStartWithComputer, startSettingLabel } from "$lib/startWithComputer";
   import { formatCost, formatTokens } from "$lib/agent/events";
@@ -359,6 +362,45 @@
     }
   });
 
+  /** 24y: the run rules card (in full until answered once, then one line), kept in the project's settings. */
+  let rules = $state<RunRules>({ ...DEFAULT_RULES });
+  let rulesOpen = $state(false);
+  let allowText = $state("");
+  let neverText = $state("");
+  let isGit = $state(false);
+  $effect(() => {
+    const id = project.id;
+    const r = rulesOf(untrack(() => project.settings));
+    rules = { ...r };
+    allowText = r.allow.join("\n");
+    neverText = r.never.join("\n");
+    rulesOpen = false;
+    isGit = false;
+    api.git
+      .status(id)
+      .then((s) => {
+        if (project.id === id) isGit = s.is_repo;
+      })
+      .catch(() => {});
+  });
+
+  function currentRules(): RunRules {
+    return { ...rules, set: true, allow: parsePatterns(allowText), never: parsePatterns(neverText) };
+  }
+
+  /** Keeps the card's answers in the project (pressing Start is the answer); false when saving failed. */
+  async function saveRules(): Promise<boolean> {
+    const next = currentRules();
+    if (JSON.stringify(next) === JSON.stringify(rulesOf(project.settings))) return true;
+    const e = await projects.update(project.id, project.name, { ...project.settings, run_rules: next });
+    if (e) {
+      error = `The run rules could not be saved (${e}).`;
+      return false;
+    }
+    rules = { ...next };
+    return true;
+  }
+
   /** The check before a run (24i): what the run will need, answered once. */
   let checkFirst = $state(true);
   let checking = $state(false);
@@ -488,7 +530,8 @@
         secrets: await api.agent.secretNames(project.id).catch(() => [] as string[]),
         testCommand: project.settings.test_command,
         previewUrl: project.settings.preview_url,
-        notes: loadPlanNotes(project.id, file),
+        // 24y: the run rules are standing answers, so the check decides what they cover instead of asking.
+        notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules())],
       };
       const steps = coveredSteps().map((s) => ({ number: s.number, title: s.title, details: s.details }));
       const r = await planner.ask(
@@ -609,6 +652,7 @@
 
   async function start(event: SubmitEvent) {
     event.preventDefault();
+    if (!(await saveRules())) return;
     if (checkFirst && !check) return runCheck();
     if (check) return startChecked();
     await go();
@@ -995,6 +1039,49 @@
         )}, about a minute. The run starts after you answer.
       </p>
     {/if}
+    <div class="rules-card">
+      {#if !rules.set || rulesOpen}
+        <strong>While this plan runs alone</strong>
+        <p class="hint">
+          It may: change files in this project, run its tests and builds.<br />
+          It never: publishes, deletes outside the project, uses your passwords, or changes your main branch. A step that
+          needs anything else is set aside with the command named, and the run goes on with the rest.
+        </p>
+        {#if isGit}
+          <div class="rules-branch">
+            <span>Keep the work on its own git branch?</span>
+            <label
+              ><input type="radio" name="rules-branch" value={false} bind:group={rules.branch} /> No, Qanuvi keeps its own
+              copies</label
+            >
+            <label><input type="radio" name="rules-branch" value={true} bind:group={rules.branch} /> Yes</label>
+          </div>
+        {/if}
+        {#if rulesOpen}
+          <label class="rules-list">
+            <span>May also run without asking (one per line; * stands for anything)</span>
+            <textarea rows="3" bind:value={allowText} placeholder={"make docs\nphp artisan migrate --env=testing"}
+            ></textarea>
+          </label>
+          <label class="rules-list">
+            <span>Never runs (besides the fixed never-list)</span>
+            <textarea rows="2" bind:value={neverText} placeholder="npm run e2e"></textarea>
+          </label>
+          <p class="hint">
+            Already allowed: the project's test command, its package.json scripts (not dev, start or publish), the usual
+            test, check and build tools, reading commands. A plan file can add a "Run rules" section with Allow: and
+            Never: lines; it wins for that plan.
+          </p>
+        {:else}
+          <button type="button" class="link" onclick={() => (rulesOpen = true)}>Details</button>
+        {/if}
+      {:else}
+        <p class="hint">
+          Run rules: {rulesLine(rules, isGit)} ·
+          <button type="button" class="link" onclick={() => (rulesOpen = true)}>Change</button>
+        </p>
+      {/if}
+    </div>
     {#if check}
       <div class="check-list">
         <strong>Before the run</strong>
@@ -1622,6 +1709,32 @@
     opacity: 0.6;
   }
 
+  .rules-card {
+    margin-top: var(--qx-space-3);
+    padding: var(--qx-space-2) var(--qx-space-3);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+  }
+  .rules-card .hint {
+    margin: var(--qx-space-1) 0;
+  }
+  .rules-branch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--qx-space-1) var(--qx-space-3);
+    align-items: center;
+    margin: var(--qx-space-2) 0;
+  }
+  .rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--qx-space-1);
+    margin: var(--qx-space-2) 0;
+  }
+  .rules-list textarea {
+    font-family: var(--qx-font-mono, monospace);
+    resize: vertical;
+  }
   .check-list {
     margin-top: var(--qx-space-3);
     padding: var(--qx-space-3);

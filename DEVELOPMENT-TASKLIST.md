@@ -975,7 +975,28 @@ runs on or off; with it off nothing is sent anywhere.
     installer (8576484), Linux master (10463472) and Windows master (10378752) served 200 with matching sizes. Tagged
     v0.1.29. Not done: the owner's install updating to 0.1.29 (its updater offers it), the VPS server build swap and
     the Linux laptop .deb (both ask the owner).
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 08:30): 0.1.29 PUBLISHED, nothing unpublished. Next: plan
+    24y PART 1 (Y1 + Y2) BUILT (2026-11-20, owner agreed docs/PLAN-24Y.md "ok do whats best"; not driven live):
+    run_rules.rs: RunRules {set, branch, allow, never} in ProjectSettings.run_rules; Policy = reading commands + test,
+    check and build tools (install only with no package named: patterns ending in "$") + the project's test command +
+    its package.json scripts (not dev/start/serve/preview/publish/release/deploy) + the project's allow, with the
+    fixed never-list (agent_tools::risky, agent git writes, writes/edits outside the project) + the project's never;
+    a plan file's "## Run rules" section (Allow:/Never:/Branch:) wins for that plan, never over the fixed list. The
+    runner sets TurnSetup.ruled + plan_rules at run start; CoreEnv::agent_turn gives the step session its Policy
+    (Agents::set_policy, also answers requests already waiting) and takes it back at the turn's end; can_use_tool is
+    answered at once by the rules (note "by": "run rules" in the chat), refusals kept (Agents::take_refused). After an
+    attempt a refused command with the step not done = Blocked with the command named (refused_reason) -> set aside,
+    Inbox, run goes on; done anyway = "Done without: ..." in its note. Window: rules card in the Run panel's setup form
+    just above the Before the run box (full until answered once, then one line "Run rules: ... · Change"; branch
+    question only for git projects, pre-set No; Details = allow/never lists); Start saves the rules; the check before
+    the run gets the rules as standing facts (rulesFacts). Branch "Yes" is stored only: Y3 (part 2) uses it. Not
+    covered yet: the finishing pass's fix session is not ruled. Tests: run_rules 4, agent by_policy 1, scenario
+    y24_a_command_the_run_rules_refuse... ; verify: prettier, svelte-check 0, vitest 542, fmt, clippy clean, Rust lib
+    560 + 2 ignored.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 09:45): 24y part 1 BUILT, unpublished, not driven live.
+    Next: test build, drive part 1 live on a scratch project (card first run + one line after; a step needing an
+    unlisted command set aside with it named, others go on; Details allow then the step passes), then part 2 (Y3 + Y4
+    + Y5). 0.1.29 is the published version.
+    PICKUP POINT (before, 2026-11-20 08:30): 0.1.29 PUBLISHED, nothing unpublished. Next: plan
     24y in detail with the owner before building, then 24rl (urgent after 24y).
     PICKUP POINT (before, 2026-11-20 06:05): 0.1.28 PUBLISHED; owner: 24n first, then 24y
     (decisions under 24y: git branch only when asked, few plain questions for normal users, detail for advanced

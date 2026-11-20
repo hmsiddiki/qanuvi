@@ -573,6 +573,9 @@ impl<'a> Loop<'a> {
             let _ = self.env.log_append(&g::facts_path(&file), &lines);
             let _ = self.env.plan_data_set(&file, Kind::Notes, &json!([]));
         }
+        // 24y: the run's sessions are answered by the run rules (the project's, the plan file's section winning).
+        self.s.turns.ruled = true;
+        self.s.turns.plan_rules = crate::run_rules::plan_rules(text);
         // What this plan kept from earlier runs (24u part 2).
         self.wait_list = self
             .s
@@ -2158,6 +2161,26 @@ impl<'a> Loop<'a> {
                     }
                 }
             }
+            // 24y: the run rules refused a command the step needed and it is not done: set aside with the command
+            // named (no retry would get further), the run goes on. Done anyway: the refusal stays in its note.
+            let refused = if attempt.session_id.is_empty() {
+                Vec::new()
+            } else {
+                self.env.agent_refused(&attempt.session_id)
+            };
+            if !refused.is_empty() {
+                let why = refused_reason(&refused);
+                if matches!(attempt.outcome, Outcome::Open | Outcome::Blocked) {
+                    attempt.outcome = Outcome::Blocked;
+                    attempt.note = why;
+                } else if attempt.outcome == Outcome::Done {
+                    attempt.note = if attempt.note.is_empty() {
+                        format!("Done without: {why}")
+                    } else {
+                        format!("{} Done without: {why}", attempt.note)
+                    };
+                }
+            }
             let outcome = attempt.outcome;
             let note = attempt.note.clone();
             self.run.steps[i].attempts.push(attempt);
@@ -3561,6 +3584,35 @@ impl<'a> Loop<'a> {
         }
         self.sh.live().current_model.clear();
         self.save();
+    }
+}
+
+/// Why a step was set aside for commands the run rules refused (24y), in plain words with what to do about it.
+pub fn refused_reason(refused: &[crate::run_rules::Refusal]) -> String {
+    let mut seen: Vec<&str> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
+    let mut never = false;
+    for r in refused {
+        if seen.contains(&r.what.as_str()) || seen.len() >= 3 {
+            continue;
+        }
+        seen.push(&r.what);
+        never |= !r.never.is_empty();
+        parts.push(if r.never.is_empty() {
+            format!("`{}`", r.what)
+        } else {
+            format!("`{}` ({})", r.what, r.never)
+        });
+    }
+    let what = parts.join(", ");
+    if never {
+        format!(
+            "it needed {what}, which a run never does by itself. Do it yourself, or answer how the step can go on without it"
+        )
+    } else {
+        format!(
+            "it needed {what}, which this project's run rules do not allow. Allow it under Run rules (Details) for next time, or answer how to go on"
+        )
     }
 }
 

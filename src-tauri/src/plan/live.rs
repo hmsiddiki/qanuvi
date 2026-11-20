@@ -390,6 +390,8 @@ impl RunStart {
                 },
                 labels: t.labels,
                 message_wait_ms: 0,
+                ruled: false,
+                plan_rules: None,
             },
             resume: self.resume.map(|r| ResumeAt {
                 session_id: r.session_id,

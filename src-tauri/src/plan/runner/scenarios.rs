@@ -80,6 +80,7 @@ fn settings(changes_from: &str) -> ProjectSettings {
         test_command: "php tests/run.php".into(),
         preview_url: String::new(),
         changes_from: changes_from.into(),
+        ..Default::default()
     }
 }
 
@@ -2080,4 +2081,91 @@ fn a_review_after_a_handover_sees_the_whole_steps_work_and_its_log() {
     );
     assert!(!asked.prompt.contains("Tests: none were run."));
     assert_eq!(step(&r, "10").attempts.len(), 2, "no fix round");
+}
+
+#[test]
+fn y24_a_command_the_run_rules_refuse_sets_its_step_aside_with_the_command_named_and_the_run_goes_on()
+ {
+    let env = world(
+        "# Plan\n\n## Run rules\n- Allow: make docs\n\n- [ ] **1. Start the app**\n  - check it opens\n- [ ] **2. Second**\n  - then this\n- [ ] **3. Third**\n  - and this\n",
+    );
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if c.title.unwrap_or("").starts_with("Question for you") {
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        match n {
+            // Needed a command nobody allowed, and could not finish without it.
+            "1" => c.env.refuse(c.session_id, "cargo run", ""),
+            // Refused a never-list command but got the step done another way.
+            "3" => {
+                c.env.refuse(
+                    c.session_id,
+                    "git commit -m x",
+                    "nothing goes into git during a run",
+                );
+                c.env.mark(FILE, "3", 'x');
+            }
+            _ => c.env.mark(FILE, n, 'x'),
+        }
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop.clone(),
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while running.waiting_answers() == 0 || step(&running.now(), "3").status != RunStepStatus::Done
+    {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never set step 1 aside: {:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let r = running.now();
+    stop.press();
+    stop.press();
+    let _ = running.wait();
+    // Every step turn is answered by the run rules, with the plan's own section.
+    let steps: Vec<_> = env
+        .requests()
+        .into_iter()
+        .filter(|q| q.mode != "plan" && q.prompt.contains("Start the app"))
+        .collect();
+    assert!(!steps.is_empty() && steps.iter().all(|q| q.ruled));
+    assert_eq!(
+        steps[0].plan_rules.as_ref().unwrap().allow,
+        vec!["make docs"]
+    );
+    // Step 1 set aside once (no retries that cannot get further), named; the others went on.
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Held, "{:?}", statuses(&r));
+    assert_eq!(one.attempts.len(), 1);
+    let why = &one.held.as_ref().unwrap().why;
+    assert!(
+        why.contains("`cargo run`") && why.contains("Run rules"),
+        "{why}"
+    );
+    assert_eq!(step(&r, "2").status, RunStepStatus::Done);
+    assert_eq!(step(&r, "3").status, RunStepStatus::Done);
+    assert!(
+        step(&r, "3").attempts[0]
+            .note
+            .contains("Done without: it needed `git commit -m x`")
+    );
+    assert!(
+        open_question(&env)
+            .is_some_and(|q| format!("{} {} {:?}", q.title, q.text, q.form).contains("cargo run"))
+    );
 }

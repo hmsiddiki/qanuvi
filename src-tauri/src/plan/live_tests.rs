@@ -30,6 +30,7 @@ fn world(test_command: &str) -> Arc<FakeEnv> {
         test_command: test_command.into(),
         preview_url: String::new(),
         changes_from: String::new(),
+        ..Default::default()
     });
     env.put(
         FILE,

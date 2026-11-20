@@ -14,6 +14,8 @@ pub struct ProjectSettings {
     /// Where plan steps' changes come from for reviews: "" or "qanuvi" (Qanuvi's own snapshots, git or not), or
     /// "git" (each file's repository, against its last commit; files git cannot see still use the snapshots).
     pub changes_from: String,
+    /// What a plan run may do while nobody is there (24y), set on the card before the run.
+    pub run_rules: crate::run_rules::RunRules,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

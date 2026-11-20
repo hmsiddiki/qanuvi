@@ -260,6 +260,10 @@ pub struct TurnSetup {
     pub labels: BTreeMap<String, String>,
     /// How long a change question waits for the owner (milliseconds; 0 = the default, 10 minutes).
     pub message_wait_ms: i64,
+    /// 24y: the turns are a plan run's, answered by the project's run rules instead of waiting for a click.
+    pub ruled: bool,
+    /// The plan file's own "Run rules" section (it wins for that plan).
+    pub plan_rules: Option<crate::run_rules::RunRules>,
 }
 
 impl TurnSetup {
@@ -442,6 +446,8 @@ pub fn turn(
         // Also on a session that goes on into the next step: it is renamed to the step at work (the window title
         // shows it), not left on the first step's title.
         title: (!title.is_empty()).then(|| title.to_string()),
+        ruled: setup.ruled,
+        plan_rules: setup.plan_rules.clone(),
     };
     let current = watch
         .live_model

@@ -47,6 +47,7 @@ pub mod relay;
 pub mod relay_client;
 pub mod relay_server;
 pub mod remote;
+pub mod run_rules;
 pub mod runs;
 pub mod secrets;
 pub mod servers;

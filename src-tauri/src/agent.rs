@@ -250,10 +250,69 @@ pub struct Grant {
     pub seconds_left: Option<u64>,
 }
 
+/// The run rules a plan run's sessions are answered by (24y): session id -> policy.
+type Policies = Arc<Mutex<HashMap<String, Arc<crate::run_rules::Policy>>>>;
+/// What the run rules refused in a session since the runner last asked.
+type Refused = Arc<Mutex<HashMap<String, Vec<crate::run_rules::Refusal>>>>;
+
 #[derive(Default)]
 pub struct Agents {
     map: Arc<Mutex<HashMap<String, Running>>>,
     grants: Grants,
+    policies: Policies,
+    refused: Refused,
+}
+
+fn deny_line(request_id: &str, message: &str) -> String {
+    json!({
+        "type": "control_response",
+        "response": {"subtype": "success", "request_id": request_id,
+                     "response": {"behavior": "deny", "message": message}}
+    })
+    .to_string()
+}
+
+/// A run's answer to a permission request by its rules: the line to send the agent and the note to keep in the
+/// session (shown in the step's chat as answered by the run rules). A refusal is remembered for the runner.
+fn by_policy(
+    policies: &Policies,
+    refused: &Refused,
+    session_id: &str,
+    request_id: &str,
+    request: &Value,
+) -> Option<(String, String)> {
+    use crate::run_rules::{Refusal, Verdict};
+    let policy = policies
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(session_id)
+        .cloned()?;
+    let tool = request["tool_name"].as_str().unwrap_or("");
+    let input = &request["input"];
+    let verdict = policy.decide(tool, input);
+    let allow = verdict == Verdict::Allow;
+    let line = if allow {
+        allow_line(request_id, input)
+    } else {
+        refused
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(session_id.to_string())
+            .or_default()
+            .push(Refusal {
+                what: crate::run_rules::what(tool, input),
+                never: match &verdict {
+                    Verdict::Never(why) => why.clone(),
+                    _ => String::new(),
+                },
+            });
+        deny_line(request_id, &crate::run_rules::refusal_message(&verdict))
+    };
+    let note =
+        json!({"type": "qanuvi_permission", "request_id": request_id, "allow": allow, "auto": true,
+                      "by": "run rules"})
+        .to_string();
+    Some((line, note))
 }
 
 /// The `claude` program: on PATH, else where Claude Code's installers put it (z8: a master started over ssh, or as a
@@ -1280,6 +1339,8 @@ impl Agents {
         let session_id = session.id.clone();
         let map = self.map.clone();
         let grants = self.grants.clone();
+        let policies = self.policies.clone();
+        let refused = self.refused.clone();
         let thread_db = db.clone();
         std::thread::spawn(move || {
             let db = &thread_db;
@@ -1325,6 +1386,7 @@ impl Agents {
                 append_event(db, &session_id, &line);
                 let mut changed = false;
                 let mut auto: Option<(String, Value)> = None;
+                let mut ruled: Option<(String, String)> = None;
                 match kind {
                     "system" if subtype == "init" => {
                         // A turn starts. After an ended turn that is a message sent while it worked, taken in only
@@ -1346,6 +1408,11 @@ impl Agents {
                         if let Some(rid) = msg["request_id"].as_str() {
                             if granted(&grants, &session_id, &msg["request"]) {
                                 auto = Some((rid.to_string(), msg["request"]["input"].clone()));
+                            } else if let Some(answer) =
+                                by_policy(&policies, &refused, &session_id, rid, &msg["request"])
+                            {
+                                // A plan run's session: its run rules answer at once, nobody is asked (24y).
+                                ruled = Some(answer);
                             } else {
                                 pending
                                     .lock()
@@ -1403,6 +1470,17 @@ impl Agents {
                     _ => {}
                 }
                 send(AgentEvent::Line { line });
+                if let Some((answer, note)) = ruled.take() {
+                    let sent = map
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .get_mut(&session_id)
+                        .map(|r| send_line(&mut r.stdin, &answer));
+                    if matches!(sent, Some(Ok(()))) {
+                        append_event(db, &session_id, &note);
+                        send(AgentEvent::Line { line: note });
+                    }
+                }
                 // Allowed earlier for the session or a few minutes: answered at once, shown as approved.
                 if let Some((rid, input)) = auto {
                     let sent = map
@@ -1529,6 +1607,64 @@ impl Agents {
             .unwrap_or_default();
         list.sort_by(|a, b| a.group.cmp(&b.group));
         list
+    }
+
+    /// A plan run's rules for a session (24y): its permission requests are answered by them from now on, also the
+    /// ones already waiting (one may come before the runner knew the new session's id). None: the user answers
+    /// again (the run is over).
+    pub fn set_policy(
+        &self,
+        db: &Db,
+        session_id: &str,
+        policy: Option<Arc<crate::run_rules::Policy>>,
+    ) {
+        {
+            let mut p = self.policies.lock().unwrap_or_else(|e| e.into_inner());
+            match policy {
+                Some(policy) => p.insert(session_id.to_string(), policy),
+                None => p.remove(session_id),
+            };
+        }
+        let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(running) = map.get_mut(session_id) else {
+            return;
+        };
+        let waiting: Vec<(String, Value)> = running
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (rid, request) in waiting {
+            let Some((line, note)) =
+                by_policy(&self.policies, &self.refused, session_id, &rid, &request)
+            else {
+                break;
+            };
+            if send_line(&mut running.stdin, &line).is_ok() {
+                running
+                    .pending
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&rid);
+                append_event(db, session_id, &note);
+                let _ = running
+                    .channel
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .send(AgentEvent::Line { line: note });
+            }
+        }
+    }
+
+    /// What the run rules refused in a session since the last call (24y), for the runner to set the step aside.
+    pub fn take_refused(&self, session_id: &str) -> Vec<crate::run_rules::Refusal> {
+        self.refused
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(session_id)
+            .unwrap_or_default()
     }
 
     /// Takes back the standing approvals of a session: everything asks again.
@@ -1685,6 +1821,40 @@ mod tests {
             claude_places(home, true),
             [home.join(".local").join("bin").join("claude.exe")]
         );
+    }
+
+    #[test]
+    fn a_runs_session_is_answered_by_its_run_rules_and_refusals_are_kept_for_the_runner() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = crate::projects::Project {
+            id: "p".into(),
+            name: "p".into(),
+            path: dir.path().to_string_lossy().into(),
+            kind: "rust".into(),
+            tags: vec![],
+            settings: Default::default(),
+            added_at: 0,
+            last_opened_at: 0,
+        };
+        let policies: Policies = Default::default();
+        let refused: Refused = Default::default();
+        let ask = |c: &str| json!({"tool_name": "Bash", "input": {"command": c}});
+        // No rules for the session: the user is asked as before.
+        assert!(by_policy(&policies, &refused, "s1", "r0", &ask("cargo test")).is_none());
+        policies.lock().unwrap().insert(
+            "s1".into(),
+            Arc::new(crate::run_rules::Policy::new(&project, None)),
+        );
+        let (line, note) = by_policy(&policies, &refused, "s1", "r1", &ask("cargo test")).unwrap();
+        assert!(line.contains("\"allow\"") && note.contains("run rules"));
+        let (line, _) = by_policy(&policies, &refused, "s1", "r2", &ask("cargo run")).unwrap();
+        assert!(line.contains("\"deny\"") && line.contains("not in the project's run rules"));
+        let (line, _) = by_policy(&policies, &refused, "s1", "r3", &ask("git push")).unwrap();
+        assert!(line.contains("Do not try another way"));
+        let kept = refused.lock().unwrap().remove("s1").unwrap();
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept[0].what, "cargo run");
+        assert!(kept[0].never.is_empty() && !kept[1].never.is_empty());
     }
 
     #[test]
