@@ -992,7 +992,20 @@ runs on or off; with it off nothing is sent anywhere.
     covered yet: the finishing pass's fix session is not ruled. Tests: run_rules 4, agent by_policy 1, scenario
     y24_a_command_the_run_rules_refuse... ; verify: prettier, svelte-check 0, vitest 542, fmt, clippy clean, Rust lib
     560 + 2 ignored.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 09:45): 24y part 1 BUILT, unpublished, not driven live.
+    0.1.30 PUBLISHED (owner: "publish anyway", 2026-11-20 09:35; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+    24y part 1 (Y1 + Y2 run rules), NOT driven live before release. Stray old session tree cleared first (one VS Code
+    claude.exe from 08:13 + its MCP node helpers; the installed app's master and its agents on qpfixbase left
+    running). Verify before the build: prettier clean, svelte-check 0, vitest 542, fmt clean, clippy clean, Rust lib
+    560 + 2 ignored. Built with CARGO_BUILD_JOBS=2 (free RAM 5 GB), signed, into E:/qc-scratch/release-0.1.30/chan,
+    then copied into qanuvi-updates/dev (old latest.json kept in E:/Backups/qanuvi/channel-before-0.1.30). Checked:
+    https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.30; installer (8598701), Linux master (10519152) and
+    Windows master (10434560) served 200 with matching sizes. Tagged v0.1.30. Not done: the owner's install updating
+    to 0.1.30, the VPS server build swap and the Linux laptop .deb (both ask the owner).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 09:40): 0.1.30 PUBLISHED with 24y part 1, which has
+    not been driven live yet, nothing unpublished. Next: drive part 1 live on a scratch project (card first run + one
+    line after; a step needing an unlisted command set aside with it named, others go on; Details allow then the step
+    passes); fix anything found (patch release, ask), then part 2 (Y3 + Y4 + Y5), then 24rl.
+    PICKUP POINT (before, 2026-11-20 09:45): 24y part 1 BUILT, unpublished, not driven live.
     Next: test build, drive part 1 live on a scratch project (card first run + one line after; a step needing an
     unlisted command set aside with it named, others go on; Details allow then the step passes), then part 2 (Y3 + Y4
     + Y5). 0.1.29 is the published version.
