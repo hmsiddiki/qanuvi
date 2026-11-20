@@ -416,10 +416,11 @@ impl RunEnv for CoreEnv<'_> {
             if let Ok(s) = self.project_settings() {
                 project.settings = s;
             }
-            std::sync::Arc::new(crate::run_rules::Policy::new(
-                &project,
-                req.plan_rules.as_ref(),
-            ))
+            // In Auto the user gave the agent room: only the never-lists hold, the rest is its judgement.
+            std::sync::Arc::new(
+                crate::run_rules::Policy::new(&project, req.plan_rules.as_ref())
+                    .in_mode(&req.mode, agent == crate::agent::OWN_AGENT),
+            )
         });
         let send = |tx: std::sync::Arc<std::sync::mpsc::Sender<AgentEvent>>,
                     session_id: Option<&str>,

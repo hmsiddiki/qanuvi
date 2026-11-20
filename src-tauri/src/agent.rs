@@ -273,21 +273,28 @@ fn deny_line(request_id: &str, message: &str) -> String {
 }
 
 /// What a session's run rules say about one tool call (24y), None when the session has no rules (it is not in a plan
-/// run's turn). A refusal is remembered for the runner, which sets the step aside with it named.
+/// run's turn). A refusal is remembered for the runner, which sets the step aside with it named. In Auto a command
+/// neither allowed nor forbidden is the agent's to judge: the hook (called before every tool) lets it be, while a
+/// permission request for it (Claude Code itself was unsure, and nobody is there) is refused.
 fn rule_verdict(
     policies: &Policies,
     refused: &Refused,
     session_id: &str,
     tool: &str,
     input: &Value,
+    hook: bool,
 ) -> Option<crate::run_rules::Verdict> {
-    use crate::run_rules::{Refusal, Verdict};
+    use crate::run_rules::{Refusal, Unlisted, Verdict};
     let policy = policies
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .get(session_id)
         .cloned()?;
-    let verdict = policy.decide(tool, input);
+    let verdict = match (policy.decide(tool, input), policy.unlisted()) {
+        (Verdict::Unlisted, Unlisted::Allow) => Verdict::Allow,
+        (Verdict::Unlisted, Unlisted::AgentDecides) if hook => Verdict::Allow,
+        (v, _) => v,
+    };
     if verdict != Verdict::Allow {
         refused
             .lock()
@@ -316,7 +323,7 @@ fn by_policy(
 ) -> Option<(String, String)> {
     let tool = request["tool_name"].as_str().unwrap_or("");
     let input = &request["input"];
-    let verdict = rule_verdict(policies, refused, session_id, tool, input)?;
+    let verdict = rule_verdict(policies, refused, session_id, tool, input, false)?;
     let allow = verdict == crate::run_rules::Verdict::Allow;
     let line = if allow {
         allow_line(request_id, input)
@@ -333,7 +340,7 @@ fn by_policy(
 /// The hook Claude Code calls before every tool (24y): registered when the session starts, so a run's rules hold
 /// whatever the permission mode (in Auto, Claude Code approves most commands itself and never asks), and over the
 /// user's own allow rules. Without rules, or when they allow the call, it says nothing and the usual permissions go
-/// on (a request that comes is answered by the rules too).
+/// on (a request that comes is answered by the rules too). In Auto it holds only the never-lists.
 const RULES_HOOK: &str = "qanuvi-run-rules";
 
 fn initialize_line() -> String {
@@ -356,7 +363,7 @@ fn by_hook(
     let tool_input = &input["tool_input"];
     let verdict =
         if request["callback_id"] == RULES_HOOK && input["hook_event_name"] == "PreToolUse" {
-            rule_verdict(policies, refused, session_id, tool, tool_input)
+            rule_verdict(policies, refused, session_id, tool, tool_input, true)
         } else {
             None
         };
@@ -1977,6 +1984,34 @@ mod tests {
             "node stamp.js"
         );
         assert!(initialize_line().contains(RULES_HOOK) && initialize_line().contains("PreToolUse"));
+
+        // Auto: the user gave Claude Code room. The hook lets an unlisted command be (its judgement decides) and still
+        // refuses the never-lists; a permission request for an unlisted one (it was unsure, nobody is there) is
+        // refused. Qanuvi's own agent in Auto: what is not forbidden goes ahead.
+        policies.lock().unwrap().insert(
+            "auto".into(),
+            Arc::new(crate::run_rules::Policy::new(&project, None).in_mode("auto", false)),
+        );
+        let (line, note) = by_hook(&policies, &refused, "auto", "h4", &hook("node stamp.js"));
+        assert!(line.contains("\"response\":{}") && note.is_none());
+        let (line, note) = by_hook(&policies, &refused, "auto", "h5", &hook("git commit -m x"));
+        assert!(line.contains("\"deny\"") && note.is_some());
+        let (line, _) =
+            by_policy(&policies, &refused, "auto", "r5", &ask("node stamp.js")).unwrap();
+        assert!(line.contains("\"deny\""));
+        let kept = refused.lock().unwrap().remove("auto").unwrap();
+        assert_eq!(
+            kept.iter().map(|r| r.what.as_str()).collect::<Vec<_>>(),
+            ["git commit -m x", "node stamp.js"]
+        );
+        policies.lock().unwrap().insert(
+            "own".into(),
+            Arc::new(crate::run_rules::Policy::new(&project, None).in_mode("auto", true)),
+        );
+        let (line, _) = by_policy(&policies, &refused, "own", "r6", &ask("node stamp.js")).unwrap();
+        assert!(line.contains("\"allow\""));
+        let (line, _) = by_policy(&policies, &refused, "own", "r7", &ask("git push")).unwrap();
+        assert!(line.contains("\"deny\""));
     }
 
     #[test]

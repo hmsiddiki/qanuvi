@@ -38,8 +38,11 @@ export function parsePatterns(text: string): string[] {
   return out;
 }
 
-/** What the rules say, for the check before the run (a question they answer is decided, not asked). */
-export function rulesFacts(r: RunRules): string {
+/**
+ * What the rules say, for the check before the run (a question they answer is decided, not asked). In Auto the user
+ * gave the agent room: what is not listed is its judgement, only the never-lists hold.
+ */
+export function rulesFacts(r: RunRules, auto = false): string {
   const lines = [
     "Run rules for this project (standing answers: a question they answer is decided, not asked):",
     "- The run may change files in this project and run its tests, checks and builds.",
@@ -50,12 +53,20 @@ export function rulesFacts(r: RunRules): string {
   ];
   if (r.allow.length) lines.push(`- Also allowed: ${r.allow.join("; ")}`);
   if (r.never.length) lines.push(`- Never: ${r.never.join("; ")}`);
+  lines.push(
+    auto
+      ? "- Permissions are Auto: any other command the agent judges safe may run; nothing needs to be allowed first."
+      : "- Any other command is refused while nobody is there: its step is set aside with the command named.",
+  );
   return lines.join("\n");
 }
 
 /** The one line shown once the card was answered. */
-export function rulesLine(r: RunRules, git: boolean): string {
-  const parts = ["tests and builds may run", "never publishes or touches main"];
+export function rulesLine(r: RunRules, git: boolean, auto = false): string {
+  const parts = [
+    auto ? "Auto: the agent judges the rest" : "tests and builds may run",
+    "never publishes or touches main",
+  ];
   if (git) parts.push(r.branch ? "own git branch" : "Qanuvi's own copies");
   const extra = r.allow.length + r.never.length;
   if (extra) parts.push(`${extra} rule${extra === 1 ? "" : "s"} of your own`);

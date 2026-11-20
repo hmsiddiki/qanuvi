@@ -44,12 +44,26 @@ pub struct Refusal {
     pub never: String,
 }
 
+/// What a command that is neither allowed nor forbidden gets, by the run's permission mode.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Unlisted {
+    /// Manual or edits-only: nobody is there to say yes, so it is refused and the step set aside.
+    #[default]
+    Refuse,
+    /// Auto with Claude Code: the user gave it room, so its own judgement decides (it runs what it finds safe; what
+    /// it asks about is refused, nobody being there). Only the never-lists are held.
+    AgentDecides,
+    /// Auto with Qanuvi's own agent: it asks for every change in a run, and what is not forbidden goes ahead.
+    Allow,
+}
+
 /// The rules a run's sessions are answered by.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Policy {
     root: PathBuf,
     allow: Vec<String>,
     never: Vec<String>,
+    unlisted: Unlisted,
 }
 
 /// Read-only shell commands any step may use.
@@ -203,7 +217,27 @@ impl Policy {
         allow.retain(|p| !p.is_empty());
         never.retain(|p| !p.is_empty());
         allow.dedup();
-        Policy { root, allow, never }
+        Policy {
+            root,
+            allow,
+            never,
+            unlisted: Unlisted::Refuse,
+        }
+    }
+
+    /// The run's permission mode: in Auto the user gave the agent room, so only the never-lists hold.
+    pub fn in_mode(mut self, mode: &str, own_agent: bool) -> Self {
+        self.unlisted = match (mode, own_agent) {
+            ("auto", false) => Unlisted::AgentDecides,
+            ("auto", true) => Unlisted::Allow,
+            _ => Unlisted::Refuse,
+        };
+        self
+    }
+
+    /// What a command neither allowed nor forbidden gets in this run.
+    pub fn unlisted(&self) -> Unlisted {
+        self.unlisted
     }
 
     /// Answers one permission request (a tool name and its input, as the agent sends them).
@@ -216,7 +250,7 @@ impl Policy {
                 .as_str()
                 .or_else(|| input["notebook_path"].as_str())
                 .unwrap_or("");
-            return if inside(&self.root, file) {
+            return if inside(&self.root, file) || scratch(file) {
                 Verdict::Allow
             } else {
                 Verdict::Never("it changes a file outside the project".into())
@@ -286,7 +320,7 @@ fn outside_write(root: &Path, command: &str) -> Option<String> {
         if target.is_empty() || lower == "/dev/null" || lower == "nul" || lower == "$null" {
             continue;
         }
-        if !inside(root, target) {
+        if !inside(root, target) && !scratch(target) {
             return Some(target.to_string());
         }
     }
@@ -489,6 +523,12 @@ fn same(a: &str, b: &str) -> bool {
         .eq_ignore_ascii_case(&b.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
+/// A file in the temporary folder (a scratch copy a check or test uses): writing there changes nothing of the user's.
+fn scratch(file: &str) -> bool {
+    let f = file.trim().replace('\\', "/");
+    f.starts_with("/tmp/") || (Path::new(&f).is_absolute() && inside(&std::env::temp_dir(), &f))
+}
+
 /// Whether a file path (absolute, or from the project's folder) stays inside the project once ".." is resolved.
 fn inside(root: &Path, file: &str) -> bool {
     if file.trim().is_empty() {
@@ -603,6 +643,27 @@ mod tests {
     }
 
     #[test]
+    fn in_auto_the_agent_judges_what_is_not_listed_and_the_never_lists_still_hold() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |mode: &str, own: bool| {
+            Policy::new(&project(dir.path(), RunRules::default()), None).in_mode(mode, own)
+        };
+        assert_eq!(p("default", false).unlisted(), Unlisted::Refuse);
+        assert_eq!(p("acceptEdits", false).unlisted(), Unlisted::Refuse);
+        assert_eq!(p("auto", false).unlisted(), Unlisted::AgentDecides);
+        assert_eq!(p("auto", true).unlisted(), Unlisted::Allow);
+        // The verdict itself is unchanged: the mode only says what an unlisted one gets.
+        assert_eq!(
+            p("auto", false).command("node scripts/stamp.js"),
+            Verdict::Unlisted
+        );
+        assert!(matches!(
+            p("auto", false).command("git commit -m x"),
+            Verdict::Never(_)
+        ));
+    }
+
+    #[test]
     fn edits_stay_inside_the_project_and_reading_tools_always_may() {
         let dir = tempfile::tempdir().unwrap();
         let p = Policy::new(&project(dir.path(), RunRules::default()), None);
@@ -615,15 +676,26 @@ mod tests {
             p.decide("Write", &json!({"file_path": "src/new.ts"})),
             Verdict::Allow
         );
+        let elsewhere = if cfg!(windows) {
+            "C:/Windows/elsewhere.txt"
+        } else {
+            "/etc/elsewhere.txt"
+        };
         assert!(matches!(
-            p.decide("Write", &json!({"file_path": "../other/x.ts"})),
+            p.decide("Edit", &json!({"file_path": elsewhere})),
             Verdict::Never(_)
         ));
-        let outside = std::env::temp_dir().join("elsewhere.txt");
         assert!(matches!(
-            p.decide("Edit", &json!({"file_path": outside.to_string_lossy()})),
+            p.command(&format!("echo x > {elsewhere}")),
             Verdict::Never(_)
         ));
+        // A scratch copy in the temporary folder changes nothing of the user's: a check or test may write there.
+        let scratch = std::env::temp_dir().join("scratch-check").join("x.txt");
+        assert_eq!(
+            p.decide("Write", &json!({"file_path": scratch.to_string_lossy()})),
+            Verdict::Allow
+        );
+        assert_eq!(p.command("ls > /tmp/list.txt"), Verdict::Allow);
         assert_eq!(
             p.decide("Read", &json!({"file_path": "/etc/hosts"})),
             Verdict::Allow

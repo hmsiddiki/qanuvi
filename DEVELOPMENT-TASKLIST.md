@@ -1031,7 +1031,23 @@ runs on or off; with it off nothing is sent anywhere.
     - Note: the check before the run still listed "allow node scripts/stamp.js" as a to-do although it was allowed
       (misled by the plan's FACTS.md from the refused attempt); a reminder only, the run went on.
     Verify: prettier, svelte-check 0, vitest 543, fmt, clippy clean, Rust lib 560 + 2 ignored. Not published.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 17:20): 24y part 1 DRIVEN LIVE, r1-r4 fixed
+    r6 AGREED + BUILT + DRIVEN LIVE (owner, 2026-11-20: "if auto mode is set the user by their own choice gives the
+    agent breathing room"; r1 had made Auto refuse every unlisted command): run_rules Policy::in_mode(mode, own):
+    Unlisted = Refuse (Manual, Edit automatically), AgentDecides (Auto, Claude Code: the hook lets an unlisted call
+    be, its judgement decides; a can_use_tool request for one, where Claude Code itself was unsure, is still refused
+    and the step set aside), Allow (Auto, Qanuvi's own agent, which asks for every change in a run). The never-lists
+    (fixed list, git writes, the user's Never lines) hold in every mode. Writes into the temporary folder (system
+    temp, /tmp/) count as allowed in every mode (scratch copies for checks and tests). Window: the card says in Auto
+    "anything else the agent judges safe goes ahead; what it is unsure of is set aside", the one line starts "Auto:
+    the agent judges the rest", and the check before the run is told which (rulesFacts(r, auto)). Driven on
+    PLAN-Y24.md (1 mul, 2 `node scripts/count.js`, 3 `git commit -am "math helpers"`, 4 sub): Auto: 2 done (COUNT.txt
+    "helpers 2"), 3 Blocked "nothing goes into git during a run", no commit, 4 done; Manual: 2 Blocked with the
+    command named and where to allow it (r4 message), no COUNT.txt, no commit, 1 and 4 done. Verify: prettier,
+    svelte-check 0, vitest 543, fmt, clippy clean, Rust lib 561 + 2 ignored.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 19:00): 24y part 1 DRIVEN LIVE, r1-r4 + r6 done,
+    unpublished; 0.1.31 waits for the owner's yes; r5 (Inbox Try again on an ended run) is a proposal. Test window
+    and test masters stopped. Next: 0.1.31 (ask), then part 2 (Y3 + Y4 + Y5), then 24rl.
+    PICKUP POINT (before, 2026-11-20 17:20): 24y part 1 DRIVEN LIVE, r1-r4 fixed
     (unpublished; r1 means 0.1.30's rules do nothing in Auto: publish 0.1.31 soon, ask the owner). r5 is a proposal
     for the owner. Test window and test masters stopped; scratch E:/qc-scratch/y24-plan stays in the test build's
     projects. Next: 0.1.31 (ask), then part 2 (Y3 + Y4 + Y5), then 24rl.

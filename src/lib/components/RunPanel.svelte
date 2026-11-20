@@ -532,7 +532,7 @@
         testCommand: project.settings.test_command,
         previewUrl: project.settings.preview_url,
         // 24y: the run rules are standing answers, so the check decides what they cover instead of asking.
-        notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules())],
+        notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules(), mode === "auto")],
       };
       const steps = coveredSteps().map((s) => ({ number: s.number, title: s.title, details: s.details }));
       const r = await planner.ask(
@@ -1045,8 +1045,13 @@
         <strong>While this plan runs alone</strong>
         <p class="hint">
           It may: change files in this project, run its tests and builds.<br />
-          It never: publishes, deletes outside the project, uses your passwords, or changes your main branch. A step that
-          needs anything else is set aside with the command named, and the run goes on with the rest.
+          It never: publishes, deletes outside the project, uses your passwords, or changes your main branch.
+          {#if mode === "auto"}
+            Permissions are Auto: anything else the agent judges safe goes ahead; what it is unsure of is set aside with
+            the command named, and the run goes on with the rest.
+          {:else}
+            A step that needs anything else is set aside with the command named, and the run goes on with the rest.
+          {/if}
         </p>
         {#if isGit}
           <div class="rules-branch">
@@ -1081,7 +1086,7 @@
         {/if}
       {:else}
         <p class="hint">
-          Run rules: {rulesLine(rules, isGit)} ·
+          Run rules: {rulesLine(rules, isGit, mode === "auto")} ·
           <button type="button" class="link" onclick={() => (rulesOpen = true)}>Change</button>
         </p>
       {/if}
