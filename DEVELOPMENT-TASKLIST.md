@@ -3560,7 +3560,10 @@ runs on or off; with it off nothing is sent anywhere.
   /var/lib/qanuvi-relay, listens 127.0.0.1:47300 only, LimitNOFILE 65536, hardened), 2 MB RAM, answers the
   WebSocket handshake (101). Left for the owner in the ISPConfig panel (their notes: prefer the panel): DNS A record
   relay -> 109.123.234.13 in zone qanuvi.com, and a subdomain site relay.qanuvi.com with Let's Encrypt and nginx
-  directives proxying / to 127.0.0.1:47300 with Upgrade headers. Then wss://relay.qanuvi.com is the relay address.
+  directives proxying / to 127.0.0.1:47300 with Upgrade headers. Then wss://relay.qanuvi.com is the relay address. DONE by the owner the same day: DNS A record + subdomain site
+  (web folder relay, auto-subdomain none, Let's Encrypt, no PHP); checked from outside: TLS valid to 2027-02-18, the
+  WebSocket handshake answers 101 through nginx. The owner paired the Linux laptop (fixed .deb) with This PC (0.1.28)
+  through it: connected.
 - [ ] **24y. BENCHMARK for the plan runner: a long, complex plan that runs by itself (owner, 2026-11-14; a goal to
   reach, NOT a build step yet)**: the yardstick is 24z step A (R1 to R5) itself: about 25 steps across Rust and
   TypeScript, tests and test builds, a live check, a VPS check, all without the owner except the final merge and
