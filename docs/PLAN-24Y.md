@@ -63,11 +63,13 @@ check comes first (builds wait when free memory is low). Qanuvi's own repo gets 
 **Y9. The benchmark.** A plan of R1 to R5's size runs on a scratch copy. Pass: it ends alone, and the report is
 right.
 
-## Three questions for the owner (with my recommendation)
+## Two questions for the owner (with my recommendation)
 
 1. **Where the run rules live.** In Qanuvi, per project (recommended: nothing extra in the user's files; the plan
    file can still add a "Run rules" section that wins for that plan). Or only in the plan file.
 2. **The default card.** Are the defaults above right for normal users (may change files and run tests and builds;
    never publish, delete outside, use passwords, touch main; branch recommended)?
-3. **Something needs the user in the middle of a run.** Set that step aside and go on (recommended), or hold the
-   whole run until they answer.
+
+Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
+with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
+24y keeps this as it is.
