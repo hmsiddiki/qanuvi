@@ -1099,8 +1099,16 @@ runs on or off; with it off nothing is sent anywhere.
     0.1.28 .deb needs one install by hand into ~/.local (ask the owner); from then on it is one click.
     Mac: owner asked about a 2014 Mac mini (Intel, Monterey) for testing; advised against buying it (CI's macos-latest
     is Apple silicon and free; it could build the Mac app + master for the channel, signed here). Proposal open.
-    PICKUP POINT (fresh conversation starts here, 2026-11-21 00:10): 0.1.32 PUBLISHED, nothing unpublished. Next: the
-    laptop's first move to ~/.local (ask), Mac builds on the channel through CI (proposal), 24y part 2, 24rl.
+    Laptop moved (owner yes, 2026-11-21 00:05): the L2 helper (filled in by hand, the .deb removal left out because
+    pkexec over ssh has no password window) put 0.1.32 into ~/.local/lib/qanuvi; menu entry + qanuvi:// handler point
+    there, it runs from there on the same data, version 0.1.32. The owner removes the old copy with sudo apt remove
+    qanuvi. ~/.local/bin joins PATH at the next sign-in (Ubuntu's .profile). From now on its updates are one click.
+    Mac publishing: owner, "no mac publishing for now".
+    PICKUP POINT (fresh conversation starts here, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
+    nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
+    report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on
+    the laptop; c2 if it comes back (~/qanuvi-stuck.sh).
+    PICKUP POINT (before, 2026-11-21 00:10): 0.1.32 PUBLISHED, nothing unpublished.
     PICKUP POINT (before, 2026-11-20 22:40): L2 BUILT, unpublished, not driven live (laptop
     ssh down). Next: laptop drive of L2, then publish 0.1.32 (ask), then 24y part 2 (Y3 + Y4 + Y5), then 24rl.
     PICKUP POINT (before, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
