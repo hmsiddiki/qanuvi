@@ -181,6 +181,8 @@ pub fn command_for(
         }
         let mut c = Command::new(master);
         c.arg("--stdio").arg("--data").arg(local_data);
+        #[cfg(target_os = "linux")]
+        crate::linux_fonts::give_back(&mut c);
         return Ok(c);
     }
     check_target(target)?;

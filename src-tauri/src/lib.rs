@@ -21,6 +21,8 @@ pub mod git;
 pub mod inbox;
 pub mod index;
 pub mod knowledge;
+#[cfg(any(target_os = "linux", test))]
+pub mod linux_fonts;
 pub mod llm;
 pub mod local_agent;
 pub mod local_servers;

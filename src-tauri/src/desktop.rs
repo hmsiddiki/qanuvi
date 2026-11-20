@@ -723,6 +723,12 @@ pub fn run() {
         eprintln!("{note}");
     }
     let data = crate::data_location::resolve(&defaults);
+    // L1: WebKitGTK hangs on the system's WOFF fonts (a blank window); the window hides them from it.
+    #[cfg(target_os = "linux")]
+    // SAFETY: start-up, before the window or any other thread exists.
+    unsafe {
+        crate::linux_fonts::hide_web_fonts(&data)
+    };
     let context = tauri::generate_context!();
     // t1: the tray's Quit question alone (no restore applied, no master started): the window's look and storage are
     // the app's own.

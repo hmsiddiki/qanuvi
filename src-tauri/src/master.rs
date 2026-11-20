@@ -2058,6 +2058,9 @@ fn spawn_service(exe: &Path, dir: &Path, after: Option<u32>) -> Result<(), Strin
     {
         let mut cmd = std::process::Command::new(exe);
         cmd.arg("serve").arg("--data").arg(dir);
+        // L1: the window's font setting stays with the window; the master and its terminals get the user's.
+        #[cfg(target_os = "linux")]
+        crate::linux_fonts::give_back(&mut cmd);
         if let Some(pid) = after {
             cmd.arg(format!("--after-pid={pid}"));
         }
