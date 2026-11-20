@@ -37,6 +37,8 @@
     holdWording,
     keepDecided,
     keepHolds,
+    keepChecked,
+    alreadyChecked,
     keptModel,
     loadPlanState,
     savePlanState,
@@ -406,6 +408,9 @@
   let checkFirst = $state(true);
   let checking = $state(false);
   let check = $state<Preflight | null>(null);
+  /** The steps the check in hand went through (kept once the run starts), and how many it left out as checked before. */
+  let checkSteps: { number: string | null; title: string; details: string[] }[] = [];
+  let checkedBefore = $state(0);
   let secretValues = $state<Record<string, string>>({});
   let answers = $state<Record<number, string>>({});
   /** Answers the owner typed or changed (an untouched recommended answer is Qanuvi's decision). */
@@ -534,7 +539,16 @@
         // 24y: the run rules are standing answers, so the check decides what they cover instead of asking.
         notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules(), mode === "auto")],
       };
-      const steps = coveredSteps().map((s) => ({ number: s.number, title: s.title, details: s.details }));
+      // A run started again (stopped by its budget, paused, ended): steps the check already went through, unchanged
+      // since, are not asked about again; their answers, holds and extra checks are kept with the plan.
+      const { checked, fresh } = alreadyChecked(loadPlanState(project.id, file), coveredSteps());
+      checkedBefore = checked.length;
+      const steps = fresh.map((s) => ({ number: s.number, title: s.title, details: s.details }));
+      checkSteps = steps;
+      if (!steps.length) {
+        await go();
+        return;
+      }
       const r = await planner.ask(
         project,
         preflightPrompt(file, steps, known),
@@ -559,6 +573,7 @@
         !found.order.length
       ) {
         check = null;
+        savePlanState(project.id, file, keepChecked(loadPlanState(project.id, file), checkSteps));
         await go();
       }
     } catch (e) {
@@ -630,7 +645,7 @@
       ...state,
       holds: state.holds.filter((h) => !cleared.has(h.step) || holds.some((n) => n.step === h.step)),
     };
-    savePlanState(project.id, file, keepHolds(state, holds));
+    savePlanState(project.id, file, keepChecked(keepHolds(state, holds), checkSteps));
     // The check's order decisions (R2e g) become Needs lines in the plan, so the run keeps that order.
     if (c.order.length) {
       try {
@@ -1094,6 +1109,13 @@
     {#if check}
       <div class="check-list">
         <strong>Before the run</strong>
+        {#if checkedBefore}
+          <p class="hint">
+            {checkedBefore} step{checkedBefore === 1 ? " was" : "s were"} checked before and {checkedBefore === 1
+              ? "is"
+              : "are"} not asked about again (your answers stand); these questions are about new or changed steps only.
+          </p>
+        {/if}
         {#if check.secrets.length}
           <p class="hint">
             Logins and keys the steps need. A value is saved as this project's secret; no model sees it. Leave one empty

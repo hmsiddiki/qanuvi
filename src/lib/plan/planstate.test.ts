@@ -116,3 +116,33 @@ describe('"Decided for you" open or folded', () => {
     expect(decidedOpen({ ...emptyPlanState(), decided: [choice("x", "b")] })).toBe(false);
   });
 });
+
+describe("steps the check before a run already went through (owner, 2026-11-21)", () => {
+  const one = { number: "1", title: "Add mul", details: ["- Add mul to src/math.js.", "- Check: `npm test`"] };
+  const two = { number: "2", title: "Add sub", details: ["- Add sub."] };
+
+  it("asks again only about new or changed steps", async () => {
+    const { alreadyChecked, keepChecked } = await import("./planstate");
+    const state = keepChecked(emptyPlanState(), [one]);
+    expect(alreadyChecked(state, [one, two])).toEqual({ checked: [one], fresh: [two] });
+    // The author changed step 1: it is checked again.
+    const changed = { ...one, details: ["- Add mul and div to src/math.js.", "- Check: `npm test`"] };
+    expect(alreadyChecked(state, [changed]).fresh).toEqual([changed]);
+  });
+
+  it("does not count lines the run itself writes under a step", async () => {
+    const { alreadyChecked, keepChecked } = await import("./planstate");
+    const state = keepChecked(emptyPlanState(), [one]);
+    const worked = {
+      ...one,
+      details: [...one.details, "- Needs: 3", "- Progress (try 1): mul written", "- Done: tested with `npm test`"],
+    };
+    expect(alreadyChecked(state, [worked]).checked).toEqual([worked]);
+  });
+
+  it("is kept with the plan and read back", async () => {
+    const { keepChecked, loadPlanState, savePlanState } = await import("./planstate");
+    savePlanState("p", "PLAN.md", keepChecked(emptyPlanState(), [one, two]));
+    expect(loadPlanState("p", "PLAN.md").checked.map((c) => c.step)).toEqual(["1", "2"]);
+  });
+});

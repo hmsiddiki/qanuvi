@@ -51,6 +51,12 @@ export interface KeptModel {
   model: string;
 }
 
+/** A step the check before a run went through: its key and its text's fingerprint then. */
+export interface KeptChecked {
+  step: string;
+  sig: string;
+}
+
 export interface PlanState {
   holds: KeptHold[];
   answers: KeptAnswer[];
@@ -59,6 +65,11 @@ export interface PlanState {
   /** Steps that count as done only after the decider's review and passing tests (24u part 3). */
   checks: { step: string; why: string }[];
   models: KeptModel[];
+  /**
+   * The steps the check before a run already went through, with a fingerprint of their text then: a run started
+   * again checks only steps that are new or changed since (owner, 2026-11-21).
+   */
+  checked: KeptChecked[];
   /** The owner folded "Decided for you" when it held this many choices: it stays folded until a new one comes. */
   decidedFolded?: number;
 }
@@ -70,7 +81,46 @@ export const emptyPlanState = (): PlanState => ({
   decided: [],
   checks: [],
   models: [],
+  checked: [],
 });
+
+/** Lines a run itself writes under a step (the check's order, notes on work done): they do not change the step. */
+const RUN_LINE = /^[-*]?\s*(needs|skipped|done|progress|model|blocked|note)\b[^:]{0,40}:/i;
+
+/**
+ * A fingerprint of a step's text (its title and the detail lines the plan's author wrote): a changed step is checked
+ * again; lines the run adds (Needs, Progress, Done ...) do not count.
+ */
+export function stepSig(s: { title: string; details: string[] }): string {
+  const own = s.details.map((l) => l.trim()).filter((l) => l && !RUN_LINE.test(l));
+  const text = [s.title.trim(), ...own].join("\n");
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  return `${text.length.toString(36)}-${h.toString(36)}`;
+}
+
+/** The steps the check went through before, as they were then (new and changed steps are not among them). */
+export function alreadyChecked<T extends { number: string | null; title: string; details: string[] }>(
+  state: PlanState,
+  steps: T[],
+): { checked: T[]; fresh: T[] } {
+  const seen = new Set(state.checked.map((c) => `${c.step}\u0000${c.sig}`));
+  const checked: T[] = [];
+  const fresh: T[] = [];
+  for (const s of steps) (seen.has(`${stepKey(s)}\u0000${stepSig(s)}`) ? checked : fresh).push(s);
+  return { checked, fresh };
+}
+
+/** The check went through these steps: kept, so a later start does not ask about them again. */
+export function keepChecked(
+  state: PlanState,
+  steps: { number: string | null; title: string; details: string[] }[],
+): PlanState {
+  const keys = new Set(steps.map(stepKey));
+  const others = state.checked.filter((c) => !keys.has(c.step));
+  const now = steps.map((s) => ({ step: stepKey(s), sig: stepSig(s) }));
+  return { ...state, checked: [...others, ...now].slice(-500) };
+}
 
 /** A step's key in the plan state: its number, else its title. */
 export const stepKey = (s: { number: string | null; title: string }): string => s.number ?? s.title;
@@ -127,6 +177,9 @@ export function loadPlanState(projectId: string, file: string): PlanState {
       models: Array.isArray(v?.models)
         ? v.models.filter((m) => typeof m?.step === "string" && typeof m.model === "string" && m.model)
         : [],
+      checked: Array.isArray(v?.checked)
+        ? v.checked.filter((c) => typeof c?.step === "string" && typeof c.sig === "string")
+        : [],
       ...(typeof v?.decidedFolded === "number" ? { decidedFolded: v.decidedFolded } : {}),
     };
   } catch {
@@ -143,7 +196,8 @@ export function savePlanState(projectId: string, file: string, state: PlanState)
       !state.closings.length &&
       !state.decided.length &&
       !state.checks.length &&
-      !state.models?.length
+      !state.models?.length &&
+      !state.checked?.length
     )
       planData.removeItem(key);
     else planData.setItem(key, JSON.stringify(state));

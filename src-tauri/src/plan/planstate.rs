@@ -70,6 +70,10 @@ pub struct PlanState {
     /// The models the owner chose for steps in Qanuvi (R2e i), kept here, not in the plan file.
     #[serde(default)]
     pub models: Vec<KeptModel>,
+    /// The steps the check before a run already went through, with a fingerprint of their text as it saw them: a run
+    /// started again checks only steps that are new or changed since (owner, 2026-11-21). Set by the window.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checked: Vec<KeptChecked>,
     /// The owner folded "Decided for you" when it held this many choices; a choice added later opens it again.
     /// Set by the window; the core keeps it as it is, so its writes never undo the fold.
     #[serde(
@@ -81,6 +85,13 @@ pub struct PlanState {
 }
 
 /// The model the owner chose for a step in Qanuvi (`KeptModel`).
+/// A step the check before a run went through (`KeptChecked`): its key and its text's fingerprint then.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeptChecked {
+    pub step: String,
+    pub sig: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeptModel {
     /// The step's number, else its title.
@@ -103,6 +114,7 @@ impl PlanState {
             && self.decided.is_empty()
             && self.checks.is_empty()
             && self.models.is_empty()
+            && self.checked.is_empty()
     }
 
     /// The model the owner chose for the step in Qanuvi, if any.
@@ -158,6 +170,7 @@ impl PlanState {
                         .and_then(Value::as_str)
                         .is_some_and(|m| !m.is_empty())
             }),
+            checked: list(v, "checked", |x| s(x, "step") && s(x, "sig")),
             decided_folded: v.get("decidedFolded").and_then(Value::as_u64),
         }
     }
@@ -237,6 +250,13 @@ pub fn prune_state(state: &PlanState, open: &HashSet<String>, all: &HashSet<Stri
             .collect(),
         checks: state
             .checks
+            .iter()
+            .filter(|c| open.contains(&c.step))
+            .cloned()
+            .collect(),
+        // A step the check went through stays checked while it is open (done ones need no check again).
+        checked: state
+            .checked
             .iter()
             .filter(|c| open.contains(&c.step))
             .cloned()

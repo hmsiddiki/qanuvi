@@ -1132,8 +1132,15 @@ runs on or off; with it off nothing is sent anywhere.
     PICKUP POINT (fresh conversation starts here, 2026-11-21): 24y part 2 BUILT, not driven live, unpublished. Next:
     drive part 2 live on a scratch project (scratch git repo: a step whose check passes after a fix round, one that
     always fails and gets undone, one with a refused check; once with Branch yes, once with No), then 0.1.33 (ask).
-    Open owner question (2026-11-21): a run stopped by its budget, started again, ran the check before the run
-    again and asked again; proposal given in chat (remember the check per plan and step), waiting for the owner.
+    CHECK MEMORY BUILT (owner "go on", 2026-11-21; owner found: a run stopped by its budget, started again, ran the
+    check before the run again and asked partly different questions): the plan state keeps the steps the check went
+    through (checked: step + fingerprint of its title and the author's detail lines; Needs/Progress/Done/... lines
+    the run writes do not count). Start again: only new or changed steps go to the check; none = the run starts at
+    once (kept holds, extra checks and decided choices already apply in the runner); the check box says how many
+    were checked before. Kept on Check and start (no questions) and on Start the run. Raise budget (plan view) opens
+    the same panel, so it goes straight on now. Rust PlanState keeps the field (skipped when empty, compare cases
+    unchanged). Tests: planstate 3 new; verify green (vitest 546, Rust 567, clippy app + server). Not driven live.
+    NEXT: drive part 2 + check memory live on a scratch project, then 0.1.33 (ask).
     PICKUP POINT (before, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
     nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
     report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on
