@@ -95,6 +95,8 @@ pub struct Master {
     cut_off: Mutex<(String, Vec<String>)>,
     /// M8a: what its own look on the update channel found.
     updates: Arc<crate::master_update::Updates>,
+    /// LM1: the Preview's live pictures of agents' test browsers being watched.
+    lives: Arc<crate::live::Lives>,
 }
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
@@ -241,6 +243,7 @@ impl Master {
             me: std::sync::OnceLock::new(),
             cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
             updates: Arc::default(),
+            lives: Arc::default(),
         })
     }
 
@@ -1160,6 +1163,21 @@ impl Master {
             "browser_agent_view" => to(Ok(crate::preview::agent_view(&agent::browser_state_file(
                 &s(args, "sessionId"),
             )?))),
+            "browser_agent_shot" => to(crate::preview::agent_shot(&agent::browser_state_file(
+                &s(args, "sessionId"),
+            )?)),
+            // LM1: a live picture of the session's test browser, for the Preview while it is watched.
+            "browser_live_start" => {
+                let sink = stream(&s(args, "onEvent"));
+                to(self
+                    .lives
+                    .start(&agent::browser_state_file(&s(args, "sessionId"))?, sink))
+            }
+            "browser_live_ack" => to(self.lives.ack(&s(args, "id"))),
+            "browser_live_stop" => {
+                self.lives.stop(&s(args, "id"));
+                Ok(Value::Null)
+            }
             // Plan runs.
             "runs_save" => {
                 projects::get(db, &s(args, "projectId"))?;
@@ -4363,7 +4381,6 @@ mod tests {
         "inspector_pick",
         "inspector_page_text",
         "inspector_close",
-        "browser_agent_shot",
         // The app's own lifecycle (M4c): it stops This PC's master before an update installs.
     ];
 

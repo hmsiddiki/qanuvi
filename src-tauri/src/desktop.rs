@@ -240,12 +240,7 @@ fn dap_stop_window(window: tauri::Window, state: State<AppState>) {
     state.debuggers.stop_owner(window.label());
 }
 
-// The preview pane's inspector and an agent's browser picture ---------------------------------------------------
-
-#[tauri::command]
-fn browser_agent_shot(session_id: String) -> Res<String> {
-    preview::agent_shot(&agent::browser_state_file(&session_id)?)
-}
+// The preview pane's inspector ----------------------------------------------------------------------------------
 
 #[tauri::command]
 async fn inspector_show(
@@ -959,7 +954,6 @@ pub fn run() {
             notify_item,
             app_info,
             screen_usage,
-            browser_agent_shot,
             inspector_show,
             inspector_scroll,
             inspector_pick,

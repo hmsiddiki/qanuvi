@@ -98,6 +98,11 @@ fn tools() -> Value {
             "inputSchema": {"type": "object", "properties": shot_props}
         },
         {
+            "name": "browser_show_live",
+            "description": "Show this browser live to the user in Qanuvi's Preview (a moving picture of its page; the user only watches). Use it when the user asks to see or watch the browser, or after asking them in chat whether to watch live and getting a yes. Then go on working as usual.",
+            "inputSchema": {"type": "object", "properties": {}}
+        },
+        {
             "name": "browser_eval",
             "description": "Evaluate a JavaScript expression in the page and answer its value as JSON (promises are awaited).",
             "inputSchema": {"type": "object", "properties": {"expression": {"type": "string"}}, "required": ["expression"]}
@@ -198,6 +203,11 @@ impl BrowserTools {
 
     /// Writes the page the agent is on (and the last screenshot) for the preview tab.
     fn note_state(&mut self, shot: Option<&str>) {
+        self.note_state_with(shot, None);
+    }
+
+    /// As note_state; `watch` (a time) asks the window to show the browser live in Preview (LM3).
+    fn note_state_with(&mut self, shot: Option<&str>, watch: Option<u64>) {
         let Some(file) = self.state.clone() else {
             return;
         };
@@ -215,17 +225,24 @@ impl BrowserTools {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        let state = json!({"url": v[0], "title": v[1], "updated": millis, "shot": has_shot, "shot_updated": shot.map(|_| millis)});
+        let state = json!({"url": v[0], "title": v[1], "updated": millis, "shot": has_shot, "shot_updated": shot.map(|_| millis), "cdp": b.ws_url});
         if let Some(dir) = file.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        // Keep the time of the last screenshot when this update has none.
+        // Keep the time of the last screenshot when this update has none, and the last ask to watch live (LM3).
         let mut state = state;
-        if shot.is_none()
-            && let Ok(old) = std::fs::read_to_string(&file)
+        if let Ok(old) = std::fs::read_to_string(&file)
             && let Ok(old) = serde_json::from_str::<Value>(&old)
         {
-            state["shot_updated"] = old["shot_updated"].clone();
+            if shot.is_none() {
+                state["shot_updated"] = old["shot_updated"].clone();
+            }
+            if watch.is_none() {
+                state["watch"] = old["watch"].clone();
+            }
+        }
+        if let Some(at) = watch {
+            state["watch"] = json!(at);
         }
         let _ = std::fs::write(&file, state.to_string());
     }
@@ -358,6 +375,14 @@ impl BrowserTools {
                 out.push(p["text"].as_str().unwrap_or("").to_string());
                 self.note_state(None);
                 Ok(out.join("\n"))
+            }
+            "browser_show_live" => {
+                let at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+                self.note_state_with(None, Some(at));
+                Ok("Qanuvi's Preview shows this browser live to the user now (while their window is open). Go on as usual: they see each change as it happens.".into())
             }
             "browser_read" => {
                 let max = n("max_chars", READ_TEXT as u64, MAX_TEXT as u64);
@@ -600,7 +625,7 @@ impl Tools for BrowserTools {
         SERVER_NAME
     }
     fn instructions(&self) -> &'static str {
-        "Qanuvi's headless test browser, with its own empty profile. Use it instead of starting Playwright or another browser to check pages: open, then read text, list fields, click and type by number, and check errors. Ask for a screenshot only when text cannot answer the question."
+        "Qanuvi's headless test browser, with its own empty profile. Use it instead of starting Playwright or another browser to check pages: open, then read text, list fields, click and type by number, and check errors. Ask for a screenshot only when text cannot answer the question. When the user seeing the page move matters (a flow or animation they want to check), ask them in chat whether to watch it live; on a yes, or when they ask to see the browser, use browser_show_live."
     }
     fn list(&self) -> Value {
         tools()
@@ -694,7 +719,7 @@ mod tests {
             .iter()
             .map(|t| t["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names.len(), 10);
+        assert_eq!(names.len(), 11);
         assert!(names.iter().all(|n| n.starts_with("browser_")));
         // Tools that need an element refuse without one, before any browser is started.
         let r = t.call("browser_click", &json!({}));

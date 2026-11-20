@@ -11,6 +11,8 @@ import { memoryContext } from "./memory.svelte";
 import { modelLabel, paidAgent, providerById, type AgentProvider } from "$lib/agents/providers";
 import { chatModelPrompt, deciderSeat, overruleNote, parseChatModel, strongerModel } from "$lib/core/decider";
 import { itemsToMarkdown } from "$lib/agent/events";
+import { asksToShowLive, previewLive } from "./previewLive.svelte";
+import { ui } from "./ui.svelte";
 import { freeDecide, ownSetup, setupFor } from "./brain.svelte";
 import { snapshotChanges, type Snap } from "./changes";
 import { branchPreamble } from "$lib/agent/sessionTools";
@@ -568,6 +570,11 @@ ${text}`
       if (event.kind === "line") {
         if (event.line.includes('"qanuvi_interrupted"')) this.interrupting = false;
         this.items = reduce(this.items, event.line, ++this.#seq, Math.floor(Date.now() / 1000));
+        // LM3: the agent shows its test browser live; Preview opens on it.
+        if (id && asksToShowLive(event.line)) {
+          previewLive.ask = { sessionId: id, at: Date.now() };
+          ui.view = "preview";
+        }
         // The stats line counts this turn's model calls as they come (the session's totals come at the turn's end).
         if (this.turnUsage && this.turnUsage.sessionId !== id) this.#clearTurn();
         if (id && this.#turn.take(event.line)) this.turnUsage = { sessionId: id, ...this.#turn.sums() };

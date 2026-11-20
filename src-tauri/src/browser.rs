@@ -128,6 +128,8 @@ pub struct Browser {
     /// Alerts and confirms the page showed (answered with OK so the page does not hang).
     pub dialogs: Vec<String>,
     pub viewport: (u32, u32),
+    /// The page's DevTools address, for a second connection (the Preview's live picture, LM1).
+    pub ws_url: String,
 }
 
 fn no_window(cmd: &mut Command) {
@@ -389,6 +391,7 @@ impl Browser {
             status: None,
             dialogs: Vec::new(),
             viewport: (WIDTH, HEIGHT),
+            ws_url: ws_url.clone(),
         };
         drop(guard);
         for domain in [

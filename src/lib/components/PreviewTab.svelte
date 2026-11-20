@@ -13,6 +13,7 @@
   import FileInput from "@lucide/svelte/icons/file-input";
   import MousePointerClick from "@lucide/svelte/icons/mouse-pointer-click";
   import X from "@lucide/svelte/icons/x";
+  import Cast from "@lucide/svelte/icons/cast";
   import { onDestroy, untrack } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { openUrl } from "@tauri-apps/plugin-opener";
@@ -22,6 +23,8 @@
   import { workspace } from "$lib/stores/workspace.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
   import { normalizeUrl } from "$lib/url";
+  import { machineFor } from "$lib/remote";
+  import { LiveWatch, previewLive } from "$lib/stores/previewLive.svelte";
   import { loopbackPort, machineText, throughTunnel } from "$lib/previewTunnel";
   import IconButton from "./IconButton.svelte";
 
@@ -102,16 +105,77 @@
   let lastSeen = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
 
+  // LM2: a live picture of the agent's own test browser (its page, logins and all); the agent carries on headless.
+  let live = $state<LiveWatch | null>(null);
+  /** The agent's last screenshot, shown while its browser is not open. */
+  let lastShot = $state("");
+  /** The browser address the picture came from: a new one (the browser opened again) starts the picture anew. */
+  let liveFrom = "";
+
+  function watchLive(sessionId: string | null = agent.selectedId) {
+    if (!sessionId) {
+      error = "Open the chat of the agent whose test browser to watch.";
+      return;
+    }
+    live?.stop();
+    shot = null;
+    error = "";
+    lastShot = "";
+    const w = new LiveWatch(sessionId, machineFor("browser_live_start", { sessionId }) !== null);
+    live = w;
+    void w.start();
+  }
+
+  function stopFollowing() {
+    live?.stop();
+    live = null;
+    follow = false;
+  }
+
+  // The agent asked to show its browser live, and opened Preview for it.
+  $effect(() => {
+    const ask = previewLive.ask;
+    if (!ask) return;
+    untrack(() => {
+      previewLive.ask = null;
+      liveFrom = "";
+      watchLive(ask.sessionId);
+    });
+  });
+
+  // While the browser is not open (or closed), its last picture.
+  let liveEnded = $derived(live?.status === "ended" && live.why !== "");
+  $effect(() => {
+    if (!liveEnded || !live) return;
+    const w = live;
+    untrack(() => {
+      api.browser
+        .agentShot(w.sessionId)
+        .then((s) => {
+          if (live === w) lastShot = s;
+        })
+        .catch(() => {});
+    });
+  });
+
   $effect(() => {
     clearInterval(timer);
-    if (!follow) return;
+    if (!follow && !live) return;
     const check = async () => {
-      const id = agent.selectedId;
+      const id = live?.sessionId ?? agent.selectedId;
       if (!id) return;
       const view = await api.browser.agentView(id).catch(() => null);
-      if (!view || view.updated === lastSeen) return;
+      if (!view) return;
+      if (live && view.cdp && view.cdp !== liveFrom) {
+        // The first look notes where the picture comes from; a new address later means the browser opened again.
+        const again = liveFrom !== "" || live.status === "ended";
+        liveFrom = view.cdp;
+        if (again && live.status === "ended" && live.why) watchLive(id);
+      }
+      if (view.updated === lastSeen) return;
       lastSeen = view.updated;
       agentPage = view.title || view.url;
+      if (live) return;
       if (view.url && view.url !== current && /^(https?|file):/.test(view.url)) go(view.url);
     };
     check();
@@ -121,6 +185,7 @@
 
   onDestroy(() => {
     clearInterval(timer);
+    live?.stop();
     if (shot) api.browser.close().catch(() => {});
   });
 
@@ -144,6 +209,7 @@
 
   async function inspect() {
     if (!loaded) return;
+    if (live) stopFollowing();
     busy = "Opening the page in the test browser…";
     error = "";
     try {
@@ -284,9 +350,16 @@
       <IconButton
         label={follow ? "Stop following the agent" : "Follow the agent: show the page its test browser is on"}
         active={follow}
-        onclick={() => (follow = !follow)}
+        onclick={() => (follow ? stopFollowing() : ((follow = true), live?.stop(), (live = null)))}
       >
         <Eye size={14} />
+      </IconButton>
+      <IconButton
+        label={live ? "Stop following the agent" : "Watch the agent's test browser live"}
+        active={!!live}
+        onclick={() => (live ? stopFollowing() : ((follow = false), watchLive()))}
+      >
+        <Cast size={14} />
       </IconButton>
       <IconButton label="Send this page to the agent (as text)" disabled={!loaded || !!busy} onclick={sendPage}>
         <FileInput size={14} />
@@ -316,11 +389,29 @@
   {#if busy}<p class="note">{busy}</p>{:else if shot}<p class="note">
       Click an element to send it to the agent; scroll to move the page; Esc to stop.
       <button type="button" class="link" onclick={() => (shot = null)}><X size={12} /> Stop</button>
+    </p>{:else if live}<p class="note">
+      {#if live.status === "ended" && live.why}{live.why}{lastShot ? " Its last picture:" : ""}{:else}Live from the
+        agent's test browser{agentPage ? `: ${agentPage}` : ""}{live.status === "starting" ? " (connecting…)" : ""}{/if}
+      <button type="button" class="link" onclick={stopFollowing}><X size={12} /> Stop following</button>
     </p>{:else if follow}<p class="note">
       Following the agent{agentPage ? `: ${agentPage}` : " (its test browser has not opened a page yet)"}
     </p>{/if}
   <div class="stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
-    {#if shot}
+    {#if live}
+      {#if live.frame && live.status !== "ended"}
+        <img class="live" src={live.frame} alt="The agent's test browser, live" />
+      {:else if live.status === "ended" && lastShot}
+        <img class="live old" src={lastShot} alt="The agent's test browser as it last looked" />
+      {:else}
+        <div class="empty">
+          <p>
+            {live.status === "ended"
+              ? "The agent's test browser is not open right now. The picture comes back when it opens a page."
+              : "Connecting to the agent's test browser…"}
+          </p>
+        </div>
+      {/if}
+    {:else if shot}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
       <img
         class="inspect"
@@ -468,6 +559,17 @@
     color: var(--qx-accent);
     font: inherit;
     cursor: pointer;
+  }
+
+  .live {
+    align-self: center;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .live.old {
+    opacity: 0.6;
   }
 
   .inspect {

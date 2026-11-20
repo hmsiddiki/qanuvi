@@ -315,7 +315,14 @@ export interface AgentView {
   updated: number;
   shot: boolean;
   shot_updated: number | null;
+  /** The page's DevTools address on its machine (LM1), set once the browser is open. */
+  cdp?: string;
+  /** When the agent last asked to show its browser live (LM3). */
+  watch?: number;
 }
+
+/** What a live picture of an agent's test browser streams (LM1). */
+export type LiveEvent = { frame: string; width: number; height: number } | { ended: string };
 
 export interface InspectorShot {
   image: string;
@@ -620,6 +627,15 @@ export const api = {
     /** The page the agent's browser tools are on in a session (null before they open one). */
     agentView: (sessionId: string) => invoke<AgentView | null>("browser_agent_view", { sessionId }),
     agentShot: (sessionId: string) => invoke<string>("browser_agent_shot", { sessionId }),
+    /** A live picture of the session's test browser, on the session's machine (LM1); gives back the stream's id. */
+    liveStart: (sessionId: string, onEvent: (e: LiveEvent) => void) => {
+      const channel = new Channel<LiveEvent>();
+      channel.onmessage = onEvent;
+      return invoke<string>("browser_live_start", { sessionId, onEvent: channel });
+    },
+    /** The window has the last picture and still watches; the next one may come. */
+    liveAck: (sessionId: string, id: string) => invoke<void>("browser_live_ack", { sessionId, id }),
+    liveStop: (sessionId: string, id: string) => invoke<void>("browser_live_stop", { sessionId, id }),
     show: (url: string, width: number, height: number) =>
       invoke<InspectorShot>("inspector_show", { url, width, height }),
     scroll: (dy: number) => invoke<InspectorShot>("inspector_scroll", { dy }),
