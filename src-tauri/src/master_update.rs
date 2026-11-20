@@ -15,6 +15,9 @@
 //! data folder's `updates` folder ([`Target::Installer`]); after the same wait for running work, the master closes the
 //! app's windows (their unsaved text kept as drafts), ends, and the installer puts the app and the master in and
 //! starts Qanuvi again. The app has no updater of its own any more.
+//!
+//! L2: on Linux the same: This PC's build (`linux-x86_64`) is the app and its master in a signed tarball; a helper puts
+//! it into the user's home folder (~/.local, no password, see master.rs `linux_install_script`).
 
 use crate::claude_update::is_newer;
 use base64::Engine;
@@ -429,9 +432,17 @@ enum Job {
     Finish(String, PathBuf),
 }
 
+/// What a whole-install build's file name ends with: the Windows installer, or (L2) on Linux the app's programs in a
+/// tarball that the update puts into the user's home folder.
+pub const INSTALLER_END: &str = if cfg!(windows) {
+    "_setup.exe"
+} else {
+    "_linux.tar.gz"
+};
+
 /// M8d: the app installer of `version` in This PC's update folder.
 pub fn installer_path(folder: &Path, version: &str) -> PathBuf {
-    folder.join(format!("Qanuvi_{version}_setup.exe"))
+    folder.join(format!("Qanuvi_{version}{INSTALLER_END}"))
 }
 
 /// M8d: downloads the app's installer into `folder` (the installers of older versions there go), checks its signature
@@ -454,7 +465,7 @@ pub fn prepare_installer(
         if let Ok(old) = std::fs::read_dir(folder) {
             for f in old.flatten() {
                 let name = f.file_name().to_string_lossy().to_string();
-                if name.starts_with("Qanuvi_") && name.ends_with("_setup.exe") {
+                if name.starts_with("Qanuvi_") && name.ends_with(INSTALLER_END) {
                     let _ = std::fs::remove_file(f.path());
                 }
             }

@@ -1616,10 +1616,12 @@ impl Master {
     /// tray's Quit (their unsaved text is kept as drafts); then a helper waits for the app and this master to end and
     /// runs the installer quietly, which replaces both and starts Qanuvi again (in the background when no window was
     /// open). A window that does not close stops the update; nothing changes then.
+    ///
+    /// L2: on Linux the helper puts the app's tarball into the user's home folder instead ([`linux_install_script`]).
     fn install_whole_app(&self, installer: &Path) -> Result<(), String> {
-        if !cfg!(windows) {
+        if !cfg!(any(windows, target_os = "linux")) {
             return Err(
-                "This PC's whole install updates through its installer on Windows only so far."
+                "This PC's whole install updates by itself on Windows and Linux only so far."
                     .into(),
             );
         }
@@ -1635,7 +1637,12 @@ impl Master {
         }
         let master = std::env::current_exe().map_err(|e| e.to_string())?;
         let app = crate::sign_in_start::app_exe()?;
-        let script = installer_script(&[&master, &app], installer, !had_window);
+        let script = if cfg!(windows) {
+            installer_script(&[&master, &app], installer, !had_window)
+        } else {
+            let (home, own) = linux_install_home()?;
+            linux_install_script(&master, &app, installer, !had_window, &home, own)
+        };
         // A watched core's children end with its watcher (its job object), so the watcher starts the helper.
         if watch::watched() {
             std::fs::write(watch::install_file(&self.dir), &script).map_err(|e| e.to_string())?;
@@ -1732,6 +1739,80 @@ pub fn installer_script(programs: &[&Path], installer: &Path, background: bool) 
     )
 }
 
+/// L2: where Linux puts the app: the user's home folder (`own`: the user's real one, where a system-wide copy from the
+/// .deb is moved out of the way), or `QANUVI_INSTALL_HOME` for a test.
+fn linux_install_home() -> Result<(PathBuf, bool), String> {
+    match std::env::var_os("QANUVI_INSTALL_HOME").filter(|h| !h.is_empty()) {
+        Some(h) => Ok((PathBuf::from(h), false)),
+        None => std::env::var_os("HOME")
+            .filter(|h| !h.is_empty())
+            .map(|h| (PathBuf::from(h), true))
+            .ok_or_else(|| "The home folder is not known, so the update cannot go in.".into()),
+    }
+}
+
+/// The Linux helper (L2), as `sh -c` runs it; the @NAMES@ are filled in by [`linux_install_script`].
+const LINUX_INSTALL: &str = r#"n=0
+while [ $n -lt 120 ]; do
+  busy=
+  for e in /proc/[0-9]*/exe; do
+    case "$(readlink "$e" 2>/dev/null)" in @PROGRAMS@) busy=1; break ;; esac
+  done
+  [ -z "$busy" ] && break
+  n=$((n + 1)); sleep 0.5
+done
+lib=@HOME@/.local/lib/qanuvi
+rm -rf "$lib.new"
+if ! { mkdir -p "$lib.new" && tar -xzf @TARBALL@ -C "$lib.new" && [ -x "$lib.new/qanuvi" ] && [ -x "$lib.new/qanuvi-master" ]; }; then
+  rm -rf "$lib.new"
+  @OLD_APP@ @FLAG@ </dev/null >/dev/null 2>&1 &
+  exit 1
+fi
+rm -rf "$lib.prev"
+[ -d "$lib" ] && mv "$lib" "$lib.prev"
+mv "$lib.new" "$lib"
+apps=@HOME@/.local/share/applications
+icons=@HOME@/.local/share/icons/hicolor/128x128/apps
+mkdir -p @HOME@/.local/bin "$apps" "$icons"
+ln -sfn "$lib/qanuvi" @HOME@/.local/bin/qanuvi
+[ -f "$lib/qanuvi.png" ] && cp -f "$lib/qanuvi.png" "$icons/qanuvi.png"
+printf '%s
+' '[Desktop Entry]' 'Type=Application' 'Name=Qanuvi' 'Comment=Qanuvi' "Exec="$lib/qanuvi" %u" 'Icon=qanuvi' 'Terminal=false' 'Categories=Development;' 'MimeType=x-scheme-handler/qanuvi;' 'StartupWMClass=qanuvi' > "$apps/Qanuvi.desktop"
+update-desktop-database "$apps" >/dev/null 2>&1
+xdg-mime default Qanuvi.desktop x-scheme-handler/qanuvi >/dev/null 2>&1
+"$lib/qanuvi" @FLAG@ </dev/null >/dev/null 2>&1 &
+asked=@HOME@/.local/lib/qanuvi-system-copy-asked
+if @OWN@ && [ ! -e "$asked" ] && dpkg-query -W -f='${Status}' qanuvi 2>/dev/null | grep -q 'ok installed'; then
+  touch "$asked"
+  sleep 5
+  pkexec dpkg -r qanuvi >/dev/null 2>&1
+fi
+"#;
+
+/// L2: the shell lines that wait (a minute at most) for the app and its master (`master`, `app`: the programs they run
+/// from) to end, unpack the checked `tarball` into `home`/.local/lib/qanuvi (the one before kept as `.prev`), link
+/// ~/.local/bin/qanuvi, write the app's menu entry and `qanuvi://` link handler, and start Qanuvi again from there
+/// (`background`: without a window). A tarball that does not unpack changes nothing and starts the old app again.
+/// `own` (the user's real home): the first time, a system-wide copy from the .deb is removed (the system asks for the
+/// password once; refused, it stays and the home-folder copy is the one the menu and the sign-in start use).
+pub fn linux_install_script(
+    master: &Path,
+    app: &Path,
+    tarball: &Path,
+    background: bool,
+    home: &Path,
+    own: bool,
+) -> String {
+    let q = |p: &Path| format!("'{}'", p.display().to_string().replace('\'', r"'\''"));
+    LINUX_INSTALL
+        .replace("@PROGRAMS@", &format!("{}|{}", q(master), q(app)))
+        .replace("@HOME@", &q(home))
+        .replace("@TARBALL@", &q(tarball))
+        .replace("@OLD_APP@", &q(app))
+        .replace("@FLAG@", if background { "--background" } else { "" })
+        .replace("@OWN@", if own { "true" } else { "false" })
+}
+
 /// M8d: starts the helper that runs the installer (its `installer_script` line); it outlives this master.
 fn run_helper(script: &str) -> Result<(), String> {
     #[cfg(windows)]
@@ -1753,8 +1834,18 @@ fn run_helper(script: &str) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        let _ = script;
-        Err("This PC's whole install updates through its installer on Windows only so far.".into())
+        // L2: `sh` in a process group of its own, so it outlives this master and the app it waits for.
+        use std::os::unix::process::CommandExt;
+        std::process::Command::new("sh")
+            .arg("-c")
+            .arg(script)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("The update's helper could not start: {e}"))
     }
 }
 
@@ -2414,6 +2505,114 @@ mod tests {
         assert!(
             installer_script(&[master], setup, true)
                 .ends_with("@('/S', '/UPDATE', '/R', '/ARGS', '--background')")
+        );
+    }
+
+    // L2: the Linux helper waits for both programs, quoted, and puts the app into the home folder.
+    #[test]
+    fn the_linux_helper_waits_for_both_programs_and_installs_into_the_home_folder() {
+        let master = Path::new("/usr/bin/qanuvi-master");
+        let app = Path::new("/usr/bin/qanuvi");
+        let tar = Path::new("/home/o'neil/.local/share/q/updates/Qanuvi_0.9.0_linux.tar.gz");
+        let home = Path::new("/home/o'neil");
+        let s = linux_install_script(master, app, tar, false, home, true);
+        assert!(
+            s.contains("in '/usr/bin/qanuvi-master'|'/usr/bin/qanuvi') busy=1"),
+            "{s}"
+        );
+        assert!(
+            s.contains("lib='/home/o'\\''neil'/.local/lib/qanuvi\n"),
+            "{s}"
+        );
+        assert!(
+            s.contains("tar -xzf '/home/o'\\''neil/.local/share/"),
+            "{s}"
+        );
+        assert!(s.contains("dpkg-query -W -f='${Status}' qanuvi"), "{s}");
+        assert!(!s.contains('@'), "every name is filled in: {s}");
+        assert!(s.contains("if true && "), "{s}");
+        // No window was open: Qanuvi comes back in the background; a test home never removes the system copy.
+        let b = linux_install_script(master, app, tar, true, home, false);
+        assert!(b.contains("\"$lib/qanuvi\" --background </dev/null"), "{b}");
+        assert!(b.contains("if false && "), "{b}");
+    }
+
+    // L2, run for real on Linux: the tarball goes in, the one before is kept, the menu entry and link are written, the
+    // new app is started; a broken tarball changes nothing and starts the old app again.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_linux_helper_puts_the_tarball_in_and_starts_the_new_app() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = tempfile::tempdir().unwrap();
+        let h = home.path();
+        let started = h.join("started.txt");
+        let program = |file: &Path, says: &str| {
+            let text = format!("#!/bin/sh\necho \"{says} $*\" >> '{}'\n", started.display());
+            std::fs::write(file, text).unwrap();
+            std::fs::set_permissions(file, std::fs::Permissions::from_mode(0o755)).unwrap();
+        };
+        let build = h.join("build");
+        std::fs::create_dir_all(&build).unwrap();
+        program(&build.join("qanuvi"), "new app");
+        program(&build.join("qanuvi-master"), "new master");
+        std::fs::write(build.join("qanuvi.png"), "png").unwrap();
+        let tar = h.join("Qanuvi_0.9.0_linux.tar.gz");
+        let packed = std::process::Command::new("tar")
+            .arg("-czf")
+            .arg(&tar)
+            .arg("-C")
+            .arg(&build)
+            .args(["qanuvi", "qanuvi-master", "qanuvi.png"])
+            .status()
+            .unwrap();
+        assert!(packed.success());
+        let lib = h.join(".local/lib/qanuvi");
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(lib.join("qanuvi"), "old").unwrap();
+        let old_app = h.join("old-app");
+        program(&old_app, "old app");
+        let run = || {
+            let master = Path::new("/nowhere/qanuvi-master");
+            let script = linux_install_script(master, &old_app, &tar, true, h, false);
+            std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&script)
+                .status()
+                .unwrap();
+            // The started app runs in the background.
+            std::thread::sleep(Duration::from_millis(500));
+        };
+        run();
+        let prev = h.join(".local/lib/qanuvi.prev/qanuvi");
+        assert_eq!(std::fs::read_to_string(prev).unwrap(), "old");
+        assert!(lib.join("qanuvi-master").is_file());
+        let entry =
+            std::fs::read_to_string(h.join(".local/share/applications/Qanuvi.desktop")).unwrap();
+        let exec = format!("Exec=\"{}/qanuvi\" %u", lib.display());
+        assert!(entry.contains(&exec), "{entry}");
+        assert!(
+            entry.contains("MimeType=x-scheme-handler/qanuvi;"),
+            "{entry}"
+        );
+        let link = std::fs::read_link(h.join(".local/bin/qanuvi")).unwrap();
+        assert_eq!(link, lib.join("qanuvi"));
+        assert!(
+            h.join(".local/share/icons/hicolor/128x128/apps/qanuvi.png")
+                .is_file()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&started).unwrap(),
+            "new app --background\n"
+        );
+        // A broken tarball: the install stays as it is and the old app starts again.
+        std::fs::write(&tar, "not a tarball").unwrap();
+        std::fs::remove_file(&started).unwrap();
+        run();
+        assert!(lib.join("qanuvi-master").is_file());
+        assert!(!h.join(".local/lib/qanuvi.new").exists());
+        assert_eq!(
+            std::fs::read_to_string(&started).unwrap(),
+            "old app --background\n"
         );
     }
 

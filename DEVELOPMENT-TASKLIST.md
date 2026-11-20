@@ -1056,8 +1056,31 @@ runs on or off; with it off nothing is sent anywhere.
     Target::Installer). Plan: publish builds the Linux app on the laptop over ssh from the tagged commit, signs it
     here (key never leaves Windows), lists it as linux-x86_64; the app installs per user into ~/.local (no root, like
     the per-user Windows install), so Update now is one click; the first update moves the system-wide .deb install
-    there (password once). Owner's go-ahead to build: asked, after 0.1.31.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
+    there (password once). (The owner had already said so; asking again after 0.1.31 was a mistake.)
+    L2 BUILT (2026-11-20, not driven live): This PC's master on Linux updates the whole install, the same as Windows.
+    master_update.rs: INSTALLER_END per OS (Qanuvi_<v>_linux.tar.gz on Linux), the update folder keeps it the same
+    way. master.rs: install_whole_app runs on Windows and Linux; linux_install_script (sh, run by run_helper in its own
+    process group, or by the watcher) waits up to a minute for the app and master programs to end (/proc/*/exe),
+    unpacks into ~/.local/lib/qanuvi (the one before kept as qanuvi.prev; a tarball that does not unpack changes
+    nothing and starts the old app again), links ~/.local/bin/qanuvi, writes ~/.local/share/applications/Qanuvi.desktop
+    (qanuvi:// handler, xdg-mime) and the icon, starts the new app (--background when no window was open); the first
+    time in the real home, a system-wide .deb copy is removed with pkexec dpkg -r qanuvi (password once; refused, it
+    stays and the home copy is the one used; the sign-in entry follows the app by sign_in_start::refresh).
+    QANUVI_INSTALL_HOME puts it in another home for a test (never removes the .deb). publish-update.mjs step 5: with
+    QANUVI_LINUX_APP_HOST (+ QANUVI_LINUX_APP_KEY, QANUVI_LINUX_APP_DIR) the tree as it is (version included) goes to
+    the Linux machine, is built there (npx tauri build --no-bundle; npm ci only when package-lock.json changed), packed
+    (qanuvi, qanuvi-master, qanuvi.png), brought back, signed here and listed as linux-x86_64; without it a warning.
+    Tests: the script's quoting and parts (all OSes); a real run in a temp home on Linux (cfg linux: goes in, .prev
+    kept, entry + link + icon, new app started; broken tarball: nothing changed, old app started). Verify: fmt,
+    clippy clean, Rust lib 562 + 2 ignored (answers_generic_questions_about_its_machine failed once in a full run,
+    passed alone and in the rerun: flaky, host_write_new), Linux master cross-build clean, prettier.
+    Still to do: the Linux test run and the drive on the laptop (ssh to it timed out on 2026-11-20 though it answers
+    ping): check the .deb's own desktop file name, icon and WM class match, build a test channel with the test key,
+    update an installed copy from it into a test home, then publish (ask) and see the laptop's real install update.
+    Note: the build machine's glibc sets the oldest Linux it runs on (Zorin 18 = Ubuntu 24.04).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 22:40): L2 BUILT, unpublished, not driven live (laptop
+    ssh down). Next: laptop drive of L2, then publish 0.1.32 (ask), then 24y part 2 (Y3 + Y4 + Y5), then 24rl.
+    PICKUP POINT (before, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
     (Inbox Try again on an ended run) is a proposal. Next: L2 Linux desktop updates (owner to confirm the ~/.local
     plan), then 24y part 2 (Y3 + Y4 + Y5), then 24rl. Release rule: Claude Code here is behind (2.1.318).
     PICKUP POINT (before, 2026-11-20 19:00): 24y part 1 DRIVEN LIVE, r1-r4 + r6 done,

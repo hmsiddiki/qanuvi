@@ -11,7 +11,11 @@
 // 4. M8a: master builds, signed with the same key, listed beside the installer as master-<os>-<arch>: the Windows one
 //    the build above made, and the Linux server build (cargo zigbuild; QANUVI_SKIP_LINUX_MASTER=1 leaves it out). A
 //    macOS master build is made on a Mac; until then macOS masters say the version has no build for them yet.
-import { execSync } from "node:child_process";
+// 5. L2: the Linux app (linux-x86_64): the app and its master, built on a Linux machine over ssh from this very tree
+//    (QANUVI_LINUX_APP_HOST, user@host; QANUVI_LINUX_APP_KEY, its ssh key; QANUVI_LINUX_APP_DIR, the build folder there,
+//    else ~/qanuvi-release), packed as a tarball and signed here (the key never leaves this computer). The installed
+//    Linux app puts it into the user's home folder. Without QANUVI_LINUX_APP_HOST it is left out, with a warning.
+import { execSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -99,6 +103,17 @@ for (const [key, file, ext] of masters) {
   console.log(`Master build ${key}: ${out}`);
 }
 
+// 5. The Linux app (L2), built on a Linux machine from this tree.
+const linuxHost = process.env.QANUVI_LINUX_APP_HOST;
+if (!linuxHost) {
+  console.warn("(No Linux app build this time: QANUVI_LINUX_APP_HOST is not set.)");
+} else {
+  const out = `Qanuvi_${version}_linux.tar.gz`;
+  fs.copyFileSync(linuxApp(linuxHost, version, out), path.join(outDir, out));
+  platforms["linux-x86_64"] = { signature: signFile(path.join(outDir, out)), url: `${baseUrl}/${out}` };
+  console.log(`Linux app build: ${out}`);
+}
+
 const latest = {
   version,
   notes: notes || `Qanuvi ${version}`,
@@ -107,6 +122,58 @@ const latest = {
 };
 fs.writeFileSync(path.join(outDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
 console.log(`Published ${name} and latest.json to ${outDir} (${baseUrl}/latest.json)`);
+
+/**
+ * Builds the Linux app on `host` from this tree (its files as they are now, version included) and answers the
+ * tarball brought back here (qanuvi, qanuvi-master and the icon), not yet signed.
+ */
+function linuxApp(host, version, name) {
+  const key = process.env.QANUVI_LINUX_APP_KEY;
+  const ssh = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ...(key ? ["-i", key] : [])];
+  const dir = process.env.QANUVI_LINUX_APP_DIR || "qanuvi-release";
+  const work = path.join(root, "src-tauri/target/linux-app");
+  fs.mkdirSync(work, { recursive: true });
+  // Paths relative to the folder they are in: tar and scp read "E:\..." as a host called E.
+  const files = execSync("git ls-files -co --exclude-standard", { cwd: root, encoding: "utf8" })
+    .split(/\r?\n/)
+    .filter((p) => p && fs.existsSync(path.join(root, p)));
+  fs.writeFileSync(path.join(work, "files.txt"), files.join("\n") + "\n");
+  execSync("tar -czf src-tauri/target/linux-app/source.tar.gz -T src-tauri/target/linux-app/files.txt", {
+    cwd: root,
+    stdio: "inherit",
+  });
+  const run = (cmd, args, input) => {
+    const r = spawnSync(cmd, args, {
+      cwd: work,
+      stdio: [input === undefined ? "inherit" : "pipe", "inherit", "inherit"],
+      input,
+    });
+    if (r.status !== 0) {
+      console.error(`The Linux app build failed (${cmd} ${args.at(-1)}).`);
+      process.exit(1);
+    }
+  };
+  run("scp", [...ssh, "source.tar.gz", `${host}:qanuvi-release-source.tar.gz`]);
+  // On the build machine: the tree unpacked over the last one (its node_modules and target kept, so it builds only
+  // what changed), packages installed again only when package-lock.json changed, then the app and its master.
+  const script = [
+    "set -e",
+    '[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"',
+    'export PATH="$HOME/.local/node/bin:$HOME/.cargo/bin:$PATH"',
+    `d="$HOME/${dir}"`,
+    'mkdir -p "$d" && tar -xzf "$HOME/qanuvi-release-source.tar.gz" -C "$d" && cd "$d"',
+    'lock="$(sha256sum package-lock.json)"',
+    'if [ ! -d node_modules ] || [ "$(cat .lock-hash 2>/dev/null)" != "$lock" ]; then npm ci; echo "$lock" > .lock-hash; fi',
+    "CARGO_BUILD_JOBS=4 npx tauri build --no-bundle",
+    "mkdir -p out && cp src-tauri/target/release/qanuvi src-tauri/target/release/qanuvi-master out/",
+    "cp src-tauri/icons/128x128.png out/qanuvi.png",
+    `tar -czf "$HOME/${name}" -C out qanuvi qanuvi-master qanuvi.png`,
+    `out/qanuvi-master version | grep -q "${version}"`,
+  ].join("\n");
+  run("ssh", [...ssh, host, "bash -s"], script + "\n");
+  run("scp", [...ssh, `${host}:${name}`, name]);
+  return path.join(work, name);
+}
 
 /** Signs a file with the update key (Tauri's signer writes <file>.sig beside it) and answers the signature. */
 function signFile(file) {
