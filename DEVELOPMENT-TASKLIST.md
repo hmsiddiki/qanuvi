@@ -1141,6 +1141,51 @@ runs on or off; with it off nothing is sent anywhere.
     the same panel, so it goes straight on now. Rust PlanState keeps the field (skipped when empty, compare cases
     unchanged). Tests: planstate 3 new; verify green (vitest 546, Rust 567, clippy app + server). Not driven live.
     NEXT: drive part 2 + check memory live on a scratch project, then 0.1.33 (ask).
+    24y PART 2 + CHECK MEMORY DRIVEN LIVE (2026-11-21, scratch E:/qc-scratch/y24-part2, git, PLAN-PART2.md: 1 mul with
+    `npm test` + a check that fails its first time, 2 div with an impossible check, 3 a `npm publish` check, 4 sub,
+    later 5 pow with a check that always fails; Claude Code, Auto; $0.36 in all):
+    - PASS Branch yes: project put on qanuvi/plan-part2 before the start snapshot, step 1 committed there alone
+      ("Step 1: Add mul"), main unchanged; report line "The work is on qanuvi/plan-part2 (1 commit); your main
+      branch is unchanged, merging is yours"; status bar follows the branch.
+    - PASS Branch no (second run on main): nothing committed.
+    - PASS Y4: step prompt names the checks; Qanuvi ran `node checks/never.js` / `node checks/pow.js` after the step,
+      failure text in the step log and the fix round ("Checks failed: ..."). Step 3 set aside before any work, `npm
+      publish` + the never-list named, package.json untouched.
+    - PASS Y5: report Done / Waiting for you (one action each) / Set aside with reasons, Inbox links.
+    - PASS check memory: second run "4 steps were checked before and are not asked about again"; only new step 5 went
+      to the check.
+    - NOT REACHED LIVE Y3 undo: on a failing check both Haiku and Sonnet marked the step [!] themselves in the fix
+      round (honest: only the owner can change the check), so the step is blocked (kept for the owner), not failed,
+      and nothing is undone. Undo stays covered by the scenarios (y24_part_2).
+    - pa1 FOUND + FIXED: the first Check and start after the run rules change lost the check's answer and started
+      nothing (seen twice: first run, and after Branch yes -> no). Saving the rules hands PlanView a new project
+      object; its effect read project.id (tracks the object), reopened the view and remounted RunPanel. Fix:
+      PlanView and RunPanel react to a $derived project id only.
+    - pa2 FIXED: the run line said "3 set aside" where the report said "1 set aside, 2 waiting"; once a report
+      exists the line uses its counts ("N set aside, M waiting for you").
+    - pa4 FIXED: step logs wrote UTC times ("Attempt ... 19:12" for 01:12 here); attempt_entry now uses the
+      computer's time zone (attempt_entry_in(UTC) for the unit test and compare cases).
+    - Not a bug: step 3 held on step 2 in run 2 was the decider's own reasoned choice (publishes src, step 2 unchecked).
+    AGREED ORDER (owner, 2026-11-21 01:10): (1) drive part 2 + check memory (scratch E:/qc-scratch/y24-part2),
+    (2) PM project memory a-e, (3) LT Linux title bar. Then 0.1.33 (ask).
+    PM (owner found on qpfixbase QC-ADVANCE-TRACKING step 98z: the run asked which site to test on although the
+    owner answered it in TINYCODE-STEP1 (https://aloelo.dev/qpfixbase/) and earlier plans worked out test-site and
+    test-admin recipes). Found: every project's memory is EMPTY (0 entries on This PC), preview_url empty; owner
+    answers and run facts live only in each plan's FACTS.md; the check before a run reads secrets names, test
+    command, preview address and this plan's notes, never the memory; the decider's choice ("set up its own site")
+    was refused by the run rules; `curl` to localhost counted as a download. Agreed:
+    a. owner answers about the project go straight into This project memory (active, they are the owner's); a site
+       address also fills Preview address.
+    b. at a run's end, project facts it learned (how tests run, test site, test login recipe) become memory
+       suggestions, approved in one click from the Inbox.
+    c. the check and the decider read the project memory + secret names first; a question the memory answers is
+       not asked, it is used and shown "from memory".
+    d. the decider's own choices are checked against the run rules; curl/wget to localhost/127.0.0.1 = reading.
+    e. once per project: existing plan notes (FACTS.md) are read and their project facts offered as suggestions.
+    LT (owner: "looks odd"): Linux shows the system title bar above Qanuvi's own bar (tauri.linux.conf.json
+    decorations true; platform.drawsWindowControls Windows only). Agreed: Linux like Windows (no system bar, Qanuvi's
+    window buttons), a "Use the system title bar" setting (off by default), drive on the laptop (drag, double-click
+    maximise, edge resize, snapping, shadow, X11 + Wayland).
     PICKUP POINT (before, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
     nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
     report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on

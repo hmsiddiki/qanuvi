@@ -611,7 +611,10 @@ fn run_2b(name: &str, a: &[Value]) -> Value {
             a[1]["number"].as_str(),
             a[1]["title"].as_str().unwrap()
         )),
-        "attemptEntry" => json!(guidance::attempt_entry(&de(&a[0]))),
+        "attemptEntry" => json!(guidance::attempt_entry_in(
+            &de(&a[0]),
+            &jiff::tz::TimeZone::UTC
+        )),
         "resultEntry" => json!(guidance::result_entry(&s(0), a[1].as_str())),
         "logsBlock" => json!(guidance::logs_block(&s(0), &s(1), a[2] == true)),
         "mapPath" => json!(guidance::map_path(&s(0))),

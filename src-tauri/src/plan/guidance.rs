@@ -403,8 +403,13 @@ pub struct AttemptLog {
     pub answer: Option<String>,
 }
 
-/// One attempt in a step's log.
+/// One attempt in a step's log, its time in this computer's own time zone (the owner reads it as a clock time).
 pub fn attempt_entry(a: &AttemptLog) -> String {
+    attempt_entry_in(a, &jiff::tz::TimeZone::system())
+}
+
+/// One attempt in a step's log, its time in the given zone (tests and the compare cases use UTC).
+pub fn attempt_entry_in(a: &AttemptLog, zone: &jiff::tz::TimeZone) -> String {
     let cut = |t: &str, n: usize| {
         if js::len(t) > n {
             format!("{} …", js::cut(t, n))
@@ -413,7 +418,11 @@ pub fn attempt_entry(a: &AttemptLog) -> String {
         }
     };
     let when = jiff::Timestamp::from_millisecond(a.when)
-        .map(|t| t.strftime("%Y-%m-%d %H:%M").to_string())
+        .map(|t| {
+            t.to_zoned(zone.clone())
+                .strftime("%Y-%m-%d %H:%M")
+                .to_string()
+        })
         .unwrap_or_default();
     let outcome = if a.outcome == "open" {
         "turn ended"
@@ -953,20 +962,23 @@ mod tests {
 
     #[test]
     fn records_attempts_and_results() {
-        let e = attempt_entry(&AttemptLog {
-            when: "2026-11-12T10:00:00Z"
-                .parse::<jiff::Timestamp>()
-                .unwrap()
-                .as_millisecond(),
-            model: "claude-opus-5-5".into(),
-            outcome: "open".into(),
-            cost_usd: 2.19,
-            seconds: 349.0,
-            tests_passed: Some(false),
-            note: None,
-            failure: Some("Expected 1200, got 1250".into()),
-            answer: Some("The cart cache was not cleared.".into()),
-        });
+        let e = attempt_entry_in(
+            &AttemptLog {
+                when: "2026-11-12T10:00:00Z"
+                    .parse::<jiff::Timestamp>()
+                    .unwrap()
+                    .as_millisecond(),
+                model: "claude-opus-5-5".into(),
+                outcome: "open".into(),
+                cost_usd: 2.19,
+                seconds: 349.0,
+                tests_passed: Some(false),
+                note: None,
+                failure: Some("Expected 1200, got 1250".into()),
+                answer: Some("The cart cache was not cleared.".into()),
+            },
+            &jiff::tz::TimeZone::UTC,
+        );
         assert!(
             e.contains(
                 "## Attempt 2026-11-12 10:00 · claude-opus-5-5 · turn ended · $2.19 · 349 s"

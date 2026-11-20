@@ -370,8 +370,10 @@
   let allowText = $state("");
   let neverText = $state("");
   let isGit = $state(false);
+  // Read again for another project only, not when saving the rules hands in a new object for the same project.
+  let projectId = $derived(project.id);
   $effect(() => {
-    const id = project.id;
+    const id = projectId;
     const r = rulesOf(untrack(() => project.settings));
     rules = { ...r };
     allowText = r.allow.join("\n");
@@ -1301,10 +1303,17 @@
                 : run.status === "paused"
                   ? "Run paused"
                   : "Run stopped"}
-          · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
-            {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
-            {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}{#if run.steps.some((s) => s.status === "held" || s.status === "set-aside")},
-            {run.steps.filter((s) => s.status === "held" || s.status === "set-aside").length} set aside{/if}
+          {#if run.report}
+            <!-- Once the run ended, the counts are the end report's, so the line and the report never disagree. -->
+            · This run: {run.report.done.length} of {run.steps.length} done{#if run.report.setAside.length},
+              {run.report.setAside.length} set aside{/if}{#if run.report.waiting.length},
+              {run.report.waiting.length} waiting for you{/if}
+          {:else}
+            · This run: {run.steps.filter((s) => s.status === "done").length} of {run.steps.length} done{#if run.steps.some((s) => s.status === "skipped")},
+              {run.steps.filter((s) => s.status === "skipped").length} skipped{/if}{#if run.steps.some((s) => s.status === "blocked" || s.status === "failed")},
+              {run.steps.filter((s) => s.status === "blocked" || s.status === "failed").length} blocked{/if}{#if run.steps.some((s) => s.status === "held" || s.status === "set-aside")},
+              {run.steps.filter((s) => s.status === "held" || s.status === "set-aside").length} set aside{/if}
+          {/if}
           · Plan: {plan.steps.filter((s) => s.status === "x").length} of {plan.steps.length} done
           {#if run.message && !(run.status === "stopped" && run.budgetReached)}<span class="dim">
               · {run.message}</span

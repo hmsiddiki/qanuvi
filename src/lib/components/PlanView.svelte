@@ -302,17 +302,21 @@
     return () => clearInterval(timer);
   });
 
+  // Only another project reopens the view. Saving this project's settings (the run rules on Start) hands in a new
+  // project object with the same id; reopening then dropped the Run panel and the check's answer with it.
+  let projectId = $derived(project.id);
   $effect(() => {
-    void project.id;
-    open.clear();
-    // Another project: its own saved plan opens, not a same-named file of the last one.
-    file = "";
-    candidates = [];
-    discover().then(load);
-    void loadRouting();
-    // Untracked: this effect must not re-run (and reload an old record) whenever the run changes.
-    const id = project.id;
-    untrack(() => runner.loadLast(id));
+    const id = projectId;
+    untrack(() => {
+      open.clear();
+      // Another project: its own saved plan opens, not a same-named file of the last one.
+      file = "";
+      candidates = [];
+      discover().then(load);
+      void loadRouting();
+      // Untracked: this effect must not re-run (and reload an old record) whenever the run changes.
+      runner.loadLast(id);
+    });
   });
 
   // Reload the list while a run changes it.
