@@ -1301,6 +1301,15 @@ runs on or off; with it off nothing is sent anywhere.
       05:10:39 is not known (no log on the laptop). Proposal: relay pings every connection (about 30 s), one silent
       for about 90 s is gone and its sessions get Close; the laptop side pings too and reconnects at once. Relay
       server change = deploy on basevm376 (ask); master change = next release.
+    rl1 BUILT + RELAY DEPLOYED (owner "do on basevm376", 2026-11-21 05:30): c24e8de relay pings every connection every
+      30 s and drops one silent for 90 s (its sessions get Close); Link (master + handler) pings too and ends on 90 s
+      of silence ("The relay stopped answering.") so it connects again; a master whose own relay link dropped now
+      ends all its sessions (they went with the link). Tests: quiet handler forgotten + live one stays, older client
+      that only reads stays connected (0.1.32 safe with the new relay), silent relay ends the link, master that lost
+      the relay forgets its sessions (each fails without its fix). qanuvi-relay (Linux build, 680 KB) swapped into
+      /usr/local/bin on basevm376 (old kept as qanuvi-relay.prev), systemctl restart: active. The owner's 0.1.32
+      PC master still listed the 4 dead laptop sessions after the restart (old code keeps them): Stop next to the
+      ribbon clears them now; 0.1.33 carries the master side.
     lx1 test build on the laptop: ~/src/qanuvi/src-tauri/target/release/qanuvi (bbd72c6, own test data).
     PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
     server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the

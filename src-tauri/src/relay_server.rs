@@ -44,6 +44,8 @@ pub struct Relay {
     file: Option<PathBuf>,
     ping_every: Duration,
     silent: Duration,
+    /// Tests: masters' connections are cut (as when the relay restarts or their network drops).
+    cut_masters: std::sync::atomic::AtomicBool,
 }
 
 fn hash(secret: &str) -> String {
@@ -75,7 +77,13 @@ impl Relay {
             file,
             ping_every: PING_EVERY,
             silent: SILENT,
+            cut_masters: Default::default(),
         })
+    }
+
+    /// Tests: cut every master's connection (and keep cutting new ones) while `on`.
+    pub fn cut_masters(&self, on: bool) {
+        self.cut_masters.store(on, Ordering::SeqCst);
     }
 
     fn save(&self, st: &State) {
@@ -353,7 +361,9 @@ impl Relay {
                 Err(Gone) => break,
             }
             // rl1: something (a pong at least) must come back; a quiet link is gone, and its sessions get a Close.
-            if heard.elapsed() > self.silent {
+            if heard.elapsed() > self.silent
+                || (master_of.is_some() && self.cut_masters.load(Ordering::SeqCst))
+            {
                 break;
             }
             if pinged.elapsed() >= self.ping_every {
@@ -432,6 +442,14 @@ pub fn start_local() -> Result<String, String> {
 
 /// A test relay with its own ping and silence times (rl1 tests).
 pub fn start_local_timed(ping_every: Duration, silent: Duration) -> Result<String, String> {
+    Ok(start_local_relay(ping_every, silent)?.0)
+}
+
+/// A test relay and its handle (rl1 tests cut its masters off).
+pub fn start_local_relay(
+    ping_every: Duration,
+    silent: Duration,
+) -> Result<(String, Arc<Relay>), String> {
     let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let mut relay = Relay::new(None);
@@ -439,11 +457,12 @@ pub fn start_local_timed(ping_every: Duration, silent: Duration) -> Result<Strin
         r.ping_every = ping_every;
         r.silent = silent;
     }
+    let handle = relay.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
             let relay = relay.clone();
             std::thread::spawn(move || relay.serve_conn(stream));
         }
     });
-    Ok(format!("ws://127.0.0.1:{port}"))
+    Ok((format!("ws://127.0.0.1:{port}"), handle))
 }

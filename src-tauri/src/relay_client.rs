@@ -567,9 +567,17 @@ impl RelayMaster {
             match self.connected_loop(generation, &master) {
                 Ok(()) => return,
                 Err(e) => {
-                    let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-                    i.connected = false;
-                    i.error = e;
+                    // rl1: the sessions went with the link (the relay forgets them too), so they end here as
+                    // well; the devices connect again on their own.
+                    let ended: Vec<String> = {
+                        let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                        i.connected = false;
+                        i.error = e;
+                        i.sessions.drain().map(|(_, l)| l.device).collect()
+                    };
+                    for device in ended {
+                        self.log(&device, "disconnected");
+                    }
                 }
             }
             std::thread::sleep(wait);
@@ -1016,6 +1024,41 @@ mod tests {
         let sessions = rm.status().sessions;
         assert_eq!(sessions.len(), 1, "{sessions:?}");
         drop(quiet);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// rl1: the master's own link to the relay dropped (the relay restarted, its network went): the sessions went
+    /// with it, so the master ends them too instead of listing them for ever; it connects again afterwards.
+    #[test]
+    fn a_master_that_lost_the_relay_forgets_its_sessions() {
+        let (relay, server) = crate::relay_server::start_local_relay(
+            crate::relay_server::PING_EVERY,
+            crate::relay_server::SILENT,
+        )
+        .unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let wait_for = |what: &str, ok: &dyn Fn() -> bool| {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !ok() {
+                assert!(Instant::now() < deadline, "{what}: {:?}", rm.status());
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        };
+        wait_for("connected", &|| rm.status().connected);
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+        let _session = open_session(&paired).unwrap();
+        assert_eq!(rm.status().sessions.len(), 1);
+
+        server.cut_masters(true);
+        wait_for("sessions forgotten", &|| rm.status().sessions.is_empty());
+        server.cut_masters(false);
+        wait_for("connected again", &|| rm.status().connected);
         rm.configure(&relay, "Home PC", false, master).unwrap();
     }
 
