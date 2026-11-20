@@ -1270,6 +1270,8 @@ runs on or off; with it off nothing is sent anywhere.
       Browser.close then open passes; fails without the fix).
     - NOT YET: the VPS over the relay (5/s cap) and the Linux laptop: the VPS needs a new server build swapped in
       (ask the owner first).
+    - Watch: one headless browser from the first `cargo test --lib live::` run (04:25) outlived the test process (its
+      profile never removed, so its Drop never ran and the job did not end it); reruns leave nothing. Stopped by hand.
     PICKUP POINT (newest, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
     (owner yes for the VPS server build swap), then LT Linux title bar, then 0.1.33 (ask).
     PICKUP POINT (before, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
