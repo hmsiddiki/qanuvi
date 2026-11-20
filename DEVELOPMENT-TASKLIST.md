@@ -947,6 +947,17 @@ runs on or off; with it off nothing is sent anywhere.
     https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.28; installer (8569135), Linux master (10458224) and
     Windows master (10373632) served 200 with matching sizes. Tagged v0.1.28. Not done: the owner's install updating
     to 0.1.28 (its updater offers it), the VPS server build swap to 0.1.28 (asks the owner).
+    L1 OPEN (2026-11-20): the Linux WINDOW shows a blank page. First time a Linux window was used (until now Linux ran
+    only masters, the window was on Windows). 0.1.28 built as a .deb on the Linux laptop (Zorin 18.1, WebKitGTK
+    2.52.6, X11, Intel UHD 620; ~/Downloads/Qanuvi_0.1.28_amd64.deb, installed by the owner): the window opens, the
+    tray and This PC's master start, but the page stays empty and no data base is made. Found: WebKit's remote
+    inspector (test copy with the tauri "devtools" feature, WEBKIT_INSPECTOR_HTTP_SERVER) lists one page, about:blank,
+    so the webview never navigates to the app (tauri://localhost); no page script runs (an error catcher built in
+    showed nothing). Ruled out: DMABUF renderer, compositing, software GL, the WebKit sandbox (one run with the
+    owner's yes), AppArmor (no denials), a blocked main thread (idle in its loop), navigation hooks (none). Next:
+    a minimal Tauri 2.12 / wry 0.57 app on the laptop to see whether any custom-scheme page loads with WebKitGTK
+    2.52 there, then wry's Linux custom-protocol path; test copies only (~/src/qanuvi on main again, test data in
+    ~/.local/share/dev.qanuvi.desktop.source).
     PICKUP POINT (fresh conversation starts here, 2026-11-20 06:05): 0.1.28 PUBLISHED; owner: 24n first, then 24y
     (decisions under 24y: git branch only when asked, few plain questions for normal users, detail for advanced
     ones). 24n DONE and driven live (see 24n "WHAT IS LEFT" notes; small drives left for the next test build).
