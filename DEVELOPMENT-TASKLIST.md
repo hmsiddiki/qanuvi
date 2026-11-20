@@ -1268,13 +1268,28 @@ runs on or off; with it off nothing is sent anywhere.
     - lv1 FOUND + FIXED: after the browser closed, the agent's first browser_open failed ("connection closed") and the
       agent had to try again; browser_open now starts a new browser and tries once more itself (real-browser test:
       Browser.close then open passes; fails without the fix).
-    - NOT YET: the VPS over the relay (5/s cap) and the Linux laptop: the VPS needs a new server build swapped in
-      (ask the owner first).
+    LM4 ON THE LAPTOP + VPS SWAP (owner "yes, swap the VPS build and do the laptop too", 2026-11-21 04:52-05:00):
+    - VPS basevm378: server build of 981531c cross-built (zigbuild, 10.7 MB) swapped into ~/.local/bin (old one kept as
+      qanuvi-master.prev), pkill -x; both links (test window + owner's app) came back by themselves. The VPS has NO
+      Chrome/Edge/Chromium/Brave, so an agent there cannot open a test browser: live picture not testable there
+      until one is installed (asked the owner: apt install chromium on the VPS?).
+    - Laptop: ~/src/qanuvi pulled to 981531c (its uncommitted master.rs change was the L2 Exec= fix already on main;
+      kept as a git stash "L2 hand fix, same as main"), debug server build, wrapper ~/src/lm/qm with throwaway data
+      ~/src/lm/data, page ~/src/lm/site/index.html. Test data server "Laptop (lm test)" (SSH, laptop_key). The owner's
+      installed laptop app untouched.
+    - PASS on the laptop (shown from This PC's test window over SSH): "let me watch it live" -> browser_show_live
+      (Brave /usr/bin/brave-browser), Preview opened on "Live from the agent's test browser: Live check", hello +
+      Save seen, counter 221 -> 238 in about 4 s over the link. About /tmp/e.pl.08.
+    - Not checked: the relay path itself (the test links are SSH; the relay's 4 MiB message limit is far above a
+      picture, about 100-200 KB); the 5/s cap with a page changing faster than 5/s (unit-tested only).
     - Watch: one headless browser from the first `cargo test --lib live::` run (04:25) outlived the test process (its
       profile never removed, so its Drop never ran and the job did not end it); reruns leave nothing. Stopped by hand.
     lx1 OWNER FOUND (2026-11-21, not looked into yet): on Linux a screen capture does not get pasted into the chat
       (pasting an image from the clipboard into the chat box does nothing there). To check on the laptop after LM4.
-    PICKUP POINT (newest, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
+    PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
+    server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the
+    laptop; LT Linux title bar; then 0.1.33 (ask). Test window, laptop test master stopped.
+    PICKUP POINT (before, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
     (owner yes for the VPS server build swap), then LT Linux title bar, then 0.1.33 (ask).
     PICKUP POINT (before, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
     owner, then build; LT Linux title bar; then 0.1.33 (ask).
