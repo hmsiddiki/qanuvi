@@ -1044,7 +1044,23 @@ runs on or off; with it off nothing is sent anywhere.
     "helpers 2"), 3 Blocked "nothing goes into git during a run", no commit, 4 done; Manual: 2 Blocked with the
     command named and where to allow it (r4 message), no COUNT.txt, no commit, 1 and 4 done. Verify: prettier,
     svelte-check 0, vitest 543, fmt, clippy clean, Rust lib 561 + 2 ignored.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 19:00): 24y part 1 DRIVEN LIVE, r1-r4 + r6 done,
+    0.1.31 PUBLISHED (owner: "publish anyway", 2026-11-20 19:25; the release rule had stopped it: Claude Code
+    2.1.329 out, 2.1.318 here; skipped with QANUVI_RELEASE_ANYWAY=1): r1-r4 + r6 (run rules hold in every mode, Auto
+    = the agent judges unlisted commands). Built with CARGO_BUILD_JOBS=2 into E:/qc-scratch/release-0.1.31/chan, copied
+    into qanuvi-updates/dev (old latest.json in E:/Backups/qanuvi/channel-before-0.1.31). Checked online: latest.json
+    0.1.31; installer (8601290), Linux master (10529648), Windows master (10445312) served 200, sizes match. Tagged
+    v0.1.31. Not done: the owner's install updating, the VPS server build swap (asks the owner).
+    L2 AGREED IN PRINCIPLE (owner, 2026-11-20: "why can't a simple update-available click do the update, same as
+    Windows?"): Linux desktop updates. Today the channel has no Linux app build (the .deb is built by hand on the
+    laptop) and the whole-install update only runs the Windows NSIS installer (master.rs update_install,
+    Target::Installer). Plan: publish builds the Linux app on the laptop over ssh from the tagged commit, signs it
+    here (key never leaves Windows), lists it as linux-x86_64; the app installs per user into ~/.local (no root, like
+    the per-user Windows install), so Update now is one click; the first update moves the system-wide .deb install
+    there (password once). Owner's go-ahead to build: asked, after 0.1.31.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
+    (Inbox Try again on an ended run) is a proposal. Next: L2 Linux desktop updates (owner to confirm the ~/.local
+    plan), then 24y part 2 (Y3 + Y4 + Y5), then 24rl. Release rule: Claude Code here is behind (2.1.318).
+    PICKUP POINT (before, 2026-11-20 19:00): 24y part 1 DRIVEN LIVE, r1-r4 + r6 done,
     unpublished; 0.1.31 waits for the owner's yes; r5 (Inbox Try again on an ended run) is a proposal. Test window
     and test masters stopped. Next: 0.1.31 (ask), then part 2 (Y3 + Y4 + Y5), then 24rl.
     PICKUP POINT (before, 2026-11-20 17:20): 24y part 1 DRIVEN LIVE, r1-r4 fixed
