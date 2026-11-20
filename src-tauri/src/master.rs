@@ -1072,6 +1072,7 @@ impl Master {
                         .map(|v| crate::brain::with_keys(&v.to_string(), crate::model_keys::get))
                         .transpose()?
                         .as_deref(),
+                    None,
                     events,
                 ))
             }

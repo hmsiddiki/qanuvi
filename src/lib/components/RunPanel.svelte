@@ -388,7 +388,8 @@
     return { ...rules, set: true, allow: parsePatterns(allowText), never: parsePatterns(neverText) };
   }
 
-  /** Keeps the card's answers in the project (pressing Start is the answer); false when saving failed. */
+  /** Keeps the card's answers in the project (pressing Start is the answer, and leaving a Details list: a step set
+   * aside for a command can then be tried again from the Inbox with it allowed); false when saving failed. */
   async function saveRules(): Promise<boolean> {
     const next = currentRules();
     if (JSON.stringify(next) === JSON.stringify(rulesOf(project.settings))) return true;
@@ -1060,12 +1061,15 @@
         {#if rulesOpen}
           <label class="rules-list">
             <span>May also run without asking (one per line; * stands for anything)</span>
-            <textarea rows="3" bind:value={allowText} placeholder={"make docs\nphp artisan migrate --env=testing"}
-            ></textarea>
+            <textarea
+              rows="3"
+              bind:value={allowText}
+              onchange={saveRules}
+              placeholder={"make docs\nphp artisan migrate --env=testing"}></textarea>
           </label>
           <label class="rules-list">
             <span>Never runs (besides the fixed never-list)</span>
-            <textarea rows="2" bind:value={neverText} placeholder="npm run e2e"></textarea>
+            <textarea rows="2" bind:value={neverText} onchange={saveRules} placeholder="npm run e2e"></textarea>
           </label>
           <p class="hint">
             Already allowed: the project's test command, its package.json scripts (not dev, start or publish), the usual

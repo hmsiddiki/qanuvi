@@ -1001,7 +1001,41 @@ runs on or off; with it off nothing is sent anywhere.
     https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.30; installer (8598701), Linux master (10519152) and
     Windows master (10434560) served 200 with matching sizes. Tagged v0.1.30. Not done: the owner's install updating
     to 0.1.30, the VPS server build swap and the Linux laptop .deb (both ask the owner).
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 09:40): 0.1.30 PUBLISHED with 24y part 1, which has
+    24y PART 1 DRIVEN LIVE (2026-11-20, scratch E:/qc-scratch/y24-plan, git, PLAN-Y24.md: 1 add mul, 2 run exactly
+    `node scripts/stamp.js`, 3 add sub; Permissions Auto, Claude Code):
+    - PASS: full card on the first run (may/never lines, branch question pre-set No, Details with empty lists and
+      hints); one line after ("Run rules: tests and builds may run · never publishes or touches main · Qanuvi's own
+      copies · Change", "· 1 rule your own" once one is added).
+    - r1 FOUND + FIXED: in 0.1.30 the rules did nothing in Auto: Claude Code approves most commands itself there and
+      never sends can_use_tool, so `node scripts/stamp.js` ran and all 3 steps were done. Fix (agent.rs): every
+      Claude Code session registers a PreToolUse hook in its initialize request (hookCallbackIds ["qanuvi-run-rules"];
+      checked first by hand against Claude Code 2.1.318 in Auto: deny blocks the call). by_hook answers each call
+      from the session's rules: allowed or no rules = {} (the usual permissions go on), refused = deny with the
+      refusal message, kept for the runner, and a qanuvi_permission note with tool + input, which the window shows
+      as a refused card (events.ts). Hook calls are answered at once and not stored (they carry whole inputs). The
+      runner hands its Policy to Agents::start (new parameter), so the rules hold from the first tool call;
+      set_policy after start stays for requests already waiting. Qanuvi's own agent: a ruled session runs in
+      "default" mode (in Auto it approved edits and non-risky commands itself). Driven: step 2 Blocked with the
+      command named, no BUILD-STAMP.txt, step 3 done, "Run ended: it needs you · 2 of 3 done, 1 set aside", Inbox
+      card with the command to copy.
+    - r2 FIXED: Details lists were saved only by Start, so after a run ended an allowed command could not be kept
+      (Start is off when every other step is done). Now leaving a Details list saves it (RunPanel onchange). Driven:
+      allow line typed, field left, card reads "1 rule your own"; step 2 reopened (its circle in the plan), run:
+      the step ran `node scripts/stamp.js` and was done.
+    - r3 FIXED: `node --check` (a syntax check, like php -l) added to the check tools (step 1 had been refused it).
+    - r4 FIXED: the refusal message says where the user allows a command (Run panel, Run rules, Change, "May also
+      run without asking"); the agent had written "I don't know where your hook keeps its run rules".
+    - r5 OPEN (proposal, n1 behaviour, not 24y): "Try again" in the Inbox on a blocked step whose run has ended only
+      keeps the answer for the next run; the step stays [!] and Start at leaves it out until its circle is clicked.
+      Proposal: Try again on an ended run's blocked step reopens it in the plan, so Run picks it up.
+    - Note: the check before the run still listed "allow node scripts/stamp.js" as a to-do although it was allowed
+      (misled by the plan's FACTS.md from the refused attempt); a reminder only, the run went on.
+    Verify: prettier, svelte-check 0, vitest 543, fmt, clippy clean, Rust lib 560 + 2 ignored. Not published.
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 17:20): 24y part 1 DRIVEN LIVE, r1-r4 fixed
+    (unpublished; r1 means 0.1.30's rules do nothing in Auto: publish 0.1.31 soon, ask the owner). r5 is a proposal
+    for the owner. Test window and test masters stopped; scratch E:/qc-scratch/y24-plan stays in the test build's
+    projects. Next: 0.1.31 (ask), then part 2 (Y3 + Y4 + Y5), then 24rl.
+    PICKUP POINT (before, 2026-11-20 09:40): 0.1.30 PUBLISHED with 24y part 1, which has
     not been driven live yet, nothing unpublished. Next: drive part 1 live on a scratch project (card first run + one
     line after; a step needing an unlisted command set aside with it named, others go on; Details allow then the step
     passes); fix anything found (patch release, ask), then part 2 (Y3 + Y4 + Y5), then 24rl.

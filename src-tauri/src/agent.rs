@@ -272,28 +272,23 @@ fn deny_line(request_id: &str, message: &str) -> String {
     .to_string()
 }
 
-/// A run's answer to a permission request by its rules: the line to send the agent and the note to keep in the
-/// session (shown in the step's chat as answered by the run rules). A refusal is remembered for the runner.
-fn by_policy(
+/// What a session's run rules say about one tool call (24y), None when the session has no rules (it is not in a plan
+/// run's turn). A refusal is remembered for the runner, which sets the step aside with it named.
+fn rule_verdict(
     policies: &Policies,
     refused: &Refused,
     session_id: &str,
-    request_id: &str,
-    request: &Value,
-) -> Option<(String, String)> {
+    tool: &str,
+    input: &Value,
+) -> Option<crate::run_rules::Verdict> {
     use crate::run_rules::{Refusal, Verdict};
     let policy = policies
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .get(session_id)
         .cloned()?;
-    let tool = request["tool_name"].as_str().unwrap_or("");
-    let input = &request["input"];
     let verdict = policy.decide(tool, input);
-    let allow = verdict == Verdict::Allow;
-    let line = if allow {
-        allow_line(request_id, input)
-    } else {
+    if verdict != Verdict::Allow {
         refused
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -306,6 +301,26 @@ fn by_policy(
                     _ => String::new(),
                 },
             });
+    }
+    Some(verdict)
+}
+
+/// A run's answer to a permission request by its rules: the line to send the agent and the note to keep in the
+/// session (shown in the step's chat as answered by the run rules). A refusal is remembered for the runner.
+fn by_policy(
+    policies: &Policies,
+    refused: &Refused,
+    session_id: &str,
+    request_id: &str,
+    request: &Value,
+) -> Option<(String, String)> {
+    let tool = request["tool_name"].as_str().unwrap_or("");
+    let input = &request["input"];
+    let verdict = rule_verdict(policies, refused, session_id, tool, input)?;
+    let allow = verdict == crate::run_rules::Verdict::Allow;
+    let line = if allow {
+        allow_line(request_id, input)
+    } else {
         deny_line(request_id, &crate::run_rules::refusal_message(&verdict))
     };
     let note =
@@ -313,6 +328,54 @@ fn by_policy(
                       "by": "run rules"})
         .to_string();
     Some((line, note))
+}
+
+/// The hook Claude Code calls before every tool (24y): registered when the session starts, so a run's rules hold
+/// whatever the permission mode (in Auto, Claude Code approves most commands itself and never asks), and over the
+/// user's own allow rules. Without rules, or when they allow the call, it says nothing and the usual permissions go
+/// on (a request that comes is answered by the rules too).
+const RULES_HOOK: &str = "qanuvi-run-rules";
+
+fn initialize_line() -> String {
+    json!({"type": "control_request", "request_id": "qanuvi-init", "request": {"subtype": "initialize",
+        "hooks": {"PreToolUse": [{"matcher": null, "hookCallbackIds": [RULES_HOOK]}]}}})
+    .to_string()
+}
+
+/// The answer to one hook call: the line to send, and for a refusal the note to keep (a refused card in the step's
+/// chat, since no permission request came for it).
+fn by_hook(
+    policies: &Policies,
+    refused: &Refused,
+    session_id: &str,
+    request_id: &str,
+    request: &Value,
+) -> (String, Option<String>) {
+    let input = &request["input"];
+    let tool = input["tool_name"].as_str().unwrap_or("");
+    let tool_input = &input["tool_input"];
+    let verdict =
+        if request["callback_id"] == RULES_HOOK && input["hook_event_name"] == "PreToolUse" {
+            rule_verdict(policies, refused, session_id, tool, tool_input)
+        } else {
+            None
+        };
+    let (output, note) = match verdict {
+        Some(v) if v != crate::run_rules::Verdict::Allow => (
+            json!({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": crate::run_rules::refusal_message(&v)}}),
+            Some(
+                json!({"type": "qanuvi_permission", "request_id": request_id, "allow": false, "auto": true,
+                    "by": "run rules", "tool": tool, "input": tool_input})
+                .to_string(),
+            ),
+        ),
+        _ => (json!({}), None),
+    };
+    let line = json!({"type": "control_response",
+        "response": {"subtype": "success", "request_id": request_id, "response": output}})
+    .to_string();
+    (line, note)
 }
 
 /// The `claude` program: on PATH, else where Claude Code's installers put it (z8: a master started over ssh, or as a
@@ -1067,6 +1130,7 @@ impl Agents {
         files: &[Attachment],
         kind: &str,
         setup: Option<&str>,
+        policy: Option<Arc<crate::run_rules::Policy>>,
         channel: Sink<AgentEvent>,
     ) -> Result<Session, String> {
         let context = context_with(context, files);
@@ -1097,6 +1161,22 @@ impl Agents {
         if !MODES.contains(&mode) {
             return Err(format!("Unknown permission mode {mode}."));
         }
+        // A plan run's turn (24y): its rules answer from the start, before the agent's first tool call. Qanuvi's own
+        // agent then asks for every change (in Auto it would approve most of them itself, never asking the rules);
+        // Claude Code's are held by the run-rules hook, whatever its mode.
+        let mode = if own && policy.is_some() {
+            "default"
+        } else {
+            mode
+        };
+        let rules_for = |id: &str| {
+            if let Some(p) = &policy {
+                self.policies
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(id.to_string(), p.clone());
+            }
+        };
         let model = model.trim();
         if model.is_empty() || model.len() > 160 || model.contains(char::is_whitespace) {
             return Err("Choose a model.".into());
@@ -1104,6 +1184,7 @@ impl Agents {
 
         // Follow-up message to a running session.
         if let Some(id) = session_id {
+            rules_for(id);
             let mut map = self.map.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(running) = map.get_mut(id) {
                 // A message while the agent is working joins the task (both agents take it in mid-turn).
@@ -1197,6 +1278,7 @@ impl Agents {
                 get(db, &id)?
             }
         };
+        rules_for(&session.id);
 
         let mut cmd = Command::new(&program);
         cmd.current_dir(&project.path);
@@ -1294,11 +1376,7 @@ impl Agents {
             .take()
             .ok_or("No error output from the agent.")?;
 
-        send_line(
-            &mut stdin,
-            &json!({"type": "control_request", "request_id": "qanuvi-init", "request": {"subtype": "initialize"}})
-                .to_string(),
-        )?;
+        send_line(&mut stdin, &initialize_line())?;
         send_line(
             &mut stdin,
             &user_message(&with_context(context, prompt), files),
@@ -1367,6 +1445,23 @@ impl Agents {
                                 .as_str()
                                 .is_some_and(|r| r.starts_with("qanuvi-interrupt"))));
                 if noise {
+                    continue;
+                }
+                // The run-rules hook (24y), called before every tool: answered at once and not stored (it carries the
+                // tool's whole input); a refusal is noted, so the step's chat shows the refused command.
+                if kind == "control_request" && msg["request"]["subtype"] == "hook_callback" {
+                    let rid = msg["request_id"].as_str().unwrap_or("");
+                    let (answer, note) =
+                        by_hook(&policies, &refused, &session_id, rid, &msg["request"]);
+                    let sent = map
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .get_mut(&session_id)
+                        .map(|r| send_line(&mut r.stdin, &answer));
+                    if let (Some(Ok(())), Some(note)) = (sent, note) {
+                        append_event(db, &session_id, &note);
+                        send(AgentEvent::Line { line: note });
+                    }
                     continue;
                 }
                 // Text as it is written: shown live, not stored (the whole message follows).
@@ -1855,6 +1950,33 @@ mod tests {
         assert_eq!(kept.len(), 2);
         assert_eq!(kept[0].what, "cargo run");
         assert!(kept[0].never.is_empty() && !kept[1].never.is_empty());
+
+        // The run-rules hook (Claude Code calls it before every tool, in Auto too): silent when the rules allow the
+        // call or the session has none; a refusal denies it, is kept for the runner and noted with the command.
+        let hook = |c: &str| {
+            json!({"subtype": "hook_callback", "callback_id": RULES_HOOK,
+                "input": {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": c}}})
+        };
+        let (line, note) = by_hook(&policies, &refused, "s1", "h1", &hook("cargo test"));
+        assert!(line.contains("\"h1\"") && line.contains("\"response\":{}") && note.is_none());
+        let (line, note) = by_hook(&policies, &refused, "s2", "h2", &hook("node stamp.js"));
+        assert!(line.contains("\"response\":{}") && note.is_none());
+        let (line, note) = by_hook(&policies, &refused, "s1", "h3", &hook("node stamp.js"));
+        assert!(
+            line.contains("\"permissionDecision\":\"deny\"")
+                && line.contains("not in the project's run rules")
+        );
+        let note = note.unwrap();
+        assert!(
+            note.contains("\"tool\":\"Bash\"")
+                && note.contains("node stamp.js")
+                && note.contains("run rules")
+        );
+        assert_eq!(
+            refused.lock().unwrap().remove("s1").unwrap()[0].what,
+            "node stamp.js"
+        );
+        assert!(initialize_line().contains(RULES_HOOK) && initialize_line().contains("PreToolUse"));
     }
 
     #[test]

@@ -134,6 +134,7 @@ const BUILDING: &[&str] = &[
     "pytest",
     "python -m pytest",
     "php -l",
+    "node --check",
     "vendor/bin/phpunit",
     "php vendor/bin/phpunit",
     "php artisan test",
@@ -315,7 +316,8 @@ pub fn refusal_message(v: &Verdict) -> String {
         Verdict::Never(why) => {
             format!("Not allowed in this run: {why}. Do not try another way to do it.")
         }
-        _ => "This is not in the project's run rules, so it cannot run while nobody is there."
+        _ => "This is not in the project's run rules, so it cannot run while nobody is there. The user can allow \
+              it in Qanuvi's Run panel, under Run rules (Change, then \"May also run without asking\")."
             .to_string(),
     };
     format!("{why} Finish what you can without it, and say at the end what still needs it.")

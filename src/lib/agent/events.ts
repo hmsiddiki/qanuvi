@@ -377,6 +377,19 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
         state: msg.allow ? "allowed" : "refused",
         auto: msg.auto === true,
       };
+    // 24y: refused by the run rules before any request came (their hook): the note itself is the card.
+    else if (msg.tool) {
+      const input = obj(msg.input);
+      out.push({
+        kind: "approval",
+        id: str(msg.request_id),
+        tool: str(msg.tool),
+        summary: toolSummary(str(msg.tool), input),
+        detail: toolDetail(str(msg.tool), input),
+        state: msg.allow ? "allowed" : "refused",
+        auto: msg.auto === true,
+      });
+    }
   } else if (type === "assistant") {
     const content = obj(msg.message).content;
     for (const [n, block] of (Array.isArray(content) ? content : []).entries()) {

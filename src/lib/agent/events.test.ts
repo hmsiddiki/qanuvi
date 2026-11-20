@@ -77,6 +77,21 @@ describe("reduceAll", () => {
     expect(auto).toMatchObject({ state: "allowed", auto: true });
   });
 
+  it("shows a command the run rules refused before any request came (their hook)", () => {
+    const card = reduceAll([
+      JSON.stringify({
+        type: "qanuvi_permission",
+        request_id: "hook1",
+        allow: false,
+        auto: true,
+        by: "run rules",
+        tool: "Bash",
+        input: { command: "node scripts/stamp.js" },
+      }),
+    ]).find((i) => i.kind === "approval");
+    expect(card).toMatchObject({ tool: "Bash", summary: "node scripts/stamp.js", state: "refused", auto: true });
+  });
+
   it("ends with time and cost", () => {
     expect(items.at(-1)).toMatchObject({ kind: "result", ok: true, seconds: 7.2, costUsd: 0.0044 });
   });

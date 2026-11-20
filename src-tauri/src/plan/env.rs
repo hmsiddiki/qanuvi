@@ -409,6 +409,18 @@ impl RunEnv for CoreEnv<'_> {
         } else {
             &req.agent
         };
+        // 24y: a run's turn is answered by the run rules (the settings as they are now, the plan's section winning),
+        // handed to the session as it starts, so they hold from its first tool call.
+        let policy = req.ruled.then(|| {
+            let mut project = self.project.clone();
+            if let Ok(s) = self.project_settings() {
+                project.settings = s;
+            }
+            std::sync::Arc::new(crate::run_rules::Policy::new(
+                &project,
+                req.plan_rules.as_ref(),
+            ))
+        });
         let send = |tx: std::sync::Arc<std::sync::mpsc::Sender<AgentEvent>>,
                     session_id: Option<&str>,
                     prompt: &str,
@@ -429,6 +441,7 @@ impl RunEnv for CoreEnv<'_> {
                 &[],
                 agent,
                 req.setup.as_deref(),
+                policy.clone(),
                 crate::sink::Sink::new(move |e| tx.send(e).is_ok()),
             )
         };
@@ -441,15 +454,10 @@ impl RunEnv for CoreEnv<'_> {
         if let Some(title) = &req.title {
             let _ = crate::agent::rename(&self.db, &started.id, title);
         }
-        // 24y: a run's turn is answered by the run rules (the settings as they are now, the plan's section winning).
-        if req.ruled {
-            let mut project = self.project.clone();
-            if let Ok(s) = self.project_settings() {
-                project.settings = s;
-            }
-            let policy = crate::run_rules::Policy::new(&project, req.plan_rules.as_ref());
+        // Requests that came before the session's id was known are answered now too.
+        if policy.is_some() {
             self.agents
-                .set_policy(&self.db, &started.id, Some(std::sync::Arc::new(policy)));
+                .set_policy(&self.db, &started.id, policy.clone());
         }
         let mut end = TurnEnd {
             session_id: started.id.clone(),
