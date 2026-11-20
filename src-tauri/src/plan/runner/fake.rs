@@ -105,6 +105,15 @@ pub struct FakeEnv {
     decide: Mutex<Option<DecideScript>>,
     /// Called each quiet second of a turn (the owner acting while the agent works or waits).
     on_tick: Mutex<Option<TickScript>>,
+    /// The project is a git repository (24y Y3: the plan's branch and its commits are recorded, not made).
+    pub git: Mutex<bool>,
+    /// The branch the plan's work is on, and the commits made there: message and files.
+    pub branch: Mutex<Option<String>>,
+    pub commits: Mutex<Vec<(String, Vec<String>)>>,
+    /// Undos asked for: the snapshot each went back to.
+    pub undos: Mutex<Vec<String>>,
+    /// Commands the run rules refuse when the runner would run them (a step's check).
+    pub never: Mutex<Vec<String>>,
 }
 
 impl Default for FakeEnv {
@@ -129,6 +138,11 @@ impl FakeEnv {
             memory: Mutex::new(None),
             decide: Mutex::new(None),
             on_tick: Mutex::new(None),
+            git: Mutex::new(false),
+            branch: Mutex::new(None),
+            commits: Mutex::new(Vec::new()),
+            undos: Mutex::new(Vec::new()),
+            never: Mutex::new(Vec::new()),
         }
     }
 
@@ -364,6 +378,98 @@ impl RunEnv for FakeEnv {
     fn snapshot_take(&self, _also: &[String]) -> Result<Taken, String> {
         self.call("snapshots_take");
         Ok(self.take())
+    }
+
+    fn snapshot_undo(
+        &self,
+        before: &str,
+        _also: &[String],
+        plan_file: &str,
+    ) -> Result<crate::snapshots::Undone, String> {
+        self.call("snapshots_undo");
+        let was = self
+            .w()
+            .snapshots
+            .get(before)
+            .cloned()
+            .ok_or("The snapshot is gone.")?;
+        let after = self.take();
+        let now = self.w().snapshots[&after.id].clone();
+        let logs = crate::plan::guidance::log_dir(plan_file);
+        let mut out = crate::snapshots::Undone {
+            after: after.id,
+            ..Default::default()
+        };
+        let mut paths: Vec<String> = was.keys().chain(now.keys()).cloned().collect();
+        paths.sort();
+        paths.dedup();
+        for p in paths {
+            if crate::plan::finishing::is_plan_file(&p, plan_file, &logs) {
+                continue;
+            }
+            match (was.get(&p), now.get(&p)) {
+                (Some(b), Some(n)) if b == n => {}
+                (Some(b), _) => {
+                    self.put(&p, b);
+                    out.restored.push(p);
+                }
+                (None, Some(_)) => {
+                    self.w().files.remove(&p);
+                    out.removed.push(p);
+                }
+                (None, None) => {}
+            }
+        }
+        if !out.removed.is_empty() {
+            out.moved_to = "undone".into();
+        }
+        self.undos.lock().unwrap().push(before.to_string());
+        Ok(out)
+    }
+
+    fn plan_branch(&self, name: &str) -> Result<String, String> {
+        self.call("git_plan_branch");
+        if !*self.git.lock().unwrap() {
+            return Err("the project is not in a git repository".into());
+        }
+        *self.branch.lock().unwrap() = Some(name.to_string());
+        Ok(format!("made {name} from main"))
+    }
+
+    fn commit_step(
+        &self,
+        branch: &str,
+        paths: &[String],
+        message: &str,
+    ) -> Result<Option<String>, String> {
+        self.call("git_commit_step");
+        if self.branch.lock().unwrap().as_deref() != Some(branch) {
+            return Err(format!("{branch} is no longer checked out"));
+        }
+        if paths.is_empty() {
+            return Ok(None);
+        }
+        let mut c = self.commits.lock().unwrap();
+        c.push((message.to_string(), paths.to_vec()));
+        Ok(Some(format!("c{}", c.len())))
+    }
+
+    fn rules_verdict(
+        &self,
+        command: &str,
+        _plan_rules: Option<&crate::run_rules::RunRules>,
+        _mode: &str,
+    ) -> crate::run_rules::Verdict {
+        if self.never.lock().unwrap().iter().any(|n| n == command) {
+            crate::run_rules::Verdict::Never("this project's run rules forbid it".into())
+        } else {
+            crate::run_rules::Verdict::Allow
+        }
+    }
+
+    fn has_program(&self, name: &str) -> bool {
+        // The programs this fake machine has.
+        ["npm", "node", "cargo", "php", "make"].contains(&name)
     }
 
     fn snapshot_changes(

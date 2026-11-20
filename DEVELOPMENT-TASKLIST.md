@@ -1104,7 +1104,37 @@ runs on or off; with it off nothing is sent anywhere.
     there, it runs from there on the same data, version 0.1.32. The owner removes the old copy with sudo apt remove
     qanuvi. ~/.local/bin joins PATH at the next sign-in (Ubuntu's .profile). From now on its updates are one click.
     Mac publishing: owner, "no mac publishing for now".
-    PICKUP POINT (fresh conversation starts here, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
+    24y PART 2 (Y3 + Y4 + Y5) BUILT (2026-11-21, not driven live, unpublished):
+    - Y3 undo: snapshots::undo puts back what changed since a snapshot (changed and deleted files get their stored
+      text, added files are MOVED into data/snapshots/undone/<id>, never deleted; binary or too-large ones are named
+      as not undone; the plan file, archive and logs are left alone). Every step now takes its snapshot at its first
+      try (before, only reviewed steps). A Failed step is undone before it is set aside; the reason says "its changes
+      were undone (N files)" and the decision list has an "undo" entry.
+    - Y3 branch: with Branch yes (card, or the plan's "Branch: yes"), the run puts the project on qanuvi/<plan name>
+      before the start snapshot (git::to_plan_branch: made from the branch checked out now, uncommitted work goes
+      along; an existing plan branch that is not checked out is never switched to, said in the decisions, and the
+      run keeps Qanuvi's copies). Each Done step commits only its own files there (git::commit_step: add + commit
+      with pathspec, never on another branch, no empty commits); a failed commit stops commits for the run, said once.
+      No git: "no branch: ..." in the decisions, nothing committed, undo still works.
+    - Y4 checks: a step's lines "Check: `cmd`", "Checks: `a`, `b`", "Check with `cmd`" (line start) or "Check: cmd"
+      (only when its first word is a program here) are run by Qanuvi after the step with the test command, failures
+      of all of them in the same fix rounds; the prompt says which checks follow. A check the run rules refuse
+      (never-list, or unlisted outside Auto) sets the step aside before any work, command named. Still failing after
+      every try: "its checks still fail after every try: `cmd`", then undone (Y3).
+    - Y5 report: PlanRun.report {done, setAside, waiting (with one action each), branch}; the Inbox item at the run's
+      end carries it as text; the Run panel shows it under the status line (open when something is left).
+    - FOUND + FIXED while testing: a step the run blocks itself (run rules refused what it needs) stayed [ ] in the
+      plan, so take_added read it as reopened by the owner and gave it a second row (Y2 had the same latent bug). The
+      run now marks such a step [!] in the plan, as an agent does.
+    - Tests: snapshot undo 1, git plan branch 1, step checks 1, scenarios y24_part_2 (checks + undo + commits +
+      report) and without git; y24_a now asserts one row per step. Verify: prettier clean, svelte-check 0, vitest
+      543, fmt, clippy clean (app + server build), Rust lib 567 + 2 ignored.
+    PICKUP POINT (fresh conversation starts here, 2026-11-21): 24y part 2 BUILT, not driven live, unpublished. Next:
+    drive part 2 live on a scratch project (scratch git repo: a step whose check passes after a fix round, one that
+    always fails and gets undone, one with a refused check; once with Branch yes, once with No), then 0.1.33 (ask).
+    Open owner question (2026-11-21): a run stopped by its budget, started again, ran the check before the run
+    again and asked again; proposal given in chat (remember the check per plan and step), waiting for the owner.
+    PICKUP POINT (before, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
     nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
     report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on
     the laptop; c2 if it comes back (~/qanuvi-stuck.sh).

@@ -645,6 +645,7 @@ fn pass_work(
         title: "Finishing pass".into(),
         test_command: command.clone(),
         resume: None,
+        checks: Vec::new(),
     };
     let end = turn::attempt(env, &sh.controls, &mut watch, &turns, &ask, &mut |e| {
         sh.forward(e)

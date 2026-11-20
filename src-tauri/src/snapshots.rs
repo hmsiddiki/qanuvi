@@ -314,6 +314,83 @@ pub fn changes(
     Ok(out)
 }
 
+/// What `undo` did (24y Y3).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Undone {
+    /// Files put back as they were.
+    pub restored: Vec<String>,
+    /// Files the work added, moved out of the project (into `moved_to`), not deleted.
+    pub removed: Vec<String>,
+    /// Changed files that could not be put back (binary or too large, so their earlier content was never stored).
+    pub kept: Vec<String>,
+    /// Where added files went (empty when none were added).
+    pub moved_to: String,
+    /// The snapshot of the files as the work left them (their text stays stored for two weeks).
+    pub after: String,
+}
+
+/// Puts the project's files back as snapshot `before` had them, for the files changed since (files `skip` names left
+/// alone): changed and deleted files get their earlier text again, added files are moved into Qanuvi's data folder.
+/// The files as the work left them are recorded first, so nothing is lost. Undoes only what changed since `before`.
+pub fn undo(
+    root: &Path,
+    before: &str,
+    also: &[String],
+    skip: &dyn Fn(&str) -> bool,
+) -> Result<Undone, String> {
+    let was = load(before)?;
+    let now = take(root, also)?;
+    let after = load(&now.id)?;
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut out = Undone {
+        after: now.id.clone(),
+        ..Default::default()
+    };
+    let names: BTreeSet<&String> = was.files.keys().chain(after.files.keys()).collect();
+    let aside = dir().join("undone").join(&now.id);
+    for path in names {
+        if skip(path) {
+            continue;
+        }
+        let full = root.join(path);
+        match (was.files.get(path), after.files.get(path)) {
+            (Some(b), Some(a)) if same(b, a) => {}
+            (None, Some(_)) => {
+                let to = aside.join(path);
+                let moved = to
+                    .parent()
+                    .is_some_and(|p| std::fs::create_dir_all(p).is_ok())
+                    && (std::fs::rename(&full, &to).is_ok()
+                        || std::fs::copy(&full, &to).is_ok()
+                            && std::fs::remove_file(&full).is_ok());
+                if moved {
+                    out.removed.push(path.clone());
+                } else {
+                    out.kept.push(path.clone());
+                }
+            }
+            (Some(b), _) => {
+                let bytes = if b.text {
+                    std::fs::read(blob_path(&b.hash)).ok()
+                } else {
+                    None
+                };
+                match bytes {
+                    Some(bytes) if write_atomic(&full, &bytes).is_ok() => {
+                        out.restored.push(path.clone())
+                    }
+                    _ => out.kept.push(path.clone()),
+                }
+            }
+            (None, None) => {}
+        }
+    }
+    if !out.removed.is_empty() {
+        out.moved_to = aside.to_string_lossy().to_string();
+    }
+    Ok(out)
+}
+
 fn same(b: &Mark, a: &Mark) -> bool {
     if b.hash.is_empty() || a.hash.is_empty() {
         b.size == a.size && b.modified == a.modified

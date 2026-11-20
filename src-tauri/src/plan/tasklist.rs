@@ -452,6 +452,66 @@ fn locale_compare(a: &str, b: &str) -> Ordering {
     key(a).cmp(&key(b)).then_with(|| case(a).cmp(&case(b)))
 }
 
+/// A command a step names as its check (24y Y4).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StepCheck {
+    pub command: String,
+    /// Written in backticks: surely a command. Without them ("Check: npm test") it counts only when its first word is
+    /// a program, so "Check: the page looks right" is never run.
+    pub quoted: bool,
+}
+
+/// At most this many checks per step.
+const MAX_CHECKS: usize = 5;
+
+/// The checks a step names in its lines: "Check: `npm test -- notes`", "Checks: `a`, `b`", "Check with `npm test`."
+/// (the line starts with it), or "Check: npm test" without backticks. Run by the runner after the step.
+pub fn step_checks(step: &Step) -> Vec<StepCheck> {
+    static KEY: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)(?:^check with\b|\bchecks?:)").unwrap());
+    static TICKS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`([^`\n]+)`").unwrap());
+    let mut out: Vec<StepCheck> = Vec::new();
+    let lines = std::iter::once(step.note.as_str()).chain(step.details.iter().map(String::as_str));
+    for line in lines.flat_map(str::lines) {
+        let line = line.trim().trim_start_matches(['-', '*']).trim();
+        let Some(m) = KEY.find(line) else {
+            continue;
+        };
+        let rest = &line[m.end()..];
+        let quoted: Vec<String> = TICKS
+            .captures_iter(rest)
+            .map(|c| c[1].trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect();
+        let found: Vec<StepCheck> = if !quoted.is_empty() {
+            quoted
+                .into_iter()
+                .map(|command| StepCheck {
+                    command,
+                    quoted: true,
+                })
+                .collect()
+        } else if m.as_str().ends_with(':') {
+            let plain = rest.trim().trim_end_matches('.').trim();
+            if plain.is_empty() || plain.len() > 200 {
+                continue;
+            }
+            vec![StepCheck {
+                command: plain.to_string(),
+                quoted: false,
+            }]
+        } else {
+            continue;
+        };
+        for c in found {
+            if out.len() < MAX_CHECKS && !out.iter().any(|o| o.command == c.command) {
+                out.push(c);
+            }
+        }
+    }
+    out
+}
+
 /// Removes "- Skipped:" lines that no longer hold: the step's needs (in this plan) are all done now. A run does this
 /// before it starts, so the plan never says a step waits for one that is finished. `also_done`: numbers done in the
 /// plan's archive.
@@ -502,6 +562,29 @@ Plain step without bold\n- [ ] **15b. Git like VS Code** (added by the owner)\n 
 
     fn line(text: &str, i: usize) -> String {
         text.split('\n').nth(i).unwrap_or_default().to_string()
+    }
+
+    #[test]
+    fn reads_a_steps_checks_from_its_lines() {
+        let plan = parse_plan(
+            "- [ ] **1. Add mul**\n  - Add `mul` to src/math.js.\n  - Check with `npm test`.\n  - Checks: `node --check src/math.js`, `npm test`\n  - Check: cargo test -p core.\n  - Check: the page looks right\n  - Done: checked with `npm run lint`\n",
+        );
+        let got: Vec<(String, bool)> = step_checks(&plan.steps[0])
+            .into_iter()
+            .map(|c| (c.command, c.quoted))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("npm test".to_string(), true),
+                ("node --check src/math.js".to_string(), true),
+                ("cargo test -p core".to_string(), false),
+                ("the page looks right".to_string(), false),
+            ]
+        );
+        // A plain mention of a check in prose is no check.
+        let plain = parse_plan("- [ ] **2. Docs**\n  - We check with care.\n");
+        assert!(step_checks(&plain.steps[0]).is_empty());
     }
 
     #[test]

@@ -1303,6 +1303,36 @@
         {#if startError}<span class="bad">{startError}</span>{/if}
       </div>
     {/if}
+    {#if run.report && run.status !== "running"}
+      {@const rep = run.report}
+      <!-- 24y Y5: the end report, in plain words: done; set aside and why; waiting for you, with what to do. -->
+      <details class="report" open={rep.waiting.length > 0 || rep.setAside.length > 0}>
+        <summary
+          >Report: {rep.done.length} done{#if rep.setAside.length}, {rep.setAside.length} set aside{/if}{#if rep.waiting.length},
+            {rep.waiting.length} waiting for you{/if}</summary
+        >
+        {#if rep.done.length}<div><strong>Done:</strong> {rep.done.join("; ")}</div>{/if}
+        {#if rep.waiting.length}
+          <div><strong>Waiting for you</strong></div>
+          <ul>
+            {#each rep.waiting as l, n (n)}
+              <li>
+                {l.step}: {l.why}{#if l.action}<br /><span class="act">{l.action}</span>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if rep.setAside.length}
+          <div><strong>Set aside</strong></div>
+          <ul>
+            {#each rep.setAside as l, n (n)}
+              <li>{l.step}: {l.why}</li>
+            {/each}
+          </ul>
+        {/if}
+        {#if rep.branch}<div class="dim">{rep.branch}</div>{/if}
+      </details>
+    {/if}
     {#if heldSteps.length}
       <!-- Set aside for an answer (24u): answer while the run goes on; it goes back to them after the step in hand. -->
       <div class="asks">
@@ -1526,6 +1556,25 @@
 {/if}
 
 <style>
+  .report {
+    margin: var(--qx-space-2) 0;
+    padding: var(--qx-space-2) var(--qx-space-3);
+    border: 1px solid var(--qx-border);
+    border-radius: var(--qx-radius-card);
+    font-size: var(--qx-text-small);
+    line-height: 1.5;
+  }
+  .report summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .report ul {
+    margin: 2px 0 6px;
+    padding-left: 18px;
+  }
+  .report .act {
+    color: var(--qx-accent);
+  }
   .start-offer {
     margin-top: 6px;
     padding: 6px 8px;

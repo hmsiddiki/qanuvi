@@ -359,3 +359,40 @@ fn a_run_learns_up_front_which_plan_folders_git_cannot_see() {
     // The ignored folder is blind; the nested repository and the project's top are seen.
     assert_eq!(take(r, &all).unwrap().git_blind, ["plugins/shop"]);
 }
+
+#[test]
+fn undo_puts_back_only_what_changed_since_and_moves_added_files_aside() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = dir.path();
+    write(r, "a.php", "<?php\necho 1;\n");
+    write(r, "gone.txt", "bye\n");
+    write(r, "same.txt", "kept\n");
+    write(r, "plan/PLAN.md", "- [ ] **1. Step**\n");
+    let t = take(r, &[]).unwrap();
+
+    write(r, "a.php", "<?php\necho 2;\n");
+    write(r, "src/new.php", "<?php\n");
+    fs::remove_file(r.join("gone.txt")).unwrap();
+    write(r, "plan/PLAN.md", "- [x] **1. Step**\n");
+    let skip = |p: &str| p.starts_with("plan/");
+    let u = undo(r, &t.id, &[], &skip).unwrap();
+    assert_eq!(u.restored, ["a.php", "gone.txt"]);
+    assert_eq!(u.removed, ["src/new.php"]);
+    assert!(u.kept.is_empty());
+    assert_eq!(
+        fs::read_to_string(r.join("a.php")).unwrap(),
+        "<?php\necho 1;\n"
+    );
+    assert_eq!(fs::read_to_string(r.join("gone.txt")).unwrap(), "bye\n");
+    assert!(!r.join("src/new.php").exists());
+    // The added file is kept in Qanuvi's data folder, not deleted; skipped files keep the work's change.
+    assert!(Path::new(&u.moved_to).join("src/new.php").exists());
+    assert_eq!(
+        fs::read_to_string(r.join("plan/PLAN.md")).unwrap(),
+        "- [x] **1. Step**\n"
+    );
+    assert_eq!(fs::read_to_string(r.join("same.txt")).unwrap(), "kept\n");
+    // What the work left is in the snapshot taken first: its change still shows from there.
+    let c = changes(r, &u.after, &[], false, &skip).unwrap();
+    assert_eq!(c.changes.len(), 3);
+}

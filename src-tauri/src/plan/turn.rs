@@ -823,6 +823,9 @@ impl Totals {
     }
 }
 
+/// How an attempt's note starts when the step's own checks still failed after its fix rounds (24y Y4).
+pub const CHECKS_FAILED: &str = "Checks failed: ";
+
 /// One attempt's request: the prompt, the model and mode it starts with, and the tests Qanuvi runs after it.
 #[derive(Clone, Debug, Default)]
 pub struct AttemptAsk {
@@ -833,6 +836,8 @@ pub struct AttemptAsk {
     pub title: String,
     /// The project's test command ("" = Qanuvi runs no tests).
     pub test_command: String,
+    /// The step's own checks (24y Y4), run after the test command; they must pass too.
+    pub checks: Vec<String>,
     /// Go on in an open session (the step before left it idle): its id and its totals before this attempt.
     pub resume: Option<(String, Totals)>,
 }
@@ -871,7 +876,13 @@ pub fn attempt(
     let mut test_runs = 0u32;
     let mut tests_passed: Option<bool> = None;
     let mut failure = String::new();
-    if !ask.test_command.is_empty() {
+    // The project's test command, then the step's own checks (24y Y4): all must pass.
+    let commands: Vec<&str> = std::iter::once(ask.test_command.as_str())
+        .chain(ask.checks.iter().map(String::as_str))
+        .filter(|c| !c.trim().is_empty())
+        .collect();
+    let mut failing: Vec<String> = Vec::new();
+    if !commands.is_empty() {
         let mut round = 0u32;
         // A paused step does not go on to the tests: it stops where the owner paused it.
         while t.outcome == TurnOutcome::Idle
@@ -880,29 +891,49 @@ pub fn attempt(
             && !watch.pause_now
         {
             controls.asks().checking = true;
-            let check = env
-                .run_check(&ask.test_command, CHECK_TIMEOUT)
-                .unwrap_or_else(|e| CheckResult {
-                    ok: false,
-                    exit_code: None,
-                    timed_out: false,
-                    duration_ms: 0,
-                    output: e,
-                });
+            failing.clear();
+            let mut outputs: Vec<(String, CheckResult)> = Vec::new();
+            for command in &commands {
+                let check = env
+                    .run_check(command, CHECK_TIMEOUT)
+                    .unwrap_or_else(|e| CheckResult {
+                        ok: false,
+                        exit_code: None,
+                        timed_out: false,
+                        duration_ms: 0,
+                        output: e,
+                    });
+                if !check.ok {
+                    failing.push(command.to_string());
+                    outputs.push((command.to_string(), check));
+                }
+            }
             controls.asks().checking = false;
             test_runs += 1;
-            tests_passed = Some(check.ok);
-            if check.ok || round >= MAX_FIX_ROUNDS {
+            tests_passed = Some(failing.is_empty());
+            if failing.is_empty() || round >= MAX_FIX_ROUNDS {
                 break;
             }
-            let summary = if check.timed_out {
-                "The tests did not finish within the time limit.".to_string()
-            } else {
-                failure_summary(&check.output, FAILURE_CHARS)
-            };
+            let share = FAILURE_CHARS / outputs.len().max(1);
+            let summary = outputs
+                .iter()
+                .map(|(command, check)| {
+                    let what = if check.timed_out {
+                        "It did not finish within the time limit.".to_string()
+                    } else {
+                        failure_summary(&check.output, share)
+                    };
+                    if outputs.len() > 1 {
+                        format!("{command}:\n{what}")
+                    } else {
+                        what
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
             failure = summary.clone();
             round += 1;
-            let follow = fix_prompt(&ask.test_command, &summary, round, MAX_FIX_ROUNDS);
+            let follow = fix_prompt(&failing.join("`, `"), &summary, round, MAX_FIX_ROUNDS);
             // A model or mode the owner picked meanwhile stays (it is not switched back for the fix round).
             let model = watch
                 .live_model
@@ -936,7 +967,16 @@ pub fn attempt(
     let note = if !t.note.is_empty() {
         t.note.clone()
     } else if tests_passed == Some(false) {
-        "Tests failed.".into()
+        let own: Vec<String> = failing
+            .iter()
+            .filter(|f| **f != ask.test_command)
+            .map(|f| format!("`{f}`"))
+            .collect();
+        if own.is_empty() {
+            "Tests failed.".into()
+        } else {
+            format!("{CHECKS_FAILED}{}.", own.join(", "))
+        }
     } else {
         String::new()
     };

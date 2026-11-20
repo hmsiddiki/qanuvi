@@ -1,6 +1,6 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: AGREED by the owner (2026-11-20, "ok do whats best"). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 built 2026-11-21 (not driven live). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
 part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line

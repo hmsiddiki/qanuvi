@@ -161,6 +161,43 @@ pub trait RunEnv: Send + Sync {
         git: bool,
         skip: Option<&str>,
     ) -> Result<Changes, String>;
+    /// Puts the files changed since snapshot `before` back as they were (24y Y3: a failed step undone); the plan's
+    /// own files (the plan, its archive and logs) are left alone. Added files are moved into Qanuvi's data folder.
+    fn snapshot_undo(
+        &self,
+        _before: &str,
+        _also: &[String],
+        _plan_file: &str,
+    ) -> Result<crate::snapshots::Undone, String> {
+        Err("undo is not available here".into())
+    }
+    /// Puts the project on the plan's own branch (24y Y3, only after the user's yes); answers what was done.
+    fn plan_branch(&self, _name: &str) -> Result<String, String> {
+        Err("the project is not in a git repository".into())
+    }
+    /// Commits a finished step's files on the plan's branch; None when there was nothing to commit.
+    fn commit_step(
+        &self,
+        _branch: &str,
+        _paths: &[String],
+        _message: &str,
+    ) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+    /// What the run rules say about a command the runner itself runs (a step's check, 24y Y4). Unlisted ones go
+    /// ahead only in Auto, where the user gave the run room.
+    fn rules_verdict(
+        &self,
+        _command: &str,
+        _plan_rules: Option<&crate::run_rules::RunRules>,
+        _mode: &str,
+    ) -> crate::run_rules::Verdict {
+        crate::run_rules::Verdict::Allow
+    }
+    /// A program of this name can be started here (a check written without backticks must name one).
+    fn has_program(&self, name: &str) -> bool {
+        crate::terminal::find_on_path(name).is_some()
+    }
 
     /// Sends a message and waits until the turn is over. `on_event` hears every event (first the session as it
     /// started, so its id is known at once) and, while nothing comes, about once a second `None`; what it answers
@@ -392,6 +429,49 @@ impl RunEnv for CoreEnv<'_> {
         crate::snapshots::changes(&self.root(), before, also, git, &|p| {
             !skip.is_empty() && p == skip
         })
+    }
+
+    fn snapshot_undo(
+        &self,
+        before: &str,
+        also: &[String],
+        plan_file: &str,
+    ) -> Result<crate::snapshots::Undone, String> {
+        let logs = super::guidance::log_dir(plan_file);
+        crate::snapshots::undo(&self.root(), before, also, &|p| {
+            super::finishing::is_plan_file(p, plan_file, &logs)
+        })
+    }
+
+    fn plan_branch(&self, name: &str) -> Result<String, String> {
+        crate::git::to_plan_branch(&self.root(), name)
+    }
+
+    fn commit_step(
+        &self,
+        branch: &str,
+        paths: &[String],
+        message: &str,
+    ) -> Result<Option<String>, String> {
+        crate::git::commit_step(&self.root(), branch, paths, message)
+    }
+
+    fn rules_verdict(
+        &self,
+        command: &str,
+        plan_rules: Option<&crate::run_rules::RunRules>,
+        mode: &str,
+    ) -> crate::run_rules::Verdict {
+        use crate::run_rules::{Policy, Unlisted, Verdict};
+        let mut project = self.project.clone();
+        if let Ok(s) = self.project_settings() {
+            project.settings = s;
+        }
+        let policy = Policy::new(&project, plan_rules).in_mode(mode, true);
+        match policy.command(command) {
+            Verdict::Unlisted if policy.unlisted() == Unlisted::Allow => Verdict::Allow,
+            v => v,
+        }
     }
 
     fn agent_turn(

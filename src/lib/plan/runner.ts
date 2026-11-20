@@ -170,6 +170,26 @@ export interface PlanRun {
   snapshot?: { id: string; also: string[] };
   /** The finishing pass over the whole run (24o), once it ran or runs. */
   finish?: import("./finishing").FinishPass;
+  /** The plan's own git branch the work went on (24y Y3, only after the user's yes), and its commits. */
+  branch?: string;
+  commits?: { step: string; id: string }[];
+  /** The end report (24y Y5), once the run ended. */
+  report?: RunReport;
+}
+
+/** One step in the end report: which, why, and the one thing the user does about it. */
+export interface ReportLine {
+  step: string;
+  why: string;
+  action?: string;
+}
+
+/** The end report (24y Y5): done; set aside and why; waiting for you, with the one action each needs. */
+export interface RunReport {
+  done: string[];
+  setAside: ReportLine[];
+  waiting: ReportLine[];
+  branch?: string;
 }
 
 export type RunTeam = "settings" | "paid" | "free" | "free-only";

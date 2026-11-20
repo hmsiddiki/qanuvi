@@ -2148,7 +2148,10 @@ fn y24_a_command_the_run_rules_refuse_sets_its_step_aside_with_the_command_named
         steps[0].plan_rules.as_ref().unwrap().allow,
         vec!["make docs"]
     );
-    // Step 1 set aside once (no retries that cannot get further), named; the others went on.
+    // Step 1 set aside once (no retries that cannot get further), named; the others went on. It is marked [!] in the
+    // plan, so it is not read as one the owner sent back (no second row for it).
+    assert_eq!(r.steps.len(), 3, "{:?}", statuses(&r));
+    assert!(env.text(FILE).contains("- [!] **1. Start the app**"));
     let one = step(&r, "1");
     assert_eq!(one.status, RunStepStatus::Held, "{:?}", statuses(&r));
     assert_eq!(one.attempts.len(), 1);
@@ -2167,5 +2170,198 @@ fn y24_a_command_the_run_rules_refuse_sets_its_step_aside_with_the_command_named
     assert!(
         open_question(&env)
             .is_some_and(|q| format!("{} {} {:?}", q.title, q.text, q.form).contains("cargo run"))
+    );
+}
+
+#[test]
+fn y24_part_2_checks_get_fix_rounds_a_failed_step_is_undone_done_steps_are_committed_and_the_report_says_it_all()
+ {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let env = world(
+        "# Plan\n\n- [ ] **1. Add mul**\n  - Add mul to src/math.js.\n  - Check: `npm run lint`\n- [ ] **2. Rework keep**\n  - Change src/keep.php.\n  - Check: `npm run fail`\n- [ ] **3. Third**\n  - and this\n- [ ] **4. Deploy docs**\n  - Check: `make deploy`\n",
+    );
+    env.put("src/keep.php", "<?php // original\n");
+    let mut s = settings("");
+    s.test_command = String::new();
+    s.run_rules.branch = true;
+    env.set_settings(s);
+    *env.git.lock().unwrap() = true;
+    env.never.lock().unwrap().push("make deploy".into());
+    let fixed = Arc::new(AtomicBool::new(false));
+    let lint_ok = fixed.clone();
+    env.set_checks(move |cmd| match cmd {
+        "npm run lint" if lint_ok.load(Ordering::SeqCst) => (true, String::new()),
+        "npm run lint" => (false, "src/math.js:1 missing semicolon".into()),
+        "npm run fail" => (false, "keep.php: 3 failures".into()),
+        _ => (true, String::new()),
+    });
+    let fixer = fixed.clone();
+    env.set_agent(move |c| {
+        if planner(c) || c.title.unwrap_or("").starts_with("Question for you") {
+            return if planner(c) {
+                ok_review(c)
+            } else {
+                AgentReply::default()
+            };
+        }
+        // A fix round names the failing check, not the step.
+        if c.prompt.contains("`npm run lint` failed (fix round") {
+            assert!(c.prompt.contains("missing semicolon"), "{}", c.prompt);
+            c.env
+                .put("src/math.js", "export const mul = (a, b) => a * b;\n");
+            fixer.store(true, Ordering::SeqCst);
+            return AgentReply::default();
+        }
+        if c.prompt.contains("`npm run fail` failed (fix round") {
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "2", "3", "4"]);
+        match n {
+            "1" => {
+                assert!(c.prompt.contains("Qanuvi runs its checks (`npm run lint`)"));
+                c.env
+                    .put("src/math.js", "export const mul = (a, b) => a * b\n");
+            }
+            "2" => {
+                c.env.put("src/keep.php", "<?php // reworked\n");
+                c.env.put("src/bad.php", "<?php // half done\n");
+            }
+            "4" => panic!("step 4 must never start: its check is refused"),
+            _ => c.env.put("src/three.txt", "3\n"),
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop.clone(),
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while running.waiting_answers() < 2 || step(&running.now(), "3").status != RunStepStatus::Done {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never got through: {:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    stop.press();
+    stop.press();
+    let r = running.wait();
+
+    assert_eq!(r.steps.len(), 4, "{:?}", statuses(&r));
+    // Y4: step 1's check failed, one fix round made it pass, done.
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Done, "{:?}", statuses(&r));
+    assert_eq!(one.attempts[0].test_runs, Some(2));
+    // Y3: step 2's check never passed: undone (its change back, its new file moved out), set aside, the run went on.
+    let two = step(&r, "2");
+    assert_eq!(two.status, RunStepStatus::Held);
+    let why = &two.held.as_ref().unwrap().why;
+    assert!(
+        why.contains("its checks still fail after every try: `npm run fail`")
+            && why.contains("its changes were undone (2 files)"),
+        "{why}"
+    );
+    assert_eq!(env.text("src/keep.php"), "<?php // original\n");
+    assert_eq!(env.text("src/bad.php"), "");
+    assert_eq!(env.undos.lock().unwrap().len(), 1);
+    // The plan file keeps what the run wrote (it is never undone).
+    assert!(env.text(FILE).contains("**3. Third**"));
+    // Y4: step 4's check is on the never-list: set aside before any work, the command named.
+    let four = step(&r, "4");
+    assert_eq!(four.status, RunStepStatus::Held);
+    assert!(four.attempts.is_empty());
+    assert!(
+        four.held.as_ref().unwrap().why.contains("`make deploy`"),
+        "{:?}",
+        four.held
+    );
+    // Y3: the plan's own branch, a commit per finished step with only its files.
+    assert_eq!(r.branch.as_deref(), Some("qanuvi/plan"));
+    let commits = env.commits.lock().unwrap().clone();
+    assert_eq!(commits.len(), 2, "{commits:?}");
+    assert!(commits[0].0.starts_with("Step 1: Add mul"));
+    assert!(commits[0].1.contains(&"src/math.js".to_string()));
+    assert!(!commits[0].1.contains(&"src/keep.php".to_string()));
+    assert!(commits[1].0.starts_with("Step 3: Third"));
+    assert_eq!(r.commits.as_ref().map(Vec::len), Some(2));
+    // Y5: the report.
+    let rep = r.report.as_ref().expect("the run has its report");
+    assert_eq!(rep.done, ["Step 1: Add mul", "Step 3: Third"]);
+    let waiting: Vec<&str> = rep.waiting.iter().map(|w| w.step.as_str()).collect();
+    assert_eq!(
+        waiting,
+        ["Step 2: Rework keep", "Step 4: Deploy docs"],
+        "{:?} {:?}",
+        statuses(&r),
+        r.steps
+            .iter()
+            .map(|s| (&s.line, &s.replaces, &s.reason))
+            .collect::<Vec<_>>()
+    );
+    assert!(rep.waiting[0].action.starts_with("Read its log"));
+    assert!(rep.waiting[1].action.starts_with("Do that part yourself"));
+    assert!(rep.branch.contains("qanuvi/plan (2 commits)"));
+}
+
+#[test]
+fn y24_part_2_without_git_nothing_is_committed_and_a_failed_step_is_still_undone() {
+    let env = world("# Plan\n\n- [ ] **1. Rework**\n  - Check: `npm run fail`\n");
+    env.put("src/a.php", "<?php // a\n");
+    let mut s = settings("");
+    s.test_command = String::new();
+    s.run_rules.branch = true;
+    env.set_settings(s);
+    env.set_checks(|cmd| (cmd != "npm run fail", "fails".into()));
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if c.title.unwrap_or("").starts_with("Question for you") || c.prompt.contains("fix round") {
+            return AgentReply::default();
+        }
+        c.env.put("src/a.php", "<?php // b\n");
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop.clone(),
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while running.waiting_answers() < 1 {
+        assert!(
+            std::time::Instant::now() < until,
+            "{:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    stop.press();
+    stop.press();
+    let r = running.wait();
+    assert_eq!(r.branch, None);
+    assert!(env.commits.lock().unwrap().is_empty());
+    assert_eq!(env.text("src/a.php"), "<?php // a\n");
+    assert!(
+        r.decisions
+            .iter()
+            .flatten()
+            .any(|d| d.subject == "Git branch" && d.decision.starts_with("no branch")),
+        "{:?}",
+        r.decisions
     );
 }

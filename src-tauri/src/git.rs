@@ -407,6 +407,95 @@ pub fn switch(dir: &Path, name: &str, create: bool) -> Result<(), String> {
     git(dir, &["switch", name]).map(|_| ())
 }
 
+// ---------- A plan's own branch (24y Y3, only when the user said yes before the run) ----------
+
+/// The branch a plan's work goes on: "qanuvi/" and the plan file's name ("PLAN-Y24.md" -> "qanuvi/plan-y24").
+pub fn plan_branch_name(plan_file: &str) -> String {
+    let name = plan_file.rsplit(['/', '\\']).next().unwrap_or(plan_file);
+    let stem = name.strip_suffix(".md").unwrap_or(name);
+    let mut slug = String::new();
+    for c in stem.chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c.to_ascii_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    let slug = slug.trim_matches('-');
+    format!("qanuvi/{}", if slug.is_empty() { "plan" } else { slug })
+}
+
+/// The branch checked out in `dir` (None: not a repository, or no branch checked out).
+pub fn current_branch(dir: &Path) -> Option<String> {
+    git(dir, &["symbolic-ref", "--short", "-q", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Puts `dir` on the plan's branch: already there, or a new one made from the branch checked out now (uncommitted
+/// work goes along, no file changes). An existing one that is not checked out is never switched to. Answers what was
+/// done.
+pub fn to_plan_branch(dir: &Path, name: &str) -> Result<String, String> {
+    if git(dir, &["rev-parse", "--is-inside-work-tree"]).is_err() {
+        return Err("the project is not in a git repository".into());
+    }
+    let now = current_branch(dir);
+    if now.as_deref() == Some(name) {
+        return Ok(format!("the work goes on {name}"));
+    }
+    let from = now.unwrap_or_else(|| "the current commit".into());
+    let exists = git(
+        dir,
+        &["rev-parse", "--verify", "-q", &format!("refs/heads/{name}")],
+    )
+    .is_ok();
+    if exists {
+        // Switching would change the files under a run that already read them (the plan file too): the user
+        // switches back themselves when they want the work to go on there.
+        Err(format!(
+            "{name} from an earlier run is there, but {from} is checked out; switch to {name} to go on there"
+        ))
+    } else {
+        valid_branch(dir, name)?;
+        git(dir, &["switch", "-c", name])?;
+        Ok(format!("made {name} from {from}"))
+    }
+}
+
+/// Commits these files (paths from `dir`) on `branch`, only while it is checked out; other changes in the work tree
+/// stay uncommitted. Files git cannot take (ignored, in another repository) are left out. Answers the commit's short
+/// id, or None when there was nothing to commit.
+pub fn commit_step(
+    dir: &Path,
+    branch: &str,
+    paths: &[String],
+    message: &str,
+) -> Result<Option<String>, String> {
+    if current_branch(dir).as_deref() != Some(branch) {
+        return Err(format!("{branch} is no longer checked out"));
+    }
+    let taken: Vec<&str> = paths
+        .iter()
+        .map(String::as_str)
+        .filter(|p| !p.starts_with('-') && git(dir, &["add", "-A", "--", p]).is_ok())
+        .collect();
+    if taken.is_empty() {
+        return Ok(None);
+    }
+    let mut check = vec!["diff", "--cached", "--quiet", "--"];
+    check.extend(&taken);
+    if git(dir, &check).is_ok() {
+        return Ok(None);
+    }
+    let mut args = vec!["commit", "--cleanup=strip", "-F", "-", "--"];
+    args.extend(&taken);
+    git_input(dir, &args, Some(message))?;
+    Ok(git(dir, &["rev-parse", "--short", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string()))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Stash {
     pub index: u32,
@@ -575,6 +664,51 @@ mod tests {
                 .unwrap()
                 .uncommitted
         );
+    }
+
+    #[test]
+    fn a_plans_branch_takes_only_its_steps_files_and_never_commits_elsewhere() {
+        assert_eq!(plan_branch_name("docs/PLAN-Y24.md"), "qanuvi/plan-y24");
+        assert_eq!(plan_branch_name("a b__c.md"), "qanuvi/a-b-c");
+        let Some(dir) = repo() else { return };
+        let d = dir.path();
+        std::fs::write(d.join("a.txt"), "one\n").unwrap();
+        git(d, &["add", "a.txt"]).unwrap();
+        git(d, &["commit", "-q", "-m", "start"]).unwrap();
+        let first = status(d).unwrap().branch;
+        std::fs::write(d.join("mine.txt"), "the user's own work\n").unwrap();
+        let said = to_plan_branch(d, "qanuvi/plan-x").unwrap();
+        assert!(said.starts_with("made qanuvi/plan-x from"), "{said}");
+        assert!(
+            to_plan_branch(d, "qanuvi/plan-x")
+                .unwrap()
+                .contains("goes on")
+        );
+        std::fs::write(d.join("step.txt"), "from step 1\n").unwrap();
+        let id = commit_step(d, "qanuvi/plan-x", &["step.txt".into()], "Step 1").unwrap();
+        assert!(id.is_some());
+        // Nothing new for those files: no empty commit.
+        assert_eq!(
+            commit_step(d, "qanuvi/plan-x", &["step.txt".into()], "again").unwrap(),
+            None
+        );
+        // The user's own file stayed out of the commit, uncommitted.
+        let left = status(d).unwrap().changes;
+        assert!(left.iter().any(|c| c.path == "mine.txt" && c.untracked));
+        assert!(!left.iter().any(|c| c.path == "step.txt"));
+        // On another branch nothing is committed.
+        switch(d, &first, false).unwrap();
+        std::fs::write(d.join("step.txt"), "later\n").unwrap();
+        assert!(commit_step(d, "qanuvi/plan-x", &["step.txt".into()], "x").is_err());
+        assert_eq!(log(d, None, 10).unwrap().len(), 1);
+        // The plan's branch is there but not checked out: never switched to under a run.
+        let e = to_plan_branch(d, "qanuvi/plan-x").unwrap_err();
+        assert!(e.contains("switch to qanuvi/plan-x"), "{e}");
+        assert_eq!(status(d).unwrap().branch, first);
+        // The plan's branch has the step's commit on top of where it started.
+        std::fs::remove_file(d.join("step.txt")).unwrap();
+        switch(d, "qanuvi/plan-x", false).unwrap();
+        assert_eq!(log(d, None, 10).unwrap().len(), 2);
     }
 
     fn repo() -> Option<tempfile::TempDir> {

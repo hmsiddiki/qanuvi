@@ -382,6 +382,8 @@ struct Loop<'a> {
     /// Each reviewed step's snapshot from its first try: a review sees the whole step's work, also what a session
     /// before a handover, a model switch, a pause or a failed try did (not only the last session's).
     step_snaps: HashMap<String, Snap>,
+    /// The plan's own git branch, while the run commits finished steps there (24y Y3).
+    branch: Option<String>,
     keep_for_resume: bool,
     free_until: Option<i64>,
     asked_changes_from: bool,
@@ -491,6 +493,9 @@ impl<'a> Loop<'a> {
             decider_calls: None,
             snapshot: None,
             finish: None,
+            branch: None,
+            commits: None,
+            report: None,
         };
         let known = parse_plan(&text)
             .steps
@@ -524,6 +529,7 @@ impl<'a> Loop<'a> {
             resume_text: String::new(),
             resume_is_handover: false,
             step_snaps: HashMap::new(),
+            branch: None,
             keep_for_resume: false,
             free_until: None,
             asked_changes_from: false,
@@ -556,6 +562,39 @@ impl<'a> Loop<'a> {
     /// Before the first step: the start snapshot, the plan's notes and kept state, the decider's assignment.
     fn prepare(&mut self, text: &str) {
         let file = self.s.file.clone();
+        // 24y: the run's sessions are answered by the run rules (the project's, the plan file's section winning).
+        self.s.turns.ruled = true;
+        self.s.turns.plan_rules = crate::run_rules::plan_rules(text);
+        // Y3: the user said yes to the plan's own branch (on the card, or the plan's "Branch: yes"): the work goes
+        // there, a commit per finished step. Before the start snapshot: making the branch changes no file.
+        let wants_branch = self
+            .env
+            .project_settings()
+            .is_ok_and(|p| p.run_rules.branch)
+            || self.s.turns.plan_rules.as_ref().is_some_and(|r| r.branch);
+        if wants_branch {
+            let name = crate::git::plan_branch_name(&file);
+            match self.env.plan_branch(&name) {
+                Ok(done) => {
+                    self.branch = Some(name.clone());
+                    self.run.branch = Some(name);
+                    self.decide(
+                        "decided",
+                        "Qanuvi",
+                        "Git branch",
+                        &done,
+                        "you chose to keep the plan's work on its own branch: each finished step is committed there, your main branch is never changed, and merging stays yours",
+                    );
+                }
+                Err(e) => self.decide(
+                    "decided",
+                    "Qanuvi",
+                    "Git branch",
+                    &format!("no branch: {e}"),
+                    "Qanuvi's own copies undo a failed step instead; nothing goes into git",
+                ),
+            }
+        }
         // The finishing pass compares with this, so changes from before the run are not taken for the run's (24o).
         let start = self.snapshot();
         if let Some(sn) = &start {
@@ -573,9 +612,6 @@ impl<'a> Loop<'a> {
             let _ = self.env.log_append(&g::facts_path(&file), &lines);
             let _ = self.env.plan_data_set(&file, Kind::Notes, &json!([]));
         }
-        // 24y: the run's sessions are answered by the run rules (the project's, the plan file's section winning).
-        self.s.turns.ruled = true;
-        self.s.turns.plan_rules = crate::run_rules::plan_rules(text);
         // What this plan kept from earlier runs (24u part 2).
         self.wait_list = self
             .s
@@ -907,6 +943,9 @@ impl<'a> Loop<'a> {
         self.run.status = status;
         self.run.message = message.to_string();
         self.run.ended_at = Some(self.env.now_ms() as f64);
+        // Y5: the end report (done; set aside and why; waiting for you, with what to do), in the Run panel and below.
+        let report = run_report(&self.run);
+        self.run.report = Some(report.clone());
         if message != STOPPED {
             let done = self
                 .run
@@ -925,10 +964,7 @@ impl<'a> Loop<'a> {
             } else {
                 format!("{}: ", self.s.project_name)
             };
-            let mut text = vec![message.to_string()];
-            if status != RunStatus::Done {
-                text.push(run_summary(&self.run.steps));
-            }
+            let text = vec![message.to_string(), report_text(&report)];
             let _ = self.env.inbox_add(&NewItem {
                 kind_of: "info".into(),
                 kind: "run".into(),
@@ -1734,7 +1770,19 @@ impl<'a> Loop<'a> {
             }
             let Some(model) = model else {
                 self.run.steps[i].status = RunStepStatus::Failed;
-                self.run.steps[i].reason = Some("not finished even by the strongest model".into());
+                // Y4: its own checks still failed after the fix rounds of every try: said so, with the commands.
+                let last = st
+                    .attempts
+                    .last()
+                    .map(|a| a.note.clone())
+                    .unwrap_or_default();
+                self.run.steps[i].reason = Some(match last.strip_prefix(turn::CHECKS_FAILED) {
+                    Some(what) => format!(
+                        "its checks still fail after every try: {}",
+                        what.trim_end_matches('.')
+                    ),
+                    None => "not finished even by the strongest model".into(),
+                });
                 // Set aside after its result is logged; the run goes on with the steps that do not need it (24u).
                 break;
             };
@@ -1797,6 +1845,18 @@ impl<'a> Loop<'a> {
             } else {
                 String::new()
             };
+            // Y4: the checks the step names, run by Qanuvi after it; a check the run rules refuse sets the step aside
+            // before any work (no try could pass it).
+            let (checks, refused_checks) = self.step_checks(&fresh, &test_command);
+            if !refused_checks.is_empty() {
+                self.run.steps[i].status = RunStepStatus::Blocked;
+                self.run.steps[i].reason = Some(format!(
+                    "its check {}",
+                    refused_reason(&refused_checks).trim_start_matches("it needed ")
+                ));
+                self.mark_blocked_in_plan(i);
+                break;
+            }
             let private = self.env.plan_private(&file);
             let own_log = g::log_path(&file, fresh.number.as_deref(), &fresh.title);
             let own_log_exists = self.env.read(&own_log).is_ok();
@@ -1872,21 +1932,27 @@ impl<'a> Loop<'a> {
                      reviews your diff before it counts as done. Keep the change small and easy to check."
                 ));
             }
-            let reviewed = is_free(&model) || extra.is_some();
-            let before = if reviewed {
-                match self.step_snaps.get(&key(&st)) {
-                    Some(s) => Some(s.clone()),
-                    None => {
-                        let s = self.snapshot().map(|s| s.0);
-                        if let Some(s) = &s {
-                            self.step_snaps.insert(key(&st), s.clone());
-                        }
-                        s
+            if !checks.is_empty() {
+                let list: Vec<String> = checks.iter().map(|c| format!("`{c}`")).collect();
+                prompt.push_str(&format!(
+                    "\n\nAfter this step Qanuvi runs its checks ({}); it counts as done only when they pass.",
+                    list.join(", ")
+                ));
+            }
+            // Every step's snapshot from its first try: a review sees the whole step's work, and a failed step is
+            // undone back to it (Y3).
+            let step_snap = match self.step_snaps.get(&key(&st)) {
+                Some(s) => Some(s.clone()),
+                None => {
+                    let s = self.snapshot().map(|s| s.0);
+                    if let Some(s) = &s {
+                        self.step_snaps.insert(key(&st), s.clone());
                     }
+                    s
                 }
-            } else {
-                None
             };
+            let reviewed = is_free(&model) || extra.is_some();
+            let before = if reviewed { step_snap } else { None };
             if self.s.options.packets {
                 let ctx = self.context(&fresh);
                 prompt = packet_prompt(&prompt, &ctx, &test_command);
@@ -1954,6 +2020,7 @@ impl<'a> Loop<'a> {
                 mode: self.run.options.mode.clone(),
                 title,
                 test_command: test_command.clone(),
+                checks: checks.clone(),
                 resume,
             };
             // The window learns the step is at work before its agent starts: a model picked for it and words typed
@@ -2128,11 +2195,13 @@ impl<'a> Loop<'a> {
                 };
                 // With Qanuvi running the tests, "done" also needs them to pass.
                 if attempt.outcome == Outcome::Done
-                    && !test_command.is_empty()
+                    && (!test_command.is_empty() || !checks.is_empty())
                     && attempt.tests_passed == Some(false)
                 {
                     attempt.outcome = Outcome::Open;
-                    attempt.note = "Marked done, but the tests still fail.".into();
+                    if !attempt.note.starts_with(turn::CHECKS_FAILED) {
+                        attempt.note = "Marked done, but the tests still fail.".into();
+                    }
                 }
             }
             // Quality first: a free model's "done" is checked by the decider before it counts. A step with extra checks
@@ -2218,6 +2287,7 @@ impl<'a> Loop<'a> {
                     self.run.steps[i].status = RunStepStatus::Blocked;
                     self.run.steps[i].reason =
                         Some(reason.unwrap_or_else(|| "it needs you".into()));
+                    self.mark_blocked_in_plan(i);
                     // Set aside after its result is logged; the run carries on (24u).
                     break;
                 }
@@ -2228,6 +2298,148 @@ impl<'a> Loop<'a> {
                 }
                 Outcome::Open | Outcome::Error => {}
             }
+        }
+    }
+
+    /// Y4: the checks a step names, without the test command already run; and the ones the run rules refuse. A check
+    /// written without backticks counts only when its first word is a program here.
+    fn step_checks(
+        &self,
+        step: &Step,
+        test_command: &str,
+    ) -> (Vec<String>, Vec<crate::run_rules::Refusal>) {
+        use crate::run_rules::{Refusal, Verdict};
+        let mut checks = Vec::new();
+        let mut refused = Vec::new();
+        for c in super::tasklist::step_checks(step) {
+            let program = c.command.split_whitespace().next().unwrap_or("");
+            if c.command == test_command || !c.quoted && !self.env.has_program(program) {
+                continue;
+            }
+            match self.env.rules_verdict(
+                &c.command,
+                self.s.turns.plan_rules.as_ref(),
+                &self.run.options.mode,
+            ) {
+                Verdict::Allow => checks.push(c.command),
+                Verdict::Never(why) => refused.push(Refusal {
+                    what: c.command,
+                    never: why,
+                }),
+                Verdict::Unlisted => refused.push(Refusal {
+                    what: c.command,
+                    never: String::new(),
+                }),
+            }
+        }
+        (checks, refused)
+    }
+
+    /// Y3: puts back what a failed step changed (from its first try's snapshot; the plan's own files stay). Answers
+    /// what was done, in plain words, or None when it changed nothing or could not be undone (said in the decisions).
+    fn undo_step(&mut self, i: usize) -> Option<String> {
+        let k = key(&self.run.steps[i]);
+        let snap = self.step_snaps.get(&k)?.clone();
+        match self.env.snapshot_undo(&snap.id, &snap.also, &self.s.file) {
+            Ok(u) => {
+                self.step_snaps.remove(&k);
+                let n = u.restored.len() + u.removed.len();
+                if n == 0 && u.kept.is_empty() {
+                    return None;
+                }
+                let mut said = format!(
+                    "its changes were undone ({n} file{})",
+                    if n == 1 { "" } else { "s" }
+                );
+                if !u.moved_to.is_empty() {
+                    said.push_str(&format!("; the files it added are kept in {}", u.moved_to));
+                }
+                if !u.kept.is_empty() {
+                    said.push_str(&format!(
+                        "; not undone (binary or too large): {}",
+                        u.kept.join(", ")
+                    ));
+                }
+                self.decide(
+                    "undo",
+                    "Qanuvi",
+                    &format!("Step {k}"),
+                    &said,
+                    "a failed step is undone, so the steps after it start from clean files",
+                );
+                Some(said)
+            }
+            Err(e) => {
+                self.decide(
+                    "undo",
+                    "Qanuvi",
+                    &format!("Step {k}"),
+                    "its changes stay",
+                    &format!("they could not be undone: {e}"),
+                );
+                None
+            }
+        }
+    }
+
+    /// Y3: on the plan's own branch, commits what a finished step changed (its files only, the plan's tick too).
+    /// A commit that fails stops the commits for this run, said once; the work stays in the files.
+    fn commit_done(&mut self, i: usize) {
+        let Some(branch) = self.branch.clone() else {
+            return;
+        };
+        let k = key(&self.run.steps[i]);
+        let Some(snap) = self.step_snaps.get(&k).cloned() else {
+            return;
+        };
+        let paths: Vec<String> = match self.env.snapshot_changes(&snap.id, &snap.also, false, None)
+        {
+            Ok(c) => c.changes.into_iter().map(|c| c.path).collect(),
+            Err(_) => self.run.steps[i].changed.clone().unwrap_or_default(),
+        };
+        let st = &self.run.steps[i];
+        let message = format!(
+            "{}{}\n\nPlan {}, step done in a Qanuvi run.",
+            st.number
+                .as_ref()
+                .map(|n| format!("Step {n}: "))
+                .unwrap_or_default(),
+            st.title,
+            self.plan_name()
+        );
+        match self.env.commit_step(&branch, &paths, &message) {
+            Ok(Some(id)) => self
+                .run
+                .commits
+                .get_or_insert_with(Vec::new)
+                .push(StepCommit { step: k, id }),
+            Ok(None) => {}
+            Err(e) => {
+                self.branch = None;
+                self.decide(
+                    "decided",
+                    "Qanuvi",
+                    "Git branch",
+                    "no more commits in this run",
+                    &format!(
+                        "committing step {k} failed: {e}. The work stays in the files; Qanuvi's own copies still undo failed steps"
+                    ),
+                );
+            }
+        }
+    }
+
+    /// A step the run blocked itself (the run rules refused what it needs) is marked [!] in the plan, as an agent
+    /// marks one: an open step the run counts as blocked would read as one the owner sent back.
+    fn mark_blocked_in_plan(&self, i: usize) {
+        let st = &self.run.steps[i];
+        if let Some(now) = self.plan()
+            && let Some(p) = find(&now.text, st.number.as_deref(), &st.title)
+            && p.status == StepStatus::Open
+            && let Ok(next) =
+                set_step_status(&now.text, p.line, StepStatus::Blocked, Some(&p.title))
+        {
+            let _ = self.env.write(&self.s.file, &next, Some(&now.hash));
         }
     }
 
@@ -2259,6 +2471,10 @@ impl<'a> Loop<'a> {
         self.take_added(i);
         self.collect_notes(i);
         self.update_api(i);
+        // Y3: on the plan's own branch, a finished step is committed there.
+        if self.run.steps[i].status == RunStepStatus::Done {
+            self.commit_done(i);
+        }
         // A step the planner just rewrote is not the owner's problem: its replacement steps do its work, nothing
         // waits for it, and it is ticked once they are all done.
         let k = key(&self.run.steps[i]);
@@ -2287,10 +2503,17 @@ impl<'a> Loop<'a> {
             } else {
                 HeldKind::Failed
             };
-            let why = self.run.steps[i]
+            let mut why = self.run.steps[i]
                 .reason
                 .clone()
                 .unwrap_or_else(|| "it needs you".into());
+            // Y3: a failed step is undone (only its own changes), so the steps after it start from clean files.
+            if kind == HeldKind::Failed
+                && let Some(undone) = self.undo_step(i)
+            {
+                why = format!("{why}; {undone}");
+                self.run.steps[i].reason = Some(why.clone());
+            }
             self.set_aside(i, kind, &why);
         }
         // Finished after its section's closing step already ran (it was set aside): the closing step runs once more,

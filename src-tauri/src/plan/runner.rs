@@ -332,6 +332,161 @@ pub struct PlanRun {
     /// The finishing pass over the whole run (24o), once it ran or runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finish: Option<FinishPass>,
+    /// The plan's own git branch the work goes on (24y Y3, only after the user's yes), and the commits made there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commits: Option<Vec<StepCommit>>,
+    /// The end report (24y Y5), once the run ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<RunReport>,
+}
+
+/// A finished step's commit on the plan's branch.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StepCommit {
+    pub step: String,
+    pub id: String,
+}
+
+/// One step in the end report: which, why, and the one thing the user does about it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportLine {
+    pub step: String,
+    pub why: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub action: String,
+}
+
+/// The end report (24y Y5): done; set aside and why; waiting for you, with the one action each needs.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunReport {
+    pub done: Vec<String>,
+    pub set_aside: Vec<ReportLine>,
+    pub waiting: Vec<ReportLine>,
+    /// Where the work is, when it went on the plan's branch ("on qanuvi/plan-x, 3 commits; merging is yours").
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub branch: String,
+}
+
+/// A step as the report names it: "Step 3: Add sub", or its title.
+fn report_name(s: &StepRun) -> String {
+    match &s.number {
+        Some(n) => format!("Step {n}: {}", s.title),
+        None => s.title.clone(),
+    }
+}
+
+/// What the user does about a held step: one action, in plain words.
+fn held_action(h: &Held) -> String {
+    match h.kind {
+        HeldKind::Hold => "Say in the Inbox whether it may go ahead.".into(),
+        HeldKind::Blocked if h.why.contains("run rules do not allow") => {
+            "Allow the command under Run rules (Change, then Details), then Try again in the Inbox."
+                .into()
+        }
+        HeldKind::Blocked if h.why.contains("a run never does") => {
+            "Do that part yourself, then say in the Inbox how the step goes on.".into()
+        }
+        HeldKind::Blocked => "Answer its question in the Inbox.".into(),
+        HeldKind::Failed => {
+            "Read its log, then answer in the Inbox: try again, skip it, or say how it can be done."
+                .into()
+        }
+    }
+}
+
+/// The end report of a run's steps (24y Y5).
+pub fn run_report(run: &PlanRun) -> RunReport {
+    let mut r = RunReport::default();
+    for s in &run.steps {
+        match s.status {
+            RunStepStatus::Done => r.done.push(report_name(s)),
+            RunStepStatus::Held => {
+                let (why, action) = match &s.held {
+                    Some(h) => (h.why.clone(), held_action(h)),
+                    None => ("it needs you".into(), "Answer it in the Inbox.".into()),
+                };
+                r.waiting.push(ReportLine {
+                    step: report_name(s),
+                    why,
+                    action,
+                });
+            }
+            RunStepStatus::SetAside => r.set_aside.push(ReportLine {
+                step: report_name(s),
+                why: s
+                    .waits_for
+                    .as_ref()
+                    .map(|w| {
+                        if w.why.is_empty() {
+                            format!("waits for step {}", w.step)
+                        } else {
+                            format!("waits for step {}: {}", w.step, w.why)
+                        }
+                    })
+                    .unwrap_or_else(|| "it waits for another step".into()),
+                action: String::new(),
+            }),
+            RunStepStatus::Skipped | RunStepStatus::Blocked | RunStepStatus::Failed => {
+                r.set_aside.push(ReportLine {
+                    step: report_name(s),
+                    why: s
+                        .reason
+                        .clone()
+                        .filter(|w| !w.is_empty())
+                        .unwrap_or_else(|| step_word_plain(s.status).into()),
+                    action: String::new(),
+                })
+            }
+            _ => {}
+        }
+    }
+    if let Some(b) = &run.branch {
+        let n = run.commits.as_ref().map_or(0, Vec::len);
+        r.branch = format!(
+            "The work is on {b} ({n} commit{}); your main branch is unchanged, merging is yours.",
+            if n == 1 { "" } else { "s" }
+        );
+    }
+    r
+}
+
+fn step_word_plain(s: RunStepStatus) -> &'static str {
+    match s {
+        RunStepStatus::Skipped => "skipped",
+        RunStepStatus::Blocked => "blocked",
+        _ => "not finished",
+    }
+}
+
+/// The report as plain text (the Inbox item).
+pub fn report_text(r: &RunReport) -> String {
+    let mut out = Vec::new();
+    out.push(if r.done.is_empty() {
+        "Done: nothing yet.".to_string()
+    } else {
+        format!("Done ({}): {}.", r.done.len(), r.done.join("; "))
+    });
+    if !r.set_aside.is_empty() {
+        out.push(format!("Set aside ({}):", r.set_aside.len()));
+        for l in &r.set_aside {
+            out.push(format!("- {}: {}", l.step, l.why));
+        }
+    }
+    if !r.waiting.is_empty() {
+        out.push(format!("Waiting for you ({}):", r.waiting.len()));
+        for l in &r.waiting {
+            out.push(format!("- {}: {} {}", l.step, l.why, l.action));
+        }
+    }
+    if !r.branch.is_empty() {
+        out.push(r.branch.clone());
+    }
+    out.join("\n")
 }
 
 /// The models a step may move up to after failures: the agent's list, or none when the run stays on one model.
