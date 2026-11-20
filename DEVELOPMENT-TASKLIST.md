@@ -1292,6 +1292,16 @@ runs on or off; with it off nothing is sent anywhere.
       (clipboard.rs with arboard 3.7, desktop only, RGBA -> PNG; window-only command clipboard_image;
       paste.ts pasteMayHoldPicture + pngFile). Tests: PNG round trip, paste checks; an ignored test puts a picture on
       the real clipboard (run by hand: it replaces what the clipboard holds). Windows unchanged (WebView2 gives files).
+    rl1 OWNER FOUND (2026-11-21 05:18, not fixed, proposal to the owner): the laptop chat says the connection to the
+      master ended while This PC's window keeps "Used from Zorin Laptop". This PC's relay_status listed 4 sessions
+      from the laptop: 88 (00:11), 91 (05:01), 102 (05:10:03, laptop app started 05:10), 107 (05:10:39); only the
+      newest is in use (laptop calls every few seconds). Cause: a session leaves the master's list only on a Close
+      from the relay, and the relay sends one only when a connection errors out; nothing pings, so a link that dies
+      quietly (wifi, sleep, NAT) stays open on the relay and the master forever. Why the laptop's link dropped at
+      05:10:39 is not known (no log on the laptop). Proposal: relay pings every connection (about 30 s), one silent
+      for about 90 s is gone and its sessions get Close; the laptop side pings too and reconnects at once. Relay
+      server change = deploy on basevm376 (ask); master change = next release.
+    lx1 test build on the laptop: ~/src/qanuvi/src-tauri/target/release/qanuvi (bbd72c6, own test data).
     PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
     server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the
     laptop; LT Linux title bar; then 0.1.33 (ask). Test window, laptop test master stopped.
