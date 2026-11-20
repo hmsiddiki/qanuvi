@@ -1220,7 +1220,24 @@ runs on or off; with it off nothing is sent anywhere.
     - Noise seen (not Qanuvi): step agents follow the owner's global agent rules file and report an extra word check.
     - Checks: prettier, svelte-check 0, vitest 549, fmt, clippy -D warnings (app + server build), Rust lib 576 + 2
       ignored.
-    PICKUP POINT (newest, 2026-11-21 03:25): pa1 + PM + FC DONE and driven live (above). Next: (1) LT Linux title bar
+    OWNER a + b DONE (2026-11-21 04:10):
+    - a. Preview address could not be changed: the start-page effect in PreviewTab called go(), which reads history,
+      so pressing Enter re-ran it and put the saved (old, not yet written) page back; a new project object did the
+      same. It now follows the project id only and does its work untracked. Driven live: /about, then 127.0.0.1/,
+      both stay, Back works. (Side note: a text/plain page shows blank in the frame; HTML pages show.)
+    - b. Branch yes that could not be kept: the report now says "Not on the plan's own branch: <why>. Nothing went
+      into git; Qanuvi's own copies kept the work safe." (from the Git branch decision). Scenario asserts it.
+    - Flaky seen once: master::tests::answers_generic_questions_about_its_machine failed in the full run, passed alone
+      (shared data folder while tests run in parallel); watch.
+    PREVIEW LIVE MIRROR (owner AGREED direction 2026-11-21, not planned in detail, not built): the agent's headless
+    browser stays the default and Follow stays; when the user asks in chat to see it, Preview shows a live picture of
+    the agent's own test browser (DevTools screencast, only while watched, same session/logins), "Stop following"
+    ends the picture and the agent carries on headless; the agent may ask "watch this live?" when seeing it matters,
+    else screenshots. (The Preview frame itself cannot be driven by the agent: other sites' pages in a frame cannot be
+    scripted.) LATER (owner): the agent can also browse through Qanuvi's own interface.
+    PICKUP POINT (newest, 2026-11-21 04:10): a + b done (above). Next: plan the Preview live mirror in parts with the
+    owner, then build; LT Linux title bar; then 0.1.33 (ask).
+    PICKUP POINT (before, 2026-11-21 03:25): pa1 + PM + FC DONE and driven live (above). Next: (1) LT Linux title bar
     (agreed design below, drive on the laptop: drag, double-click maximise, edge resize, snapping, shadow, X11 +
     Wayland); then 0.1.33 (ask the owner first). Test window, test masters and the local site are stopped; scratch
     y24-part2 is on branch qanuvi/plan-fc (scratch only, fine to leave).

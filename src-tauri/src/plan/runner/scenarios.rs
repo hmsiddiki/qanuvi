@@ -2364,6 +2364,15 @@ fn y24_part_2_without_git_nothing_is_committed_and_a_failed_step_is_still_undone
         "{:?}",
         r.decisions
     );
+    // Owner (b): the report says the yes to a branch was not kept, and why.
+    let rep = super::run_report(&r);
+    assert!(
+        rep.branch.starts_with("Not on the plan's own branch: ")
+            && rep.branch.contains("Nothing went into git"),
+        "{}",
+        rep.branch
+    );
+    assert!(super::report_text(&rep).contains("Not on the plan's own branch"));
 }
 
 #[test]

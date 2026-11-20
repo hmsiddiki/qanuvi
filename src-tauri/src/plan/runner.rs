@@ -455,6 +455,15 @@ pub fn run_report(run: &PlanRun) -> RunReport {
             "The work is on {b} ({n} commit{}); your main branch is unchanged, merging is yours.",
             if n == 1 { "" } else { "s" }
         );
+    } else if let Some(why) = run.decisions.iter().flatten().find_map(|d| {
+        (d.subject == "Git branch")
+            .then(|| d.decision.strip_prefix("no branch: "))
+            .flatten()
+    }) {
+        // Owner (b): a yes to the plan's own branch that could not be kept is said in the report, not only in Decisions.
+        r.branch = format!(
+            "Not on the plan's own branch: {why}. Nothing went into git; Qanuvi's own copies kept the work safe."
+        );
     }
     r
 }

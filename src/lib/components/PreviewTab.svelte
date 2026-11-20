@@ -13,7 +13,7 @@
   import FileInput from "@lucide/svelte/icons/file-input";
   import MousePointerClick from "@lucide/svelte/icons/mouse-pointer-click";
   import X from "@lucide/svelte/icons/x";
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { api, errorText, type InspectorShot, type Project } from "$lib/api";
@@ -188,14 +188,19 @@
     }
   }
 
+  // Another project starts at its own page. Only the id is followed: go() reads the history, so following it (or the
+  // project object, handed in new when settings are saved) put a typed address back to the saved one (owner, a).
+  let projectId = $derived(project.id);
   $effect(() => {
-    void project.id;
-    history = [];
-    position = -1;
-    // The page this project was on last time, else its preview address.
-    const start = workspace.read(project.id).preview ?? project.settings.preview_url;
-    address = start;
-    if (start) go(start);
+    const id = projectId;
+    untrack(() => {
+      history = [];
+      position = -1;
+      // The page this project was on last time, else its preview address.
+      const start = workspace.read(id).preview ?? project.settings.preview_url;
+      address = start;
+      if (start) go(start);
+    });
   });
 
   function go(raw: string) {
