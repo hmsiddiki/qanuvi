@@ -479,7 +479,9 @@ impl RunEnv for CoreEnv<'_> {
         if let Ok(s) = self.project_settings() {
             project.settings = s;
         }
-        let policy = Policy::new(&project, plan_rules).in_mode(mode, true);
+        let policy = Policy::new(&project, plan_rules)
+            .in_mode(mode, true)
+            .with_vars(crate::secrets::env(&project.id));
         match policy.command(command) {
             Verdict::Unlisted if policy.unlisted() == Unlisted::Allow => Verdict::Allow,
             v => v,
@@ -511,7 +513,9 @@ impl RunEnv for CoreEnv<'_> {
             // In Auto the user gave the agent room: only the never-lists hold, the rest is its judgement.
             std::sync::Arc::new(
                 crate::run_rules::Policy::new(&project, req.plan_rules.as_ref())
-                    .in_mode(&req.mode, agent == crate::agent::OWN_AGENT),
+                    .in_mode(&req.mode, agent == crate::agent::OWN_AGENT)
+                    // The values the session gets in its environment (agent.rs), for fetches that name one.
+                    .with_vars(crate::secrets::env(&project.id)),
             )
         });
         let send = |tx: std::sync::Arc<std::sync::mpsc::Sender<AgentEvent>>,

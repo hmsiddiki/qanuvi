@@ -480,7 +480,13 @@ impl<'a> Loop<'a> {
                 RunStatus::Running
             },
             message: if steps.is_empty() {
-                "No open steps to run.".into()
+                // pm1: a step range that matches no open step says so, not just "nothing to run".
+                match options.ranges.as_deref().map(str::trim) {
+                    Some(r) if !r.is_empty() && !ranges.ranges.is_empty() => {
+                        format!("No open steps to run: none of steps {r} is open in this plan.")
+                    }
+                    _ => "No open steps to run.".into(),
+                }
             } else {
                 String::new()
             },

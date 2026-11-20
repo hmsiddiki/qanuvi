@@ -10,6 +10,7 @@ import {
   preflightPrompt,
   projectAnswers,
   readAnswers,
+  siteAddressValues,
   recommendedRisk,
   secretNeedsReading,
   settleCheck,
@@ -464,5 +465,32 @@ describe("PM: the project memory in the check", () => {
     );
     expect(firstUrl("Test on https://shop.example.test/base/. Thanks")).toBe("https://shop.example.test/base/");
     expect(firstUrl("the usual one")).toBeNull();
+  });
+
+  it("keeps a site address given as a value in the project memory too, never a login or key (pm3)", () => {
+    const secrets = [
+      {
+        name: "TEST_SITE_URL",
+        what: "The web address of this project's test site",
+        example: "",
+        ifEmpty: "",
+        why: "",
+        steps: ["1"],
+      },
+    ] as Parameters<typeof siteAddressValues>[0];
+    const got = siteAddressValues(secrets, [
+      { name: "TEST_SITE_URL", value: " http://127.0.0.1:5199/ " },
+      { name: "ADMIN_PASSWORD", value: "hunter2" },
+      { name: "WITH_LOGIN", value: "https://me:pw@shop.example.test/" },
+      { name: "WITH_KEY", value: "https://api.example.test/?api_key=abc" },
+      { name: "TWO_WORDS", value: "http://a.test/ and more" },
+    ]);
+    expect(got).toEqual([
+      {
+        title: "The web address of this project's test site",
+        body: "http://127.0.0.1:5199/ (also kept as TEST_SITE_URL)",
+        url: "http://127.0.0.1:5199/",
+      },
+    ]);
   });
 });

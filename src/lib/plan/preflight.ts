@@ -622,6 +622,31 @@ export function projectAnswers(
   });
 }
 
+/**
+ * pm3 (seen live): the check may ask for a site address as a value to keep (TEST_SITE_URL) rather than as a question.
+ * A value that is only a plain web address (no login in it, no key-like query) is a fact about the project, so it is
+ * kept in This project memory too; anything else stays a secret only.
+ */
+export function siteAddressValues(
+  secrets: PreflightSecret[],
+  saved: { name: string; value: string }[],
+): { title: string; body: string; url: string }[] {
+  return saved.flatMap((s) => {
+    const v = s.value.trim();
+    if (!/^https?:\/\/[^\s"'<>]+$/i.test(v)) return [];
+    let u: URL;
+    try {
+      u = new URL(v);
+    } catch {
+      return [];
+    }
+    if (u.username || u.password) return [];
+    if ([...u.searchParams.keys()].some((k) => /key|token|secret|pass|auth|sig|code/i.test(k))) return [];
+    const what = secrets.find((x) => x.name === s.name)?.what.trim() || s.name;
+    return [{ title: clipReason(what, 200), body: `${v} (also kept as ${s.name})`, url: v }];
+  });
+}
+
 /** PM a: the first web address in an answer (a test site fills Preview address when it is empty). */
 export function firstUrl(text: string): string | null {
   const m = /https?:\/\/[^\s"'<>()[\]]+/.exec(text);

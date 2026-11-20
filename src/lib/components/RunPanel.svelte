@@ -59,6 +59,7 @@
     preflightPrompt,
     projectAnswers,
     readAnswers,
+    siteAddressValues,
     recommendedRisk,
     settleCheck,
     typedAnswers,
@@ -364,8 +365,16 @@
   /** The changed choice's step was already done: say it needs opening again to take the change. */
   let changeDone = $state("");
 
+  /** The plan the step range was typed for: another plan starts with no range (pm1: "6" from one plan ran nothing in
+   * a one-step plan). Reopening the same plan keeps it. */
+  let rangesFile = "";
   $effect(() => {
     if (setup) {
+      if (rangesFile !== file) {
+        rangesFile = file;
+        ranges = "";
+        onlyOne = false;
+      }
       fromLine = openSteps[0]?.line ?? -1;
       // Unattended work needs a mode that does not stop at every edit; the user can still choose Manual.
       mode = provider.modes.some((m) => m.id === "auto") ? "auto" : settings.agent(provider.id).mode;
@@ -615,10 +624,17 @@
    * PM a: the owner's answers about the whole project go into This project memory at once (they are theirs), so no
    * later plan or check asks again; a site named there fills Preview address when the project has none.
    */
-  async function keepProjectAnswers(c: Preflight, given: Record<number, string>, touched: Record<number, boolean>) {
+  async function keepProjectAnswers(
+    c: Preflight,
+    given: Record<number, string>,
+    touched: Record<number, boolean>,
+    saved: { name: string; value: string }[],
+  ) {
     const kept = projectAnswers(c, given, touched);
-    for (const a of kept) await api.memory.keep(project.id, a.title, a.body).catch(() => {});
-    const url = kept.map((a) => firstUrl(a.body)).find((u) => u);
+    // pm3: a site address the check asked for as a value to keep is a project fact too.
+    const sites = siteAddressValues(c.secrets, saved);
+    for (const a of [...kept, ...sites]) await api.memory.keep(project.id, a.title, a.body).catch(() => {});
+    const url = kept.map((a) => firstUrl(a.body)).find((u) => u) ?? sites[0]?.url;
     if (url && !project.settings.preview_url.trim())
       await projects.update(project.id, project.name, { ...project.settings, preview_url: url });
   }
@@ -640,7 +656,7 @@
       if (readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep).offered.length) return;
     }
     const read = readAnswers(c, secretValues, answers, answersTouched, readings, used, firstStep);
-    await keepProjectAnswers(c, read.answers, read.answersTouched);
+    await keepProjectAnswers(c, read.answers, read.answersTouched, read.save);
     for (const s of read.save) await api.agent.setSecret(project.id, s.name, s.value).catch(() => {});
     for (const x of read.copy) {
       const from = otherProjects.find((p) => p.name.toLowerCase() === x.project.toLowerCase());
@@ -1211,7 +1227,7 @@
                     title="Your answer goes into This project memory, so later plans and checks do not ask again"
                   >
                     · kept for the project</span
-                  >{/if}{#if q.because}<span class="dim"> {q.because}</span>{/if}</span
+                  >{/if}{#if q.because}<span class="dim">{" "}{q.because}</span>{/if}</span
               >
               <input
                 type="text"

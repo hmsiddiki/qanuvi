@@ -64,6 +64,58 @@ pub struct Policy {
     allow: Vec<String>,
     never: Vec<String>,
     unlisted: Unlisted,
+    vars: Vars,
+}
+
+/// The values the run's sessions get in their environment (the project's secrets): a fetch that names one
+/// (`curl "$TEST_SITE_URL"`) is judged by the address it holds. Never printed.
+#[derive(Clone, Default, PartialEq, Eq)]
+struct Vars(Vec<(String, String)>);
+
+impl std::fmt::Debug for Vars {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Vars({} values)", self.0.len())
+    }
+}
+
+/// The command with the environment values it names put in: `$NAME`, `${NAME}`, `%NAME%` and `$env:NAME`.
+fn expand_vars(command: &str, vars: &Vars) -> String {
+    if vars.0.is_empty() || !command.contains(['$', '%']) {
+        return command.to_string();
+    }
+    let mut names: Vec<&(String, String)> = vars.0.iter().collect();
+    // Longer names first, so $SITE_URL is not read as $SITE followed by "_URL".
+    names.sort_by_key(|(k, _)| std::cmp::Reverse(k.len()));
+    let mut out = command.to_string();
+    for (k, v) in names {
+        for form in [format!("${{{k}}}"), format!("%{k}%")] {
+            out = out.replace(&form, v);
+        }
+        let mut rest = out.as_str();
+        let mut done = String::with_capacity(out.len());
+        while let Some(at) = rest.find('$') {
+            done.push_str(&rest[..at]);
+            let after = &rest[at + 1..];
+            let skip = if after.len() >= 4 && after[..4].eq_ignore_ascii_case("env:") {
+                4
+            } else {
+                0
+            };
+            let name_end = skip + k.len();
+            let whole = after.get(skip..name_end) == Some(k.as_str())
+                && !after[name_end..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_');
+            if whole {
+                done.push_str(v);
+                rest = &after[name_end..];
+            } else {
+                done.push('$');
+                rest = after;
+            }
+        }
+        done.push_str(rest);
+        out = done;
+    }
+    out
 }
 
 /// Read-only shell commands any step may use.
@@ -222,7 +274,14 @@ impl Policy {
             allow,
             never,
             unlisted: Unlisted::Refuse,
+            vars: Vars::default(),
         }
+    }
+
+    /// The environment values the run's sessions get (the project's secrets), for judging fetches that name one.
+    pub fn with_vars(mut self, vars: Vec<(String, String)>) -> Self {
+        self.vars = Vars(vars);
+        self
     }
 
     /// The run's permission mode: in Auto the user gave the agent room, so only the never-lists hold.
@@ -269,7 +328,10 @@ impl Policy {
         if command.is_empty() {
             return Verdict::Unlisted;
         }
-        if crate::agent_tools::risky(command) {
+        // pm2: a fetch is judged by the address its variable holds; a value never makes a command allowed that is
+        // risky for another reason, since putting values in only replaces the names.
+        let expanded = expand_vars(command, &self.vars);
+        if crate::agent_tools::risky(command) && crate::agent_tools::risky(&expanded) {
             return Verdict::Never(
                 "it is on the never-list (deleting, pushing, downloading, publishing or system changes)".into(),
             );
@@ -287,10 +349,10 @@ impl Policy {
                 });
             }
         }
-        if parts
-            .iter()
-            .all(|p| self.allow.iter().any(|a| matches(a, p)) || crate::agent_tools::local_fetch(p))
-        {
+        if parts.iter().all(|p| {
+            self.allow.iter().any(|a| matches(a, p))
+                || crate::agent_tools::local_fetch(&expand_vars(p, &self.vars))
+        }) {
             Verdict::Allow
         } else {
             Verdict::Unlisted
@@ -661,6 +723,55 @@ mod tests {
             p("auto", false).command("git commit -m x"),
             Verdict::Never(_)
         ));
+    }
+
+    #[test]
+    fn a_fetch_naming_a_secret_is_judged_by_its_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None).with_vars(vec![
+            ("TEST_SITE_URL".into(), "http://127.0.0.1:5199/".into()),
+            ("TEST_SITE".into(), "https://example.com/".into()),
+        ]);
+        // pm2 (seen live): the agent used the secret's name, not its value.
+        for c in [
+            "curl -sS -i \"$TEST_SITE_URL\"",
+            "curl -s ${TEST_SITE_URL}about",
+            "curl.exe %TEST_SITE_URL%",
+            "Invoke-WebRequest -Uri $env:TEST_SITE_URL",
+            "curl -s \"$TEST_SITE_URL\" | head -1",
+        ] {
+            assert_eq!(p.command(c), Verdict::Allow, "{c}");
+        }
+        // A value outside this computer is still a download; a name that is no secret stays unknown.
+        for c in [
+            "curl -s \"$TEST_SITE\"",
+            "curl -s $OTHER_URL",
+            "curl -s \"$TEST_SITE_URL\"; rm -rf src",
+        ] {
+            assert!(matches!(p.command(c), Verdict::Never(_)), "{c}");
+        }
+        // Without the values the old answer holds.
+        let bare = Policy::new(&project(dir.path(), RunRules::default()), None);
+        assert!(matches!(
+            bare.command("curl \"$TEST_SITE_URL\""),
+            Verdict::Never(_)
+        ));
+        // The values never show in the policy's debug text.
+        assert!(!format!("{p:?}").contains("5199"));
+    }
+
+    #[test]
+    fn expand_vars_takes_whole_names_only() {
+        let v = Vars(vec![
+            ("SITE".into(), "a".into()),
+            ("SITE_URL".into(), "b".into()),
+        ]);
+        assert_eq!(
+            expand_vars("$SITE_URL $SITE ${SITE} %SITE_URL% $SITEX", &v),
+            "b a a b $SITEX"
+        );
+        assert_eq!(expand_vars("$ENV:SITE_URL", &v), "b");
+        assert_eq!(expand_vars("no vars here", &v), "no vars here");
     }
 
     #[test]

@@ -1191,7 +1191,40 @@ runs on or off; with it off nothing is sent anywhere.
       only for a yes to using the memory's answer (the step agent has the memory from the start now, so it should
       not block on it).
     - Checks: 574 Rust + 548 TS tests, clippy -D warnings, svelte-check, prettier clean.
-    PICKUP POINT (newest, 2026-11-21, after the PM + FC commit): next in order: (1) drive pa1 + PM + FC live on scratch
+    pa1 + PM + FC DRIVEN LIVE (2026-11-21 02:30-03:20, scratch E:/qc-scratch/y24-part2, plans PLAN-PART2 step 6,
+    PLAN-PM, PLAN-SITE, PLAN-PM2, PLAN-FC; a small local site on 127.0.0.1:5199; about $0.70 in all):
+    - PASS pa1: run rules changed (Branch no -> yes), one Check and start ran at once (step 6 done).
+    - PASS PM b + e: run end -> Inbox "6 things learned about the project" (test command, layout, broken checks...),
+      Keep all -> Memory > This project (6). Later runs added more suggestions (Memory badge).
+    - PASS PM a: check asked the test site as a project question ("kept for the project"); the answer filled Preview
+      address and the step agent used it "from the project memory".
+    - PASS PM c: PLAN-PM2's check asked nothing about the site (knew 127.0.0.1:5199), only "keep it running".
+    - PASS FC: light pass with no test command -> "Set the test command" pre-filled `npm test`, one click saved it;
+      PLAN-FC light pass Found (4) -> "Fix these" ran the full pass on them: "Fixed 1 of 4" with Fixed (README.md
+      link opens the file) / Not fixed (plan says keep tmp-try.js) / Needs you (untracked files).
+    - PASS Branch yes on a new plan: qanuvi/plan-pm made, report "The work is on qanuvi/plan-pm (0 commits)...".
+      By design: when qanuvi/plan-part2 exists from an earlier run and main is checked out, the run stays on main
+      (decision "no branch: ... switch to it to go on there"); the report says nothing about it (small, not fixed).
+    - pm1 FOUND + FIXED: the Steps range typed for one plan stayed when another plan was picked ("6" ran nothing in
+      a one-step plan, "No open steps to run."). RunPanel clears range + Only this one step when the plan file changes
+      (same plan keeps them); the empty run says "none of steps 6 is open in this plan". Driven live: field empty.
+    - pm2 FOUND + FIXED: `curl -sS -i "$TEST_SITE_URL"` (secret = http://127.0.0.1:5199/) refused as a download: the
+      hook saw only the name. Policy::with_vars(secrets::env) (both plan env policies); a fetch is judged with $NAME /
+      ${NAME} / %NAME% / $env:NAME put in; never-list still holds for the command as written; values never in Debug.
+      Unit-tested (run_rules a_fetch_naming_a_secret..., expand_vars...); not met again live (the memory gave the
+      address itself the second time).
+    - pm3 FOUND + FIXED: the check may ask a site address as a value to keep (TEST_SITE_URL, "Logins and keys"), so it
+      never reached memory or Preview address. siteAddressValues(): a plain http(s) address (no login, no key-like
+      query) saved there is also kept in This project memory and fills Preview address when empty. Unit-tested.
+    - pm4 FIXED: "kept for the projectNo preview..." missing space before the reason (explicit {" "}).
+    - Noise seen (not Qanuvi): step agents follow the owner's global agent rules file and report an extra word check.
+    - Checks: prettier, svelte-check 0, vitest 549, fmt, clippy -D warnings (app + server build), Rust lib 576 + 2
+      ignored.
+    PICKUP POINT (newest, 2026-11-21 03:25): pa1 + PM + FC DONE and driven live (above). Next: (1) LT Linux title bar
+    (agreed design below, drive on the laptop: drag, double-click maximise, edge resize, snapping, shadow, X11 +
+    Wayland); then 0.1.33 (ask the owner first). Test window, test masters and the local site are stopped; scratch
+    y24-part2 is on branch qanuvi/plan-fc (scratch only, fine to leave).
+    PICKUP POINT (before, 2026-11-21, after the PM + FC commit): next in order: (1) drive pa1 + PM + FC live on scratch
     E:/qc-scratch/y24-part2 (owner off mouse/keyboard; fg.ps1 first): check card with a project question (answer it,
     see Memory > This project + Preview address), a run end with FACTS.md (Inbox Keep all), a second check asking
     nothing the memory answers, a light pass then "Fix these", "Set the test command"; (2) LT Linux title bar;
