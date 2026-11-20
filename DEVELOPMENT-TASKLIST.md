@@ -965,7 +965,19 @@ runs on or off; with it off nothing is sent anywhere.
     a minimal Tauri 2.12 / wry 0.57 app on the laptop to see whether any custom-scheme page loads with WebKitGTK
     2.52 there, then wry's Linux custom-protocol path; test copies only (~/src/qanuvi on main again, test data in
     ~/.local/share/dev.qanuvi.desktop.source).
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 06:05): 0.1.28 PUBLISHED; owner: 24n first, then 24y
+    0.1.29 PUBLISHED (owner: "publish anyway", 2026-11-20 08:25; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+    24n (A3-A5, export, what changed, Show earlier, image clean-up) and the L1 Linux window WOFF fix. Stray old
+    session tree cleared first (one VS Code claude.exe from 05:04 + its 4 MCP node helpers; the installed app's agent
+    on qpfixbase left running). Verify before the build: prettier clean, svelte-check 0, vitest 538, fmt clean, clippy
+    clean, Rust lib 554 + 2 ignored. Built with CARGO_BUILD_JOBS=2 (free RAM 6 GB), signed, into
+    E:/qc-scratch/release-0.1.29/chan, then copied into qanuvi-updates/dev (old latest.json kept in
+    E:/Backups/qanuvi/channel-before-0.1.29). Checked: https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.29;
+    installer (8576484), Linux master (10463472) and Windows master (10378752) served 200 with matching sizes. Tagged
+    v0.1.29. Not done: the owner's install updating to 0.1.29 (its updater offers it), the VPS server build swap and
+    the Linux laptop .deb (both ask the owner).
+    PICKUP POINT (fresh conversation starts here, 2026-11-20 08:30): 0.1.29 PUBLISHED, nothing unpublished. Next: plan
+    24y in detail with the owner before building, then 24rl (urgent after 24y).
+    PICKUP POINT (before, 2026-11-20 06:05): 0.1.28 PUBLISHED; owner: 24n first, then 24y
     (decisions under 24y: git branch only when asked, few plain questions for normal users, detail for advanced
     ones). 24n DONE and driven live (see 24n "WHAT IS LEFT" notes; small drives left for the next test build).
     Unpublished since 0.1.28: A3-A5, export, what changed, Show earlier, image clean-up. Next: plan 24y in detail
