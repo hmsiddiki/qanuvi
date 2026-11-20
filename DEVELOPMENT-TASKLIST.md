@@ -947,7 +947,14 @@ runs on or off; with it off nothing is sent anywhere.
     https://qlopy.top/qanuvi-updates/dev/latest.json says 0.1.28; installer (8569135), Linux master (10458224) and
     Windows master (10373632) served 200 with matching sizes. Tagged v0.1.28. Not done: the owner's install updating
     to 0.1.28 (its updater offers it), the VPS server build swap to 0.1.28 (asks the owner).
-    L1 OPEN (2026-11-20): the Linux WINDOW shows a blank page. First time a Linux window was used (until now Linux ran
+    L1 FIXED 12f7305 + DRIVEN LIVE (2026-11-20): cause found: WebKitGTK 2.52.6 spins at 100% CPU before its first
+    frame when fontconfig offers it a WOFF font (Zorin ships fonts-opendyslexic in /usr/share/fonts/woff); a bare
+    tauri app and a bare WebKitGTK page (python) were blank too, and drew at once with WOFF fonts hidden (strace: the
+    web process spins right after reading the font caches). Fix (linux_fonts.rs): the window points FONTCONFIG_FILE
+    at its own file (system fonts.conf included, /*.woff and /*.woff2 rejected) unless the user set one; This PC's
+    master and the local link get the user's setting back. A .deb from main (still labelled 0.1.28) built on the
+    laptop, its window drew the full screen there (WebKit at 8% CPU). History of the search:
+    L1 (2026-11-20): the Linux WINDOW shows a blank page. First time a Linux window was used (until now Linux ran
     only masters, the window was on Windows). 0.1.28 built as a .deb on the Linux laptop (Zorin 18.1, WebKitGTK
     2.52.6, X11, Intel UHD 620; ~/Downloads/Qanuvi_0.1.28_amd64.deb, installed by the owner): the window opens, the
     tray and This PC's master start, but the page stays empty and no data base is made. Found: WebKit's remote
