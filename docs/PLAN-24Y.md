@@ -1,6 +1,7 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: PROPOSAL, waiting for the owner's yes. Nothing here is built yet.
+Status: AGREED by the owner (2026-11-20, "ok do whats best"). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line
 
@@ -24,7 +25,7 @@ The card before the run (normal user):
 > **Before this plan runs alone**
 > While it works, Qanuvi may: change files in this project, run its tests and builds.
 > It never: publishes, deletes outside the project, uses your passwords, or changes your main branch.
-> Keep the work on its own git branch? **Yes (recommended)** / No, Qanuvi keeps its own copies
+> Keep the work on its own git branch? Yes / **No, Qanuvi keeps its own copies** (pre-chosen)
 > [Start] [Details]
 
 ## What is built (in this order)
@@ -63,12 +64,16 @@ check comes first (builds wait when free memory is low). Qanuvi's own repo gets 
 **Y9. The benchmark.** A plan of R1 to R5's size runs on a scratch copy. Pass: it ends alone, and the report is
 right.
 
-## Two questions for the owner (with my recommendation)
+## Owner decisions (2026-11-20)
 
-1. **Where the run rules live.** In Qanuvi, per project (recommended: nothing extra in the user's files; the plan
-   file can still add a "Run rules" section that wins for that plan). Or only in the plan file.
-2. **The default card.** Are the defaults above right for normal users (may change files and run tests and builds;
-   never publish, delete outside, use passwords, touch main; branch recommended)?
+1. **Where the run rules live:** in Qanuvi, per project (nothing extra in the user's files). A plan file may add a
+   "Run rules" section that wins for that plan only.
+2. **Where the card shows:** at the top of the Run panel's existing "Before the run" box (no new screen). In full
+   only on the first run in a project; after that one line, "Run rules: as before · Change". Start run and Accept all
+   recommended fill it in too.
+3. **The branch question:** pre-chosen answer is "No, Qanuvi keeps its own copies" (git is the user's; undo still
+   works through snapshots). Yes is kept per project once chosen. A project without git never sees the line.
+4. The other defaults on the card stand as written above.
 
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
