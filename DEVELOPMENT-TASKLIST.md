@@ -1084,7 +1084,24 @@ runs on or off; with it off nothing is sent anywhere.
     D-Bus can wait). Not yet known whether the tray's Quit click even reaches the master on Linux: check on the laptop
     (it is behind the owner's home router, which lets no connection in: owner to set it to access point mode or forward
     a port). svelte-check 0, vitest 543, clippy clean.
-    PICKUP POINT (fresh conversation starts here, 2026-11-20 22:40): L2 BUILT, unpublished, not driven live (laptop
+    L2 checked on the Linux laptop: both helper tests pass there (the first run found Exec= unquoted, fixed ce354af);
+    the .deb's entry is Qanuvi.desktop with StartupWMClass=qanuvi, the same as the helper writes. Not driven: a whole
+    update from a test channel (owner: "publish anyway").
+    c2 on the laptop: with nothing running, close (WM_DELETE_WINDOW) and the tray's Quit (dbusmenu Event) both work on
+    0.1.28 and on the bb981cd test build; Wi-Fi off (owner) works too; the desktop notice takes 60 ms. Cause not
+    found: it failed at home (laptop moved networks while open, links to the office hang silently). ~/qanuvi-stuck.sh
+    on the laptop saves what each Qanuvi process waits on to ~/qanuvi-stuck.txt, for the next time.
+    0.1.32 PUBLISHED (owner: "publish anyway", 2026-11-21 00:05; release rule skipped): L2 + c2. First release with the
+    Linux app (linux-x86_64, Qanuvi_0.1.32_linux.tar.gz 13261532, built on the laptop in ~/qanuvi-release, signed
+    here). Built into E:/qc-scratch/release-0.1.32/chan, copied to qanuvi-updates/dev (old latest.json in
+    E:/Backups/qanuvi/channel-before-0.1.32). Checked online: all five files 200, sizes match. Tagged v0.1.32.
+    Note: a Linux install older than 0.1.32 cannot put the whole app in by itself (that code is new), so the laptop's
+    0.1.28 .deb needs one install by hand into ~/.local (ask the owner); from then on it is one click.
+    Mac: owner asked about a 2014 Mac mini (Intel, Monterey) for testing; advised against buying it (CI's macos-latest
+    is Apple silicon and free; it could build the Mac app + master for the channel, signed here). Proposal open.
+    PICKUP POINT (fresh conversation starts here, 2026-11-21 00:10): 0.1.32 PUBLISHED, nothing unpublished. Next: the
+    laptop's first move to ~/.local (ask), Mac builds on the channel through CI (proposal), 24y part 2, 24rl.
+    PICKUP POINT (before, 2026-11-20 22:40): L2 BUILT, unpublished, not driven live (laptop
     ssh down). Next: laptop drive of L2, then publish 0.1.32 (ask), then 24y part 2 (Y3 + Y4 + Y5), then 24rl.
     PICKUP POINT (before, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
     (Inbox Try again on an ended run) is a proposal. Next: L2 Linux desktop updates (owner to confirm the ~/.local
