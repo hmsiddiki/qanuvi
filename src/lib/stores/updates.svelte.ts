@@ -34,13 +34,19 @@ class UpdatesStore {
         // i1: unsaved text is kept as drafts on its machine before anything else.
         await windowGoing();
         const last = (await getAllWebviewWindows().catch(() => [])).length <= 1;
-        const work = await thisPcWork().catch(() => null);
+        // A master that does not answer never keeps the window open (Linux: close and tray Quit did nothing).
+        const work = await Promise.race([
+          thisPcWork().catch(() => null),
+          new Promise<null>((done) => setTimeout(() => done(null), 3000)),
+        ]);
         const what = work ? workText(work) : null;
         if (last && work && what && !(await invoke<boolean>("app_quitting").catch(() => false))) {
-          await invoke("notify_notice", {
+          // Sent before the window goes, but never waited for longer than 2 s.
+          const shown = invoke("notify_notice", {
             title: "Qanuvi keeps working",
             text: `${what} ${keepVerb(work)} going on this computer. Quit Qanuvi from the tray icon to stop ${itOrThem(work)}.`,
           }).catch(() => {});
+          await Promise.race([shown, new Promise((done) => setTimeout(done, 2000))]);
         }
       })
       .catch(() => {});

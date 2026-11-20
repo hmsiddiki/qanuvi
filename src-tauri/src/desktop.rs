@@ -606,10 +606,14 @@ fn notify_test(app: tauri::AppHandle) -> Res<()> {
     crate::desktop_notify::test(&app)
 }
 
-/// The window's own notice (M5a: the last window closed while This PC's work goes on, said once it is gone).
+/// The window's own notice (M5a: the last window closed while This PC's work goes on, said once it is gone). Off the
+/// window's main thread: on Linux the notification goes over D-Bus, which can wait a long time, and the closing
+/// window waits for it.
 #[tauri::command]
-fn notify_notice(app: tauri::AppHandle, title: String, text: String) -> Res<()> {
-    crate::desktop_notify::notice(&app, &title, &text)
+async fn notify_notice(app: tauri::AppHandle, title: String, text: String) -> Res<()> {
+    tauri::async_runtime::spawn_blocking(move || crate::desktop_notify::notice(&app, &title, &text))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// s4: the tray's Quit closes the windows; then This PC's work stops too, so the last window says nothing goes on.

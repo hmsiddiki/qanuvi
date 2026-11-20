@@ -1078,6 +1078,12 @@ runs on or off; with it off nothing is sent anywhere.
     ping): check the .deb's own desktop file name, icon and WM class match, build a test channel with the test key,
     update an installed copy from it into a test home, then publish (ask) and see the laptop's real install update.
     Note: the build machine's glibc sets the oldest Linux it runs on (Zorin 18 = Ubuntu 24.04).
+    c2 (owner, 2026-11-20: on Linux the window's close button and the tray's Quit both did nothing) FIXED, not driven
+    live: the close handler (updates.svelte.ts) asked This PC's master for its work with no time limit; now 3 s at
+    most, the "keeps working" notice 2 s at most, and notify_notice runs off the main thread (async + spawn_blocking;
+    D-Bus can wait). Not yet known whether the tray's Quit click even reaches the master on Linux: check on the laptop
+    (it is behind the owner's home router, which lets no connection in: owner to set it to access point mode or forward
+    a port). svelte-check 0, vitest 543, clippy clean.
     PICKUP POINT (fresh conversation starts here, 2026-11-20 22:40): L2 BUILT, unpublished, not driven live (laptop
     ssh down). Next: laptop drive of L2, then publish 0.1.32 (ask), then 24y part 2 (Y3 + Y4 + Y5), then 24rl.
     PICKUP POINT (before, 2026-11-20 19:30): 0.1.31 PUBLISHED, nothing unpublished. r5
