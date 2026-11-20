@@ -83,3 +83,21 @@ export async function pastedAttachments(files: File[], already = 0): Promise<Pas
   }
   return { attachments, errors, handled: files.length > 0 };
 }
+
+/**
+ * lx1: a paste that carried neither a file nor text. WebKitGTK (Linux) hands the message box nothing for a copied
+ * screen capture, so the picture is then read from the system clipboard itself.
+ */
+export function pasteMayHoldPicture(data: DataTransfer | null): boolean {
+  if (!data) return true;
+  if (clipboardFiles(data).length) return false;
+  return !data.getData("text/plain");
+}
+
+/** The clipboard's picture (PNG in base64) as a file to attach. */
+export function pngFile(base64Png: string): File {
+  const bin = atob(base64Png);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], "image.png", { type: "image/png" });
+}

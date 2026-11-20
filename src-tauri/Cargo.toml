@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [features]
 # The desktop app with its window. Without it, only the master without a window is built (for a Linux server).
 default = ["desktop"]
-desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:tauri-plugin-dialog", "dep:keyring", "dep:tauri-plugin-process", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-deep-link", "dep:windows", "dep:notify-rust", "dep:tray-icon", "dep:tao", "dep:png"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:tauri-plugin-dialog", "dep:keyring", "dep:tauri-plugin-process", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-deep-link", "dep:windows", "dep:notify-rust", "dep:tray-icon", "dep:tao", "dep:png", "dep:arboard"]
 
 [[bin]]
 name = "qanuvi"
@@ -74,6 +74,8 @@ tauri-plugin-deep-link = { version = "2", optional = true }
 tray-icon = { version = "0.25", optional = true }
 tao = { version = "0.37", optional = true }
 png = { version = "0.18", optional = true }
+# lx1: a copied screen capture the web view does not hand over on a paste (WebKitGTK on Linux).
+arboard = { version = "3", optional = true }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

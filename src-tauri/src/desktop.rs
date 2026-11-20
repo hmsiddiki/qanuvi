@@ -240,6 +240,14 @@ fn dap_stop_window(window: tauri::Window, state: State<AppState>) {
     state.debuggers.stop_owner(window.label());
 }
 
+/// lx1: the clipboard's picture as PNG (base64) for a chat paste that carried no file (WebKitGTK on Linux).
+#[tauri::command]
+async fn clipboard_image() -> Res<Option<String>> {
+    tauri::async_runtime::spawn_blocking(crate::clipboard::image_png)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // The preview pane's inspector ----------------------------------------------------------------------------------
 
 #[tauri::command]
@@ -955,6 +963,7 @@ pub fn run() {
             app_info,
             screen_usage,
             inspector_show,
+            clipboard_image,
             inspector_scroll,
             inspector_pick,
             inspector_page_text,

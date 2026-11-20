@@ -62,6 +62,8 @@ pub mod terminal;
 pub mod usage;
 
 #[cfg(feature = "desktop")]
+mod clipboard;
+#[cfg(feature = "desktop")]
 mod desktop;
 #[cfg(feature = "desktop")]
 mod desktop_notify;

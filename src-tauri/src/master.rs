@@ -4381,6 +4381,7 @@ mod tests {
         "inspector_pick",
         "inspector_page_text",
         "inspector_close",
+        "clipboard_image",
         // The app's own lifecycle (M4c): it stops This PC's master before an update installs.
     ];
 

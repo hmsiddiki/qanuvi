@@ -529,6 +529,8 @@ export const api = {
   attachments: {
     file: (path: string) => invoke<Attachment>("attachment_file", { path }),
     page: (url: string) => invoke<Attachment>("attachment_page", { url }),
+    /** lx1: the system clipboard's picture (PNG, base64), for a paste the web view handed over without it. */
+    clipboardImage: () => invoke<string | null>("clipboard_image"),
   },
   /** A conversation's Markdown export, saved on this computer (24n). */
   exportSave: (path: string, text: string) => invoke<void>("export_save", { path, text }),

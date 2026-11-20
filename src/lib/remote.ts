@@ -113,6 +113,7 @@ const WINDOW_ONLY = new Set([
   "notify_notice",
   "app_quitting",
   "inspector_close",
+  "clipboard_image",
   "inspector_page_text",
   "inspector_pick",
   "inspector_scroll",

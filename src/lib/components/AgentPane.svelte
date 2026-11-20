@@ -1,7 +1,7 @@
 <script lang="ts">
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import AttachMenu from "./AttachMenu.svelte";
-  import { clipboardFiles, pastedAttachments } from "$lib/agent/paste";
+  import { clipboardFiles, pasteMayHoldPicture, pastedAttachments, pngFile } from "$lib/agent/paste";
   import ChatImage from "./ChatImage.svelte";
   import { overruleIn } from "$lib/core/decider";
   import { reviewFreeTurn } from "$lib/stores/chatReview";
@@ -519,8 +519,14 @@
   /** Ctrl+V with an image (a screenshot) or copied files: they become attachments; plain text pastes as usual. */
   async function paste(event: ClipboardEvent) {
     const files = clipboardFiles(event.clipboardData);
-    if (!files.length) return;
-    event.preventDefault();
+    if (files.length) event.preventDefault();
+    else {
+      // lx1: nothing came with the paste (a screen capture on Linux): the picture is read from the clipboard itself.
+      if (!pasteMayHoldPicture(event.clipboardData)) return;
+      const png = await api.attachments.clipboardImage().catch(() => null);
+      if (!png) return;
+      files.push(pngFile(png));
+    }
     const images = agent.attachments.filter((a) => a.kind === "image").length;
     const got = await pastedAttachments(files, images);
     if (got.attachments.length) agent.attachments = [...agent.attachments, ...got.attachments];

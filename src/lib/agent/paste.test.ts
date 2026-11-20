@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pastedAttachments, pastedName } from "./paste";
+import { pasteMayHoldPicture, pastedAttachments, pastedName, pngFile } from "./paste";
 
 const png = (name = "image.png", size = 8) => new File([new Uint8Array(size).fill(7)], name, { type: "image/png" });
 
@@ -33,5 +33,30 @@ describe("pasted files", () => {
 
   it("leaves a text-only paste to the box", async () => {
     expect((await pastedAttachments([])).handled).toBe(false);
+  });
+});
+
+describe("a paste that carried no file (lx1, Linux)", () => {
+  /** Enough of a DataTransfer for the paste checks. */
+  const transfer = (text: string, files: File[] = []) =>
+    ({
+      items: files.map((f) => ({ kind: "file", getAsFile: () => f })),
+      files,
+      getData: (t: string) => (t === "text/plain" ? text : ""),
+    }) as unknown as DataTransfer;
+
+  it("reads the clipboard's picture only when neither a file nor text came", () => {
+    expect(pasteMayHoldPicture(transfer(""))).toBe(true);
+    expect(pasteMayHoldPicture(null)).toBe(true);
+    expect(pasteMayHoldPicture(transfer("some text"))).toBe(false);
+    expect(pasteMayHoldPicture(transfer("", [png()]))).toBe(false);
+  });
+
+  it("the picture read becomes a pasted screenshot like any other", async () => {
+    const file = pngFile(btoa("\x89PNG-bytes"));
+    expect(file.type).toBe("image/png");
+    const r = await pastedAttachments([file], 0);
+    expect(r.attachments[0]).toMatchObject({ name: "Pasted image 1.png", kind: "image", mediaType: "image/png" });
+    expect(atob(r.attachments[0].data)).toBe("\x89PNG-bytes");
   });
 });

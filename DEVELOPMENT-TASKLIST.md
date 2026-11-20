@@ -1273,6 +1273,8 @@ runs on or off; with it off nothing is sent anywhere.
       qanuvi-master.prev), pkill -x; both links (test window + owner's app) came back by themselves. The VPS has NO
       Chrome/Edge/Chromium/Brave, so an agent there cannot open a test browser: live picture not testable there
       until one is installed (asked the owner: apt install chromium on the VPS?).
+      OWNER: leave the VPS without a browser for now (memory); if wanted later, Chrome's headless shell via
+      QANUVI_BROWSER is the lighter choice, measure its memory then.
     - Laptop: ~/src/qanuvi pulled to 981531c (its uncommitted master.rs change was the L2 Exec= fix already on main;
       kept as a git stash "L2 hand fix, same as main"), debug server build, wrapper ~/src/lm/qm with throwaway data
       ~/src/lm/data, page ~/src/lm/site/index.html. Test data server "Laptop (lm test)" (SSH, laptop_key). The owner's
@@ -1284,8 +1286,12 @@ runs on or off; with it off nothing is sent anywhere.
       picture, about 100-200 KB); the 5/s cap with a page changing faster than 5/s (unit-tested only).
     - Watch: one headless browser from the first `cargo test --lib live::` run (04:25) outlived the test process (its
       profile never removed, so its Drop never ran and the job did not end it); reruns leave nothing. Stopped by hand.
-    lx1 OWNER FOUND (2026-11-21, not looked into yet): on Linux a screen capture does not get pasted into the chat
-      (pasting an image from the clipboard into the chat box does nothing there). To check on the laptop after LM4.
+    lx1 OWNER FOUND (2026-11-21): on Linux a screen capture does not get pasted into the chat. BUILT (not yet tried by
+      the owner): the chat paste only used what the web view handed over; WebKitGTK gives no file for a copied picture.
+      When a paste carries neither a file nor text, the window now reads the system clipboard's picture itself
+      (clipboard.rs with arboard 3.7, desktop only, RGBA -> PNG; window-only command clipboard_image;
+      paste.ts pasteMayHoldPicture + pngFile). Tests: PNG round trip, paste checks; an ignored test puts a picture on
+      the real clipboard (run by hand: it replaces what the clipboard holds). Windows unchanged (WebView2 gives files).
     PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
     server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the
     laptop; LT Linux title bar; then 0.1.33 (ask). Test window, laptop test master stopped.
