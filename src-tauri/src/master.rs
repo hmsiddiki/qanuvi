@@ -1776,8 +1776,7 @@ icons=@HOME@/.local/share/icons/hicolor/128x128/apps
 mkdir -p @HOME@/.local/bin "$apps" "$icons"
 ln -sfn "$lib/qanuvi" @HOME@/.local/bin/qanuvi
 [ -f "$lib/qanuvi.png" ] && cp -f "$lib/qanuvi.png" "$icons/qanuvi.png"
-printf '%s
-' '[Desktop Entry]' 'Type=Application' 'Name=Qanuvi' 'Comment=Qanuvi' "Exec="$lib/qanuvi" %u" 'Icon=qanuvi' 'Terminal=false' 'Categories=Development;' 'MimeType=x-scheme-handler/qanuvi;' 'StartupWMClass=qanuvi' > "$apps/Qanuvi.desktop"
+printf '%s\n' '[Desktop Entry]' 'Type=Application' 'Name=Qanuvi' 'Comment=Qanuvi' "Exec=\"$lib/qanuvi\" %u" 'Icon=qanuvi' 'Terminal=false' 'Categories=Development;' 'MimeType=x-scheme-handler/qanuvi;' 'StartupWMClass=qanuvi' > "$apps/Qanuvi.desktop"
 update-desktop-database "$apps" >/dev/null 2>&1
 xdg-mime default Qanuvi.desktop x-scheme-handler/qanuvi >/dev/null 2>&1
 "$lib/qanuvi" @FLAG@ </dev/null >/dev/null 2>&1 &
