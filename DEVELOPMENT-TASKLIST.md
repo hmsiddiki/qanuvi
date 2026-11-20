@@ -1166,6 +1166,19 @@ runs on or off; with it off nothing is sent anywhere.
     - pa4 FIXED: step logs wrote UTC times ("Attempt ... 19:12" for 01:12 here); attempt_entry now uses the
       computer's time zone (attempt_entry_in(UTC) for the unit test and compare cases).
     - Not a bug: step 3 held on step 2 in run 2 was the decider's own reasoned choice (publishes src, step 2 unchecked).
+    PICKUP POINT (fresh conversation starts here, 2026-11-21 01:45, after 63166bc pushed): part 2 + check memory
+    DRIVEN LIVE, pa1/pa2/pa4 fixed and built into target/release (pa1 NOT driven live yet: owner was on this PC).
+    Next, in order: (1) drive pa1 on scratch E:/qc-scratch/y24-part2 (new step 6 "Add neg" is there: Run, Change,
+    flip Branch, Check and start ONCE -> the check card must show at once); (2) PM a-e below + FC; (3) LT. Then
+    0.1.33 (ask). Drive tools kept in E:/qc-scratch/drive-tools (ui.ps1, go.ps1, wheel.ps1 -X -Y -N, dclick.ps1 +
+    pick2.ps1 for the folder picker: click the tree item then Select Folder, fg.ps1, mcall.js, procs.ps1); before
+    clicking, fg.ps1 must show the test window can come to front (owner working = stop). Test window + test masters
+    stopped. Owner's qpfixbase leftover `php -S 127.0.0.1:8765` (PID 21528) offered to stop, waiting for the yes.
+    FC (owner, finishing pass card): the full pass DID fix both findings in qpfixbase (tracking.js search_term top
+    level, README feed wording, 01:00), but the card lists them only as "Found", so it looks like nothing was done.
+    Proposed (owner to agree with PM): each finding Fixed (file + change link) / Not fixed (why) / Needs you,
+    heading "Fixed N of M"; light pass offers "Fix these"; "No test command" becomes "Set the test command",
+    pre-filled from what the run used (ties to PM a).
     AGREED ORDER (owner, 2026-11-21 01:10): (1) drive part 2 + check memory (scratch E:/qc-scratch/y24-part2),
     (2) PM project memory a-e, (3) LT Linux title bar. Then 0.1.33 (ask).
     PM (owner found on qpfixbase QC-ADVANCE-TRACKING step 98z: the run asked which site to test on although the
