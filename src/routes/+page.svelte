@@ -380,7 +380,8 @@
 <svelte:window onkeydown={keydown} />
 
 {#if ready}
-  <div class="shell">
+  <!-- LT: a Linux window without the system's bar has no frame of its own: a thin edge marks it. -->
+  <div class="shell" class:edged={platform.os === "linux" && platform.drawsWindowControls}>
     <TitleBar {title} />
 
     <div class="body">
@@ -455,6 +456,15 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+  }
+
+  .shell.edged::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    border: 1px solid var(--qx-border);
+    pointer-events: none;
+    z-index: 10000;
   }
 
   .body {

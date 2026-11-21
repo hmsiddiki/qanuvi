@@ -81,7 +81,7 @@
       icon: LayoutPanelLeft,
       words: "layouts presets vs code coding side screen review sidebar conversation left right save",
     },
-    { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale" },
+    { id: "appearance", label: "Appearance", icon: Palette, words: "font size editor interface zoom scale title bar window buttons" },
     {
       id: "languages",
       label: "Languages",

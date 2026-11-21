@@ -12,7 +12,7 @@
         "center": true,
         "backgroundColor": "#141416",
         "theme": "Dark",
-        "decorations": true
+        "decorations": false
       }
     ]
   }

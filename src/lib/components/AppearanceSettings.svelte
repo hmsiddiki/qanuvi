@@ -1,6 +1,7 @@
 <script lang="ts">
   /** Settings → Appearance (15h): the editor's font size, the size of the whole interface, the minimap (15i). */
   import { settings } from "$lib/stores/settings.svelte";
+  import { platform } from "$lib/platform.svelte";
 
   let a = $derived(settings.value.appearance);
   const set = (patch: Partial<typeof a>) => settings.set("appearance", { ...a, ...patch });
@@ -41,6 +42,22 @@
       ></span
     >
   </label>
+  {#if platform.os === "linux"}
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={platform.systemTitleBar}
+        onchange={(e) => platform.setSystemTitleBar(e.currentTarget.checked)}
+      />
+      <span
+        ><strong>Use the system title bar</strong>
+        <span class="muted"
+          >The desktop's own bar and window buttons above Qanuvi's bar. Off: Qanuvi's bar is the title bar, with its own
+          window buttons. This window only.</span
+        ></span
+      >
+    </label>
+  {/if}
   <button type="button" class="link" onclick={() => set({ editorFontSize: 13, uiScale: 100 })}
     >Back to the usual sizes</button
   >

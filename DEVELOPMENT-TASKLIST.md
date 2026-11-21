@@ -1373,6 +1373,13 @@ runs on or off; with it off nothing is sent anywhere.
     decorations true; platform.drawsWindowControls Windows only). Agreed: Linux like Windows (no system bar, Qanuvi's
     window buttons), a "Use the system title bar" setting (off by default), drive on the laptop (drag, double-click
     maximise, edge resize, snapping, shadow, X11 + Wayland).
+    LT BUILT (2026-11-21 06:25): Linux windows open without the system's bar (tauri.linux.conf.json decorations
+      false); Qanuvi's bar is the title bar with its own window buttons (platform.drawsWindowControls: Windows, and
+      Linux unless chosen); Settings > Appearance "Use the system title bar" (Linux only, off by default, kept with
+      the window in localStorage, set at once with setDecorations; capability allow-set-decorations); a thin edge
+      marks the window (no frame/shadow without the system's bar). Edge resize comes from tao (undecorated windows
+      resize at their edges on Linux). Found on the way: project and machine windows were already opened without the
+      system's bar on every OS, so on Linux they had no window buttons at all; now they get Qanuvi's.
     PICKUP POINT (before, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
     nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
     report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on
