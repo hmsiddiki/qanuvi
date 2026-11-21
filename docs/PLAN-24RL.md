@@ -1,6 +1,6 @@
 # 24rl: a relay for 50-100k devices at once (proposal, 2026-11-21)
 
-Status: PART 1 DONE (R1-R5, deployed on basevm376, in 0.1.35/0.1.36). PART 2a DONE (in 0.1.37, driven on both machines). PART 3 PROPOSED (below, waiting for the owner). Earlier: 2a AGREED and BUILT
+Status: PART 1 DONE (R1-R5, deployed on basevm376, in 0.1.35/0.1.36). PART 2a DONE (in 0.1.37, driven on both machines). PART 3 DECIDED (below), being built. Earlier: 2a AGREED and BUILT
 (not driven live yet). Parts 2, 3 and the relay kit are outlines; each gets its own detailed write-up before it is built.
 Order: 2a, then 3 (free relays + fair use), then the kit (alongside or after 3); part 2 (direct links) goes with sl1.
 
@@ -60,6 +60,36 @@ what makes sl1 (slow switch over the relay) mostly go away for home use.
 after the user says yes. A daily fallback cap per user on relayed traffic (idle links are not counted). The relay
 program for volunteers is the same binary as ours (part 1 makes it run with its own TLS and no nginx). Adds "A free
 relay" to part 2a's choice: a list fetched from qanuvi.com, one used only after the user picks it and says yes.
+
+## Part 3 in detail (2026-11-22; owner: "check what you need, then go forward", defaults below taken)
+
+Why: Qanuvi is free, so one relay paid by the owner must not carry everybody's traffic for ever. Two things help:
+other people's relays (volunteers), and a fair-use cap so a few heavy users cannot fill Qanuvi's relay. Messages stay
+sealed end to end on every relay; what a relay does see is who connects, when, from which address and how much.
+That is why a volunteer relay is only ever used after the user says yes.
+
+- F1. **The free relay list.** relays.json on the update channel beside latest.json, with relays.json.sig signed
+  by the update key (the same minisign check as updates), so nobody can slip a relay into it. Each entry: address,
+  name, who runs it, region, note. The owner adds relays by hand after checking them. The app fetches it when the
+  relay choice is opened (and keeps the last good copy). Shipped empty until the first volunteer.
+- F2. **"A free relay" in the relay choice** (third option beside Qanuvi relay / Your own relay). Lists the relays
+  from F1, each tested on the spot (connects, ping time), best first. Picking one shows what that relay can and
+  cannot see and asks "Use <name>'s relay?"; only a yes switches. Pairing works as for your own relay (A3).
+- F3. **Fair use on a relay.** The relay counts relayed bytes per computer (master id) per UTC day, both ways;
+  pings and pairing do not count. Over the cap the computer's links are slowed, not cut, until midnight UTC.
+  Relay options --cap-per-day <MB> and --slow-to <KB/s>; none given = no cap (volunteers choose). Qanuvi's relay:
+  2 GB a day, 256 KB/s after. The relay tells the computer its use (a Usage message), near and over the cap.
+- F4. **What the user sees.** Remote access: "Today through the relay: 120 MB of 2 GB". Over the cap: "Slowed
+  until <time> (your daily share of this relay is used)", with "a free relay" and "your own relay" offered.
+  Nothing switches by itself.
+- F5. **When the relay is down.** After a minute without a link, Remote access says so and offers the free relays
+  (same yes as F2). No automatic switch (paired devices would need pairing again on the new relay).
+- Validate: list signature (good, changed, missing); the free relay choice against local relays; the cap counted
+  and slowed in a relay test (small cap); the use and over lines in the window; the down offer.
+
+Decisions taken (owner said go forward): cap 2 GB/day per computer, slowed to 256 KB/s; slow down, not stop; the
+list on the update channel, edited by the owner by hand; built and tested with local relays and shipped with an
+empty list; relay kit after. Deploying the cap on basevm376 and publishing still ask first.
 
 ## Part 1 in detail
 
