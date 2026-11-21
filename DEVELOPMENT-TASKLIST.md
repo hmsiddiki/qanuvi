@@ -1543,6 +1543,17 @@ runs on or off; with it off nothing is sent anywhere.
     PICKUP POINT (newest, fresh conversation starts here): drive 2a live on a scratch setup (laptop turn on with nothing
       typed; pair with only the code; custom relay shown next to the code and paired;
       older records with an address keep it), then 0.1.37 (ask). Then part 3, relay kit, sl1.
+    2a DRIVEN ON THE LAPTOP (2026-11-21, headless: scratch masters A/B/C under ~/src/r2a through --stdio, cleaned up):
+      A turned on with nothing typed -> wss://relay.qanuvi.com connected (road 443 on a first link); B paired with
+      only the code (no --relay) and connected through the relay; A on its own relay (local qanuvi-relay
+      ws://127.0.0.1:47390): C without --relay is told no computer waits for that code, C with --relay pairs and
+      connects; A's relay.json kept both devices. Back to an empty box: Qanuvi's relay again, new id.
+      Window parts checked in code, not driven: the code card's "on your own relay" line shows only for a custom
+      relay; server records keep the relay written out by the pairing (nothing rewrites them).
+      ra1 FIXED (found in the drive): after Turn off or a relay change, "connected" kept the old link's true until a
+        new welcome (turned off: for ever), so Pair was offered on a gone link. configure() now clears it; test
+        connected_waits_for_the_new_link_after_a_change fails without it. Relay tests 11/11, clippy clean (laptop).
+      Next: 0.1.37 (ask). Then part 3, relay kit, sl1.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status

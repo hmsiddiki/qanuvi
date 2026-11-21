@@ -828,6 +828,9 @@ impl RelayMaster {
             i.config.name = clean_name(name);
             i.config.enabled = enabled;
             i.generation += 1;
+            // ra1: the old link gives way now; "connected" waits for the new one's welcome (turned off: never).
+            i.connected = false;
+            i.error.clear();
             let c = i.config.clone();
             drop(i);
             self.save(&c);
@@ -1304,6 +1307,38 @@ mod tests {
         rm.remove_device(&paired.pairing);
         assert!(open_session(&paired).is_err());
         rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// ra1: turning off or changing the relay is not "connected" until a new link is welcomed (before, the old
+    /// link's flag stayed, so Pair was offered on a link that was gone, and a turned-off computer read connected).
+    #[test]
+    fn connected_waits_for_the_new_link_after_a_change() {
+        let relay = crate::relay_server::start_local().unwrap();
+        let relay2 = crate::relay_server::start_local().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        let wait_connected = |rm: &Arc<RelayMaster>| {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !rm.status().connected {
+                assert!(Instant::now() < deadline, "not connected: {:?}", rm.status());
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        };
+        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        wait_connected(&rm);
+        rm.configure(&relay, "Home PC", false, master.clone()).unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(!rm.status().connected, "turned off reads connected");
+        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        wait_connected(&rm);
+        rm.configure(&relay2, "Home PC", true, master.clone()).unwrap();
+        assert!(
+            !rm.status().connected,
+            "a changed relay read connected before its welcome"
+        );
+        wait_connected(&rm);
+        rm.configure(&relay2, "Home PC", false, master).unwrap();
     }
 
     /// rl1: a handler whose link died quietly (it reads nothing, so it answers no ping) is dropped by the relay, and
