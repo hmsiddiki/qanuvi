@@ -1362,6 +1362,10 @@ runs on or off; with it off nothing is sent anywhere.
       6 MB written and read back through a local relay, link and session stay (fails without parts: "The
       connection to the relay ended."); parts sealed and joined; Msg JSON both ways. Rust lib 590, clippy clean.
       Needs: relay deploy (the relay passes "more" on; an old relay drops it) + 0.1.34 on both machines.
+    rl4 RELAY DEPLOYED (owner "do both", 2026-11-21 10:15 server time): basevm376 runs 64bc403 (748 KB), .prev =
+      rl3 build; active, both links back. 0.1.34 HELD: the release rule stopped it (Claude Code 2.1.330 out, here
+      2.1.329); updating Claude Code from the session was refused, so the owner runs "claude update" or says
+      "publish anyway". Run script ready: E:/qc-scratch/release-0.1.34/run.sh (add QANUVI_RELEASE_ANYWAY=1 for anyway).
     PICKUP POINT (newest, 2026-11-21 rl4 fixed): rl4 + r5 unpublished. Next: relay deploy (ask), 0.1.34 (ask),
       drive r5 + a long chat from the laptop live, then plan 24rl part 1 with the owner (questions asked).
     PICKUP POINT (before, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
