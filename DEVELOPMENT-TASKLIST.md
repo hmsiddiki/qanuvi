@@ -1561,6 +1561,25 @@ runs on or off; with it off nothing is sent anywhere.
       in a window. Next: owner updates both machines; then 24rl part 3 (free relays), relay kit, sl1.
     0.1.37 ON BOTH MACHINES (owner, 2026-11-22): updates worked; the laptop paired again with This PC (nothing typed)
       and loaded This PC's master "like a blink". 24rl PART 2a DONE. Next: part 3 write-up for the owner's yes.
+    24rl PART 3 BUILT (2026-11-22; owner "check what you need, then go forward": the write-up's defaults taken, see
+      docs/PLAN-24RL.md "Part 3 in detail"). Unpublished, relay not deployed.
+      F3 139f520: relay counts relayed bytes per master id per UTC day (memory only), --cap-per-day <MB> and
+        --slow-to <KB/s> (default 256); over the cap the reading link waits its turn (slowed, not cut); a capped relay
+        tells the master Usage (near 80%, over, at most once a minute, and at Welcome); no cap = no Usage messages.
+        Older apps skip Usage. Tests: slowed-not-cut + told, master status shows it.
+      F4 7ca67c9: Remote access "Today through the relay: 120 MB of 2 GB" / "Slowed until <time> ..." (warning colour).
+      F1/F2/F5 316a649: free_relays.rs (relays.json + .sig beside latest.json, update-key minisign check, last good
+        copy kept, 404 = no free relays, entries must be wss:// and not Qanuvi's), master command free_relays (each
+        tested by connecting only, fastest first, 10 s); RelayChoice gets "A free relay" (list, Use, then the yes text:
+        who runs it, sealed, what it sees, devices pair again); F5 line when the relay is out of reach (no automatic
+        switch). scripts/publish-relays.mjs signs a list into a channel folder.
+      DRIVEN headless on the laptop (local test channel, throwaway test key): signed list listed and tested (own
+        port 354-809 ms, a missing host with its reason); changed list refused, last good copy kept; no list = empty.
+      Also fixed: run_rules + ownerask wd1 tests used drive paths, so they failed on Linux (CI's Linux job).
+      Tests: Rust 616 (laptop, ulimit -n raised for the 1,000-link test), clippy clean both builds; TS 570.
+      Not driven: RelayChoice "A free relay" and the usage lines in a window (needs a window on This PC: ask).
+      Next (each asks): deploy the cap on basevm376 (--cap-per-day 2048), 0.1.38, an empty signed relays.json on
+      the channel (optional: 404 already means none); then the relay kit, then sl1.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
