@@ -1370,9 +1370,16 @@ runs on or off; with it off nothing is sent anywhere.
       Claude Code 2.1.330 out, here 2.1.329): rl4 (long lines in parts, sealing writer fix), r5, rl3. Built into
       E:/qc-scratch/release-0.1.34/chan (Linux app on the laptop), copied to qanuvi-updates/dev (old latest.json in
       E:/Backups/qanuvi/channel-before-0.1.34). Online: all files 200, sizes match. Tagged v0.1.34.
-    PICKUP POINT (newest, 2026-11-21 0.1.34): nothing unpublished. Next: owner updates PC + laptop; drive live: a
-      long chat (over 4 MB) opened from the laptop stays connected and opens fast, r5 on a scratch plan; then a
-      fresh conversation for 24rl part 1 (questions to the owner asked: scale meaning, who runs free relays, nginx).
+    CHECKPOINT (newest, 2026-11-21 after 0.1.34, fresh conversation starts here): nothing unpublished, all pushed.
+      basevm376 relay = rl4 build (64bc403, .prev = rl3). Next, in order: (1) owner updates PC + laptop to 0.1.34
+      (laptop: first real one-click Linux update, watch it); (2) drive live: a long chat (over 4 MB) opened from the
+      laptop stays connected and opens fast; relay log (journalctl -u qanuvi-relay) shows no "Message too long";
+      r5 on a scratch plan (held step answered after the run ended reopens, next Run finishes it); (3) 24rl part 1:
+      relay rebuilt event-driven (no 50 ms polling, idle links nearly free) AND its own TLS port beside nginx (see
+      24rl OWNER DECISIONS), clients try own port then 443, load test 100k links on This PC or the laptop (never on
+      basevm376); write part 1's plan in detail first. Owner order after 24rl: sl1, big-plan basics + stable
+      Windows/Linux, cosmetics, later voice. Open: relay link drops other than rl4 (watch the rl3 log), r5 driven.
+    PICKUP POINT (before, 2026-11-21 0.1.34): owner updates, drive live, then 24rl part 1.
     PICKUP POINT (before, 2026-11-21 rl4 fixed): rl4 + r5 unpublished. Next: relay deploy (ask), 0.1.34 (ask),
       drive r5 + a long chat from the laptop live, then plan 24rl part 1 with the owner (questions asked).
     PICKUP POINT (before, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
@@ -1406,7 +1413,7 @@ runs on or off; with it off nothing is sent anywhere.
       the group; the startup sweep ends browsers still running on a gone process's profile (/proc cmdline) before
       removing it. Linux tests (laptop): script + child both end; a left browser ends in the sweep (each fails
       without its fix).
-    PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
+    PICKUP POINT (before, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
     server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the
     laptop; LT Linux title bar; then 0.1.33 (ask). Test window, laptop test master stopped.
     PICKUP POINT (before, 2026-11-21 04:50): LM1-LM3 built, LM4 on This PC passed (above). Next: LM4 on the VPS + laptop
