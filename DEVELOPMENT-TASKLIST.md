@@ -1532,6 +1532,12 @@ runs on or off; with it off nothing is sent anywhere.
       (default) · Change" (Qanuvi relay / Your own relay, the only address box) in remote access and both pairing
       forms; A3 pairing assumes Qanuvi's relay, the code card names a custom relay. The window sends the default
       written out, so masters from before A1 (VPS) take it too.
+    CHECKPOINT (newest, 2026-11-21 18:50, owner restarting the PC, fresh conversation starts here): all pushed,
+      nothing unpublished except 24rl part 2a (7fc8126 + relay line above Turn on). Test build processes stopped.
+      Still to drive: laptop turn on with nothing typed; pair with only the code; custom relay shown next to the code
+      and paired; older records with an address keep it. Then 0.1.37 (ask). Then part 3, relay kit, sl1. The owner
+      saw the PC's built-in screen flicker (still flickering with no test runs going; not from Qanuvi); ask before
+      driving windows while the owner is at the PC.
     2a DRIVEN (This PC test build, 2026-11-21): Turn on with nothing typed connected to Qanuvi's relay (443 first,
       own port after the restart); relay line moved above Turn on. The owner saw the old box in the installed 0.1.36.
     PICKUP POINT (newest, fresh conversation starts here): drive 2a live on a scratch setup (laptop turn on with nothing
