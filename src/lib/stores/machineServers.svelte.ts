@@ -5,6 +5,7 @@
  * in masters.svelte.ts (its switcher), which also follows each master's list for the machines nested under it (M3c).
  */
 import { Channel } from "@tauri-apps/api/core";
+import { DEFAULT_RELAY } from "./remoteAccess.svelte";
 import { errorText } from "$lib/api";
 import { callOn, machineName } from "$lib/remote";
 import { nameProblem, pickColor, uniqueName } from "$lib/machineNames";
@@ -156,7 +157,8 @@ class MachineServersStore {
     try {
       const p = await this.#call<{ relay: string; masterId: string; masterName: string; pairing: string }>(
         "remote_pair",
-        { relay: relay.trim(), code: code.trim(), name: mine },
+        // 24rl A3: Qanuvi's relay written out, so a master from before A1 takes it too.
+        { relay: relay.trim() || DEFAULT_RELAY, code: code.trim(), name: mine },
       );
       const m: MasterSettings = {
         id: crypto.randomUUID(),

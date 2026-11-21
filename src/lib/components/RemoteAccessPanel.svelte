@@ -3,7 +3,8 @@
   /** The shown machine's remote access (Milestone 20; per machine since 24z3 D6), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import { ask } from "$lib/stores/confirm.svelte";
-  import { connectedText, remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import { connectedText, isDefaultRelay, remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import RelayChoice from "./RelayChoice.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
   import { placeTitle, shownPlace } from "$lib/remote";
@@ -52,7 +53,6 @@
       end to end; the relay only passes it on. Nothing is opened on {here ? "this computer's" : "its"} network.
     </p>
     <div class="row">
-      <input bind:value={relay} placeholder="Relay address, for example wss://relay.qanuvi.com" spellcheck="false" />
       <input class="short" bind:value={name} placeholder={here ? "This computer's name" : "Its name on your devices"} />
     </div>
     <div class="row">
@@ -77,16 +77,17 @@
         <button
           type="button"
           class="btn primary"
-          disabled={remoteAccess.busy || !relay.trim()}
+          disabled={remoteAccess.busy}
           onclick={() => remoteAccess.set(true, relay, name)}>Turn on</button
         >
       {/if}
       {#if on && st}
-        <span class="state" class:ok={st.connected}
-          >{st.connected ? connectedText(st) : st.error || "Connecting…"}</span
+        <span class="state" class:ok={st.connected}>{st.connected ? connectedText(st) : st.error || "Connecting…"}</span
         >
       {/if}
     </div>
+    <!-- 24rl A2: Qanuvi's relay unless the user picks their own; nothing to type for the default. -->
+    <RelayChoice bind:value={relay} />
     {#if shownError(remoteAccess.error)}<p class="error">{shownError(remoteAccess.error)}</p>{/if}
 
     {#if on && st}
@@ -98,7 +99,8 @@
           <span class="code">{st.code[0]}</span>
           <span class="muted"
             >type this on the other device (Servers → Pair through the relay); good for {Math.ceil(st.code[1] / 60)} min,
-            one try</span
+            one try{#if !isDefaultRelay(st.relay)}; it is on your own relay
+              <span class="addr">{st.relay}</span>: pick the same under Relay · Change there{/if}</span
           >
         {/if}
       </div>
@@ -241,6 +243,11 @@
     font-family: var(--qx-font-mono, monospace);
     font-size: 15px;
     letter-spacing: 1px;
+    user-select: text;
+  }
+
+  .addr {
+    font-family: var(--qx-font-mono, monospace);
     user-select: text;
   }
 

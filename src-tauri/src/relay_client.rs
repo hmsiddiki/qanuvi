@@ -29,8 +29,15 @@ pub struct Link {
     silent: Duration,
 }
 
+/// 24rl A1: Qanuvi's relay, used whenever no relay is given (nobody types an address for the default).
+pub const DEFAULT_RELAY: &str = "wss://relay.qanuvi.com";
+
+/// The relay address to use: an empty one means Qanuvi's relay (24rl A1).
 pub fn check_relay_url(url: &str) -> Result<String, String> {
     let u = url.trim().trim_end_matches('/');
+    if u.is_empty() {
+        return Ok(DEFAULT_RELAY.to_string());
+    }
     let lower = u.to_ascii_lowercase();
     let local = lower.starts_with("ws://127.0.0.1") || lower.starts_with("ws://localhost");
     if (lower.starts_with("wss://") && u.len() > 6 || local)
@@ -805,11 +812,14 @@ impl RelayMaster {
         let relay = if enabled {
             check_relay_url(relay)?
         } else {
-            relay.trim().to_string()
+            // Turned off: an empty box is still Qanuvi's relay, so turning on again keeps this computer's id.
+            check_relay_url(relay).unwrap_or_else(|_| relay.trim().to_string())
         };
         {
             let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-            if i.config.relay != relay {
+            // An empty saved relay is Qanuvi's too (24rl A1): the same relay keeps this computer's id.
+            let was = check_relay_url(&i.config.relay).unwrap_or_else(|_| i.config.relay.clone());
+            if was != relay {
                 // Another relay: it gives this computer a new id.
                 i.config.master_id.clear();
                 i.config.secret.clear();
@@ -833,7 +843,7 @@ impl RelayMaster {
     pub fn start(self: &Arc<Self>, master: Arc<crate::master::Master>) {
         let (enabled, generation) = {
             let i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-            (i.config.enabled && !i.config.relay.is_empty(), i.generation)
+            (i.config.enabled, i.generation)
         };
         if !enabled {
             return;
@@ -1206,6 +1216,9 @@ mod tests {
     #[test]
     fn relay_addresses_must_be_wss_or_this_computer() {
         assert!(check_relay_url("wss://relay.qanuvi.com").is_ok());
+        // 24rl A1: nothing typed is Qanuvi's relay.
+        assert_eq!(check_relay_url("").as_deref(), Ok(DEFAULT_RELAY));
+        assert_eq!(check_relay_url("  ").as_deref(), Ok(DEFAULT_RELAY));
         assert!(check_relay_url("ws://127.0.0.1:47300").is_ok());
         assert!(check_relay_url("ws://relay.example.com").is_err());
         assert!(check_relay_url("https://relay.example.com").is_err());

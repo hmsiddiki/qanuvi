@@ -9,6 +9,7 @@
  * next to the app ("local") and remote access ("self") stay the window's own links.
  */
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { DEFAULT_RELAY } from "./remoteAccess.svelte";
 import { listen } from "@tauri-apps/api/event";
 import { errorText, type Project } from "$lib/api";
 import {
@@ -913,7 +914,7 @@ class MastersStore {
     if (problem) return `This device's name: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`;
     try {
       const p = await invoke<{ relay: string; masterId: string; masterName: string; pairing: string }>("remote_pair", {
-        relay: relay.trim(),
+        relay: relay.trim() || DEFAULT_RELAY,
         code: code.trim(),
         name: mine || "A device",
       });

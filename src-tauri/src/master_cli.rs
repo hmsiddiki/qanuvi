@@ -207,7 +207,7 @@ fn add_and_connect(dir: &Path, mut server: Value) -> Result<(), String> {
 const USAGE: &str = "Usage: qanuvi-master servers list
        qanuvi-master servers add <ssh address> [--name <name>] [--program <path>] [--key <ssh key file>] [--no-auto]
        qanuvi-master servers remove <name or id>
-       qanuvi-master pair --relay <address> --code <pairing code> [--name <this machine's name there>]";
+       qanuvi-master pair --code <pairing code> [--relay <your own relay>] [--name <this machine's name there>]";
 
 /// `qanuvi-master servers …`; `args` are the words after `servers`.
 pub fn servers_cli(dir: &Path, args: &[String]) -> Result<(), String> {
@@ -286,9 +286,10 @@ pub fn servers_cli(dir: &Path, args: &[String]) -> Result<(), String> {
     }
 }
 
-/// `qanuvi-master pair --relay <address> --code <code>`: pairs this master with a computer showing a pairing code.
+/// `qanuvi-master pair --code <code> [--relay <address>]`: pairs this master with a computer showing a pairing code.
 pub fn pair_cli(dir: &Path, args: &[String]) -> Result<(), String> {
-    let relay = flag(args, "--relay").ok_or(USAGE)?;
+    // 24rl A1: no --relay means Qanuvi's relay.
+    let relay = flag(args, "--relay").unwrap_or("");
     let code = flag(args, "--code").ok_or(USAGE)?;
     let name = flag(args, "--name").unwrap_or("");
     let p = call(

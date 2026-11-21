@@ -1526,7 +1526,16 @@ runs on or off; with it off nothing is sent anywhere.
     24rl PART 1 DONE (R1-R5): event-driven relay, own TLS port beside nginx, apps own port then 443, 100k load
       test, deployed on basevm376, in 0.1.35/0.1.36. Watch: the apps' first switch to 47443 at their next
       reconnect (relay_status road "own port"). Next by the owner's order: sl1 (fresh session).
-    CHECKPOINT (newest, 2026-11-21 after 0.1.36 + 24rl part 1 DONE, fresh conversation starts here): all pushed,
+    24rl PART 2a BUILT (2026-11-21, not driven live, unpublished): A1 an empty relay is Qanuvi's
+      (relay_client DEFAULT_RELAY; configure keeps the id when the saved relay is empty or the default written out;
+      start no longer needs an address; qanuvi-master pair --relay is optional); A2 RelayChoice line "Relay: Qanuvi
+      (default) · Change" (Qanuvi relay / Your own relay, the only address box) in remote access and both pairing
+      forms; A3 pairing assumes Qanuvi's relay, the code card names a custom relay. The window sends the default
+      written out, so masters from before A1 (VPS) take it too.
+    PICKUP POINT (newest, fresh conversation starts here): drive 2a live on a scratch setup (turn on with nothing
+      typed, Windows + laptop, own port; pair with only the code; custom relay shown next to the code and paired;
+      older records with an address keep it), then 0.1.37 (ask). Then part 3, relay kit, sl1.
+    CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
       road "own port"; a relay restart to force it was held: owner's call); bg1-bg5 in the owner's next runs.

@@ -38,6 +38,15 @@ export function connectedText(st: Pick<RelayStatus, "road">): string {
   return "Connected to the relay";
 }
 
+/** 24rl A1: Qanuvi's relay, used when no relay is given (the master has the same default). */
+export const DEFAULT_RELAY = "wss://relay.qanuvi.com";
+
+/** An empty relay, or Qanuvi's own address typed out, is the default relay. */
+export function isDefaultRelay(relay: string | undefined): boolean {
+  const r = (relay ?? "").trim().replace(/\/+$/, "").toLowerCase();
+  return r === "" || r === DEFAULT_RELAY;
+}
+
 export interface Activity {
   at: number;
   device: string;
@@ -102,8 +111,10 @@ class RemoteAccessStore {
     this.error = "";
     try {
       await this.#attach();
-      await callMaster(target(), "relay_configure", { relay: relay.trim(), name: name.trim(), enabled });
-      settings.set("remoteAccess", { enabled, relay: relay.trim(), name: name.trim() });
+      // Nothing picked is Qanuvi's relay, sent written out so a master from before 24rl A1 takes it too.
+      const r = relay.trim() || DEFAULT_RELAY;
+      await callMaster(target(), "relay_configure", { relay: r, name: name.trim(), enabled });
+      settings.set("remoteAccess", { enabled, relay: r, name: name.trim() });
       this.#watch();
     } catch (e) {
       this.error = errorText(e);

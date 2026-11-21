@@ -11,7 +11,7 @@
 //!                           (--site <address>; --password-stdin reads the login name and password from stdin)
 //! qanuvi-master logout      forget this machine's sign-in
 //! qanuvi-master servers     the servers this machine connects to: list, add <ssh address>, remove <name>
-//! qanuvi-master pair        pair with a computer through the relay (--relay <address> --code <pairing code>)
+//! qanuvi-master pair        pair with a computer through the relay (--code <pairing code>; --relay <address> only for your own relay)
 //! qanuvi-master projects    the projects this master works on: list, add <folder>, remove <name>
 //! qanuvi-master inbox       questions and notes: list, show <number>, answer <number> <choice> [text]
 //! qanuvi-master update      put a newer version in (the running service does it and restarts from it)

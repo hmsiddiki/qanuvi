@@ -16,6 +16,7 @@
   import { COLORS, NAME_MAX, nameProblem } from "$lib/machineNames";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
   import IconButton from "./IconButton.svelte";
+  import RelayChoice from "./RelayChoice.svelte";
 
   let { machine }: { machine: string } = $props();
 
@@ -35,7 +36,8 @@
   let formError = $state("");
   let adding = $state(false);
 
-  let pairRelay = $state(settings.value.remoteAccess.relay);
+  // 24rl A3: Qanuvi's relay unless the code card names another one.
+  let pairRelay = $state("");
   let pairCode = $state("");
   let pairName = $state("");
   let pairError = $state("");
@@ -178,19 +180,16 @@
   </p>
   <form class="add" onsubmit={pairNow}>
     <label>
-      Relay address
-      <input bind:value={pairRelay} placeholder="wss://relay.qanuvi.com" spellcheck="false" />
-    </label>
-    <label>
       Pairing code
       <input bind:value={pairCode} placeholder="K7QF-29MX-T4HD" spellcheck="false" />
     </label>
+    <RelayChoice bind:value={pairRelay} />
     <label>
       Name of {here} on the other computer (empty: its computer name)
       <input bind:value={pairName} maxlength={NAME_MAX + 10} />
     </label>
     {#if shownError(pairError)}<p class="error">{shownError(pairError)}</p>{/if}
-    <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
+    <button type="submit" class="btn primary" disabled={pairing || !pairCode.trim()}>
       {pairing ? "Pairing…" : "Pair and connect"}
     </button>
   </form>
