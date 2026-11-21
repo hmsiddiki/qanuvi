@@ -55,6 +55,8 @@
     <div class="row">
       <input class="short" bind:value={name} placeholder={here ? "This computer's name" : "Its name on your devices"} />
     </div>
+    <!-- 24rl A2: Qanuvi's relay unless the user picks their own; nothing to type for the default. -->
+    <RelayChoice bind:value={relay} />
     <div class="row">
       {#if on}
         <button
@@ -86,8 +88,6 @@
         >
       {/if}
     </div>
-    <!-- 24rl A2: Qanuvi's relay unless the user picks their own; nothing to type for the default. -->
-    <RelayChoice bind:value={relay} />
     {#if shownError(remoteAccess.error)}<p class="error">{shownError(remoteAccess.error)}</p>{/if}
 
     {#if on && st}
