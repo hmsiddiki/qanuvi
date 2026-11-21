@@ -1346,7 +1346,25 @@ runs on or off; with it off nothing is sent anywhere.
       pass, clippy clean.
     ORDER (owner, 2026-11-21): r5, then 24rl (relay for 50-100k users at once + free relays), then sl1, then the
       basics for big plans and a stable Windows + Linux Qanuvi, then cosmetics, later voice training + commands.
-    PICKUP POINT (newest, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
+    rl4 OWNER FOUND + FIXED (2026-11-21, owner: "after the dead-connection fix it takes ages"): the rl3 relay log
+      showed the cause at once: "link 1 (master 9059dfaf) ended ... read failed: Space limit exceeded: Message too
+      long: 5974810 > 4194304" (again 5037622 a minute later); the laptop's handler link went the same second. A
+      chat over about 3 MB (its whole history goes in one answer, sealed + base64 adds a third; This PC has chats
+      of 3.4-8.6 MB, session_events 301 MB) was one relay message over the relay's 4 MB limit, so the relay ended
+      the master's link and every session with it, the laptop asked again, and so on. This is the "all links end
+      the same second" of rl2. Not caused by rl1: the 4 MB limit is old, the chats grew past it with the runs.
+      Second cause, found by the new test: the master's SealingWriter looked through its whole buffer for the line
+      end on every write, and an answer comes in many small writes (JSON printed piece by piece): quadratic, a
+      5.6 MB answer did not finish in 30 s, so big chats were slow over the relay even under the limit.
+      Fixed: lines over 1 MB go as several Data messages (each sealed on its own, all but the last with
+      "more": true; relay.rs Msg::Data more, left out when false so whole lines read as before); both ends put
+      them back together (Joiner, at most 512 MB per line); the writer looks only through the new bytes. Tests:
+      6 MB written and read back through a local relay, link and session stay (fails without parts: "The
+      connection to the relay ended."); parts sealed and joined; Msg JSON both ways. Rust lib 590, clippy clean.
+      Needs: relay deploy (the relay passes "more" on; an old relay drops it) + 0.1.34 on both machines.
+    PICKUP POINT (newest, 2026-11-21 rl4 fixed): rl4 + r5 unpublished. Next: relay deploy (ask), 0.1.34 (ask),
+      drive r5 + a long chat from the laptop live, then plan 24rl part 1 with the owner (questions asked).
+    PICKUP POINT (before, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
       plan 24rl in parts with the owner.
     PICKUP POINT (before, 2026-11-21 rl3 deployed): next owner picks: sl1 (measure + fix switch speed), r5, 24rl.
     PICKUP POINT (before, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link

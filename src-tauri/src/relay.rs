@@ -269,6 +269,10 @@ pub enum Msg {
     Data {
         session: u64,
         body: String,
+        /// rl4: this is one part of a long line and more parts follow (a line over the relay's message limit used
+        /// to end the whole link). Each part is sealed on its own; the last one goes without the flag.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        more: bool,
     },
     Close {
         session: u64,
@@ -369,9 +373,19 @@ mod tests {
         let m = Msg::Data {
             session: 3,
             body: "abc".into(),
+            more: false,
         };
         let j = serde_json::to_string(&m).unwrap();
+        // A whole line reads as before (older devices and relays know it).
         assert_eq!(j, r#"{"t":"data","session":3,"body":"abc"}"#);
         assert_eq!(serde_json::from_str::<Msg>(&j).unwrap(), m);
+        let part = Msg::Data {
+            session: 3,
+            body: "abc".into(),
+            more: true,
+        };
+        let j = serde_json::to_string(&part).unwrap();
+        assert_eq!(j, r#"{"t":"data","session":3,"body":"abc","more":true}"#);
+        assert_eq!(serde_json::from_str::<Msg>(&j).unwrap(), part);
     }
 }

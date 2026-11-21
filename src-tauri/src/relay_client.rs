@@ -207,11 +207,64 @@ pub fn pair(relay: &str, code: &str, my_name: &str) -> Result<Paired, String> {
     })
 }
 
+/// rl4: lines longer than this go in parts. A part, sealed and in base64, stays far under the relay's 4 MB message
+/// limit; a longer message used to end the whole link (a long chat opened from the laptop did it every time).
+const PART: usize = 1 << 20;
+/// rl4: a line put back together from parts may be at most this long (the other side cannot fill memory).
+const MAX_LINE: usize = 512 << 20;
+
+/// Seals one line for the relay: one Data message, or several (all but the last with `more`) for a long line.
+fn seal_line(crypto: &mut Session, session: u64, line: &[u8]) -> Result<Vec<Msg>, String> {
+    let parts: Vec<&[u8]> = if line.is_empty() {
+        vec![line]
+    } else {
+        line.chunks(PART).collect()
+    };
+    let last = parts.len() - 1;
+    parts
+        .into_iter()
+        .enumerate()
+        .map(|(i, p)| {
+            Ok(Msg::Data {
+                session,
+                body: b64(&crypto.seal(p)?),
+                more: i < last,
+            })
+        })
+        .collect()
+}
+
+/// rl4: puts a line's parts back together; answers the whole line once its last part came.
+#[derive(Default)]
+struct Joiner {
+    parts: Vec<u8>,
+}
+
+impl Joiner {
+    fn add(&mut self, plain: Vec<u8>, more: bool) -> Result<Option<Vec<u8>>, String> {
+        if self.parts.len() + plain.len() > MAX_LINE {
+            self.parts = Vec::new();
+            return Err("A message from the other computer was too long.".into());
+        }
+        if more {
+            self.parts.extend_from_slice(&plain);
+            return Ok(None);
+        }
+        if self.parts.is_empty() {
+            return Ok(Some(plain));
+        }
+        let mut whole = std::mem::take(&mut self.parts);
+        whole.extend_from_slice(&plain);
+        Ok(Some(whole))
+    }
+}
+
 /// An encrypted session with a paired master, carrying the same lines as over SSH.
 pub struct Conversation {
     link: Link,
     session: u64,
     crypto: Session,
+    joiner: Joiner,
 }
 
 pub fn open_session(p: &Paired) -> Result<Conversation, String> {
@@ -236,6 +289,7 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
                 link,
                 session,
                 crypto,
+                joiner: Joiner::default(),
             })
         }
         Msg::Reject { reason, .. } => Err(reason),
@@ -245,19 +299,26 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
 
 impl Conversation {
     pub fn send_line(&mut self, line: &str) -> Result<(), String> {
-        let body = b64(&self.crypto.seal(line.as_bytes())?);
-        self.link.send(&Msg::Data {
-            session: self.session,
-            body,
-        })
+        for m in seal_line(&mut self.crypto, self.session, line.as_bytes())? {
+            self.link.send(&m)?;
+        }
+        Ok(())
     }
 
-    /// The next line from the master, None after a short wait; Err when the session ended.
+    /// The next line from the master, None after a short wait (or while a long line's parts still come); Err when
+    /// the session ended.
     pub fn poll_line(&mut self) -> Result<Option<String>, String> {
         match self.link.poll()? {
-            Some(Msg::Data { session, body }) if session == self.session => {
+            Some(Msg::Data {
+                session,
+                body,
+                more,
+            }) if session == self.session => {
                 let plain = self.crypto.open(&unb64(&body)?)?;
-                Ok(Some(String::from_utf8_lossy(&plain).to_string()))
+                Ok(self
+                    .joiner
+                    .add(plain, more)?
+                    .map(|line| String::from_utf8_lossy(&line).to_string()))
             }
             Some(Msg::Close { session }) if session == self.session => {
                 Err("The other computer ended the connection.".into())
@@ -340,6 +401,7 @@ struct LiveSession {
     since: i64,
     input: Sender<Vec<u8>>,
     crypto: Arc<Mutex<Session>>,
+    joiner: Joiner,
 }
 
 #[derive(Default)]
@@ -396,21 +458,25 @@ struct SealingWriter {
 
 impl Write for SealingWriter {
     fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        // rl4: only the new bytes are looked through. An answer arrives in many small writes (JSON is printed piece
+        // by piece), and looking through all of it on every write took minutes for a chat of a few MB.
+        let mut from = self.pending.len();
         self.pending.extend_from_slice(b);
-        while let Some(i) = self.pending.iter().position(|c| *c == b'\n') {
+        while let Some(at) = self.pending[from..].iter().position(|c| *c == b'\n') {
+            let i = from + at;
+            from = 0;
             let line: Vec<u8> = self.pending.drain(..=i).collect();
-            let sealed = self
-                .crypto
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .seal(&line[..line.len() - 1])
-                .map_err(std::io::Error::other)?;
-            self.outbox
-                .send(Msg::Data {
-                    session: self.session,
-                    body: b64(&sealed),
-                })
-                .map_err(|_| std::io::Error::other("link gone"))?;
+            let sealed = seal_line(
+                &mut self.crypto.lock().unwrap_or_else(|e| e.into_inner()),
+                self.session,
+                &line[..line.len() - 1],
+            )
+            .map_err(std::io::Error::other)?;
+            for m in sealed {
+                self.outbox
+                    .send(m)
+                    .map_err(|_| std::io::Error::other("link gone"))?;
+            }
         }
         Ok(b.len())
     }
@@ -753,6 +819,7 @@ impl RelayMaster {
                             since: now_secs(),
                             input,
                             crypto: crypto.clone(),
+                            joiner: Joiner::default(),
                         },
                     );
                 self.log(&device.name, "connected");
@@ -777,18 +844,25 @@ impl RelayMaster {
                     crate::master::handle_connection(master, reader, out);
                 });
             }
-            Msg::Data { session, body } => {
+            Msg::Data {
+                session,
+                body,
+                more,
+            } => {
                 let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-                let Some(live) = i.sessions.get(&session) else {
+                let Some(live) = i.sessions.get_mut(&session) else {
                     return Ok(());
                 };
                 let plain = live
                     .crypto
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
-                    .open(&unb64(&body)?);
+                    .open(&unb64(&body)?)
+                    .and_then(|p| live.joiner.add(p, more));
                 match plain {
-                    Ok(mut line) => {
+                    // A part of a long line: the rest is still coming.
+                    Ok(None) => {}
+                    Ok(Some(mut line)) => {
                         let device = live.device.clone();
                         // The activity log keeps which commands came in, not their contents.
                         let cmd = serde_json::from_slice::<serde_json::Value>(&line)
@@ -1163,5 +1237,107 @@ mod tests {
         };
         assert_eq!(e, "The relay stopped answering.");
         held.join().unwrap();
+    }
+
+    /// rl4: a line far over the relay's 4 MB message limit (a long chat's history) goes both ways in parts, and the
+    /// link stays up. Before, the relay ended the master's whole link and every session with it.
+    #[test]
+    fn lines_over_the_relays_message_limit_go_in_parts_and_the_link_stays() {
+        let relay = crate::relay_server::start_local().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !rm.status().connected {
+            assert!(
+                Instant::now() < deadline,
+                "the master did not reach the relay"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+        let mut c = open_session(&paired).unwrap();
+        let ask = |c: &mut Conversation, id: u64, cmd: &str, args: serde_json::Value| {
+            c.send_line(&serde_json::json!({"id": id, "cmd": cmd, "args": args}).to_string())
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(30);
+            loop {
+                assert!(Instant::now() < deadline, "no answer to {cmd}");
+                if let Some(line) = c.poll_line().unwrap() {
+                    let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+                    if v["id"] == id {
+                        return v;
+                    }
+                }
+            }
+        };
+        let added = ask(
+            &mut c,
+            1,
+            "projects_add",
+            serde_json::json!({"path": project.path().to_string_lossy()}),
+        );
+        let pid = added["ok"]["id"].as_str().unwrap().to_string();
+        // 6 MB of text, a little different on every line (as a real chat is).
+        let big: String = (0..120_000)
+            .map(|i| format!("line {i:06} of a long chat history, kept whole\n"))
+            .collect();
+        assert!(big.len() > 5 << 20);
+        let wrote = ask(
+            &mut c,
+            2,
+            "files_write",
+            serde_json::json!({"projectId": pid, "path": "big.txt", "text": big}),
+        );
+        assert!(
+            wrote.get("ok").is_some(),
+            "{}",
+            &wrote.to_string()[..200.min(wrote.to_string().len())]
+        );
+        let read = ask(
+            &mut c,
+            3,
+            "files_read",
+            serde_json::json!({"projectId": pid, "path": "big.txt"}),
+        );
+        assert_eq!(read["ok"]["text"].as_str().unwrap(), big);
+        // The same session still answers: nothing was cut.
+        let again = ask(&mut c, 4, "projects_list", serde_json::json!({}));
+        assert!(again.get("ok").is_some());
+        assert!(rm.status().connected);
+        assert_eq!(rm.status().sessions.len(), 1);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    #[test]
+    fn a_long_line_is_sealed_in_parts_and_put_back_together() {
+        let key = [7u8; 32];
+        let (a, b) = ([1u8; 16], [2u8; 16]);
+        let mut send = Session::new(&key, &a, &b, false).unwrap();
+        let mut recv = Session::new(&key, &a, &b, true).unwrap();
+        let line = vec![b'x'; PART * 2 + 10];
+        let msgs = seal_line(&mut send, 9, &line).unwrap();
+        assert_eq!(msgs.len(), 3);
+        let mut j = Joiner::default();
+        let mut out = None;
+        for (i, m) in msgs.into_iter().enumerate() {
+            let Msg::Data { body, more, .. } = m else {
+                panic!("not data")
+            };
+            assert_eq!(more, i < 2);
+            out = j
+                .add(recv.open(&unb64(&body).unwrap()).unwrap(), more)
+                .unwrap();
+            assert_eq!(out.is_some(), i == 2);
+        }
+        assert_eq!(out.unwrap(), line);
+        // A short line stays one message, as before.
+        assert_eq!(seal_line(&mut send, 9, b"{}").unwrap().len(), 1);
+        assert_eq!(seal_line(&mut send, 9, b"").unwrap().len(), 1);
     }
 }
