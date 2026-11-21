@@ -3,7 +3,7 @@
   /** The shown machine's remote access (Milestone 20; per machine since 24z3 D6), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import { ask } from "$lib/stores/confirm.svelte";
-  import { connectedText, isDefaultRelay, remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import { connectedText, isDefaultRelay, remoteAccess, usageText } from "$lib/stores/remoteAccess.svelte";
   import RelayChoice from "./RelayChoice.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
@@ -89,6 +89,10 @@
       {/if}
     </div>
     {#if shownError(remoteAccess.error)}<p class="error">{shownError(remoteAccess.error)}</p>{/if}
+    {#if on && st?.connected}
+      {@const share = usageText(st.usage)}
+      {#if share.text}<p class="muted" class:warn={share.over}>{share.text}</p>{/if}
+    {/if}
 
     {#if on && st}
       <div class="row">
@@ -167,6 +171,10 @@
 
   .error {
     color: var(--qx-status-failed);
+  }
+
+  .warn {
+    color: var(--qx-warning);
   }
 
   .row {

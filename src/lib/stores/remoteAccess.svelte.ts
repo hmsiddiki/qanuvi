@@ -29,6 +29,44 @@ export interface RelayStatus {
   error: string;
   /** 24rl R3: the road the link took: "own port" (the relay's own TLS port) or "443"; missing from older masters. */
   road?: string;
+  /** 24rl F3: today's use as a capped relay told it (missing: no cap, not told yet, or an older master). */
+  usage?: RelayUsage | null;
+}
+
+/** 24rl F3: relayed bytes today, the relay's daily cap (0 = none), and when slowing ends (unix seconds, 0 = not). */
+export interface RelayUsage {
+  used: number;
+  cap: number;
+  slowedUntil: number;
+}
+
+/** Bytes as people read them: 120 MB, 2 GB, 512 KB. */
+export function sizeText(bytes: number): string {
+  const units: [number, string][] = [
+    [1 << 30, "GB"],
+    [1 << 20, "MB"],
+    [1 << 10, "KB"],
+  ];
+  for (const [n, unit] of units) {
+    if (bytes >= n) {
+      const v = bytes / n;
+      return `${v >= 10 || Number.isInteger(v) ? Math.round(v) : v.toFixed(1)} ${unit}`;
+    }
+  }
+  return `${bytes} B`;
+}
+
+/** 24rl F4: the line about today's share of the relay; "" when there is nothing to say (no cap). */
+export function usageText(u: RelayUsage | null | undefined, now = Date.now() / 1000): { text: string; over: boolean } {
+  if (!u || !u.cap) return { text: "", over: false };
+  if (u.slowedUntil > now) {
+    const at = new Date(u.slowedUntil * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return {
+      text: `Slowed until ${at}: today's share of this relay (${sizeText(u.cap)}) is used. For full speed now, pick a free relay or your own under Relay · Change.`,
+      over: true,
+    };
+  }
+  return { text: `Today through the relay: ${sizeText(u.used)} of ${sizeText(u.cap)}`, over: false };
 }
 
 /** What the panel says about a working link (the road only when the master tells it). */
