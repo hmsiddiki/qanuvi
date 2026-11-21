@@ -1,6 +1,6 @@
 import { api, errorText, type AgentEvent, type AgentInfo, type Attachment, type Grant, type Session } from "$lib/api";
 import { untrack } from "svelte";
-import { shownMachine } from "$lib/remote";
+import { isLinkError, onCallOk, shownMachine } from "$lib/remote";
 import { reduce, reduceAll, type Item } from "$lib/agent/events";
 import { HOLD_MS, withdrawnNote } from "$lib/agent/waiting";
 
@@ -385,6 +385,8 @@ ${text}`
   async loadProject(projectId: string | null): Promise<void> {
     this.#projectId = projectId;
     this.sessions = [];
+    // ce1: a message about the last project's chat does not follow to the next one.
+    this.error = "";
     this.newSession();
     if (!projectId) return;
     try {
@@ -450,6 +452,7 @@ ${text}`
     this.#flushHeld();
     this.selectedId = id;
     this.reopened = null;
+    this.error = "";
     this.#fromHandover = false;
     this.loadGrants();
     this.errors = [];
@@ -1055,3 +1058,8 @@ ${text}`
 }
 
 export const agent = new AgentStore();
+
+// ce1: "the connection ... ended" in the chat goes once a call gets through again (the link is back).
+onCallOk(() => {
+  if (agent.error && isLinkError(agent.error)) agent.error = "";
+});

@@ -174,3 +174,28 @@ describe("a terminal whose link ended (j1)", () => {
     expect(linkEndedText("vps")).toMatch(/^The connection to VPS ended, and this shell ended with it./);
   });
 });
+
+describe("link errors (ce1)", () => {
+  it("knows the texts that say a link was gone, and not other errors", async () => {
+    const { isLinkError } = await import("./remote");
+    expect(isLinkError("The connection to the master has ended.")).toBe(true);
+    expect(isLinkError("Home PC: That computer is not online.")).toBe(true);
+    expect(isLinkError("The file could not be saved.")).toBe(false);
+  });
+
+  it("tells who asks of a call that got through, and not of one that failed", async () => {
+    const { callMaster, onCallOk } = await import("./remote");
+    const seen: string[] = [];
+    const stop = onCallOk((m) => seen.push(m));
+    invoke.mockRejectedValueOnce("The connection to the master has ended.");
+    await expect(callMaster("laptop-x", "projects_list", {})).rejects.toBe("The connection to the master has ended.");
+    expect(seen).toEqual([]);
+    invoke.mockResolvedValueOnce([]);
+    await callMaster("laptop-x", "projects_list", {});
+    expect(seen).toEqual(["laptop-x"]);
+    stop();
+    invoke.mockResolvedValueOnce([]);
+    await callMaster("laptop-x", "projects_list", {});
+    expect(seen).toEqual(["laptop-x"]);
+  });
+});

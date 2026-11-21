@@ -250,6 +250,32 @@ export class NotOnMachine extends Error {
 /** The master's own reply for a command it does not know (master.rs, master_inbox.rs, master_runs.rs). */
 const UNKNOWN = /^This master does not know the command [a-z_0-9]+\.$/;
 
+/**
+ * A call failed because its link was gone (finding ce1): the texts the app and the relay give for that. Such a
+ * message is about the moment, not the work: it goes again once a call gets through.
+ */
+const LINK_GONE = [
+  "The connection to the master has ended.",
+  "That computer is not online.",
+  "It is still being connected; try again in a moment.",
+  "The master did not answer in 30 seconds.",
+  "The connection ended.",
+];
+
+/** Whether an error text says the link to a machine was gone (not that the work failed). */
+export function isLinkError(text: string): boolean {
+  return LINK_GONE.some((t) => text.includes(t));
+}
+
+/** Who wants to know that a call got through (a link is there again), by the master it went to. */
+const callsOk = new Set<(master: string) => void>();
+
+/** Tells `fn` of each call that got through; gives back the function that stops it. */
+export function onCallOk(fn: (master: string) => void): () => void {
+  callsOk.add(fn);
+  return () => callsOk.delete(fn);
+}
+
 /** Sends a call to a master. A `Channel` in `onEvent` receives what it streams (terminal output, agent events). */
 export async function callMaster<T>(master: string, cmd: string, args: Record<string, unknown>): Promise<T> {
   const result = await linkCall<T>(master, cmd, args);
@@ -273,6 +299,7 @@ async function linkCall<T>(master: string, cmd: string, args: Record<string, unk
   } catch (e) {
     throw typeof e === "string" && UNKNOWN.test(e) ? new NotOnMachine(master, cmd) : e;
   }
+  for (const fn of callsOk) fn(master);
   return result;
 }
 

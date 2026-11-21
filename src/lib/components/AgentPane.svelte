@@ -39,6 +39,8 @@
   import { api, errorText } from "$lib/api";
   import { tick, untrack } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
+  import { switcher } from "$lib/stores/switcher.svelte";
+  import { isLinkError } from "$lib/remote";
   import { projects } from "$lib/stores/projects.svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import Settings2 from "@lucide/svelte/icons/settings-2";
@@ -981,7 +983,8 @@
         </div>{/if}
     {/if}
     {#each agent.errors.slice(-3) as e, i (i)}<div class="notice error">{e}</div>{/each}
-    {#if agent.error}<div class="notice error">{agent.error}</div>{/if}
+    <!-- ce1: while the machine is being reconnected its notice says so; the chat does not say it again. -->
+    {#if agent.error && !(switcher.held && isLinkError(agent.error))}<div class="notice error">{agent.error}</div>{/if}
     {#if newBelow && !follow}
       <button type="button" class="new-below" onclick={toBottom} title="Go down to the latest">↓ New activity</button>
     {/if}
