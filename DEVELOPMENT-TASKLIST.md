@@ -1385,6 +1385,10 @@ runs on or off; with it off nothing is sent anywhere.
       added now, try again" -> PLAN-HOLD.md step 1 went [!] -> [ ] at once. Next Run: step 1 done (copied.md =
       the key's first line, the Done line says the owner added it), run done, the hold question gone from the Inbox
       (not asked again). PASS. Test window stopped; the installed app left running.
+    24rl PART 1 PLAN WRITTEN (2026-11-21): docs/PLAN-24RL.md (R1 tokio relay, R2 own TLS port + cert copy, R3 apps
+      own port then 443, R4 100k load test on the laptop, R5 deploy); found: through nginx about 1,500 links max
+      (worker_connections 768 x 4, shared), thread-per-link caps at TasksMax 9440, key file root-only. 4 owner
+      questions at the end of the file; build waits for the answers.
     CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
       all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
       owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link
