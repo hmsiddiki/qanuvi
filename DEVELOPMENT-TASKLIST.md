@@ -1325,8 +1325,18 @@ runs on or off; with it off nothing is sent anywhere.
       side texts unchanged (ce1 matches them). Tests: 12 relay tests pass, clippy clean; local relay run showed
       the open/close lines with the close code. NEXT: deploy on basevm376 (ask: Linux build, swap /usr/local/bin,
       keep .prev, restart), then on the next drops read journalctl -u for the relay against nginx's log.
-    PICKUP POINT (newest, 2026-11-21 rl3): rl3 built, not deployed. Next: (1) rl3 deploy (ask), read why links end;
-      (2) LT by hand on the laptop; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.
+    rl3 DEPLOYED (owner "do on basevm376", 2026-11-21 09:23 server time): Linux build (747 KB) swapped into
+      /usr/local/bin, old kept as qanuvi-relay.prev (rl1 build), restart: active, both links back at once and
+      logged. Addresses show 127.0.0.1: nginx's relay site sends no X-Real-IP (adding it = nginx change, ask);
+      master/handler role still tells the links apart. Read: journalctl -u qanuvi-relay.
+    LT OWNER CHECKED (2026-11-21): Linux title bar fine, looks the same as on Windows. Wayland later.
+    sl1 OWNER FOUND (2026-11-21): over the relay, switching projects, plans and chats takes noticeable time. Seen
+      in code: each relay link thread (relay + master + handler side) waits up to 50 ms on a read before sending
+      what is queued, so one call can pick up to ~150 ms of waiting on top of the network (PC to VPS ~57 ms each
+      way); a switch that makes many calls one after another adds that per call. Proposal to the owner: measure a
+      switch (calls, time each), then send at once instead of after the read wait, and fewer/parallel calls on
+      switch; 24rl (direct links) cuts the network part for machines on the same network.
+    PICKUP POINT (newest, 2026-11-21 rl3 deployed): next owner picks: sl1 (measure + fix switch speed), r5, 24rl.
     PICKUP POINT (before, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link
       drops (rl2 note: relay-side log of why a link ends, deploy on basevm376 = ask); (2) LT by hand on the laptop:
       drag, edge resize, snapping; Wayland later; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.
