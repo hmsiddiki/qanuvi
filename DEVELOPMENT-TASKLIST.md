@@ -1400,6 +1400,16 @@ runs on or off; with it off nothing is sent anywhere.
       futures-util. Tests: all old relay tests pass unchanged; 1,000 idle links + a pair still talking (smoke; the
       real numbers are R4's); a handler that stops reading is ended at the limit, the master is told and its link
       stays (fails without the limit). Rust lib 592 pass, clippy clean (desktop + server). Relay 608 -> 698 KB.
+    24rl R2 BUILT (2026-11-21, not deployed): the relay's own TLS port. qanuvi-relay --tls-listen 0.0.0.0:47443
+      --cert <fullchain.pem> --key <key.pem> [--public-direct wss://relay.qanuvi.com:47443], beside --listen (both at
+      once from one process, or TLS only for a volunteer relay). rustls with ring (as the client side already had);
+      certificate files looked at every 10 min, a renewed one used for new links, open links keep theirs, a renewal
+      that does not load keeps the one in use (logged). Welcome (master) and Accept (handler, filled in by the relay)
+      carry the optional "direct" address; without it the JSON is exactly the old one. Tests: TLS master + plain
+      handler through one relay both ways, both told the TLS address; renewed cert shown to the next link while the
+      open one still works; bad renewal keeps the old; old-style JSON both ways. Rust lib 596 pass (checks kill_tree
+      failed once in the full run under load, passes alone 3/3 and in the next full run; not relay code), clippy
+      clean both builds. Relay 698 KB -> 1.8 MB (ring + rustls server side). Docs: ARCHITECTURE.md relay section.
     CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
       all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
       owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link

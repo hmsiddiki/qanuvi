@@ -58,6 +58,9 @@ tungstenite = { version = "0.30.0", default-features = false, features = ["hands
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+# 24rl R2: the relay's own TLS port (ring, as tungstenite's client side already uses).
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"] }
 base64 = "0.23.1"
 argon2 = "0.6.0"
 chacha20poly1305 = "0.11.0"
@@ -92,6 +95,8 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# 24rl R2 tests: certificates made on the spot for the relay's TLS port.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Diagnostics_ToolHelp", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }

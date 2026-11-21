@@ -139,6 +139,13 @@ out to it, a device pairs once with a short code (SPAKE2), and after that every 
 counted frames (XChaCha20-Poly1305), so the relay only passes on bytes it cannot read. Inside, the same master protocol
 as over SSH. The window's own computer offers remote access through its master service (`relay_client.rs`).
 
+Since 24rl the relay runs every link as a small tokio task (no thread per link, no polling), so idle links cost almost
+nothing. It listens behind a TLS proxy (`--listen 127.0.0.1:47300`, nginx in front for 443), on its own TLS port
+(`--tls-listen 0.0.0.0:47443 --cert fullchain.pem --key key.pem`), or both. With `--public-direct
+wss://host:47443` it tells apps its own port (in Welcome and Accept); they try it first and keep 443 as the fallback.
+A renewed certificate on disk is picked up within 10 minutes for new links; open links keep theirs. A link whose
+outbox goes over 64 MB (it stopped reading) is ended, so one stuck device cannot fill the relay's memory.
+
 ## Qanuvi's own agent and brain (Milestone 24)
 
 `qanuvi --agent` is an agent loop inside Qanuvi's own program: it speaks the same JSON lines as the command-line

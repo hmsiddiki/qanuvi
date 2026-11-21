@@ -220,6 +220,10 @@ pub enum Msg {
     Welcome {
         master_id: String,
         secret: String,
+        /// 24rl R2: the relay's own TLS address (for example wss://relay.qanuvi.com:47443), tried before the saved
+        /// one next time. Older apps ignore it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        direct: Option<String>,
     },
     /// The master opens a pairing slot (for 10 minutes, one try).
     PairOpen {
@@ -260,6 +264,9 @@ pub enum Msg {
     Accept {
         session: u64,
         nonce: String,
+        /// 24rl R2: filled in by the relay on its way to the handler (its own TLS address); the master leaves it out.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        direct: Option<String>,
     },
     Reject {
         session: u64,

@@ -283,6 +283,7 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
         Msg::Accept {
             session,
             nonce: theirs,
+            ..
         } => {
             let crypto = Session::new(&key, &nonce, &unb64(&theirs)?, false)?;
             Ok(Conversation {
@@ -696,7 +697,9 @@ impl RelayMaster {
         master: &Arc<crate::master::Master>,
     ) -> Result<(), String> {
         match m {
-            Msg::Welcome { master_id, secret } => {
+            Msg::Welcome {
+                master_id, secret, ..
+            } => {
                 let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
                 i.connected = true;
                 i.error.clear();
@@ -826,6 +829,7 @@ impl RelayMaster {
                 let _ = tx.send(Msg::Accept {
                     session,
                     nonce: b64(&mine),
+                    direct: None,
                 });
                 let out: Arc<Mutex<Box<dyn Write + Send>>> =
                     Arc::new(Mutex::new(Box::new(SealingWriter {

@@ -97,6 +97,8 @@ pub struct Relay {
     ping_every: Duration,
     silent: Duration,
     max_queued: usize,
+    /// 24rl R2: the relay's own TLS address, told to apps (Welcome, Accept).
+    direct: Option<String>,
     /// Tests: masters' connections are cut (as when the relay restarts or their network drops).
     cut_masters: AtomicBool,
     cut_now: tokio::sync::Notify,
@@ -134,6 +136,7 @@ impl Relay {
             ping_every: PING_EVERY,
             silent: SILENT,
             max_queued: MAX_QUEUED,
+            direct: None,
             cut_masters: Default::default(),
             cut_now: Default::default(),
             quiet: false,
@@ -208,6 +211,7 @@ impl Relay {
                     Msg::Welcome {
                         master_id: id,
                         secret,
+                        direct: self.direct.clone(),
                     },
                 );
             }
@@ -332,6 +336,15 @@ impl Relay {
                     && Some(&m) == master_of.as_ref()
                 {
                     let rejected = matches!(msg, Msg::Reject { .. });
+                    // R2: the handler learns the relay's own TLS address with its first session.
+                    let msg = match msg {
+                        Msg::Accept { session, nonce, .. } => Msg::Accept {
+                            session,
+                            nonce,
+                            direct: self.direct.clone(),
+                        },
+                        other => other,
+                    };
                     reply(&st, handler, msg);
                     if rejected {
                         st.sessions.remove(&session);
@@ -398,8 +411,10 @@ impl Relay {
     }
 
     /// Serves one WebSocket connection until it ends.
-    async fn serve_conn(self: Arc<Self>, stream: tokio::net::TcpStream) {
-        let _ = stream.set_nodelay(true);
+    async fn serve_conn<S>(self: Arc<Self>, stream: S, mut from: String)
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         let config = tungstenite::protocol::WebSocketConfig::default()
             .max_message_size(Some(MAX_MESSAGE))
             .max_frame_size(Some(MAX_MESSAGE))
@@ -407,10 +422,6 @@ impl Relay {
             // Each message goes out at once instead of waiting in a 128 KB buffer.
             .write_buffer_size(0);
         // rl3: who it is (behind nginx the socket's address is the proxy's, so the forwarded one is used).
-        let mut from = stream
-            .peer_addr()
-            .map(|a| a.to_string())
-            .unwrap_or_else(|_| "?".into());
         // The error type is tungstenite's own (an HTTP answer), not ours to make smaller.
         #[allow(clippy::result_large_err)]
         let callback = |req: &tungstenite::handshake::server::Request,
@@ -528,8 +539,9 @@ impl Relay {
         let mut last_error: Option<Instant> = None;
         loop {
             match listener.accept().await {
-                Ok((stream, _)) => {
-                    tokio::spawn(self.clone().serve_conn(stream));
+                Ok((stream, peer)) => {
+                    let _ = stream.set_nodelay(true);
+                    tokio::spawn(self.clone().serve_conn(stream, peer.to_string()));
                 }
                 Err(e) => {
                     // Out of open files and the like: wait a little instead of spinning; logged once a minute.
@@ -539,6 +551,54 @@ impl Relay {
                     }
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 }
+            }
+        }
+    }
+
+    /// 24rl R2: takes connections on the relay's own TLS port until the program stops. The certificate in use is the
+    /// one `certs` holds at the moment of each handshake, so a renewed one is used from the next link on.
+    async fn tls_accept_loop(
+        self: Arc<Self>,
+        listener: std::net::TcpListener,
+        certs: Arc<Certs>,
+    ) -> Result<(), String> {
+        listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+        let listener = tokio::net::TcpListener::from_std(listener).map_err(|e| e.to_string())?;
+        let mut last_error: Option<Instant> = None;
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer)) => {
+                    let _ = stream.set_nodelay(true);
+                    let acceptor = tokio_rustls::TlsAcceptor::from(certs.current());
+                    let relay = self.clone();
+                    tokio::spawn(async move {
+                        match tokio::time::timeout(HANDSHAKE, acceptor.accept(stream)).await {
+                            Ok(Ok(tls)) => relay.serve_conn(tls, peer.to_string()).await,
+                            Ok(Err(e)) => relay.note(&format!("TLS handshake failed: {e}")),
+                            Err(_) => relay.note("TLS handshake failed: none within 10 s"),
+                        }
+                    });
+                }
+                Err(e) => {
+                    if last_error.is_none_or(|t| t.elapsed() > Duration::from_secs(60)) {
+                        last_error = Some(Instant::now());
+                        self.note(&format!("accept failed (TLS port): {e}"));
+                    }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }
+        }
+    }
+
+    /// 24rl R2: looks at the certificate files every `every` and swaps in a renewed certificate (links already
+    /// open keep theirs). A file that does not load leaves the one in use and is logged.
+    async fn watch_certs(self: Arc<Self>, certs: Arc<Certs>, every: Duration) {
+        loop {
+            tokio::time::sleep(every).await;
+            match certs.reload_if_changed() {
+                Ok(true) => self.note("TLS certificate renewed: new links get the new one"),
+                Ok(false) => {}
+                Err(e) => self.note(&format!("TLS certificate not renewed: {e}")),
             }
         }
     }
@@ -632,6 +692,140 @@ pub fn read_frame<S: std::io::Read + std::io::Write>(ws: &mut WebSocket<S>) -> R
     }
 }
 
+/// 24rl R2: the relay's own TLS certificate and key (PEM files, as Let's Encrypt and ISPConfig write them).
+#[derive(Clone, Debug)]
+pub struct TlsFiles {
+    pub cert: PathBuf,
+    pub key: PathBuf,
+}
+
+/// The certificate in use, and when its files were last changed.
+pub struct Certs {
+    files: TlsFiles,
+    current: std::sync::RwLock<Arc<rustls::ServerConfig>>,
+    stamp: Mutex<Option<(std::time::SystemTime, std::time::SystemTime)>>,
+}
+
+fn stamp_of(files: &TlsFiles) -> Option<(std::time::SystemTime, std::time::SystemTime)> {
+    let changed = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    Some((changed(&files.cert)?, changed(&files.key)?))
+}
+
+fn load_tls(files: &TlsFiles) -> Result<Arc<rustls::ServerConfig>, String> {
+    use rustls::pki_types::pem::PemObject;
+    use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+    let shown = |p: &Path| p.display().to_string();
+    let chain: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(&files.cert)
+        .and_then(|it| it.collect::<Result<_, _>>())
+        .map_err(|e| {
+            format!(
+                "The certificate {} could not be read: {e}",
+                shown(&files.cert)
+            )
+        })?;
+    if chain.is_empty() {
+        return Err(format!("{} holds no certificate.", shown(&files.cert)));
+    }
+    let key = PrivateKeyDer::from_pem_file(&files.key)
+        .map_err(|e| format!("The key {} could not be read: {e}", shown(&files.key)))?;
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|e| e.to_string())?
+    .with_no_client_auth()
+    .with_single_cert(chain, key)
+    .map_err(|e| format!("The certificate and key do not go together: {e}"))?;
+    Ok(Arc::new(config))
+}
+
+impl Certs {
+    pub fn load(files: TlsFiles) -> Result<Arc<Self>, String> {
+        let config = load_tls(&files)?;
+        Ok(Arc::new(Self {
+            stamp: Mutex::new(stamp_of(&files)),
+            current: std::sync::RwLock::new(config),
+            files,
+        }))
+    }
+
+    fn current(&self) -> Arc<rustls::ServerConfig> {
+        self.current
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// Loads the files again when they changed; true when a new certificate is in use.
+    fn reload_if_changed(&self) -> Result<bool, String> {
+        let now = stamp_of(&self.files);
+        let mut stamp = self.stamp.lock().unwrap_or_else(|e| e.into_inner());
+        if now.is_none() || now == *stamp {
+            return Ok(false);
+        }
+        let config = load_tls(&self.files)?;
+        *self.current.write().unwrap_or_else(|e| e.into_inner()) = config;
+        *stamp = now;
+        Ok(true)
+    }
+}
+
+/// How often the certificate files are looked at (a renewal is picked up within this time).
+pub const CERT_CHECK: Duration = Duration::from_secs(600);
+
+/// What the relay serves (qanuvi-relay's flags).
+#[derive(Clone, Debug, Default)]
+pub struct Options {
+    /// Plain WebSocket, for a TLS proxy in front (nginx): for example 127.0.0.1:47300.
+    pub listen: Option<String>,
+    /// 24rl R2: the relay's own TLS port, for example 0.0.0.0:47443.
+    pub tls_listen: Option<String>,
+    pub tls: Option<TlsFiles>,
+    /// The address apps use for the TLS port (told to them in Welcome and Accept), for example
+    /// wss://relay.qanuvi.com:47443.
+    pub direct: Option<String>,
+    pub data: Option<PathBuf>,
+}
+
+/// Runs the relay as `options` says until it is stopped.
+pub fn run_with(options: &Options) -> Result<(), String> {
+    if options.listen.is_none() && options.tls_listen.is_none() {
+        return Err("Nothing to listen on: give --listen, --tls-listen or both.".into());
+    }
+    let bind = |addr: &str| {
+        std::net::TcpListener::bind(addr).map_err(|e| format!("Could not listen on {addr}: {e}"))
+    };
+    let plain = options.listen.as_deref().map(bind).transpose()?;
+    let tls = match options.tls_listen.as_deref() {
+        Some(addr) => {
+            let files = options
+                .tls
+                .clone()
+                .ok_or("--tls-listen needs --cert and --key.")?;
+            Some((bind(addr)?, Certs::load(files)?))
+        }
+        None => None,
+    };
+    let mut relay = Relay::new(options.data.as_deref());
+    if let Some(r) = Arc::get_mut(&mut relay) {
+        r.direct = options.direct.clone();
+    }
+    runtime()?.block_on(async move {
+        let mut tasks = Vec::new();
+        if let Some((listener, certs)) = tls {
+            tokio::spawn(relay.clone().watch_certs(certs.clone(), CERT_CHECK));
+            tasks.push(tokio::spawn(relay.clone().tls_accept_loop(listener, certs)));
+        }
+        if let Some(listener) = plain {
+            tasks.push(tokio::spawn(relay.clone().accept_loop(listener)));
+        }
+        for t in tasks {
+            t.await.map_err(|e| e.to_string())??;
+        }
+        Ok(())
+    })
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -642,10 +836,11 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
 
 /// Runs the relay on an address like 127.0.0.1:47300 until it is stopped.
 pub fn run(addr: &str, data: Option<&Path>) -> Result<(), String> {
-    let listener = std::net::TcpListener::bind(addr)
-        .map_err(|e| format!("Could not listen on {addr}: {e}"))?;
-    let relay = Relay::new(data);
-    runtime()?.block_on(relay.accept_loop(listener))
+    run_with(&Options {
+        listen: Some(addr.into()),
+        data: data.map(Path::to_path_buf),
+        ..Options::default()
+    })
 }
 
 /// Starts a relay on a free local port (for tests); answers its ws:// address.
@@ -754,6 +949,7 @@ mod tests {
             &Msg::Accept {
                 session,
                 nonce: "m".into(),
+                direct: None,
             },
         );
         assert!(matches!(next(&mut handler, 5), Some(Msg::Accept { .. })));
@@ -843,5 +1039,245 @@ mod tests {
             },
         );
         assert!(read(&mut master).is_ok(), "the master's link ended too");
+    }
+
+    /// R2: a test certificate for "localhost" written as PEM files; answers its DER (for the client to trust).
+    fn make_cert(cert: &Path, key: &Path) -> rustls::pki_types::CertificateDer<'static> {
+        let made = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        std::fs::write(cert, made.cert.pem()).unwrap();
+        std::fs::write(key, made.signing_key.serialize_pem()).unwrap();
+        made.cert.der().clone()
+    }
+
+    /// R2: a test relay on a plain port and its own TLS port at once (the TLS address told to apps), with its
+    /// certificate files looked at every 50 ms.
+    fn start_both(files: TlsFiles) -> (String, u16, Arc<Relay>) {
+        let plain = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let tls = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let (pport, tport) = (
+            plain.local_addr().unwrap().port(),
+            tls.local_addr().unwrap().port(),
+        );
+        let mut relay = Relay::new(None);
+        if let Some(r) = Arc::get_mut(&mut relay) {
+            r.quiet = true;
+            r.direct = Some(format!("wss://localhost:{tport}"));
+        }
+        let certs = Certs::load(files).unwrap();
+        let handle = relay.clone();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        std::thread::spawn(move || {
+            rt.block_on(async move {
+                tokio::spawn(
+                    relay
+                        .clone()
+                        .watch_certs(certs.clone(), Duration::from_millis(50)),
+                );
+                tokio::spawn(relay.clone().tls_accept_loop(tls, certs));
+                let _ = relay.accept_loop(plain).await;
+            })
+        });
+        (format!("ws://127.0.0.1:{pport}"), tport, handle)
+    }
+
+    /// A wss link to the test relay's TLS port, trusting only `trust`; answers it and the certificate it was shown.
+    fn tls_link(
+        port: u16,
+        trust: &[rustls::pki_types::CertificateDer<'static>],
+    ) -> (Client, Vec<u8>) {
+        let mut roots = rustls::RootCertStore::empty();
+        for c in trust {
+            roots.add(c.clone()).unwrap();
+        }
+        let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+        let tcp = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let (ws, _) = tungstenite::client_tls_with_config(
+            format!("wss://localhost:{port}"),
+            tcp,
+            None,
+            Some(tungstenite::Connector::Rustls(Arc::new(config))),
+        )
+        .unwrap();
+        let shown = match ws.get_ref() {
+            tungstenite::stream::MaybeTlsStream::Rustls(s) => {
+                s.get_ref()
+                    .set_read_timeout(Some(Duration::from_millis(50)))
+                    .unwrap();
+                s.conn.peer_certificates().unwrap()[0].to_vec()
+            }
+            _ => panic!("not TLS"),
+        };
+        (ws, shown)
+    }
+
+    fn hello_master(ws: &mut Client) -> (String, Option<String>) {
+        say(
+            ws,
+            &Msg::HelloMaster {
+                master_id: String::new(),
+                secret: String::new(),
+            },
+        );
+        match next(ws, 5) {
+            Some(Msg::Welcome {
+                master_id, direct, ..
+            }) => (master_id, direct),
+            other => panic!("no welcome: {other:?}"),
+        }
+    }
+
+    /// The handler asks for the master, the master accepts; answers the session and what the handler was told.
+    fn open_session(master: &mut Client, handler: &mut Client, master_id: &str) -> (u64, Msg) {
+        say(
+            handler,
+            &Msg::Connect {
+                master_id: master_id.into(),
+                pairing: "p".into(),
+                nonce: "n".into(),
+                session: 0,
+            },
+        );
+        let Some(Msg::Connect { session, .. }) = next(master, 5) else {
+            panic!("no connect at the master");
+        };
+        say(
+            master,
+            &Msg::Accept {
+                session,
+                nonce: "m".into(),
+                direct: None,
+            },
+        );
+        (session, next(handler, 5).expect("an answer"))
+    }
+
+    #[test]
+    fn the_own_tls_port_and_the_plain_one_work_at_once_and_apps_are_told_the_tls_address() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = TlsFiles {
+            cert: dir.path().join("cert.pem"),
+            key: dir.path().join("key.pem"),
+        };
+        let der = make_cert(&files.cert, &files.key);
+        let (plain, tport, _) = start_both(files);
+        let (mut master, _) = tls_link(tport, std::slice::from_ref(&der));
+        let (id, direct) = hello_master(&mut master);
+        assert_eq!(direct, Some(format!("wss://localhost:{tport}")));
+        let mut handler = link(&plain);
+        let (session, told) = open_session(&mut master, &mut handler, &id);
+        assert_eq!(
+            told,
+            Msg::Accept {
+                session,
+                nonce: "m".into(),
+                direct: Some(format!("wss://localhost:{tport}")),
+            }
+        );
+        let data = |body: &str| Msg::Data {
+            session,
+            body: body.into(),
+            more: false,
+        };
+        say(&mut handler, &data("up"));
+        assert_eq!(next(&mut master, 5), Some(data("up")));
+        say(&mut master, &data("down"));
+        assert_eq!(next(&mut handler, 5), Some(data("down")));
+    }
+
+    #[test]
+    fn a_renewed_certificate_is_used_for_new_links_and_open_links_stay() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = TlsFiles {
+            cert: dir.path().join("cert.pem"),
+            key: dir.path().join("key.pem"),
+        };
+        let old = make_cert(&files.cert, &files.key);
+        let (plain, tport, _) = start_both(files.clone());
+        let (mut master, shown) = tls_link(tport, std::slice::from_ref(&old));
+        assert_eq!(shown, old.to_vec());
+        let (id, _) = hello_master(&mut master);
+        // Renewed on disk (as ISPConfig does it, then the copy unit); a later change time on both files.
+        let new = make_cert(&files.cert, &files.key);
+        let later = std::time::SystemTime::now() + Duration::from_secs(5);
+        for f in [&files.cert, &files.key] {
+            std::fs::File::options()
+                .write(true)
+                .open(f)
+                .unwrap()
+                .set_modified(later)
+                .unwrap();
+        }
+        let both = [old.clone(), new.clone()];
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            let (_, shown) = tls_link(tport, &both);
+            if shown == new.to_vec() {
+                break;
+            }
+            assert!(
+                Instant::now() < until,
+                "the renewed certificate was never used"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // The link opened before the renewal still works.
+        let mut handler = link(&plain);
+        let (_, told) = open_session(&mut master, &mut handler, &id);
+        assert!(matches!(told, Msg::Accept { .. }), "{told:?}");
+    }
+
+    #[test]
+    fn a_bad_renewal_keeps_the_certificate_in_use() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = TlsFiles {
+            cert: dir.path().join("cert.pem"),
+            key: dir.path().join("key.pem"),
+        };
+        make_cert(&files.cert, &files.key);
+        let certs = Certs::load(files.clone()).unwrap();
+        let before = certs.current();
+        std::fs::write(&files.key, "not a key").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&files.key)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() + Duration::from_secs(5))
+            .unwrap();
+        let e = certs.reload_if_changed().unwrap_err();
+        assert!(e.contains("could not be read"), "{e}");
+        assert!(Arc::ptr_eq(&before, &certs.current()));
+    }
+
+    #[test]
+    fn old_apps_read_the_new_messages_and_new_relays_send_old_ones_unchanged() {
+        // An older app reads Welcome with the new field as before (no unknown-field refusal).
+        let m: Msg = serde_json::from_str(
+            r#"{"t":"welcome","master_id":"a","secret":"b","direct":"wss://x:47443","later":1}"#,
+        )
+        .unwrap();
+        assert!(matches!(m, Msg::Welcome { .. }));
+        // Without a TLS address the JSON is exactly the old one.
+        let plain = text(&Msg::Welcome {
+            master_id: "a".into(),
+            secret: "b".into(),
+            direct: None,
+        });
+        assert_eq!(plain, r#"{"t":"welcome","master_id":"a","secret":"b"}"#);
+        let accept = text(&Msg::Accept {
+            session: 1,
+            nonce: "n".into(),
+            direct: None,
+        });
+        assert_eq!(accept, r#"{"t":"accept","session":1,"nonce":"n"}"#);
     }
 }
