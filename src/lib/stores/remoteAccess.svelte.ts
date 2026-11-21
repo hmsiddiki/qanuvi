@@ -85,6 +85,58 @@ export function isDefaultRelay(relay: string | undefined): boolean {
   return r === "" || r === DEFAULT_RELAY;
 }
 
+/** 24rl F1/F2: a relay from the signed free relay list, as the shown machine tested it just now. */
+export interface FreeRelay {
+  url: string;
+  name: string;
+  runBy: string;
+  region: string;
+  note: string;
+  /** Milliseconds to connect, or null when it could not (then `error` says why). */
+  ms: number | null;
+  error: string;
+}
+
+/** The address with its trailing slash gone and in lower case, to compare relays. */
+function same(a: string, b: string): boolean {
+  const n = (r: string) => r.trim().replace(/\/+$/, "").toLowerCase();
+  return n(a) === n(b);
+}
+
+/** 24rl F2: the free relay list, fetched and tested by the shown machine when a relay choice opens. */
+class FreeRelays {
+  list = $state<FreeRelay[]>([]);
+  error = $state("");
+  loading = $state(false);
+
+  async load(): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
+    try {
+      const a = await callMaster<{ relays: FreeRelay[]; error: string }>(target(), "free_relays", {});
+      this.list = a.relays ?? [];
+      this.error = a.error ?? "";
+    } catch (e) {
+      this.error = errorText(e);
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  /** The free relay at this address, when it is one on the list. */
+  find(relay: string | undefined): FreeRelay | undefined {
+    return relay ? this.list.find((r) => same(r.url, relay)) : undefined;
+  }
+}
+
+export const freeRelays = new FreeRelays();
+
+/** 24rl F2: what the user is told before a free relay is used (said once, answered with a yes). */
+export function freeRelayAsk(r: Pick<FreeRelay, "name" | "runBy">): string {
+  const who = r.runBy ? `${r.name} (run by ${r.runBy})` : r.name;
+  return `${who} will carry this connection. It cannot read anything (it is sealed end to end), but it sees when this computer connects, from which internet address, and how much passes. Devices paired on another relay pair again here. Use it?`;
+}
+
 export interface Activity {
   at: number;
   device: string;

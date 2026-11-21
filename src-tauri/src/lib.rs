@@ -17,6 +17,7 @@ pub mod dap;
 pub mod data_location;
 pub mod drafts;
 pub mod files;
+pub mod free_relays;
 pub mod git;
 pub mod inbox;
 pub mod index;

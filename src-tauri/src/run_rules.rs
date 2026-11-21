@@ -1041,7 +1041,8 @@ mod tests {
         ] {
             assert_eq!(writable_dir(bad), None, "{bad}");
         }
-        assert!(writable_dir("C:/Users/Neel/scripts").is_some());
+        // A drive path is only a full path on Windows (on Linux it reads as relative, so it is refused there too).
+        assert!(writable_dir("C:/Users/Neel/scripts").is_some() || !cfg!(windows));
         assert!(writable_dir("/home/neel/scripts").is_some() || cfg!(windows));
     }
 

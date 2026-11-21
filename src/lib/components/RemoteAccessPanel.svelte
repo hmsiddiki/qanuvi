@@ -92,6 +92,12 @@
     {#if on && st?.connected}
       {@const share = usageText(st.usage)}
       {#if share.text}<p class="muted" class:warn={share.over}>{share.text}</p>{/if}
+    {:else if on && st?.error}
+      <!-- 24rl F5: nothing switches by itself (paired devices would have to pair again on another relay). -->
+      <p class="muted">
+        Trying again by itself. If this relay stays out of reach, a free relay or your own can be picked under Relay ·
+        Change; devices then pair again there.
+      </p>
     {/if}
 
     {#if on && st}

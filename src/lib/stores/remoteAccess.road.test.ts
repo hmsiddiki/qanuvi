@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectedText, sizeText, usageText } from "./remoteAccess.svelte";
+import { connectedText, freeRelayAsk, sizeText, usageText } from "./remoteAccess.svelte";
 
 describe("relay road (24rl R3)", () => {
   it("says which road the link took, and nothing extra for older masters", () => {
@@ -28,5 +28,15 @@ describe("daily share of the relay (24rl F4)", () => {
     expect(sizeText(1536)).toBe("1.5 KB");
     expect(sizeText(120 << 20)).toBe("120 MB");
     expect(sizeText(2 * 2 ** 30)).toBe("2 GB");
+  });
+});
+
+describe("free relays (24rl F2)", () => {
+  it("asks with who runs it and what it can see", () => {
+    const ask = freeRelayAsk({ name: "Example", runBy: "Test volunteer" });
+    expect(ask).toMatch(/^Example \(run by Test volunteer\) will carry this connection\./);
+    expect(ask).toMatch(/cannot read anything/);
+    expect(ask).toMatch(/pair again here\. Use it\?$/);
+    expect(freeRelayAsk({ name: "Example", runBy: "" })).toMatch(/^Example will carry/);
   });
 });

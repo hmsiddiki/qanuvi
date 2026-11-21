@@ -534,11 +534,17 @@ mod tests {
             })
         );
         // wd1: a folder the owner allowed comes with it; a system folder never does.
-        let r = parse_reading(
-            r#"{"intent": "act", "instruction": "Save the script there.", "allowWrite": "E:/tmp/qna-scripts/"}"#,
-        );
+        // A full path on this system (a drive path is not one on Linux).
+        let allowed = if cfg!(windows) {
+            "E:/tmp/qna-scripts"
+        } else {
+            "/tmp/qna-scripts"
+        };
+        let r = parse_reading(&format!(
+            r#"{{"intent": "act", "instruction": "Save the script there.", "allowWrite": "{allowed}/"}}"#
+        ));
         assert!(
-            matches!(&r, Some(Reading::Act { write_dir: Some(d), .. }) if d.eq_ignore_ascii_case("E:/tmp/qna-scripts")),
+            matches!(&r, Some(Reading::Act { write_dir: Some(d), .. }) if d.eq_ignore_ascii_case(allowed)),
             "{r:?}"
         );
         let r = parse_reading(r#"{"intent": "act", "allowWrite": "/etc"}"#);

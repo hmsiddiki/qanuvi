@@ -321,6 +321,8 @@ impl Master {
             // Remote access through a relay (Milestone 20), managed from this computer's own window.
             "relay_status" => to(Ok(self.relay.status())),
             "relay_activity" => to(Ok(self.relay.activity())),
+            // 24rl F1/F2: the free relay list (signed, from the update channel), each one tested from this machine.
+            "free_relays" => to(Ok(crate::free_relays::list_tested(&paths::data_dir()))),
             "relay_configure" => {
                 let me = self
                     .me

@@ -705,6 +705,28 @@ fn fetch(url: &str) -> Result<String, String> {
         .map_err(|e| format!("The update channel's answer did not read: {e}"))
 }
 
+/// 24rl F1: a small file from the update channel (the free relay list and its signature), at most 1 MB; None when
+/// the channel has no such file.
+pub fn fetch_bytes(url: &str) -> Result<Option<Vec<u8>>, String> {
+    let mut res = agent(Duration::from_secs(15))
+        .get(url)
+        .call()
+        .map_err(|e| format!("The update channel could not be reached: {e}"))?;
+    let status = res.status().as_u16();
+    if status == 404 {
+        return Ok(None);
+    }
+    if status != 200 {
+        return Err(format!("The update channel answered {status}."));
+    }
+    res.body_mut()
+        .with_config()
+        .limit(1 << 20)
+        .read_to_vec()
+        .map(Some)
+        .map_err(|e| format!("The update channel's answer did not read: {e}"))
+}
+
 /// M8b: what a terminal following an update prints when its stage changes (download progress aside).
 pub fn install_line(install: &Value) -> Option<String> {
     let version = install["version"].as_str().unwrap_or("");
