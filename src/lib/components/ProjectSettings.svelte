@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { projects, kindStyle } from "$lib/stores/projects.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { terminals } from "$lib/stores/terminals.svelte";
@@ -152,7 +153,7 @@
           <button type="button" disabled={!secretName.trim() || !secretValue} onclick={addSecret}>Add</button>
         </div>
       {/if}
-      {#if secretError}<p class="error">{secretError}</p>{/if}
+      {#if shownError(secretError)}<p class="error">{shownError(secretError)}</p>{/if}
 
       <h3>For all projects</h3>
       <label class="check">
@@ -174,7 +175,7 @@
         </select>
       </label>
 
-      {#if error}<p class="error">{error}</p>{/if}
+      {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
       <div class="actions">
         <button type="button" onclick={onclose}>Cancel</button>
         <button type="submit" class="primary">Save</button>

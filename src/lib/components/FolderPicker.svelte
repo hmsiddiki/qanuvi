@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Qanuvi's own folder picker for a server's folders (stores/folderPicker.svelte.ts): a path box (Enter goes there),
    * Up, the folders of the folder listed (a click opens one), Escape or a click outside cancels.
@@ -61,7 +62,7 @@
           aria-label="Folder path"
         />
       </form>
-      {#if folderPicker.error}<p class="error">{folderPicker.error}</p>{/if}
+      {#if shownError(folderPicker.error)}<p class="error">{shownError(folderPicker.error)}</p>{/if}
       <ul class="list" aria-label="Folders" aria-busy={folderPicker.loading}>
         {#if !folderPicker.folder}
           <li class="note">{folderPicker.loading ? "Reading the folders…" : ""}</li>

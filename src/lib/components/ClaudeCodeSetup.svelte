@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * c1: Claude Code on the shown machine, from the window. Suggested, never required: Qanuvi works without it. The
    * install is Claude Code's own native installer, its command shown first; the sign-in runs `claude auth login` in a
@@ -218,7 +219,7 @@
       <button type="button" class="link" onclick={look}>look again</button>.
     </p>
   {/if}
-  {#if error}<p class="error small">{error}</p>{/if}
+  {#if shownError(error)}<p class="error small">{shownError(error)}</p>{/if}
 </div>
 
 <style>

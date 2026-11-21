@@ -1317,6 +1317,10 @@ runs on or off; with it off nothing is sent anywhere.
       new message. Now: a project or chat switch clears it; a link error (remote.ts LINK_GONE: our own fixed texts)
       goes on the first call that gets through (onCallOk); while the reconnect notice is up the chat does not repeat
       it. Tests: link texts known, onCallOk told of calls that got through only.
+      ce1 part 2 (found driving LT on the laptop, 06:26): the Plan pane kept the same stale line. Made one rule for
+      all: stores/linkState.svelte.ts shownError(): a link error shows only while the link is still gone and no
+      reconnect notice says so (remote.ts onLinkGone / onCallOk); applied to the error lines of 28 components + the
+      chat. Tests: other errors always show; a link error goes once a call gets through; not repeated under the notice.
     bl1 FIXED (2026-11-21 06:10, the "browser left over" watch item): on the laptop a headless Brave from the 04:58
       LM4 test ran on after its test master (440127) stopped. Linux starts it through /usr/bin/brave-browser, a
       script that runs the real browser as its child (no exec); only the script was stopped, and nothing on Linux

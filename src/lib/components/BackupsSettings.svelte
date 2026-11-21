@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Backups (1d): a daily copy of Qanuvi's data (database, core records, agent histories, the window's settings) in a
    * folder the user chooses, the last 7 kept. A restore is applied when Qanuvi starts again; the data in use is kept
@@ -285,7 +286,7 @@
   {/each}
 {/if}
 
-{#if error}<p class="error small">{error}</p>{/if}
+{#if shownError(error)}<p class="error small">{shownError(error)}</p>{/if}
 
 <style>
   h2 {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * OmniRoute run by Qanuvi (24c): connections and their health, free providers to add (recommended ones, or anything
    * from OmniRoute's catalog for expert users), sign-in renewal and Qanuvi's fallback combo. Every action is a button
@@ -293,7 +294,7 @@
   {/if}
 
   {#if omni.note}<p class="ok small">{omni.note}</p>{/if}
-  {#if omni.error}<p class="error small">{omni.error}</p>{/if}
+  {#if shownError(omni.error)}<p class="error small">{shownError(omni.error)}</p>{/if}
 </div>
 
 <style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The sidebar's "Run and debug" mode (15i part 3): pick a launch.json configuration and start it; while a session
    * runs, the controls, variables, watch expressions, call stack and breakpoints.
@@ -135,7 +136,7 @@
   {#if !dap.fromFile && !dap.launchError}
     <p class="note">No launch.json: these are Qanuvi's defaults. The gear makes one VS Code also reads.</p>
   {/if}
-  {#if dap.launchError}<p class="error">{dap.launchError}</p>{/if}
+  {#if shownError(dap.launchError)}<p class="error">{shownError(dap.launchError)}</p>{/if}
 
   {#if dap.offer}
     {@const o = dap.offer}
@@ -157,7 +158,7 @@
       {:else}
         <p>{o.missing}</p>
       {/if}
-      {#if dap.installError}<p class="error">{dap.installError}</p>{/if}
+      {#if shownError(dap.installError)}<p class="error">{shownError(dap.installError)}</p>{/if}
     </div>
   {:else if dap.lastError}
     <p class="error">{dap.lastError}</p>

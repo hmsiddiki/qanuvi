@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The central Qanuvi account (Milestone 19), the shown machine's (migration M2: each machine keeps its own sign-in).
    * Optional; Qanuvi works fully without it.
@@ -53,7 +54,7 @@
       </p>
     {/if}
   {/if}
-  {#if account.error}<p class="error">{account.error}</p>{/if}
+  {#if shownError(account.error)}<p class="error">{shownError(account.error)}</p>{/if}
 </div>
 
 {#if account.waiting}

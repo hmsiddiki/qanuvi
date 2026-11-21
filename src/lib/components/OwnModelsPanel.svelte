@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /** Qanuvi's own agent (Milestone 24): the models its brain may use, and where they come from. */
   import { knowledge } from "$lib/stores/knowledge.svelte";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
@@ -186,7 +187,7 @@
     {#if guides.kept}<button type="button" class="link" onclick={() => guides.reset()}>Use the built-in ones</button
       >{/if}
   </p>
-  {#if guides.updateError}<p class="error">{guides.updateError}</p>{/if}
+  {#if shownError(guides.updateError)}<p class="error">{shownError(guides.updateError)}</p>{/if}
   {#if knowledge.offer}
     <div class="proposal">
       <strong
@@ -209,7 +210,7 @@
     {#if knowledge.kept}<button type="button" class="link" onclick={() => knowledge.reset()}
         >Use the built-in ones</button
       >{/if}
-    {#if knowledge.error}<span class="error">{knowledge.error}</span>{/if}
+    {#if shownError(knowledge.error)}<span class="error">{shownError(knowledge.error)}</span>{/if}
   </p>
   {#if guides.proposal}
     <div class="proposal">
@@ -360,7 +361,7 @@
     <input bind:value={newProvider.name} placeholder="Name" aria-label="Provider name" />
     <input bind:value={newProvider.url} spellcheck="false" aria-label="Provider address" />
     <button type="submit" class="btn">Add</button>
-    {#if addError}<span class="error">{addError}</span>{/if}
+    {#if shownError(addError)}<span class="error">{shownError(addError)}</span>{/if}
   </form>
 </div>
 

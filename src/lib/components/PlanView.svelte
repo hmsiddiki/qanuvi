@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { ask } from "$lib/stores/confirm.svelte";
   import Pause from "@lucide/svelte/icons/pause";
   import Square from "@lucide/svelte/icons/square";
@@ -480,7 +481,7 @@
     >
   </header>
 
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
   {#if runner.picking}<p class="pick-note">Picking models for the open steps…</p>
   {:else if pickNote}<p class="pick-note">{pickNote}</p>{/if}
 

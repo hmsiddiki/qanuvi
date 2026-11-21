@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Source Control, as in VS Code (Milestone 15b): commit message and commit, staged and unstaged changes, merge
    * conflicts, branches, pull / push / fetch, stash and history. Everything runs through the installed git.
@@ -426,7 +427,7 @@
           </div>
         {/if}
         {#if busy}<p class="note">{busy}</p>{/if}
-        {#if error}<p class="error">{error}</p>{/if}
+        {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
         {#if notice}<p class="note">{notice}</p>{/if}
 
         <div class="lists">

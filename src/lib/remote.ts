@@ -270,6 +270,15 @@ export function isLinkError(text: string): boolean {
 /** Who wants to know that a call got through (a link is there again), by the master it went to. */
 const callsOk = new Set<(master: string) => void>();
 
+/** Who wants to know that a call found its link gone. */
+const linksGone = new Set<(master: string) => void>();
+
+/** Tells `fn` of each call that failed because its link was gone; gives back the function that stops it. */
+export function onLinkGone(fn: (master: string) => void): () => void {
+  linksGone.add(fn);
+  return () => linksGone.delete(fn);
+}
+
 /** Tells `fn` of each call that got through; gives back the function that stops it. */
 export function onCallOk(fn: (master: string) => void): () => void {
   callsOk.add(fn);
@@ -297,6 +306,7 @@ async function linkCall<T>(master: string, cmd: string, args: Record<string, unk
       onEvent: streams ? onEvent : new Channel(),
     });
   } catch (e) {
+    if (typeof e === "string" && isLinkError(e)) for (const fn of linksGone) fn(master);
     throw typeof e === "string" && UNKNOWN.test(e) ? new NotOnMachine(master, cmd) : e;
   }
   for (const fn of callsOk) fn(master);

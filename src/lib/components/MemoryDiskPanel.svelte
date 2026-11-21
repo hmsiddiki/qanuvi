@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Memory disk settings and syncing (Milestone 18), on the Memory page: the shown machine's own (24z3 D6). On a
    * server or another computer the folder is one on that machine; a folder on a server is chosen on This PC for now
@@ -178,7 +179,7 @@
         {#if changingPass}<button type="button" class="btn" onclick={() => (changingPass = false)}>Cancel</button>{/if}
       </form>
       <p class="muted">Use the same passphrase on every computer. It cannot be recovered: keep it somewhere safe.</p>
-      {#if passError}<p class="error">{passError}</p>{/if}
+      {#if shownError(passError)}<p class="error">{shownError(passError)}</p>{/if}
     {/if}
 
     <div class="row">
@@ -196,7 +197,7 @@
         Sync by itself (at start-up, after changes, every 10 minutes)
       </label>
     </div>
-    {#if memoryDisk.error}<p class="error">{memoryDisk.error}</p>{/if}
+    {#if shownError(memoryDisk.error)}<p class="error">{shownError(memoryDisk.error)}</p>{/if}
     {#if memoryDisk.last}
       {@const l = memoryDisk.last}
       <p class="muted">
@@ -212,7 +213,7 @@
     <div class="row">
       <button type="button" class="link" disabled={!hasDisk} onclick={showVersions}>Earlier versions…</button>
     </div>
-    {#if versionError}<p class="error">{versionError}</p>{/if}
+    {#if shownError(versionError)}<p class="error">{shownError(versionError)}</p>{/if}
     {#if versions}
       {#if versions.length === 0}<p class="muted">No earlier versions yet (one is kept at each sync, up to 10).</p>{/if}
       <ul class="versions">

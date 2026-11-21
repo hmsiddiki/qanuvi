@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The user's memory (Milestone 17): rules, style, facts, decisions, solutions and approved examples. Every entry is in
    * one of three parts (24z3 D8): About me and Tools and models are account memory (they go to the user's other machines
@@ -198,7 +199,7 @@
 
   <MemoryDiskPanel />
 
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
 
   {#if suggested.length}
     <h3>Suggested by agents ({suggested.length})</h3>

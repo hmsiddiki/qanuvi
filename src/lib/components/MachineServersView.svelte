@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The Servers list of the master on screen (migration M3b): the servers that machine connects to itself, kept on it
    * with their pairing keys. Adding, pairing, connecting and removing here change that machine's list, never This
@@ -101,7 +102,7 @@
 {#if !connection}
   <p class="muted">Not connected to {here}.</p>
 {:else if ms.machine === machine}
-  {#if ms.error}<p class="error">{ms.error}</p>{/if}
+  {#if shownError(ms.error)}<p class="error">{shownError(ms.error)}</p>{/if}
 
   {#each ms.list as m (m.id)}
     {@const st = ms.statusOf(m.id)}
@@ -135,7 +136,7 @@
           <button type="submit" class="btn primary">Save</button>
           <button type="button" class="btn" onclick={() => (renaming = null)}>Cancel</button>
         </form>
-        {#if renameError}<p class="error">{renameError}</p>{/if}
+        {#if shownError(renameError)}<p class="error">{shownError(renameError)}</p>{/if}
       {:else if nameIssue(m)}
         <p class="error">{nameIssue(m)} Change the name so the two are never mixed up.</p>
       {/if}
@@ -188,7 +189,7 @@
       Name of {here} on the other computer (empty: its computer name)
       <input bind:value={pairName} maxlength={NAME_MAX + 10} />
     </label>
-    {#if pairError}<p class="error">{pairError}</p>{/if}
+    {#if shownError(pairError)}<p class="error">{shownError(pairError)}</p>{/if}
     <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
       {pairing ? "Pairing…" : "Pair and connect"}
     </button>
@@ -217,7 +218,7 @@
       <input bind:value={identity} placeholder="~/.ssh/id_ed25519 · empty: its SSH defaults" spellcheck="false" />
     </label>
     <label class="check"><input type="checkbox" bind:checked={auto} /> Connect when {here} starts</label>
-    {#if formError}<p class="error">{formError}</p>{/if}
+    {#if shownError(formError)}<p class="error">{shownError(formError)}</p>{/if}
     <button type="submit" class="btn primary" disabled={adding}>{adding ? "Connecting…" : "Add and connect"}</button>
   </form>
   <p class="muted">

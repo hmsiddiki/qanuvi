@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The diff of one file in the Source Control view (Milestone 15b): side by side or inline, unchanged parts folded,
    * and per change: stage, unstage or undo. Merge conflicts get accept current / incoming / both per block.
@@ -238,7 +239,7 @@
       </IconButton>
     {/if}
   </header>
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
   {#if conflicted}
     <div class="conflicts">
       {#if blocks.length === 0}

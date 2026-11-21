@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { contextMenu } from "$lib/stores/contextMenu.svelte";
   import * as files from "$lib/fileActions";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
@@ -175,7 +176,7 @@
       <IconButton label="Collapse folders" onclick={collapseAll}><ChevronsDownUp size={13} /></IconButton>
     </header>
   {/if}
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
   <div class="tree" role="tree" aria-label="Files" tabindex="-1" oncontextmenu={rootMenu}>
     {#each flat as { entry, depth, ignored } (entry.path)}
       {@const open = expanded.has(entry.path)}

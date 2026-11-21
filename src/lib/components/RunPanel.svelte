@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { agent } from "$lib/stores/agent.svelte";
   import { editor } from "$lib/stores/editor.svelte";
   import { ANSWER_HINT } from "$lib/plan/holdask";
@@ -1325,7 +1326,7 @@
   </form>
 {/if}
 
-{#if error}<p class="error">{error}</p>{/if}
+{#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
 
 {#if run && !setup}
   <div class="panel status {run.status}">

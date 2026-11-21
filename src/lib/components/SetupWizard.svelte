@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * First-time setup (24c): one guided path so the user configures nothing by hand. It measures the computer and says
    * honestly what local models can do here, then sets up what the user ticks: a local model through Ollama (installed
@@ -389,8 +390,8 @@
       then <button type="button" class="link" onclick={lookAgain}>look again</button>.
     </p>
   {/if}
-  {#if error}<p class="error small">{error}</p>{/if}
-  {#if omni.error}<p class="error small">{omni.error}</p>{/if}
+  {#if shownError(error)}<p class="error small">{shownError(error)}</p>{/if}
+  {#if shownError(omni.error)}<p class="error small">{shownError(omni.error)}</p>{/if}
 </div>
 
 <style>

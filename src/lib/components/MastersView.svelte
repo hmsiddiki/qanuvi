@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Servers (Milestone 16): Qanuvi without a window on a Linux server or VPS, reached over SSH. Add a server,
    * connect, and add its folders as projects; they then work like this PC's projects. The sidebar lists one machine
@@ -128,7 +129,7 @@
       work like this PC's: files, git, search, terminals and agents run on the server, and agent sessions keep going
       when this PC is off.
     </p>
-    {#if masters.keepError}<p class="error">{masters.keepError}</p>{/if}
+    {#if shownError(masters.keepError)}<p class="error">{shownError(masters.keepError)}</p>{/if}
 
     <DataFolderPanel />
     <RemoteAccessPanel />
@@ -176,7 +177,7 @@
                 />
               </label>
             {/if}
-            {#if editError}<p class="error">{editError}</p>{/if}
+            {#if shownError(editError)}<p class="error">{shownError(editError)}</p>{/if}
             <div class="row">
               <button type="submit" class="btn primary" disabled={saving}>{saving ? "Connecting…" : "Save"}</button>
               <button type="button" class="btn" disabled={saving} onclick={() => (editing = null)}>Cancel</button>
@@ -256,7 +257,7 @@
         This device's name (shown on the other computer)
         <input bind:value={pairName} placeholder="My laptop" maxlength={NAME_MAX + 10} />
       </label>
-      {#if pairError}<p class="error">{pairError}</p>{/if}
+      {#if shownError(pairError)}<p class="error">{shownError(pairError)}</p>{/if}
       <button type="submit" class="btn primary" disabled={pairing || !pairRelay.trim() || !pairCode.trim()}>
         {pairing ? "Pairing…" : "Pair and connect"}
       </button>
@@ -281,7 +282,7 @@
         <input bind:value={identity} placeholder="~/.ssh/id_ed25519 · empty: your SSH defaults" spellcheck="false" />
       </label>
       <label class="check"><input type="checkbox" bind:checked={auto} /> Connect when Qanuvi starts</label>
-      {#if formError}<p class="error">{formError}</p>{/if}
+      {#if shownError(formError)}<p class="error">{shownError(formError)}</p>{/if}
       <button type="submit" class="btn primary" disabled={adding}>{adding ? "Connecting…" : "Add and connect"}</button>
     </form>
 

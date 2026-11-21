@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The bottom panel's Problems and References lists (15i): what the language servers report for the project, and
    * the last "find references" (or several definitions). A click opens the place; "Fix with agent" (on a problem,
@@ -81,7 +82,7 @@
         {/each}
       </span>
     </div>
-    {#if lsp.lastError}<p class="error">{lsp.lastError}</p>{/if}
+    {#if shownError(lsp.lastError)}<p class="error">{shownError(lsp.lastError)}</p>{/if}
     {#if groups.length === 0}
       <p class="muted empty">
         {all.length ? "Nothing matches the filter." : checking ? "Checking…" : "No problems found."}

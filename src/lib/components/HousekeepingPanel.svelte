@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Plan housekeeping (24j): move finished sections to the plan's archive, or add another plan's steps to this one.
    * Shows what will change first; nothing is written until the user confirms.
@@ -186,7 +187,7 @@
       {mode === "archive" ? "Move to the archive" : `Add to ${file}`}
     </button>
   </div>
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
 </div>
 
 <style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /** The shown machine's remote access (Milestone 20; per machine since 24z3 D6), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import { ask } from "$lib/stores/confirm.svelte";
@@ -86,7 +87,7 @@
         >
       {/if}
     </div>
-    {#if remoteAccess.error}<p class="error">{remoteAccess.error}</p>{/if}
+    {#if shownError(remoteAccess.error)}<p class="error">{shownError(remoteAccess.error)}</p>{/if}
 
     {#if on && st}
       <div class="row">

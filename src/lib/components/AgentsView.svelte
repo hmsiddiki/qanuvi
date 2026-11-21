@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { claudeUpdate } from "$lib/stores/claudeUpdate.svelte";
   import FileCog from "@lucide/svelte/icons/file-cog";
   import CirclePlus from "@lucide/svelte/icons/circle-plus";
@@ -74,7 +75,7 @@
       >
     </span>
   </label>
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
 
   {#if settings.value.ai && team}<TeamPanel />{/if}
   {#each PROVIDERS as p (p.id)}

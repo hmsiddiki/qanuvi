@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * One CodeMirror view per editor group for all its tabs. Each tab keeps its own editor state (text, cursor, undo
    * history); switching tabs swaps the state, which is cheaper than a view per tab. A file shown in both groups has
@@ -582,7 +583,7 @@
       {/if}
       <button type="button" onclick={() => lsp.notNow(o.server)}>Not now</button>
       <button type="button" onclick={() => lsp.never(o.server)}>Don't ask again</button>
-      {#if lsp.installError}<span class="error">{lsp.installError}</span>{/if}
+      {#if shownError(lsp.installError)}<span class="error">{shownError(lsp.installError)}</span>{/if}
       {#if lsp.installing === o.server && lsp.installLog.length}
         <pre class="install-log" aria-live="polite">{lsp.installLog.join("\n")}</pre>
       {/if}

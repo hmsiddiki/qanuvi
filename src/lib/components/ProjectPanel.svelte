@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * The project panel on the work area's left edge (15h): Explorer, Search and Git. The Explorer's sections (open
    * editors, files, outline, timeline, files the session touched) open and close, are dragged into another order,
@@ -342,7 +343,7 @@
                       onkeydown={(e) => e.key === "Escape" && ((creating = ""), (createError = ""))}
                     />
                   </form>
-                  {#if createError}<p class="note error">{createError}</p>{/if}
+                  {#if shownError(createError)}<p class="note error">{shownError(createError)}</p>{/if}
                 {/if}
                 <Explorer bind:this={explorer} {project} headless />
               {:else if s.id === "outline"}

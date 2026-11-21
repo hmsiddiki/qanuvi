@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import { contextMenu, copyText } from "$lib/stores/contextMenu.svelte";
   import * as files from "$lib/fileActions";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
@@ -210,7 +211,7 @@
             <Plus size={14} />
           </button>
         </header>
-        {#if projects.error}<p class="error">{projects.error}</p>{/if}
+        {#if shownError(projects.error)}<p class="error">{shownError(projects.error)}</p>{/if}
         {#each projects.list as p (p.id)}
           {@const style = kindStyle(p.kind)}
           <div class="project" class:current={p.id === projects.currentId}>

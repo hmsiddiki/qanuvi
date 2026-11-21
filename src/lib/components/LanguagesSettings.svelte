@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Settings → Languages (15i): the language servers Qanuvi knows, whether each is on this computer, Install (the
    * click is the user's yes), on or off per language, how long an unused server keeps running; then the debuggers
@@ -97,7 +98,7 @@
   {:else}
     <p class="muted">Reading what is installed…</p>
   {/each}
-  {#if lsp.installError}<p class="error">{lsp.installError}</p>{/if}
+  {#if shownError(lsp.installError)}<p class="error">{shownError(lsp.installError)}</p>{/if}
 
   <label class="save">
     <input
@@ -149,7 +150,7 @@
       {/if}
     </div>
   {/each}
-  {#if dap.installError}<p class="error">{dap.installError}</p>{/if}
+  {#if shownError(dap.installError)}<p class="error">{shownError(dap.installError)}</p>{/if}
   {#if dap.statusError}
     <p class="error stale">
       Could not check {shownPlace()} again: {dap.statusError}. The list above is from the last check.

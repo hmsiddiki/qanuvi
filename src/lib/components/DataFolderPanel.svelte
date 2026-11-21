@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   /**
    * Where Qanuvi keeps its data (15e): any folder on any drive. The move happens when Qanuvi starts again (nothing is
    * in use then): everything is copied, checked and switched; the old copy is kept until the user removes it.
@@ -155,7 +156,7 @@
         <button type="button" class="link" onclick={removeOld}>Remove it…</button>
       </p>
     {/if}
-    {#if error}<p class="error small">{error}</p>{/if}
+    {#if shownError(error)}<p class="error small">{shownError(error)}</p>{/if}
   </section>
 {/if}
 

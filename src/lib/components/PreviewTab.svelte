@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownError } from "$lib/stores/linkState.svelte";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
@@ -385,7 +386,7 @@
       <IconButton label="Full screen" onclick={() => expand("screen")}><Fullscreen size={14} /></IconButton>
     {/if}
   </form>
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if shownError(error)}<p class="error">{shownError(error)}</p>{/if}
   {#if busy}<p class="note">{busy}</p>{:else if shot}<p class="note">
       Click an element to send it to the agent; scroll to move the page; Esc to stop.
       <button type="button" class="link" onclick={() => (shot = null)}><X size={12} /> Stop</button>
