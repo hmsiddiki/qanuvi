@@ -1559,6 +1559,8 @@ runs on or off; with it off nothing is sent anywhere.
       qanuvi-updates/dev (old latest.json = 0.1.36 in E:/Backups/qanuvi/channel-before-0.1.37). Online: all 9 files
       200, sizes match, latest.json says 0.1.37. Tagged v0.1.37. The code card's own-relay line is still not driven
       in a window. Next: owner updates both machines; then 24rl part 3 (free relays), relay kit, sl1.
+    0.1.37 ON BOTH MACHINES (owner, 2026-11-22): updates worked; the laptop paired again with This PC (nothing typed)
+      and loaded This PC's master "like a blink". 24rl PART 2a DONE. Next: part 3 write-up for the owner's yes.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
