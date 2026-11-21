@@ -1455,6 +1455,20 @@ runs on or off; with it off nothing is sent anywhere.
       and scratch as before; system folders and roots never taken; /e/... matches; reading keeps a folder and
       drops /etc; window keeps write_dirs and older records unchanged (fails without the fix). Rust lib 607,
       vitest 567, svelte-check 0, clippy clean both builds. Unpublished (0.1.35, ask).
+    24rl PING TIME (owner, 2026-11-21): stays 30 s (dead link found within 90 s); --ping-every is there for later.
+    24rl R5 RELAY DEPLOYED (owner "yes go on", 2026-11-21 13:20 server time): basevm376 runs cb0f819 relay (built on
+      the laptop, glibc 2.39 = server's; 2.1 MB, sha256 3fbfe564...), .prev = rl4 build, old unit kept in
+      /root/qanuvi-relay.service.before-24rl. Unit = deploy/relay/qanuvi-relay.service (both roads, 47443,
+      --public-direct wss://relay.qanuvi.com:47443, LimitNOFILE 262144: checked in /proc). Cert copy service + path
+      unit enabled: /var/lib/qanuvi-relay/tls/ fullchain.pem (same as ISPConfig's, 4 certs, CN relay.qanuvi.com,
+      to 2027-02-18) + key.pem 0600 qanuvi-relay. Dry run as the relay user on 127.0.0.1:47444 first: TLS verify 0.
+      UFW: 47443/tcp allowed (v4 + v6). ISPConfig MANAGES THE FIREWALL (firewall table + firewall_plugin, list
+      21,22,25,...,40110:40210): the owner adds 47443 there (System > Firewall) or a later save in the panel drops
+      the UFW rule. Live: both listeners with queue 4096; Home PC + laptop back within a second (0.1.34, via 443);
+      from This PC over the internet wss port 47443: TLSv1.3, verify 0. Laptop -> Home PC 8.8 MB chat 3.3 s warm
+      (2.9 s on the rl4 relay this morning, first cold try 5.0 s), 4.9 MB 1.69 s (1.64): same; link stayed on.
+    0.1.35 HELD by the release rule (Claude Code 2.1.330 out, here 2.1.329), before any build; script ready:
+      E:/qc-scratch/release-0.1.35/run.sh (QANUVI_RELEASE_ANYWAY=1 to skip the rule). Holds R3 + wd1.
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
