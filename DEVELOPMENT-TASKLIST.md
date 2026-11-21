@@ -1366,7 +1366,14 @@ runs on or off; with it off nothing is sent anywhere.
       rl3 build; active, both links back. 0.1.34 HELD: the release rule stopped it (Claude Code 2.1.330 out, here
       2.1.329); updating Claude Code from the session was refused, so the owner runs "claude update" or says
       "publish anyway". Run script ready: E:/qc-scratch/release-0.1.34/run.sh (add QANUVI_RELEASE_ANYWAY=1 for anyway).
-    PICKUP POINT (newest, 2026-11-21 rl4 fixed): rl4 + r5 unpublished. Next: relay deploy (ask), 0.1.34 (ask),
+    0.1.34 PUBLISHED (owner "publish anyway", 2026-11-21 08:35; release rule skipped with QANUVI_RELEASE_ANYWAY=1:
+      Claude Code 2.1.330 out, here 2.1.329): rl4 (long lines in parts, sealing writer fix), r5, rl3. Built into
+      E:/qc-scratch/release-0.1.34/chan (Linux app on the laptop), copied to qanuvi-updates/dev (old latest.json in
+      E:/Backups/qanuvi/channel-before-0.1.34). Online: all files 200, sizes match. Tagged v0.1.34.
+    PICKUP POINT (newest, 2026-11-21 0.1.34): nothing unpublished. Next: owner updates PC + laptop; drive live: a
+      long chat (over 4 MB) opened from the laptop stays connected and opens fast, r5 on a scratch plan; then a
+      fresh conversation for 24rl part 1 (questions to the owner asked: scale meaning, who runs free relays, nginx).
+    PICKUP POINT (before, 2026-11-21 rl4 fixed): rl4 + r5 unpublished. Next: relay deploy (ask), 0.1.34 (ask),
       drive r5 + a long chat from the laptop live, then plan 24rl part 1 with the owner (questions asked).
     PICKUP POINT (before, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
       plan 24rl in parts with the owner.
