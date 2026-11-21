@@ -1043,7 +1043,11 @@ mod tests {
 
     /// R2: a test certificate for "localhost" written as PEM files; answers its DER (for the client to trust).
     fn make_cert(cert: &Path, key: &Path) -> rustls::pki_types::CertificateDer<'static> {
-        let made = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        let made = rcgen::generate_simple_self_signed(vec![
+            "localhost".to_string(),
+            "127.0.0.1".to_string(),
+        ])
+        .unwrap();
         std::fs::write(cert, made.cert.pem()).unwrap();
         std::fs::write(key, made.signing_key.serialize_pem()).unwrap();
         made.cert.der().clone()
@@ -1061,7 +1065,7 @@ mod tests {
         let mut relay = Relay::new(None);
         if let Some(r) = Arc::get_mut(&mut relay) {
             r.quiet = true;
-            r.direct = Some(format!("wss://localhost:{tport}"));
+            r.direct = Some(format!("wss://127.0.0.1:{tport}"));
         }
         let certs = Certs::load(files).unwrap();
         let handle = relay.clone();
@@ -1172,7 +1176,7 @@ mod tests {
         let (plain, tport, _) = start_both(files);
         let (mut master, _) = tls_link(tport, std::slice::from_ref(&der));
         let (id, direct) = hello_master(&mut master);
-        assert_eq!(direct, Some(format!("wss://localhost:{tport}")));
+        assert_eq!(direct, Some(format!("wss://127.0.0.1:{tport}")));
         let mut handler = link(&plain);
         let (session, told) = open_session(&mut master, &mut handler, &id);
         assert_eq!(
@@ -1180,7 +1184,7 @@ mod tests {
             Msg::Accept {
                 session,
                 nonce: "m".into(),
-                direct: Some(format!("wss://localhost:{tport}")),
+                direct: Some(format!("wss://127.0.0.1:{tport}")),
             }
         );
         let data = |body: &str| Msg::Data {
@@ -1279,5 +1283,103 @@ mod tests {
             direct: None,
         });
         assert_eq!(accept, r#"{"t":"accept","session":1,"nonce":"n"}"#);
+    }
+
+    /// R3: a plain test relay that tells apps a TLS address of the test's choosing.
+    fn start_plain_telling(direct: String) -> String {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut relay = Relay::new(None);
+        if let Some(r) = Arc::get_mut(&mut relay) {
+            r.quiet = true;
+            r.direct = Some(direct);
+        }
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+        std::thread::spawn(move || {
+            let _ = rt.block_on(relay.accept_loop(listener));
+        });
+        format!("ws://127.0.0.1:{port}")
+    }
+
+    /// R3: a master's link through the app's own connect; answers what the relay said in Welcome.
+    fn app_welcome(relay: &str) -> Msg {
+        let mut link = crate::relay_client::Link::connect(relay).unwrap();
+        link.send(&Msg::HelloMaster {
+            master_id: String::new(),
+            secret: String::new(),
+        })
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < until {
+            if let Some(m @ Msg::Welcome { .. }) = link.poll().unwrap() {
+                return m;
+            }
+        }
+        panic!("no welcome");
+    }
+
+    #[test]
+    fn apps_use_the_relays_own_port_once_it_told_them() {
+        use crate::relay_client::{OWN_PORT, THROUGH_SAVED, road_of};
+        let dir = tempfile::tempdir().unwrap();
+        let files = TlsFiles {
+            cert: dir.path().join("cert.pem"),
+            key: dir.path().join("key.pem"),
+        };
+        let der = make_cert(&files.cert, &files.key);
+        crate::relay_client::TEST_ROOTS.lock().unwrap().push(der);
+        let (plain, tport, _) = start_both(files);
+        // First link: nothing known yet, so the saved address; the relay tells its own port.
+        app_welcome(&plain);
+        let road = road_of(&plain);
+        assert_eq!(road.last, THROUGH_SAVED);
+        assert_eq!(road.direct, format!("wss://127.0.0.1:{tport}"));
+        // Next link goes to the own port, and works there.
+        let told = app_welcome(&plain);
+        assert!(matches!(told, Msg::Welcome { .. }));
+        assert_eq!(road_of(&plain).last, OWN_PORT);
+    }
+
+    #[test]
+    fn an_own_port_that_does_not_answer_costs_a_few_seconds_once_then_the_saved_address_is_used_straight_away()
+     {
+        use crate::relay_client::{THROUGH_SAVED, road_of};
+        // A port that takes the connection and never answers (as a network that swallows it).
+        let silent = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let sport = silent.local_addr().unwrap().port();
+        let relay = start_plain_telling(format!("wss://127.0.0.1:{sport}"));
+        app_welcome(&relay);
+        assert_eq!(road_of(&relay).direct, format!("wss://127.0.0.1:{sport}"));
+        let t = Instant::now();
+        app_welcome(&relay);
+        let first = t.elapsed();
+        assert!(
+            first >= Duration::from_millis(2500) && first < Duration::from_secs(8),
+            "{first:?}"
+        );
+        let road = road_of(&relay);
+        assert_eq!(road.last, THROUGH_SAVED);
+        assert!(road.skip_until > crate::store::now() + 3600);
+        let t = Instant::now();
+        app_welcome(&relay);
+        assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+        drop(silent);
+    }
+
+    #[test]
+    fn a_relay_that_tells_no_own_port_is_used_as_before_and_a_foreign_host_is_not_taken() {
+        use crate::relay_client::{THROUGH_SAVED, road_of};
+        let relay = start_local().unwrap();
+        app_welcome(&relay);
+        assert_eq!(road_of(&relay).direct, "");
+        assert_eq!(road_of(&relay).last, THROUGH_SAVED);
+        // A relay cannot send this computer to another host.
+        let other = start_plain_telling("wss://elsewhere.example:47443".into());
+        app_welcome(&other);
+        assert_eq!(road_of(&other).direct, "");
     }
 }

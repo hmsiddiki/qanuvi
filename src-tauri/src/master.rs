@@ -239,7 +239,11 @@ impl Master {
             quit_question: Default::default(),
             remote_errors: Mutex::default(),
             held_off: Mutex::default(),
-            relay: crate::relay_client::RelayMaster::open(dir),
+            relay: {
+                // 24rl R3: what is learned about each relay's own port is kept with this master's data.
+                crate::relay_client::keep_roads_in(dir);
+                crate::relay_client::RelayMaster::open(dir)
+            },
             me: std::sync::OnceLock::new(),
             cut_off: Mutex::new((why.unwrap_or_default(), cut_off)),
             updates: Arc::default(),

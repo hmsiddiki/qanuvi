@@ -3,7 +3,7 @@
   /** The shown machine's remote access (Milestone 20; per machine since 24z3 D6), on the Servers page. */
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import { ask } from "$lib/stores/confirm.svelte";
-  import { remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import { connectedText, remoteAccess } from "$lib/stores/remoteAccess.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { ago } from "$lib/stores/git.svelte";
   import { placeTitle, shownPlace } from "$lib/remote";
@@ -83,7 +83,7 @@
       {/if}
       {#if on && st}
         <span class="state" class:ok={st.connected}
-          >{st.connected ? "Connected to the relay" : st.error || "Connecting…"}</span
+          >{st.connected ? connectedText(st) : st.error || "Connecting…"}</span
         >
       {/if}
     </div>

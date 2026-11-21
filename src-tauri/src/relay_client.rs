@@ -20,6 +20,8 @@ use tungstenite::{Message, WebSocket};
 /// A WebSocket to the relay.
 pub struct Link {
     ws: WebSocket<MaybeTlsStream<TcpStream>>,
+    /// The relay's saved address (24rl R3: what it tells about its own port is kept under this).
+    relay: String,
     /// rl1: when the relay was last heard from, and last pinged; a link quiet for too long has died.
     heard: Instant,
     pinged: Instant,
@@ -44,27 +46,233 @@ pub fn check_relay_url(url: &str) -> Result<String, String> {
     }
 }
 
-impl Link {
-    pub fn connect(url: &str) -> Result<Self, String> {
-        let url = check_relay_url(url)?;
-        let (ws, _) = tungstenite::connect(url.as_str())
-            .map_err(|e| format!("The relay could not be reached: {e}"))?;
-        let timeout = Some(Duration::from_millis(50));
-        match ws.get_ref() {
-            MaybeTlsStream::Plain(s) => s.set_read_timeout(timeout).map_err(|e| e.to_string())?,
-            MaybeTlsStream::Rustls(s) => s
-                .get_ref()
-                .set_read_timeout(timeout)
-                .map_err(|e| e.to_string())?,
-            _ => {}
+/// 24rl R3: how this computer reaches each relay: the relay's own TLS address (learned from the relay), until when
+/// that port is not tried (it did not answer here), and which road the last link took.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Road {
+    #[serde(default)]
+    pub direct: String,
+    /// Unix seconds; the own port is not tried before then.
+    #[serde(default)]
+    pub skip_until: i64,
+    /// OWN_PORT or THROUGH_SAVED.
+    #[serde(default)]
+    pub last: String,
+}
+
+/// The last link went to the relay's own TLS port.
+pub const OWN_PORT: &str = "own port";
+/// The last link went to the saved address (443 through nginx for Qanuvi's relay).
+pub const THROUGH_SAVED: &str = "443";
+/// How long the own port gets before the saved address is tried.
+const DIRECT_TRY: Duration = Duration::from_secs(3);
+/// A port that did not answer is left alone this long (a network that blocks it costs 3 s once, not every time).
+const SKIP_BLOCKED: i64 = 6 * 3600;
+/// The saved address gets this long to connect and shake hands (it had no limit: a dead network hung the link).
+const CONNECT_LIMIT: Duration = Duration::from_secs(15);
+
+#[derive(Default)]
+struct RoadBook {
+    file: Option<PathBuf>,
+    roads: HashMap<String, Road>,
+}
+
+static ROADS: std::sync::LazyLock<Mutex<RoadBook>> =
+    std::sync::LazyLock::new(|| Mutex::new(RoadBook::default()));
+
+fn roads() -> std::sync::MutexGuard<'static, RoadBook> {
+    ROADS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+impl RoadBook {
+    fn save(&self) {
+        if let Some(f) = &self.file {
+            let _ = std::fs::write(
+                f,
+                serde_json::to_string_pretty(&self.roads).unwrap_or_default(),
+            );
         }
-        Ok(Self {
+    }
+}
+
+/// Keeps what is learned about relays in this data folder (relay-roads.json), so a restart remembers it. Without
+/// it (tests) it is kept in memory only.
+pub fn keep_roads_in(data: &Path) {
+    let file = data.join("relay-roads.json");
+    let mut book = roads();
+    let saved: HashMap<String, Road> = std::fs::read_to_string(&file)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    for (relay, road) in saved {
+        book.roads.entry(relay).or_insert(road);
+    }
+    book.file = Some(file);
+}
+
+/// What is known about the road to a relay (by its saved address).
+pub fn road_of(relay: &str) -> Road {
+    let key = check_relay_url(relay).unwrap_or_else(|_| relay.to_string());
+    roads().roads.get(&key).cloned().unwrap_or_default()
+}
+
+fn host_of(url: &str) -> String {
+    let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    let authority = rest.split('/').next().unwrap_or("");
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or(""),
+        None => authority
+            .rsplit_once(':')
+            .map(|(h, _)| h)
+            .unwrap_or(authority),
+    };
+    host.to_ascii_lowercase()
+}
+
+/// A relay told its own TLS address. Taken only as wss:// on the same host as the saved address (only the port may
+/// differ), so a relay cannot send this computer somewhere else.
+fn learn(relay: &str, direct: &str) {
+    let Ok(direct) = check_relay_url(direct) else {
+        return;
+    };
+    if !direct.to_ascii_lowercase().starts_with("wss://") || host_of(&direct) != host_of(relay) {
+        return;
+    }
+    let mut book = roads();
+    let road = book.roads.entry(relay.to_string()).or_default();
+    if road.direct != direct {
+        road.direct = direct;
+        road.skip_until = 0;
+        book.save();
+    }
+}
+
+fn took(relay: &str, last: &str, skip_until: Option<i64>) {
+    let mut book = roads();
+    let road = book.roads.entry(relay.to_string()).or_default();
+    let changed = road.last != last || skip_until.is_some_and(|s| s != road.skip_until);
+    road.last = last.to_string();
+    if let Some(s) = skip_until {
+        road.skip_until = s;
+    }
+    if changed {
+        book.save();
+    }
+}
+
+/// Tests: certificates the relay's TLS port may show (test relays make their own).
+#[cfg(test)]
+pub(crate) static TEST_ROOTS: Mutex<Vec<rustls::pki_types::CertificateDer<'static>>> =
+    Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn connector(url: &str) -> Option<tungstenite::Connector> {
+    let roots = TEST_ROOTS.lock().unwrap_or_else(|e| e.into_inner());
+    if roots.is_empty() || !url.starts_with("wss://") {
+        return None;
+    }
+    let mut store = rustls::RootCertStore::empty();
+    for c in roots.iter() {
+        let _ = store.add(c.clone());
+    }
+    let config = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .ok()?
+    .with_root_certificates(store)
+    .with_no_client_auth();
+    Some(tungstenite::Connector::Rustls(Arc::new(config)))
+}
+
+#[cfg(not(test))]
+fn connector(_url: &str) -> Option<tungstenite::Connector> {
+    None
+}
+
+/// A WebSocket to `url`, connected and shaken hands with within `limit`.
+fn open_ws(url: &str, limit: Duration) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, String> {
+    use std::net::ToSocketAddrs;
+    let tls = url.to_ascii_lowercase().starts_with("wss://");
+    let host = host_of(url);
+    let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    let authority = rest.split('/').next().unwrap_or("");
+    let port = match authority.strip_prefix('[') {
+        Some(v6) => v6.split_once("]:").map(|(_, p)| p),
+        None => authority.rsplit_once(':').map(|(_, p)| p),
+    }
+    .and_then(|p| p.parse::<u16>().ok())
+    .unwrap_or(if tls { 443 } else { 80 });
+    let until = Instant::now() + limit;
+    let addrs: Vec<_> = (host.as_str(), port)
+        .to_socket_addrs()
+        .map_err(|e| e.to_string())?
+        .collect();
+    let mut last = "no address".to_string();
+    let mut stream = None;
+    for addr in addrs {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        match TcpStream::connect_timeout(&addr, left) {
+            Ok(s) => {
+                stream = Some(s);
+                break;
+            }
+            Err(e) => last = e.to_string(),
+        }
+    }
+    let stream = stream.ok_or(last)?;
+    let left = until
+        .saturating_duration_since(Instant::now())
+        .max(Duration::from_millis(100));
+    let _ = stream.set_read_timeout(Some(left));
+    let _ = stream.set_write_timeout(Some(left));
+    let (ws, _) = tungstenite::client_tls_with_config(url, stream, None, connector(url))
+        .map_err(|e| e.to_string())?;
+    let tcp = match ws.get_ref() {
+        MaybeTlsStream::Plain(s) => s,
+        MaybeTlsStream::Rustls(s) => s.get_ref(),
+        _ => return Ok(ws),
+    };
+    tcp.set_read_timeout(Some(Duration::from_millis(50)))
+        .map_err(|e| e.to_string())?;
+    tcp.set_write_timeout(None).map_err(|e| e.to_string())?;
+    Ok(ws)
+}
+
+impl Link {
+    /// 24rl R3: the relay's own TLS port first when it told one before (3 s, then left alone for 6 hours if it did
+    /// not answer), else and then the saved address.
+    pub fn connect(url: &str) -> Result<Self, String> {
+        let relay = check_relay_url(url)?;
+        let road = road_of(&relay);
+        let now = now_secs();
+        if !road.direct.is_empty() && road.skip_until <= now {
+            match open_ws(&road.direct, DIRECT_TRY) {
+                Ok(ws) => {
+                    took(&relay, OWN_PORT, None);
+                    return Ok(Self::with(ws, relay));
+                }
+                Err(_) => took(&relay, &road.last, Some(now + SKIP_BLOCKED)),
+            }
+        }
+        let ws = open_ws(&relay, CONNECT_LIMIT)
+            .map_err(|e| format!("The relay could not be reached: {e}"))?;
+        took(&relay, THROUGH_SAVED, None);
+        Ok(Self::with(ws, relay))
+    }
+
+    fn with(ws: WebSocket<MaybeTlsStream<TcpStream>>, relay: String) -> Self {
+        Self {
             ws,
+            relay,
             heard: Instant::now(),
             pinged: Instant::now(),
             ping_every: crate::relay_server::PING_EVERY,
             silent: crate::relay_server::SILENT,
-        })
+        }
     }
 
     /// Other ping and silence times (rl1 tests).
@@ -95,7 +303,19 @@ impl Link {
         match read_frame(&mut self.ws) {
             Ok(Frame::Text(t)) => {
                 self.heard = Instant::now();
-                Ok(serde_json::from_str(&t).ok())
+                let m: Option<Msg> = serde_json::from_str(&t).ok();
+                if let Some(
+                    Msg::Welcome {
+                        direct: Some(d), ..
+                    }
+                    | Msg::Accept {
+                        direct: Some(d), ..
+                    },
+                ) = &m
+                {
+                    learn(&self.relay, d);
+                }
+                Ok(m)
             }
             Ok(Frame::Other) => {
                 self.heard = Instant::now();
@@ -388,6 +608,8 @@ pub struct Status {
     /// A pairing code waiting, with seconds left.
     pub code: Option<(String, u64)>,
     pub error: String,
+    /// 24rl R3: the road the link to the relay took (OWN_PORT or THROUGH_SAVED; empty before the first link).
+    pub road: String,
 }
 
 struct Pending {
@@ -563,6 +785,7 @@ impl RelayMaster {
                 .filter(|p| p.until > now)
                 .map(|p| (p.code.shown(), (p.until - now).as_secs())),
             error: i.error.clone(),
+            road: road_of(&i.config.relay).last,
         }
     }
 

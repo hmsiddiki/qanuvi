@@ -27,6 +27,15 @@ export interface RelayStatus {
   sessions: { session: number; device: string; since: number }[];
   code: [string, number] | null;
   error: string;
+  /** 24rl R3: the road the link took: "own port" (the relay's own TLS port) or "443"; missing from older masters. */
+  road?: string;
+}
+
+/** What the panel says about a working link (the road only when the master tells it). */
+export function connectedText(st: Pick<RelayStatus, "road">): string {
+  if (st.road === "own port") return "Connected to the relay (its own port)";
+  if (st.road === "443") return "Connected to the relay (through port 443)";
+  return "Connected to the relay";
 }
 
 export interface Activity {

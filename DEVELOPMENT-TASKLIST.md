@@ -1410,6 +1410,17 @@ runs on or off; with it off nothing is sent anywhere.
       open one still works; bad renewal keeps the old; old-style JSON both ways. Rust lib 596 pass (checks kill_tree
       failed once in the full run under load, passes alone 3/3 and in the next full run; not relay code), clippy
       clean both builds. Relay 698 KB -> 1.8 MB (ring + rustls server side). Docs: ARCHITECTURE.md relay section.
+    24rl R3 BUILT (2026-11-21, unpublished, goes out with 0.1.35): apps use the relay's own port. relay_client.rs
+      Link::connect (every link: the master's relay link, handler sessions, pairing): when the relay told its own
+      TLS address (Welcome / Accept "direct", learned in Link::poll) it is tried first with 3 s; one that does not
+      answer is left alone 6 hours (relay-roads.json in the master's data folder, kept across restarts); then the
+      saved address, now with a 15 s connect + handshake limit (it had none: a dead network could hang the link).
+      Only wss:// on the same host as the saved address is taken (a relay cannot send this computer elsewhere).
+      relay_status says the road; the window's remote access panel: "Connected to the relay (its own port)" /
+      "(through port 443)"; older masters: as before. Tests: own port used after the relay told it; a port that
+      takes the connection and never answers -> saved address after about 3 s, then straight away; relay telling
+      nothing -> as before; another host refused; panel words (vitest). Rust lib 599, vitest 565, svelte-check 0,
+      clippy clean both builds.
     CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
       all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
       owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link
