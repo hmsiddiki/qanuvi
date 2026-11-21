@@ -1389,6 +1389,17 @@ runs on or off; with it off nothing is sent anywhere.
       own port then 443, R4 100k load test on the laptop, R5 deploy); found: through nginx about 1,500 links max
       (worker_connections 768 x 4, shared), thread-per-link caps at TasksMax 9440, key file root-only. 4 owner
       questions at the end of the file; build waits for the answers.
+    24rl PART 1 AGREED (owner, 2026-11-21): own port 47443 (not 8443: too common), cert copied by a root path unit
+      and swapped in by the relay, nginx left as is, R4 targets as written (docs/PLAN-24RL.md "Owner answers").
+    24rl R1 BUILT (2026-11-21, not deployed): relay_server.rs on tokio: one small task per link (no thread, no 50 ms
+      waits), wakes only for a message in, a message out or its ping tick; 4 KB reads, messages written at once; each
+      link's outbox counted and cut at 64 MB ("too far behind", its sessions get Close); handshake 10 s; accept
+      errors (out of files) wait 50 ms and log once a minute; rl3 log words kept. Found on the way: a link that stops
+      reading also hung the goodbye (close waits on its full socket), so its log line and its sessions' Close came
+      only when the socket died; the goodbye now has 2 s. Deps: tokio (already in via Tauri), tokio-tungstenite 0.30,
+      futures-util. Tests: all old relay tests pass unchanged; 1,000 idle links + a pair still talking (smoke; the
+      real numbers are R4's); a handler that stops reading is ended at the limit, the master is told and its link
+      stays (fails without the limit). Rust lib 592 pass, clippy clean (desktop + server). Relay 608 -> 698 KB.
     CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
       all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
       owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link

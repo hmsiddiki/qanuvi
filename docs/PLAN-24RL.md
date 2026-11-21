@@ -1,6 +1,6 @@
 # 24rl: a relay for 50-100k devices at once (proposal, 2026-11-21)
 
-Status: PROPOSAL, part 1 written in detail, waiting for the owner's answers (end of this file). Parts 2 and 3 are
+Status: PART 1 AGREED by the owner (2026-11-21, answers at the end of this file); build order R1 to R5. Parts 2 and 3 are
 outlines only; each gets its own detailed write-up before it is built.
 
 ## The goal in one line
@@ -74,7 +74,7 @@ program for volunteers is the same binary as ours (part 1 makes it run with its 
   (/var/lib/qanuvi-relay/tls/, owned by qanuvi-relay, key 0600) whenever ISPConfig renews them. Nothing in ISPConfig
   or nginx changes.
 - The relay tells apps its own address in Welcome and in its first answer to a handler (a new optional field, for
-  example `"direct": "wss://relay.qanuvi.com:8443"`, from a flag `--public-direct`). Old apps ignore the field
+  example `"direct": "wss://relay.qanuvi.com:47443"`, from a flag `--public-direct`). Old apps ignore the field
   (checked: Msg has no deny_unknown_fields).
 - Files: relay_server.rs, relay.rs (the optional field), bin/qanuvi-relay.rs, docs (relay setup notes).
 - Validate: a test relay with a test certificate takes a wss link on its TLS port and a ws link on the plain one at
@@ -133,3 +133,11 @@ program for volunteers is the same binary as ours (part 1 makes it run with its 
 3. **nginx**: leave nginx as it is (about 1,500 links at most through 443, shared with every site) and let the own
    port carry the load? Raising worker_connections would mean changing nginx's main config.
 4. **Targets** in R4 (30 KB per idle link, under 5% CPU idle, p99 under 50 ms): fine as they are?
+
+## Owner answers (2026-11-21)
+
+1. Port: not 8443 (many services use it to avoid 443); an unusual one. Chosen: **47443** (free on basevm376, not in
+   /etc/services, next to the relay's internal 47300).
+2. Certificate copy by a root path unit + the relay swapping it in by itself: yes.
+3. nginx left as it is; the own port carries the load: yes.
+4. R4 targets as written: yes.
