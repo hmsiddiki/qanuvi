@@ -1526,7 +1526,17 @@ runs on or off; with it off nothing is sent anywhere.
     24rl PART 1 DONE (R1-R5): event-driven relay, own TLS port beside nginx, apps own port then 443, 100k load
       test, deployed on basevm376, in 0.1.35/0.1.36. Watch: the apps' first switch to 47443 at their next
       reconnect (relay_status road "own port"). Next by the owner's order: sl1 (fresh session).
-    CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
+    CHECKPOINT (newest, 2026-11-21 after 0.1.36 + 24rl part 1 DONE, fresh conversation starts here): all pushed,
+      nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
+      47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
+      road "own port"; a relay restart to force it was held: owner's call); bg1-bg5 in the owner's next runs.
+      NEXT: 24rl part 2a (docs/PLAN-24RL.md "Part 2a", agreed): A1 default relay built in (no typing, empty = Qanuvi's
+      in window and master), A2 folded "Relay: Qanuvi (default) · Change" with Your own relay, A3 pairing follows the
+      machine's relay (code only for the default; a custom relay shown next to the code). Then part 3 (free relays +
+      fair use, adds "A free relay"), the relay kit (download + setup script + guide), then sl1 (with part 2,
+      direct links). Tools for drives: E:/qc-scratch/drive-tools (mcall.js, ui.ps1), laptop node at
+      ~/.local/node/bin/node, /tmp/lcall.js on the laptop, load tool src-tauri/examples/relay-load.rs.
+    CHECKPOINT (before, 2026-11-21 after 24rl R1-R4): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
       units: LimitNOFILE 262144 + --tls-listen 0.0.0.0:47443 + --public-direct + cert copy path unit, UFW 47443),

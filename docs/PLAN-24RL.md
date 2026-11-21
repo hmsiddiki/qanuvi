@@ -1,7 +1,8 @@
 # 24rl: a relay for 50-100k devices at once (proposal, 2026-11-21)
 
-Status: PART 1 AGREED by the owner (2026-11-21, answers at the end of this file); build order R1 to R5. Parts 2 and 3 are
-outlines only; each gets its own detailed write-up before it is built.
+Status: PART 1 DONE (R1-R5, deployed on basevm376, in 0.1.35/0.1.36). PART 2a AGREED (owner, 2026-11-21: "yes"),
+next to build. Parts 2, 3 and the relay kit are outlines; each gets its own detailed write-up before it is built.
+Order: 2a, then 3 (free relays + fair use), then the kit (alongside or after 3); part 2 (direct links) goes with sl1.
 
 ## The goal in one line
 
@@ -32,13 +33,33 @@ never touched again when it moves to its own VPS.
 small memory per link, own port beside nginx, apps try the own port first and fall back to 443, a 100k-link load
 test on the laptop, then the deploy on basevm376.
 
+**Part 2a (agreed, next): nobody types a relay address.** Found by the owner after part 1: today the address is
+typed in three boxes (RemoteAccessPanel "Turn on", MachineServersView and MastersView pairing), the default only a
+placeholder. To build:
+- A1. The default is built in: "Turn on" goes to Qanuvi's relay (wss://relay.qanuvi.com) with nothing typed; its own
+  port (47443) and the 443 fallback are learned and kept as since 0.1.35 (relay-roads.json). The master has the
+  default too (an empty relay in relay.json means Qanuvi's), so the terminal and older records need nothing either.
+- A2. A relay choice, folded away as one line "Relay: Qanuvi (default) · Change": Qanuvi relay (default); Your own
+  relay (the only address box anywhere). The "Free relay" choice joins it in part 3.
+- A3. Pairing follows the machine's relay: the other device asks only for the code and assumes Qanuvi's relay; a
+  machine on another relay shows that relay next to the code, and the other device fills it in from there (the
+  code card says "on relay X" and the pairing screen has the same folded "Relay · Change").
+- Validate: turning on with nothing typed connects (Windows + laptop, own port); pairing a device with only the code;
+  a custom relay set, shown next to the code, paired with it; older records with an address keep it.
+
+**Relay kit (outline, with or after part 3): run your own relay.** A small download on qanuvi.com: the same
+qanuvi-relay program (about 2 MB, Linux first, Windows later), a one-command setup script from deploy/relay/ (service,
+certificate copy or its own certificate, firewall port) and a short guide; it prints the address to paste into "Your
+own relay". The program already has what it needs (own TLS port, no nginx, renewals picked up).
+
 **Part 2 (outline): keep traffic off the relay.** Direct links when both machines are on the same network (the
 laptop and Home PC today), SSH for VPS masters as now; the relay only carries what cannot go directly. This is also
 what makes sl1 (slow switch over the relay) mostly go away for home use.
 
 **Part 3 (outline): free relays + fair use.** Qanuvi's own relay plus volunteer relays; a volunteer relay is used only
 after the user says yes. A daily fallback cap per user on relayed traffic (idle links are not counted). The relay
-program for volunteers is the same binary as ours (part 1 makes it run with its own TLS and no nginx).
+program for volunteers is the same binary as ours (part 1 makes it run with its own TLS and no nginx). Adds "A free
+relay" to part 2a's choice: a list fetched from qanuvi.com, one used only after the user picks it and says yes.
 
 ## Part 1 in detail
 
