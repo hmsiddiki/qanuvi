@@ -105,7 +105,7 @@ impl Link {
                 Err("The relay stopped answering.".into())
             }
             Ok(Frame::Nothing) => Ok(None),
-            Err(Gone) => Err(ENDED.into()),
+            Err(Gone(_)) => Err(ENDED.into()),
         }
     }
 

@@ -46,6 +46,8 @@ pub struct Relay {
     silent: Duration,
     /// Tests: masters' connections are cut (as when the relay restarts or their network drops).
     cut_masters: std::sync::atomic::AtomicBool,
+    /// Test relays write no log lines (rl3).
+    quiet: bool,
 }
 
 fn hash(secret: &str) -> String {
@@ -78,6 +80,7 @@ impl Relay {
             ping_every: PING_EVERY,
             silent: SILENT,
             cut_masters: Default::default(),
+            quiet: false,
         })
     }
 
@@ -294,8 +297,8 @@ impl Relay {
         }
     }
 
-    /// A connection ended: forget it and close the sessions it was part of.
-    fn gone(&self, me: u64, master_of: &Option<String>) {
+    /// A connection ended: forget it and close the sessions it was part of; answers how many sessions ended.
+    fn gone(&self, me: u64, master_of: &Option<String>) -> usize {
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         st.conns.remove(&me);
         st.pairing.remove(&me);
@@ -310,6 +313,7 @@ impl Relay {
             .filter(|(_, (h, m))| *h == me || Some(m) == master_of.as_ref())
             .map(|(s, (h, m))| (*s, *h, m.clone()))
             .collect();
+        let count = ended.len();
         for (session, handler, master) in ended {
             st.sessions.remove(&session);
             let close = text(&Msg::Close { session });
@@ -324,6 +328,7 @@ impl Relay {
                 let _ = tx.send(close);
             }
         }
+        count
     }
 
     /// Serves one WebSocket connection until it ends.
@@ -332,13 +337,40 @@ impl Relay {
         let config = tungstenite::protocol::WebSocketConfig::default()
             .max_message_size(Some(MAX_MESSAGE))
             .max_frame_size(Some(MAX_MESSAGE));
-        let Ok(mut ws) = tungstenite::accept_with_config(stream, Some(config)) else {
-            return;
+        // rl3: who it is (behind nginx the socket's address is the proxy's, so the forwarded one is used).
+        let mut from = stream
+            .peer_addr()
+            .map(|a| a.to_string())
+            .unwrap_or_else(|_| "?".into());
+        // The error type is tungstenite's own (an HTTP answer), not ours to make smaller.
+        #[allow(clippy::result_large_err)]
+        let callback =|req: &tungstenite::handshake::server::Request,
+                        res: tungstenite::handshake::server::Response| {
+            let header = |name: &str| {
+                req.headers()
+                    .get(name)
+                    .and_then(|v| v.to_str().ok())
+                    .map(|v| v.split(',').next().unwrap_or("").trim().to_string())
+                    .filter(|v| !v.is_empty())
+            };
+            if let Some(real) = header("x-real-ip").or_else(|| header("x-forwarded-for")) {
+                from = real;
+            }
+            Ok(res)
+        };
+        let mut ws = match tungstenite::accept_hdr_with_config(stream, callback, Some(config)) {
+            Ok(ws) => ws,
+            Err(e) => {
+                self.note(&format!("handshake failed: {e}"));
+                return;
+            }
         };
         let _ = ws
             .get_ref()
             .set_read_timeout(Some(Duration::from_millis(50)));
         let me = self.next.fetch_add(1, Ordering::SeqCst);
+        let opened = Instant::now();
+        self.note(&format!("link {me} opened from {from}"));
         let (tx, rx): (Sender<String>, Receiver<String>) = channel();
         self.state
             .lock()
@@ -348,7 +380,7 @@ impl Relay {
         let mut master_of = None;
         let mut heard = Instant::now();
         let mut pinged = Instant::now();
-        'conn: loop {
+        let why: String = 'conn: loop {
             match read_frame(&mut ws) {
                 Ok(Frame::Text(text)) => {
                     heard = Instant::now();
@@ -358,33 +390,58 @@ impl Relay {
                 }
                 Ok(Frame::Other) => heard = Instant::now(),
                 Ok(Frame::Nothing) => {}
-                Err(Gone) => break,
+                Err(Gone(why)) => break why,
             }
             // rl1: something (a pong at least) must come back; a quiet link is gone, and its sessions get a Close.
-            if heard.elapsed() > self.silent
-                || (master_of.is_some() && self.cut_masters.load(Ordering::SeqCst))
-            {
-                break;
+            if heard.elapsed() > self.silent {
+                break format!("silent for {} s", heard.elapsed().as_secs());
+            }
+            if master_of.is_some() && self.cut_masters.load(Ordering::SeqCst) {
+                break "cut by a test".into();
             }
             if pinged.elapsed() >= self.ping_every {
                 pinged = Instant::now();
-                if ws.send(Message::Ping(Vec::new().into())).is_err() {
-                    break;
+                if let Err(e) = ws.send(Message::Ping(Vec::new().into())) {
+                    break format!("ping not sent: {e}");
                 }
             }
             while let Ok(out) = rx.try_recv() {
-                if ws.send(Message::text(out)).is_err() {
-                    break 'conn;
+                if let Err(e) = ws.send(Message::text(out)) {
+                    break 'conn format!("message not sent: {e}");
                 }
             }
+        };
+        let role = match &master_of {
+            Some(id) => format!("master {}", id.chars().take(8).collect::<String>()),
+            None => "handler".into(),
+        };
+        let heard_ago = heard.elapsed().as_secs();
+        let sessions = self.gone(me, &master_of);
+        self.note(&format!(
+            "link {me} ({role}, from {from}) ended after {} s, last heard {heard_ago} s ago, \
+             {sessions} session(s) closed: {why}",
+            opened.elapsed().as_secs()
+        ));
+    }
+
+    /// rl3: one line in the relay's log (stderr: journald on the VPS) with the time, so link ends can be lined up
+    /// with nginx's log and the masters' own errors. Test relays keep quiet.
+    fn note(&self, line: &str) {
+        if self.quiet {
+            return;
         }
-        self.gone(me, &master_of);
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let (h, m, s) = ((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
+        eprintln!("{h:02}:{m:02}:{s:02} UTC {line}");
     }
 }
 
-/// The connection ended.
+/// The connection ended, and why (rl3: the relay logs it).
 #[derive(Debug)]
-pub struct Gone;
+pub struct Gone(pub String);
 
 /// What one read brought.
 pub enum Frame {
@@ -409,7 +466,17 @@ pub fn read<S: std::io::Read + std::io::Write>(
 pub fn read_frame<S: std::io::Read + std::io::Write>(ws: &mut WebSocket<S>) -> Result<Frame, Gone> {
     match ws.read() {
         Ok(Message::Text(t)) => Ok(Frame::Text(t.as_str().to_string())),
-        Ok(Message::Close(_)) => Err(Gone),
+        Ok(Message::Close(frame)) => Err(Gone(match frame {
+            Some(f) if f.reason.is_empty() => {
+                format!("closed by the other side ({})", u16::from(f.code))
+            }
+            Some(f) => format!(
+                "closed by the other side ({}: {})",
+                u16::from(f.code),
+                f.reason
+            ),
+            None => "closed by the other side".into(),
+        })),
         Ok(_) => Ok(Frame::Other),
         Err(tungstenite::Error::Io(e))
             if matches!(
@@ -419,7 +486,7 @@ pub fn read_frame<S: std::io::Read + std::io::Write>(ws: &mut WebSocket<S>) -> R
         {
             Ok(Frame::Nothing)
         }
-        Err(_) => Err(Gone),
+        Err(e) => Err(Gone(format!("read failed: {e}"))),
     }
 }
 
@@ -456,6 +523,7 @@ pub fn start_local_relay(
     if let Some(r) = Arc::get_mut(&mut relay) {
         r.ping_every = ping_every;
         r.silent = silent;
+        r.quiet = true;
     }
     let handle = relay.clone();
     std::thread::spawn(move || {

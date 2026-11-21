@@ -1317,7 +1317,17 @@ runs on or off; with it off nothing is sent anywhere.
       Built into E:/qc-scratch/release-0.1.33/chan (Linux app on the laptop in ~/qanuvi-release), copied to
       qanuvi-updates/dev (old latest.json in E:/Backups/qanuvi/channel-before-0.1.33). Online: all files 200, sizes
       match. Tagged v0.1.33.
-    PICKUP POINT (newest, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link
+    rl3 BUILT (2026-11-21, not deployed): the relay now logs every link (stderr, so journald on basevm376): "link N
+      opened from <address>" (nginx's X-Real-IP / X-Forwarded-For when present) and "link N (master <id start> or
+      handler, from <address>) ended after S s, last heard H s ago, K session(s) closed: <why>". The why is the
+      other side's close code and reason, the read or write error, "silent for N s", or a failed ping; a failed
+      handshake is logged too. Lines carry a UTC time to line up with nginx's log. Test relays stay quiet. Master
+      side texts unchanged (ce1 matches them). Tests: 12 relay tests pass, clippy clean; local relay run showed
+      the open/close lines with the close code. NEXT: deploy on basevm376 (ask: Linux build, swap /usr/local/bin,
+      keep .prev, restart), then on the next drops read journalctl -u for the relay against nginx's log.
+    PICKUP POINT (newest, 2026-11-21 rl3): rl3 built, not deployed. Next: (1) rl3 deploy (ask), read why links end;
+      (2) LT by hand on the laptop; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.
+    PICKUP POINT (before, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link
       drops (rl2 note: relay-side log of why a link ends, deploy on basevm376 = ask); (2) LT by hand on the laptop:
       drag, edge resize, snapping; Wayland later; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.
     rl2 FOUND + FIXED (2026-11-21 06:55): Home PC's relay link drops now and then (nginx log: all our links end
