@@ -7,7 +7,7 @@
 
 const USAGE: &str = "Usage: qanuvi-relay [--listen 127.0.0.1:47300] \
 [--tls-listen 0.0.0.0:47443 --cert <fullchain.pem> --key <key.pem>] \
-[--public-direct wss://relay.example.com:47443] [--data <folder>]\n\
+[--public-direct wss://relay.example.com:47443] [--data <folder>] [--ping-every 30]\n\
 With no --listen and no --tls-listen it listens on 127.0.0.1:47300 (for a TLS proxy in front).";
 
 fn main() {
@@ -38,6 +38,10 @@ fn main() {
         tls,
         direct: value("--public-direct"),
         data: value("--data").map(std::path::PathBuf::from),
+        ping_every: value("--ping-every")
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|v| *v > 0)
+            .map(std::time::Duration::from_secs),
     };
     for (what, addr) in [("", &options.listen), (" (TLS)", &options.tls_listen)] {
         if let Some(a) = addr {

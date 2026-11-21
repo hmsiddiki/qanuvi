@@ -214,12 +214,26 @@ fn pct(v: &mut [u32], p: f64) -> f64 {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let relay = arg(&args, "--relay").unwrap_or_else(|| "ws://127.0.0.1:47300".into());
-    let pairs: u64 = arg(&args, "--pairs").and_then(|v| v.parse().ok()).unwrap_or(1000);
-    let active: u64 = arg(&args, "--active").and_then(|v| v.parse().ok()).unwrap_or(10);
-    let sources: u32 = arg(&args, "--sources").and_then(|v| v.parse().ok()).unwrap_or(0);
-    let every = Duration::from_secs(arg(&args, "--every").and_then(|v| v.parse().ok()).unwrap_or(5));
-    let seconds: u64 = arg(&args, "--seconds").and_then(|v| v.parse().ok()).unwrap_or(120);
-    let rate: u64 = arg(&args, "--rate").and_then(|v| v.parse().ok()).unwrap_or(2000);
+    let pairs: u64 = arg(&args, "--pairs")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000);
+    let active: u64 = arg(&args, "--active")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    let sources: u32 = arg(&args, "--sources")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let every = Duration::from_secs(
+        arg(&args, "--every")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5),
+    );
+    let seconds: u64 = arg(&args, "--seconds")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(120);
+    let rate: u64 = arg(&args, "--rate")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2000);
     let rest = relay.split_once("://").map(|(_, r)| r).unwrap_or(&relay);
     let authority = rest.split('/').next().unwrap_or("");
     let (host, port) = authority.rsplit_once(':').expect("--relay needs a port");
@@ -230,11 +244,13 @@ fn main() {
             roots.add(c.unwrap()).unwrap();
         }
         Arc::new(
-            rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-                .with_safe_default_protocol_versions()
-                .unwrap()
-                .with_root_certificates(roots)
-                .with_no_client_auth(),
+            rustls::ClientConfig::builder_with_provider(Arc::new(
+                rustls::crypto::ring::default_provider(),
+            ))
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
         )
     });
     let setup = Setup {

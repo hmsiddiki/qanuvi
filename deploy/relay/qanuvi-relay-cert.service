@@ -1,0 +1,7 @@
+[Unit]
+Description=Copy relay.qanuvi.com's certificate (kept by ISPConfig, root only) to where qanuvi-relay can read it
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/install -D -o qanuvi-relay -g qanuvi-relay -m 0644 /var/www/relay.qanuvi.com/ssl/relay.qanuvi.com-le.crt /var/lib/qanuvi-relay/tls/fullchain.pem
+ExecStart=/usr/bin/install -D -o qanuvi-relay -g qanuvi-relay -m 0600 /var/www/relay.qanuvi.com/ssl/relay.qanuvi.com-le.key /var/lib/qanuvi-relay/tls/key.pem

@@ -74,6 +74,31 @@ impl Outbox {
     }
 }
 
+impl State {
+    fn add_session(&mut self, session: u64, handler: u64, master: &str) {
+        let Some(master_conn) = self.masters.get(master).map(|(c, _)| *c) else {
+            return;
+        };
+        self.sessions
+            .insert(session, (handler, master.to_string(), master_conn));
+        self.by_conn.entry(handler).or_default().push(session);
+        self.by_conn.entry(master_conn).or_default().push(session);
+    }
+
+    fn drop_session(&mut self, session: u64) -> Option<(u64, String, u64)> {
+        let gone = self.sessions.remove(&session)?;
+        for conn in [gone.0, gone.2] {
+            if let Some(list) = self.by_conn.get_mut(&conn) {
+                list.retain(|s| *s != session);
+                if list.is_empty() {
+                    self.by_conn.remove(&conn);
+                }
+            }
+        }
+        Some(gone)
+    }
+}
+
 #[derive(Default)]
 struct State {
     /// Masters online: id -> its connection.
@@ -84,8 +109,11 @@ struct State {
     slots: HashMap<String, (String, Instant)>,
     /// Handlers in the middle of pairing: handler connection -> master id.
     pairing: HashMap<u64, String>,
-    /// Sessions: id -> (handler connection, master id).
-    sessions: HashMap<u64, (u64, String)>,
+    /// Sessions: id -> (handler connection, master id, master connection).
+    sessions: HashMap<u64, (u64, String, u64)>,
+    /// R4: each connection's sessions (handler and master side), so a link that ends closes its own sessions without
+    /// looking through all of them (100k links ending at once took 80 s of full CPU that way).
+    by_conn: HashMap<u64, Vec<u64>>,
     /// Registered masters: id -> hash of their secret (kept in a file).
     registered: HashMap<String, String>,
 }
@@ -309,7 +337,7 @@ impl Relay {
             } => {
                 let session = self.next.fetch_add(1, Ordering::SeqCst);
                 if st.masters.contains_key(&master_id) {
-                    st.sessions.insert(session, (me, master_id.clone()));
+                    st.add_session(session, me, &master_id);
                     to_master(
                         &st,
                         &master_id,
@@ -332,7 +360,7 @@ impl Relay {
                 }
             }
             Msg::Accept { session, .. } | Msg::Reject { session, .. } if master_of.is_some() => {
-                if let Some((handler, m)) = st.sessions.get(&session).cloned()
+                if let Some((handler, m, _)) = st.sessions.get(&session).cloned()
                     && Some(&m) == master_of.as_ref()
                 {
                     let rejected = matches!(msg, Msg::Reject { .. });
@@ -347,12 +375,12 @@ impl Relay {
                     };
                     reply(&st, handler, msg);
                     if rejected {
-                        st.sessions.remove(&session);
+                        st.drop_session(session);
                     }
                 }
             }
             Msg::Data { session, .. } | Msg::Close { session } => {
-                let Some((handler, master)) = st.sessions.get(&session).cloned() else {
+                let Some((handler, master, _)) = st.sessions.get(&session).cloned() else {
                     return;
                 };
                 let closing = matches!(msg, Msg::Close { .. });
@@ -362,7 +390,7 @@ impl Relay {
                     to_master(&st, &master, msg);
                 }
                 if closing {
-                    st.sessions.remove(&session);
+                    st.drop_session(session);
                 }
             }
             _ => {}
@@ -379,25 +407,18 @@ impl Relay {
         {
             st.masters.remove(id);
         }
-        let ended: Vec<(u64, u64, String)> = st
-            .sessions
-            .iter()
-            .filter(|(_, (h, m))| *h == me || Some(m) == master_of.as_ref())
-            .map(|(s, (h, m))| (*s, *h, m.clone()))
-            .collect();
-        let count = ended.len();
-        for (session, handler, master) in ended {
-            st.sessions.remove(&session);
-            let close = text(&Msg::Close { session });
-            if handler != me
-                && let Some(tx) = st.conns.get(&handler)
+        let mine = st.by_conn.remove(&me).unwrap_or_default();
+        let mut count = 0;
+        for session in mine {
+            let Some((handler, _, master_conn)) = st.drop_session(session) else {
+                continue;
+            };
+            count += 1;
+            let other = if handler == me { master_conn } else { handler };
+            if other != me
+                && let Some(tx) = st.conns.get(&other)
             {
-                let _ = tx.send(close.clone());
-            }
-            if Some(&master) != master_of.as_ref()
-                && let Some((_, tx)) = st.masters.get(&master)
-            {
-                let _ = tx.send(close);
+                tx.send(text(&Msg::Close { session }));
             }
         }
         count
@@ -785,6 +806,8 @@ pub struct Options {
     /// wss://relay.qanuvi.com:47443.
     pub direct: Option<String>,
     pub data: Option<PathBuf>,
+    /// How often each link is pinged (default 30 s); a link silent for three of these is gone.
+    pub ping_every: Option<Duration>,
 }
 
 /// Runs the relay as `options` says until it is stopped.
@@ -792,9 +815,6 @@ pub fn run_with(options: &Options) -> Result<(), String> {
     if options.listen.is_none() && options.tls_listen.is_none() {
         return Err("Nothing to listen on: give --listen, --tls-listen or both.".into());
     }
-    let bind = |addr: &str| {
-        std::net::TcpListener::bind(addr).map_err(|e| format!("Could not listen on {addr}: {e}"))
-    };
     let plain = options.listen.as_deref().map(bind).transpose()?;
     let tls = match options.tls_listen.as_deref() {
         Some(addr) => {
@@ -809,6 +829,10 @@ pub fn run_with(options: &Options) -> Result<(), String> {
     let mut relay = Relay::new(options.data.as_deref());
     if let Some(r) = Arc::get_mut(&mut relay) {
         r.direct = options.direct.clone();
+        if let Some(p) = options.ping_every {
+            r.ping_every = p;
+            r.silent = p * 3;
+        }
     }
     runtime()?.block_on(async move {
         let mut tasks = Vec::new();
@@ -824,6 +848,29 @@ pub fn run_with(options: &Options) -> Result<(), String> {
         }
         Ok(())
     })
+}
+
+/// R4: listens with a queue of 4096 waiting connections (std's default of 128 turned away most of 100k devices
+/// coming back at once after a restart; the system may cap it lower, net.core.somaxconn).
+fn bind(addr: &str) -> Result<std::net::TcpListener, String> {
+    use std::net::ToSocketAddrs;
+    let err = |e: std::io::Error| format!("Could not listen on {addr}: {e}");
+    let at = addr
+        .to_socket_addrs()
+        .map_err(err)?
+        .next()
+        .ok_or_else(|| format!("Could not listen on {addr}: no address"))?;
+    let socket = socket2::Socket::new(
+        socket2::Domain::for_address(at),
+        socket2::Type::STREAM,
+        Some(socket2::Protocol::TCP),
+    )
+    .map_err(err)?;
+    #[cfg(unix)]
+    socket.set_reuse_address(true).map_err(err)?;
+    socket.bind(&at.into()).map_err(err)?;
+    socket.listen(4096).map_err(err)?;
+    Ok(socket.into())
 }
 
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
@@ -1381,5 +1428,40 @@ mod tests {
         let other = start_plain_telling("wss://elsewhere.example:47443".into());
         app_welcome(&other);
         assert_eq!(road_of(&other).direct, "");
+    }
+
+    #[test]
+    fn many_links_ending_at_once_each_close_only_their_own_sessions_quickly() {
+        // R4: 100k links ending together took 80 s of full CPU, each one looking through every session. 20,000
+        // here: the old way is 400 million looks (seconds); now each link finds its own.
+        let relay = Relay::new(None);
+        let n: u64 = 20_000;
+        {
+            let mut st = relay.state.lock().unwrap();
+            for i in 0..n {
+                let (master, handler) = (2 * i + 1, 2 * i + 2);
+                for c in [master, handler] {
+                    let (out, rx) = Outbox::new(MAX_QUEUED);
+                    std::mem::forget(rx);
+                    st.conns.insert(c, out);
+                }
+                let id = format!("m{i}");
+                let tx = st.conns[&master].clone();
+                st.masters.insert(id.clone(), (master, tx));
+                st.add_session(1_000_000 + i, handler, &id);
+            }
+        }
+        let t = Instant::now();
+        for i in 0..n {
+            assert_eq!(relay.gone(2 * i + 2, &None), 1);
+        }
+        assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+        let st = relay.state.lock().unwrap();
+        assert!(st.sessions.is_empty() && st.by_conn.is_empty());
+        // Each master was told its session ended.
+        assert_eq!(
+            st.conns[&1].queued.load(Ordering::SeqCst),
+            text(&Msg::Close { session: 1_000_000 }).len()
+        );
     }
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch relay.qanuvi.com's certificate for renewals (ISPConfig / Let's Encrypt)
+
+[Path]
+PathChanged=/var/www/relay.qanuvi.com/ssl/relay.qanuvi.com-le.crt
+PathChanged=/var/www/relay.qanuvi.com/ssl/relay.qanuvi.com-le.key
+Unit=qanuvi-relay-cert.service
+
+[Install]
+WantedBy=multi-user.target
