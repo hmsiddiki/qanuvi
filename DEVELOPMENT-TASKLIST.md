@@ -1311,6 +1311,15 @@ runs on or off; with it off nothing is sent anywhere.
       PC master still listed the 4 dead laptop sessions after the restart (old code keeps them): Stop next to the
       ribbon clears them now; 0.1.33 carries the master side.
     lx1 test build on the laptop: ~/src/qanuvi/src-tauri/target/release/qanuvi (bbd72c6, own test data).
+    0.1.33 PUBLISHED (owner waiting for it, 2026-11-21 07:10): 24y part 2 + check memory, PM a-e + FC, Preview
+      address + branch line, live mirror, lx1, rl1 (master side), ce1, bl1, LT, rl2. Release rule passed with
+      QANUVI_RELEASE_ANYWAY: Claude Code here updated by winget to 2.1.329, its newest; npm already lists 2.1.330.
+      Built into E:/qc-scratch/release-0.1.33/chan (Linux app on the laptop in ~/qanuvi-release), copied to
+      qanuvi-updates/dev (old latest.json in E:/Backups/qanuvi/channel-before-0.1.33). Online: all files 200, sizes
+      match. Tagged v0.1.33.
+    PICKUP POINT (newest, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link
+      drops (rl2 note: relay-side log of why a link ends, deploy on basevm376 = ask); (2) LT by hand on the laptop:
+      drag, edge resize, snapping; Wayland later; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.
     rl2 FOUND + FIXED (2026-11-21 06:55): Home PC's relay link drops now and then (nginx log: all our links end
       the same second at 06:21:24, 06:23:44, 06:26:22; This PC 06:39:57, 06:41:18, 06:51:21). Not the home network:
       an SSH link to the same server stayed up through all of them (15 min watch); no nginx reload; not the laptop
