@@ -1311,6 +1311,19 @@ runs on or off; with it off nothing is sent anywhere.
       PC master still listed the 4 dead laptop sessions after the restart (old code keeps them): Stop next to the
       ribbon clears them now; 0.1.33 carries the master side.
     lx1 test build on the laptop: ~/src/qanuvi/src-tauri/target/release/qanuvi (bbd72c6, own test data).
+    ce1 OWNER FOUND + FIXED (2026-11-21 06:00): the laptop chat kept "The connection to the master has ended." after
+      the link came back and after switching projects (seen on the laptop screen: Home PC lost at 05:54 when the
+      installed app restarted, back a minute later, red line still there). The chat's error line only cleared on a
+      new message. Now: a project or chat switch clears it; a link error (remote.ts LINK_GONE: our own fixed texts)
+      goes on the first call that gets through (onCallOk); while the reconnect notice is up the chat does not repeat
+      it. Tests: link texts known, onCallOk told of calls that got through only.
+    bl1 FIXED (2026-11-21 06:10, the "browser left over" watch item): on the laptop a headless Brave from the 04:58
+      LM4 test ran on after its test master (440127) stopped. Linux starts it through /usr/bin/brave-browser, a
+      script that runs the real browser as its child (no exec); only the script was stopped, and nothing on Linux
+      ties the browser to the master (Windows: job object). Now the browser gets its own process group and stop ends
+      the group; the startup sweep ends browsers still running on a gone process's profile (/proc cmdline) before
+      removing it. Linux tests (laptop): script + child both end; a left browser ends in the sweep (each fails
+      without its fix).
     PICKUP POINT (newest, 2026-11-21 05:00): LM1-LM3 built; LM4 passed on This PC and the laptop; VPS on the new
     server build. Next: VPS live picture if the owner agrees to install Chromium there; lx1 (Linux paste) on the
     laptop; LT Linux title bar; then 0.1.33 (ask). Test window, laptop test master stopped.

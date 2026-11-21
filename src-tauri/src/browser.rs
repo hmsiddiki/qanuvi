@@ -249,11 +249,58 @@ fn sweep_profiles_in(temp: &Path, also_mine: bool) -> usize {
         } else {
             !pid_alive(pid)
         };
+        if gone && e.path().is_dir() {
+            // bl1: the browser itself may still run (its master was killed); it goes first.
+            end_browsers_using(&e.path());
+        }
         if gone && e.path().is_dir() && std::fs::remove_dir_all(e.path()).is_ok() {
             removed += 1;
         }
     }
     removed
+}
+
+/// bl1: ends the browsers still running on this profile folder (Linux: found by their command line; elsewhere the
+/// job object already ended them with their master).
+fn end_browsers_using(profile: &Path) {
+    #[cfg(target_os = "linux")]
+    {
+        let flag = format!("--user-data-dir={}", profile.display());
+        let Ok(list) = std::fs::read_dir("/proc") else {
+            return;
+        };
+        for e in list.flatten() {
+            let Some(pid) = e.file_name().to_str().and_then(|n| n.parse::<i32>().ok()) else {
+                continue;
+            };
+            let Ok(cmdline) = std::fs::read(e.path().join("cmdline")) else {
+                continue;
+            };
+            if String::from_utf8_lossy(&cmdline)
+                .split('\0')
+                .any(|a| a.contains(&flag))
+            {
+                // SAFETY: a plain signal to a process of ours that runs on this profile.
+                unsafe {
+                    libc::kill(pid, libc::SIGKILL);
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = profile;
+}
+
+/// bl1: on Unix the browser gets a process group of its own, so stopping it reaches what it started too: on Linux the
+/// program found is often a script (/usr/bin/brave-browser) that starts the real browser as its child.
+fn own_group(cmd: &mut Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    #[cfg(not(unix))]
+    let _ = cmd;
 }
 
 /// M5b: removes the folders the updater leaves in the temp folder (`Qanuvi-0.1.x-updater-…`, one per update, never
@@ -330,6 +377,7 @@ impl Browser {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
         no_window(&mut cmd);
+        own_group(&mut cmd);
         let child = cmd
             .spawn()
             .map_err(|e| format!("The browser ({}) could not start: {e}", exe.display()))?;
@@ -813,6 +861,12 @@ fn stop(child: &mut Child, profile: &Path) {
             no_window(&mut k);
             let _ = k.status();
         }
+        // bl1: its whole group (it is not reaped yet, so the group id is still its own).
+        #[cfg(unix)]
+        // SAFETY: a plain signal to the group the browser was started in (own_group).
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -862,6 +916,77 @@ pub fn save_jpeg(base64_data: &str, file: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The processes in a process group (Linux), waiting a moment for ended ones to be reaped.
+    #[cfg(target_os = "linux")]
+    fn group_size(pg: i32) -> usize {
+        let count = || {
+            std::fs::read_dir("/proc")
+                .unwrap()
+                .flatten()
+                .filter_map(|e| std::fs::read_to_string(e.path().join("stat")).ok())
+                .filter(|st| {
+                    let after = st.rsplit_once(')').map(|(_, a)| a).unwrap_or("");
+                    let f: Vec<&str> = after.split_whitespace().collect();
+                    f.len() > 2 && f[0] != "Z" && f[2].parse::<i32>().ok() == Some(pg)
+                })
+                .count()
+        };
+        for _ in 0..20 {
+            if count() == 0 {
+                return 0;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        count()
+    }
+
+    // bl1: a browser started through a script (as /usr/bin/brave-browser does) is stopped with what it started.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn stop_ends_what_a_starter_script_started() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut cmd = Command::new("bash");
+        cmd.args(["-c", "sleep 300; true"]);
+        own_group(&mut cmd);
+        let mut child = cmd.spawn().unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        let pg = child.id() as i32;
+        assert!(group_size(pg) >= 2, "the script and the program it started");
+        stop(&mut child, temp.path());
+        assert_eq!(group_size(pg), 0);
+    }
+
+    // bl1: a browser left running by a master that was killed is ended before its profile goes.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sweep_ends_a_browser_left_by_a_gone_process() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut c = Command::new("true").spawn().unwrap();
+        let gone = c.id();
+        c.wait().unwrap();
+        let profile = temp.path().join(format!("qanuvi-browser-{gone}-d4"));
+        std::fs::create_dir_all(&profile).unwrap();
+        let mut left = Command::new("bash")
+            .args([
+                "-c",
+                &format!(
+                    "exec -a 'browser --user-data-dir={}' sleep 300",
+                    profile.display()
+                ),
+            ])
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(left.try_wait().unwrap().is_none());
+        assert_eq!(sweep_profiles_in(temp.path(), false), 1);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while left.try_wait().unwrap().is_none() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(left.try_wait().unwrap().is_some(), "the left browser ended");
+        assert!(!profile.exists());
+    }
 
     // M5b: leftovers of gone processes go; a running process's profile stays; the ending process's own go too.
     #[test]
