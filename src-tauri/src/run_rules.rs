@@ -23,6 +23,10 @@ pub struct RunRules {
     pub allow: Vec<String>,
     /// Command patterns the run never uses, besides the fixed never-list.
     pub never: Vec<String>,
+    /// wd1: folders outside the project a run may write into, because the owner allowed one when a step asked
+    /// (an answer like "yes, use E:/tmp/qna-scripts"). System folders are never taken (see writable_dir).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub write_dirs: Vec<String>,
 }
 
 /// What the policy says about one request.
@@ -61,6 +65,8 @@ pub enum Unlisted {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Policy {
     root: PathBuf,
+    /// wd1: folders outside the project it may write into (the owner allowed them).
+    write_dirs: Vec<PathBuf>,
     allow: Vec<String>,
     never: Vec<String>,
     unlisted: Unlisted,
@@ -269,7 +275,15 @@ impl Policy {
         allow.retain(|p| !p.is_empty());
         never.retain(|p| !p.is_empty());
         allow.dedup();
+        let write_dirs = rules
+            .write_dirs
+            .iter()
+            .chain(plan.map(|p| p.write_dirs.iter()).into_iter().flatten())
+            .filter_map(|d| writable_dir(d))
+            .map(PathBuf::from)
+            .collect();
         Policy {
+            write_dirs,
             root,
             allow,
             never,
@@ -294,6 +308,14 @@ impl Policy {
         self
     }
 
+    /// Whether a file may be written: inside the project, a scratch file, or in a folder the owner allowed (wd1).
+    pub fn may_write(&self, file: &str) -> bool {
+        let file = msys_path(file);
+        inside(&self.root, &file)
+            || scratch(&file)
+            || (Path::new(&file).is_absolute() && self.write_dirs.iter().any(|d| inside(d, &file)))
+    }
+
     /// What a command neither allowed nor forbidden gets in this run.
     pub fn unlisted(&self) -> Unlisted {
         self.unlisted
@@ -309,7 +331,7 @@ impl Policy {
                 .as_str()
                 .or_else(|| input["notebook_path"].as_str())
                 .unwrap_or("");
-            return if inside(&self.root, file) || scratch(file) {
+            return if self.may_write(file) {
                 Verdict::Allow
             } else {
                 Verdict::Never("it changes a file outside the project".into())
@@ -336,7 +358,7 @@ impl Policy {
                 "it is on the never-list (deleting, pushing, downloading, publishing or system changes)".into(),
             );
         }
-        if let Some(target) = outside_write(&self.root, command) {
+        if let Some(target) = outside_write(command, |t| self.may_write(t)) {
             return Verdict::Never(format!("it writes {target}, outside the project"));
         }
         let parts = parts(command);
@@ -360,8 +382,9 @@ impl Policy {
     }
 }
 
-/// A file a command writes into with > or >> that lies outside the project (the null device is fine).
-fn outside_write(root: &Path, command: &str) -> Option<String> {
+/// A file a command writes into with > or >> that may not be written (outside the project and the folders the owner
+/// allowed; the null device is fine).
+fn outside_write(command: &str, may_write: impl Fn(&str) -> bool) -> Option<String> {
     let words: Vec<&str> = command.split_whitespace().collect();
     for (n, w) in words.iter().enumerate() {
         let w = w.trim_start_matches(['1', '2']);
@@ -382,7 +405,7 @@ fn outside_write(root: &Path, command: &str) -> Option<String> {
         if target.is_empty() || lower == "/dev/null" || lower == "nul" || lower == "$null" {
             continue;
         }
-        if !inside(root, target) && !scratch(target) {
+        if !may_write(target) {
             return Some(target.to_string());
         }
     }
@@ -586,6 +609,77 @@ fn same(a: &str, b: &str) -> bool {
 }
 
 /// A file in the temporary folder (a scratch copy a check or test uses): writing there changes nothing of the user's.
+/// wd1: Git Bash writes Windows paths as /e/tmp/x; on Windows that is E:/tmp/x (else an allowed folder never
+/// matched the path the agent's shell used).
+fn msys_path(file: &str) -> String {
+    let f = file.trim();
+    if cfg!(windows) {
+        let b = f.as_bytes();
+        if b.len() >= 3 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b'/' {
+            return format!("{}:/{}", (b[1] as char).to_ascii_uppercase(), &f[3..]);
+        }
+        if b.len() == 2 && b[0] == b'/' && b[1].is_ascii_alphabetic() {
+            return format!("{}:/", (b[1] as char).to_ascii_uppercase());
+        }
+    }
+    f.to_string()
+}
+
+/// wd1: a folder the owner allowed writing into, made plain (absolute, no "..", forward slashes, no trailing
+/// slash); None for what a run must never write into whatever the answer said: a drive or the file system's root,
+/// a home folder itself, and the system's own folders.
+pub fn writable_dir(dir: &str) -> Option<String> {
+    let d = msys_path(dir.trim().trim_matches(['"', '\'']));
+    let p = Path::new(&d);
+    if !p.is_absolute() {
+        return None;
+    }
+    let mut parts: Vec<String> = Vec::new();
+    let mut prefix = String::new();
+    for c in p.components() {
+        match c {
+            Component::Prefix(x) => prefix = x.as_os_str().to_string_lossy().to_string(),
+            Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => return None,
+            Component::Normal(n) => parts.push(n.to_string_lossy().to_string()),
+        }
+    }
+    let lower: Vec<String> = parts.iter().map(|x| x.to_lowercase()).collect();
+    let first = lower.first().map(String::as_str).unwrap_or("");
+    const SYSTEM: &[&str] = &[
+        "windows",
+        "program files",
+        "program files (x86)",
+        "programdata",
+        "etc",
+        "usr",
+        "bin",
+        "sbin",
+        "lib",
+        "lib64",
+        "boot",
+        "sys",
+        "proc",
+        "dev",
+        "var",
+        "opt",
+        "system",
+        "library",
+        "applications",
+        "private",
+    ];
+    let home_only = lower.len() <= 2 && matches!(first, "users" | "home" | "root");
+    if lower.is_empty() || SYSTEM.contains(&first) || home_only {
+        return None;
+    }
+    let joined = parts.join("/");
+    Some(if prefix.is_empty() {
+        format!("/{joined}")
+    } else {
+        format!("{prefix}/{joined}")
+    })
+}
+
 fn scratch(file: &str) -> bool {
     let f = file.trim().replace('\\', "/");
     f.starts_with("/tmp/") || (Path::new(&f).is_absolute() && inside(&std::env::temp_dir(), &f))
@@ -868,5 +962,90 @@ mod tests {
             vec!["a", "b", "c", "d", "e", "f"]
         );
         assert_eq!(clean("FOO=1  cargo  test  > out.txt"), "cargo test");
+    }
+
+    #[test]
+    fn a_folder_the_owner_allowed_may_be_written_and_everything_else_outside_still_may_not() {
+        // wd1: the owner said yes to E:/tmp/qna-scripts, but the guard still refused it and the step asked again.
+        let dir = tempfile::tempdir().unwrap();
+        // Not under the system's temp folder (scratch files there are always fine); nothing is written.
+        let outside = PathBuf::from(if cfg!(windows) {
+            "Z:/wd1-outside"
+        } else {
+            "/srv/wd1-outside"
+        });
+        let allowed = outside.join("qna-scripts");
+        let mut rules = RunRules::default();
+        let p = Policy::new(&project(dir.path(), rules.clone()), None);
+        let file = allowed.join("opt.php").to_string_lossy().to_string();
+        assert!(!p.may_write(&file), "refused before the owner allowed it");
+        rules.write_dirs = vec![allowed.to_string_lossy().to_string()];
+        let p = Policy::new(&project(dir.path(), rules), None);
+        assert!(p.may_write(&file));
+        assert_eq!(
+            p.decide("Write", &serde_json::json!({"file_path": file})),
+            Verdict::Allow
+        );
+        assert!(!matches!(
+            p.command(&format!("echo x > {file}")),
+            Verdict::Never(_)
+        ));
+        // Next to it, above it, or through ".." out of it: still refused.
+        let beside = outside
+            .join("other")
+            .join("x.php")
+            .to_string_lossy()
+            .to_string();
+        let escape = format!("{}/../other/x.php", allowed.to_string_lossy());
+        for f in [&beside, &escape] {
+            assert!(!p.may_write(f), "{f}");
+            assert!(
+                matches!(p.command(&format!("echo x > {f}")), Verdict::Never(_)),
+                "{f}"
+            );
+        }
+        // The project itself and scratch files as before.
+        assert!(p.may_write("src/a.rs"));
+    }
+
+    #[test]
+    fn system_folders_and_roots_are_never_taken_as_allowed_folders() {
+        for bad in [
+            "C:/",
+            "/",
+            "C:/Windows",
+            "C:/Windows/Temp",
+            "C:/Program Files/x",
+            "/etc",
+            "/usr/local",
+            "C:/Users",
+            "C:/Users/Neel",
+            "/home/neel",
+            "relative/dir",
+            "E:/tmp/../Windows",
+        ] {
+            assert_eq!(writable_dir(bad), None, "{bad}");
+        }
+        assert!(writable_dir("C:/Users/Neel/scripts").is_some());
+        assert!(writable_dir("/home/neel/scripts").is_some() || cfg!(windows));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn git_bash_paths_match_the_allowed_windows_folder() {
+        // The refusal named /e/tmp/qna-scripts/opt.php: Git Bash's way of writing E:/tmp/qna-scripts/opt.php.
+        let dir = tempfile::tempdir().unwrap();
+        let rules = RunRules {
+            write_dirs: vec!["E:/tmp/qna-scripts".into()],
+            ..RunRules::default()
+        };
+        let p = Policy::new(&project(dir.path(), rules), None);
+        assert!(p.may_write("/e/tmp/qna-scripts/opt.php"));
+        assert!(p.may_write("E:\\tmp\\qna-scripts\\opt.php"));
+        assert!(!p.may_write("/e/tmp/elsewhere/opt.php"));
+        assert_eq!(
+            writable_dir("/e/tmp/qna-scripts/").as_deref(),
+            Some("E:/tmp/qna-scripts")
+        );
     }
 }

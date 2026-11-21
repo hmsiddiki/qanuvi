@@ -82,6 +82,8 @@ pub enum Reading {
     Act {
         instruction: String,
         fact: Option<ProjectFact>,
+        /// wd1: a folder outside the project the owner allowed the step to write into (absolute, as asked).
+        write_dir: Option<String>,
     },
     /// "I don't understand": the same need asked again, simpler and in more detail.
     Clarify(Card),
@@ -252,12 +254,20 @@ pub fn reading_prompt(f: &StepFacts, card: &Card, answer: &str) -> String {
         CARD_RULES.into(),
         String::new(),
         PROJECT_FACT_RULE.into(),
+        ALLOW_WRITE_RULE.into(),
         format!(
-            "Answer with JSON only: {{\"intent\": \"act\" | \"question\" | \"tried\" | \"unclear\" | \"followup\", \"instruction\": \"...\", \"reply\": \"...\", \"card\": {CARD_SHAPE} or null, \"projectFact\": {{\"title\": \"...\", \"text\": \"...\"}} or null}}"
+            "Answer with JSON only: {{\"intent\": \"act\" | \"question\" | \"tried\" | \"unclear\" | \"followup\", \"instruction\": \"...\", \"reply\": \"...\", \"card\": {CARD_SHAPE} or null, \"projectFact\": {{\"title\": \"...\", \"text\": \"...\"}} or null, \"allowWrite\": \"...\" or null}}"
         ),
     ]);
     out.join("\n")
 }
+
+/// wd1: an answer that allows writing outside the project becomes a run rule, so the step's next try is not refused
+/// by the same guard again (the owner said yes, the guard did not know, and the step asked the same thing twice).
+const ALLOW_WRITE_RULE: &str = "\"allowWrite\" (with \"act\" only): when the step was stopped because it could not write \
+     outside the project and the reply clearly allows a folder for that, the folder as an absolute path (the one the \
+     question named; if the reply names it slightly differently, the question's); null otherwise, and null when the \
+     reply only says to use another way or a folder inside the project.";
 
 /// PM a: what the reading call keeps for the project besides the step.
 const PROJECT_FACT_RULE: &str = "\"projectFact\" (with \"act\" only): when the reply says something about this project \
@@ -354,6 +364,10 @@ pub fn parse_reading(text: &str) -> Option<Reading> {
             )
             .to_string(),
             fact: fact_of(v.get("projectFact")),
+            write_dir: v
+                .get("allowWrite")
+                .and_then(Value::as_str)
+                .and_then(crate::run_rules::writable_dir),
         }),
         "clarify" | "question" | "unclear" => card.map(Reading::Clarify),
         "followup" | "tried" => card.map(Reading::FollowUp),
@@ -516,7 +530,27 @@ mod tests {
                 instruction: "Add the rule to /etc/nginx/nginx.conf yourself and reload nginx."
                     .into(),
                 fact: None,
+                write_dir: None,
             })
+        );
+        // wd1: a folder the owner allowed comes with it; a system folder never does.
+        let r = parse_reading(
+            r#"{"intent": "act", "instruction": "Save the script there.", "allowWrite": "E:/tmp/qna-scripts/"}"#,
+        );
+        assert!(
+            matches!(&r, Some(Reading::Act { write_dir: Some(d), .. }) if d.eq_ignore_ascii_case("E:/tmp/qna-scripts")),
+            "{r:?}"
+        );
+        let r = parse_reading(r#"{"intent": "act", "allowWrite": "/etc"}"#);
+        assert!(
+            matches!(
+                r,
+                Some(Reading::Act {
+                    write_dir: None,
+                    ..
+                })
+            ),
+            "{r:?}"
         );
         // PM a: what the reply says about the project beyond this step comes with it.
         let r = parse_reading(

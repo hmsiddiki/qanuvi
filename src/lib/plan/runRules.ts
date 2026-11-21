@@ -13,6 +13,8 @@ export interface RunRules {
   allow: string[];
   /** Command patterns the run never uses, besides the fixed never-list. */
   never: string[];
+  /** wd1: folders outside the project the owner allowed a step to write into (kept by the core from an answer). */
+  write_dirs?: string[];
 }
 
 export const DEFAULT_RULES: RunRules = { set: false, branch: false, allow: [], never: [] };
@@ -25,6 +27,10 @@ export function rulesOf(settings: { run_rules?: Partial<RunRules> } | undefined)
     branch: !!r.branch,
     allow: Array.isArray(r.allow) ? r.allow.filter((p) => typeof p === "string") : [],
     never: Array.isArray(r.never) ? r.never.filter((p) => typeof p === "string") : [],
+    // wd1: kept as they are, so saving the card never drops a folder the owner allowed in an answer.
+    ...(Array.isArray(r.write_dirs) && r.write_dirs.length
+      ? { write_dirs: r.write_dirs.filter((p) => typeof p === "string") }
+      : {}),
   };
 }
 

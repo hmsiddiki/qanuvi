@@ -1440,8 +1440,23 @@ runs on or off; with it off nothing is sent anywhere.
       per 30 s (apps'); shorter = faster dead-link finding (rl1: 90 s), longer = cheaper: OWNER QUESTION.
       Also added: --ping-every <s> (silent = 3x), deploy/relay/ (service with 262144 files + both roads + 47443,
       cert copy service + path unit, README). Rust lib 601, clippy clean both builds.
+    wd1 OWNER FOUND + FIXED (2026-11-21, installed 0.1.34, project qanuvi, QANUVI-THEME-PLAN.md step 1): the step
+      needed a setup script in E:/tmp/qna-scripts/, the run's write guard refused it (outside the project), the
+      owner answered yes to that folder, the answer was read right ("act": save it there) and the step ran again,
+      but the guard still refused (/e/tmp/qna-scripts/opt.php): an answer only became words to the agent, never a
+      rule, so the step asked the same thing a second time. Cause in 24y part 1 (0.1.30/0.1.31), not in the relay
+      work. Fixed: the answer reading gives "allowWrite" (the folder the question named, only when the reply
+      clearly allows it); the runner puts it into the project's run rules (write_dirs, one decision line) before
+      the step runs again; the guard lets writes under it through, Git Bash paths (/e/...) matched as E:/...;
+      drive and file system roots, home folders themselves, system folders and ".." never taken. Also found and
+      fixed on the way: the window's rulesOf kept only set/branch/allow/never, so pressing Start would have saved
+      the rules back without the folder (dropped it silently); it keeps write_dirs now. Tests: before allowed
+      refused, after allowed written (edit tool and > redirect), next to it / ".." out of it still refused, project
+      and scratch as before; system folders and roots never taken; /e/... matches; reading keeps a folder and
+      drops /etc; window keeps write_dirs and older records unchanged (fails without the fix). Rust lib 607,
+      vitest 567, svelte-check 0, clippy clean both builds. Unpublished (0.1.35, ask).
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
-      R3 (apps own port then 443; goes out in 0.1.35, ask). Not deployed: R1+R2+R4 relay (basevm376 still runs the
+      R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
       units: LimitNOFILE 262144 + --tls-listen 0.0.0.0:47443 + --public-direct + cert copy path unit, UFW 47443),
       drive Home PC + laptop on the own port after 0.1.35; owner question open: ping time (28% of one core per 100k

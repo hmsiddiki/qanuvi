@@ -934,6 +934,32 @@ impl<'a> Loop<'a> {
             });
     }
 
+    /// wd1: the owner allowed a folder outside the project: it goes into the project's run rules before the step
+    /// runs again, so the write guard lets it through this time and in later runs (listed in the decisions).
+    fn allow_write_dir(&mut self, dir: &str) {
+        let Ok(mut ps) = self.env.project_settings() else {
+            return;
+        };
+        if ps
+            .run_rules
+            .write_dirs
+            .iter()
+            .any(|d| d.eq_ignore_ascii_case(dir))
+        {
+            return;
+        }
+        ps.run_rules.write_dirs.push(dir.to_string());
+        if self.env.set_project_settings(&ps).is_ok() {
+            self.decide(
+                "rules",
+                "Qanuvi",
+                "Run rules: may write in",
+                dir,
+                "your answer allowed this folder outside the project, so the step's next try may write there",
+            );
+        }
+    }
+
     /// PM a: what the owner said about the project goes into This project memory at once (it is theirs); a site
     /// address also fills Preview address when that is empty.
     fn keep_owner_fact(&mut self, title: &str, text: &str) {
@@ -3224,10 +3250,14 @@ impl<'a> Loop<'a> {
                 ownerask::Reading::Act {
                     instruction: how,
                     fact,
+                    write_dir,
                 } => {
                     instruction = Some(how).filter(|h| !h.is_empty());
                     if let Some(f) = fact {
                         self.keep_owner_fact(&f.title, &f.text);
+                    }
+                    if let Some(dir) = write_dir {
+                        self.allow_write_dir(&dir);
                     }
                 }
                 ownerask::Reading::Clarify(card) | ownerask::Reading::FollowUp(card) => {
@@ -3482,6 +3512,7 @@ impl<'a> Loop<'a> {
             None => ownerask::Reading::Act {
                 instruction: String::new(),
                 fact: None,
+                write_dir: None,
             },
         }
     }
