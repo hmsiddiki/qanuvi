@@ -1421,6 +1421,25 @@ runs on or off; with it off nothing is sent anywhere.
       takes the connection and never answers -> saved address after about 3 s, then straight away; relay telling
       nothing -> as before; another host refused; panel words (vitest). Rust lib 599, vitest 565, svelte-check 0,
       clippy clean both builds.
+    24rl R4 LOAD TEST DONE (2026-11-21, Linux laptop, relay + load tool on one machine, 50,000 pairs = 100,000
+      links over 8 local addresses; tool: src-tauri/examples/relay-load.rs, script E:/qc-scratch kept in session
+      scratchpad r4-load.sh). Run 1 found 3 things, all fixed (2a3c884) and run 2 measured on the fixed relay:
+      (1) a link that ended looked through EVERY session (100k links ending together = 80 s of full CPU, new links
+      stalled meanwhile): sessions now indexed per connection, gone() only takes its own (test: 20,000 links ending
+      in 0.27 s); (2) listen queue was std's 128: after a restart 100k devices took 130 s to get back, 14k
+      handshakes timed out: queue 4096 (socket2; the system caps it at net.core.somaxconn); (3) the test's own
+      certificate (openssl, CA:TRUE) was refused by the client: test script fixed, not the relay.
+      RUN 2 RESULTS: memory 8.2 KB per idle link plain (824 MB / 100k), 22.8 KB over TLS (2.28 GB / 100k): target
+      30 KB PASS. Latency handler -> master with 1,000 links talking: p50 0.32 ms, p99 0.5-1.5 ms: PASS. Relay
+      restart with 100k links: all back within about 10-15 s (was 130 s): PASS. All 100k up in 60 s at 2,000
+      pairs/s plain, 110 s at 1,000/s TLS. Threads 9 the whole time (no thread per link). IDLE CPU: 28% of one
+      laptop core for 100k idle links with pings every 30 s, 0% with --ping-every 300: the pings are the whole idle
+      cost (target 5%: MISSED at 30 s). Free saving built: the relay no longer pings a link it heard from within
+      the ping time (apps ping every 30 s themselves, so their links got pings both ways); old read-only apps still
+      get pinged (test: a pinging link gets 0 pings back, a quiet one 5+). The remaining cost is one ping per link
+      per 30 s (apps'); shorter = faster dead-link finding (rl1: 90 s), longer = cheaper: OWNER QUESTION.
+      Also added: --ping-every <s> (silent = 3x), deploy/relay/ (service with 262144 files + both roads + 47443,
+      cert copy service + path unit, README). Rust lib 601, clippy clean both builds.
     CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
       all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
       owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link

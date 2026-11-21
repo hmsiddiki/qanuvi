@@ -528,7 +528,10 @@ impl Relay {
                     if heard.elapsed() > self.silent {
                         break format!("silent for {} s", heard.elapsed().as_secs());
                     }
-                    if pinged.elapsed() >= self.ping_every {
+                    // R4: idle links cost only their pings (100k idle links: about 28% of one core with a ping
+                    // each way per 30 s, 0% at 300 s). Apps ping the relay themselves, so a link heard from lately
+                    // is not pinged back on top; one that only reads (older apps) still is.
+                    if pinged.elapsed() >= self.ping_every && heard.elapsed() >= self.ping_every {
                         pinged = Instant::now();
                         if let Err(e) = sink.send(Message::Ping(Vec::new().into())).await {
                             break format!("ping not sent: {e}");
@@ -1463,5 +1466,28 @@ mod tests {
             st.conns[&1].queued.load(Ordering::SeqCst),
             text(&Msg::Close { session: 1_000_000 }).len()
         );
+    }
+
+    #[test]
+    fn a_link_that_pings_the_relay_itself_is_not_pinged_back_and_a_quiet_one_is() {
+        let (relay, _) =
+            start_local_relay(Duration::from_millis(100), Duration::from_secs(5)).unwrap();
+        let count_pings = |talks: bool| {
+            let mut ws = link(&relay);
+            let (mut pings, until) = (0, Instant::now() + Duration::from_millis(1200));
+            let mut sent = Instant::now();
+            while Instant::now() < until {
+                if talks && sent.elapsed() >= Duration::from_millis(40) {
+                    sent = Instant::now();
+                    ws.send(Message::Ping(Vec::new().into())).unwrap();
+                }
+                if let Ok(Message::Ping(_)) = ws.read() {
+                    pings += 1;
+                }
+            }
+            pings
+        };
+        assert_eq!(count_pings(true), 0);
+        assert!(count_pings(false) >= 5);
     }
 }
