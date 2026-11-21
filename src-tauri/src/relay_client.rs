@@ -571,6 +571,11 @@ impl RelayMaster {
                     // well; the devices connect again on their own.
                     let ended: Vec<String> = {
                         let mut i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                        // rl2: a link the relay had welcomed was working, so the next try comes soon again. The wait
+                        // never went back down before: after a few drops each one cost a whole minute offline.
+                        if i.connected {
+                            wait = Duration::from_secs(1);
+                        }
                         i.connected = false;
                         i.error = e;
                         i.sessions.drain().map(|(_, l)| l.device).collect()
@@ -1059,6 +1064,55 @@ mod tests {
         wait_for("sessions forgotten", &|| rm.status().sessions.is_empty());
         server.cut_masters(false);
         wait_for("connected again", &|| rm.status().connected);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// rl2: each drop of a working link is followed by a quick try again; before, the waits of earlier drops added up
+    /// (1, 2, 4, 8 ... 60 s) and never went back down, so after a few drops every one cost a minute offline.
+    #[test]
+    fn a_working_link_that_drops_is_tried_again_soon_every_time() {
+        let (relay, server) = crate::relay_server::start_local_relay(
+            crate::relay_server::PING_EVERY,
+            crate::relay_server::SILENT,
+        )
+        .unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let wait_for = |what: &str, ok: &dyn Fn() -> bool, limit: Duration| {
+            let deadline = Instant::now() + limit;
+            while !ok() {
+                assert!(Instant::now() < deadline, "{what}: {:?}", rm.status());
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        };
+        wait_for(
+            "connected",
+            &|| rm.status().connected,
+            Duration::from_secs(10),
+        );
+        for drop_no in 1..=4 {
+            server.cut_masters(true);
+            wait_for(
+                "dropped",
+                &|| !rm.status().connected,
+                Duration::from_secs(10),
+            );
+            server.cut_masters(false);
+            let back = Instant::now();
+            wait_for(
+                "connected again",
+                &|| rm.status().connected,
+                Duration::from_secs(20),
+            );
+            assert!(
+                back.elapsed() < Duration::from_secs(3),
+                "drop {drop_no}: back only after {:?}",
+                back.elapsed()
+            );
+        }
         rm.configure(&relay, "Home PC", false, master).unwrap();
     }
 

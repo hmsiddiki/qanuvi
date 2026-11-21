@@ -1311,6 +1311,14 @@ runs on or off; with it off nothing is sent anywhere.
       PC master still listed the 4 dead laptop sessions after the restart (old code keeps them): Stop next to the
       ribbon clears them now; 0.1.33 carries the master side.
     lx1 test build on the laptop: ~/src/qanuvi/src-tauri/target/release/qanuvi (bbd72c6, own test data).
+    rl2 FOUND + FIXED (2026-11-21 06:55): Home PC's relay link drops now and then (nginx log: all our links end
+      the same second at 06:21:24, 06:23:44, 06:26:22; This PC 06:39:57, 06:41:18, 06:51:21). Not the home network:
+      an SSH link to the same server stayed up through all of them (15 min watch); no nginx reload; not the laptop
+      test window (start/stop repro: no drop). The master's own error each time: "The connection to the relay
+      ended." Cause of the drop itself STILL OPEN (needs a relay-side log of why a link ends: deploy = ask).
+      What made each drop cost a minute: the master's reconnect wait doubled per drop (1..60 s) and never went back
+      down after a good link, so the laptop saw "not online" for 60 s. Fixed: a link the relay had welcomed starts
+      the next wait at 1 s again. Test: 4 drops in a row, each back in under 3 s (fails without the fix: drop 3 took 4 s).
     ce1 OWNER FOUND + FIXED (2026-11-21 06:00): the laptop chat kept "The connection to the master has ended." after
       the link came back and after switching projects (seen on the laptop screen: Home PC lost at 05:54 when the
       installed app restarted, back a minute later, red line still there). The chat's error line only cleared on a
