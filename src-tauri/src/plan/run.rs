@@ -1580,6 +1580,9 @@ impl<'a> Loop<'a> {
                 self.sh.nap();
             }
             self.sh.live().waiting_answers = 0;
+            // bg2: the wait is over: "Waiting for you (1 answer)" no longer holds (it stayed while the run went on).
+            self.run.message.clear();
+            self.save();
             self.sh.touch();
             self.answered = false;
             if self.stop_asked() {
@@ -2185,6 +2188,7 @@ impl<'a> Loop<'a> {
             }
             self.watch.handover = 0;
             self.watch.step_log = own_log.clone();
+            self.watch.plan_step = Some((self.s.file.clone(), key(&st)));
             self.watch.handover_limit = self
                 .s
                 .options

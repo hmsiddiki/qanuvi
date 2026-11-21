@@ -46,6 +46,24 @@ pub const BACKGROUND_GIVE_UP: &str = "(Qanuvi: your background command is still 
 
 /// How many background commands the agent's session has running, from Claude Code's
 /// `background_tasks_changed` line (None: another line).
+/// bg1: the step is already ticked in the plan, so nothing waits on the agent's background commands (a command
+/// Claude Code moved to the background on its 120 s limit and the agent left behind held a done step 30 minutes).
+pub fn step_ticked(env: &dyn RunEnv, watch: &StepWatch) -> bool {
+    let Some((file, step)) = &watch.plan_step else {
+        return false;
+    };
+    let Ok(now) = env.read(file) else {
+        return false;
+    };
+    crate::plan::tasklist::parse_plan(&now.text)
+        .steps
+        .iter()
+        .any(|s| {
+            s.number.clone().unwrap_or_else(|| s.title.clone()) == *step
+                && s.status == crate::plan::tasklist::StepStatus::Done
+        })
+}
+
 pub fn background_tasks(line: &str) -> Option<usize> {
     if !line.contains("background_tasks_changed") {
         return None;
@@ -219,6 +237,8 @@ pub struct StepWatch {
     pub messages: Vec<ownermsg::Record>,
     /// Changes the owner wants as their own steps (the run loop writes them into the plan).
     pub new_steps: Vec<ownermsg::NewStep>,
+    /// bg1: the plan file and the step (number, else title) this watch is for, so a turn can see the step is ticked.
+    pub plan_step: Option<(String, String)>,
 }
 
 impl StepWatch {
@@ -736,6 +756,7 @@ pub fn turn(
                 if st == "idle"
                     && background > 0
                     && !background_given_up
+                    && !step_ticked(env, watch)
                     && !watch.pause_now
                     && watch.handover == 0
                     && stop.is_none()

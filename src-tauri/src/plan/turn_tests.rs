@@ -668,3 +668,36 @@ fn a_stop_while_held_for_a_background_command_stops_the_turn() {
     assert_eq!(env.stopped().len(), 1);
     assert!(!end.idle);
 }
+
+#[test]
+fn a_ticked_step_is_not_held_for_a_background_command_left_behind() {
+    // bg1: Claude Code moved a slow `find /` to the background on its 120 s limit; the agent ticked the step and
+    // ended its turn; the turn was held 30 minutes for a command nothing waited on.
+    let env = FakeEnv::new();
+    env.put("PLAN.md", "# Plan\n\n- [x] **1. Do it**\n");
+    env.set_agent(|_| AgentReply {
+        lines: vec![background(1)],
+        result: Some("Step 1 is done and ticked.".into()),
+        ..Default::default()
+    });
+    let c = Controls::default();
+    let mut w = watch(&env);
+    w.plan_step = Some(("PLAN.md".into(), "1".into()));
+    let started = env.now_ms();
+    let end = run(&env, &c, &mut w, &ask(""));
+    assert!(
+        env.now_ms() - started < 60_000,
+        "held {} ms",
+        env.now_ms() - started
+    );
+    assert!(env.sent().is_empty(), "{:?}", env.sent());
+    assert_eq!(env.prompts().len(), 1);
+    assert!(end.idle);
+    // Not ticked: still held for it, as before (z4).
+    env.put("PLAN.md", "# Plan\n\n- [ ] **1. Do it**\n");
+    let mut w = watch(&env);
+    w.plan_step = Some(("PLAN.md".into(), "1".into()));
+    let started = env.now_ms();
+    run(&env, &c, &mut w, &ask(""));
+    assert!(env.now_ms() - started >= BACKGROUND_WAIT_MS);
+}

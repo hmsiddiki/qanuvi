@@ -2598,3 +2598,50 @@ fn pm_a_run_offers_what_it_learned_about_the_project_once_and_keep_all_makes_it_
     assert_eq!(env.memory_entries().len(), 2);
     assert_eq!(env.inbox().len(), before + 1, "only the run's report");
 }
+
+#[test]
+fn once_the_answer_comes_the_run_no_longer_says_it_waits_for_you() {
+    // bg2: "Waiting for you (1 answer)" stayed on the run while it went on with the next steps.
+    let env = world("# Plan\n\n- [ ] **1. Needs a key**\n- [ ] **2. Other**\n  - Needs: 1\n");
+    let blocked = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let b = blocked.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" && b.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            c.env.mark(FILE, "1", '!');
+            return AgentReply::default();
+        }
+        if n == "2" {
+            std::thread::sleep(Duration::from_millis(400));
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("the question never came", &|| running.waiting_answers() > 0);
+    assert!(
+        running
+            .now()
+            .message
+            .starts_with("Waiting for you (1 answer)")
+    );
+    let key = open_question(&env).expect("a question").key.unwrap();
+    env.answer(&key, json!({"choice": "go", "text": "the key is set now"}));
+    wait_until("step 2 never started", &|| {
+        step(&running.now(), "2").status == RunStepStatus::Running
+    });
+    let message = running.now().message;
+    assert!(!message.starts_with("Waiting for you"), "{message}");
+    assert_eq!(running.wait().status, RunStatus::Done);
+}

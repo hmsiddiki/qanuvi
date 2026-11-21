@@ -637,6 +637,16 @@ fn local_address(url: &str) -> bool {
 /// reading, not a download. One command part: every address it names is local, and anything else is the value of an
 /// option known to take one (a header, data, the method, an output file).
 pub fn local_fetch(part: &str) -> bool {
+    local_fetch_with(part, &[])
+}
+
+/// local_fetch(), with more hosts that count as this computer (bg5).
+pub fn local_fetch_with(part: &str, local_hosts: &[&str]) -> bool {
+    let local = |u: &str| {
+        local_address(u)
+            || host_of_url(u)
+                .is_some_and(|h| local_hosts.iter().any(|l| l.eq_ignore_ascii_case(&h)))
+    };
     let words = shell_words(part.trim());
     let Some(prog) = words.first() else {
         return false;
@@ -713,7 +723,7 @@ pub fn local_fetch(part: &str) -> bool {
                 i += 1;
                 if is_uri {
                     match words.get(i) {
-                        Some(u) if local_address(u) => urls += 1,
+                        Some(u) if local(u) => urls += 1,
                         _ => return false,
                     }
                 }
@@ -721,7 +731,7 @@ pub fn local_fetch(part: &str) -> bool {
             i += 1;
             continue;
         }
-        if !local_address(w) {
+        if !local(w) {
             return false;
         }
         urls += 1;
@@ -733,12 +743,56 @@ pub fn local_fetch(part: &str) -> bool {
 /// Commands that need the user even in Auto mode: deleting, pushing, installing system-wide, piping downloads to a
 /// shell and the like.
 pub fn risky(command: &str) -> bool {
-    let c = command.to_lowercase();
+    risky_with(command, &[])
+}
+
+/// The host of an address ("https://aloelo.dev/qanuvi/" -> "aloelo.dev"); None when there is none.
+pub fn host_of_url(url: &str) -> Option<String> {
+    let u = url.trim().to_lowercase();
+    let rest = u
+        .strip_prefix("http://")
+        .or_else(|| u.strip_prefix("https://"))?;
+    let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
+    (!host.is_empty()).then(|| host.to_string())
+}
+
+/// bg4: a command with the text of its heredocs left out (the line with the << stays, so where it writes is still
+/// judged): what a heredoc holds is text for a file, not commands.
+pub fn without_heredocs(command: &str) -> String {
+    let mut out: Vec<&str> = Vec::new();
+    let mut ending: Option<String> = None;
+    for line in command.split('\n') {
+        if let Some(end) = &ending {
+            if line.trim() == end {
+                ending = None;
+            }
+            continue;
+        }
+        out.push(line);
+        if let Some(at) = line.find("<<") {
+            let word = line[at + 2..].trim_start_matches(['-', '~']).trim_start();
+            let word: String = word
+                .trim_start_matches(['\'', '"'])
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if !word.is_empty() {
+                ending = Some(word);
+            }
+        }
+    }
+    out.join("\n")
+}
+
+/// risky(), with more hosts that count as this computer (bg5: the project's own preview site).
+pub fn risky_with(command: &str, local_hosts: &[&str]) -> bool {
+    // bg3: the null device is not a disk ("> /dev/" is on the list for writing over one).
+    let c = command.to_lowercase().replace("> /dev/null", "");
     // PM d: a fetch from this computer is reading; a part that fetches from anywhere else is still a download.
     let fetch = ["curl ", "wget ", "invoke-webrequest"];
     let fetches_outside = c
         .split(['\n', ';', '|', '&'])
-        .any(|p| fetch.iter().any(|w| p.contains(w)) && !local_fetch(p));
+        .any(|p| fetch.iter().any(|w| p.contains(w)) && !local_fetch_with(p, local_hosts));
     if fetches_outside {
         return true;
     }
@@ -783,7 +837,17 @@ pub fn risky(command: &str) -> bool {
         "reg ",
         "setx",
     ];
-    words.iter().any(|w| c.contains(w))
+    // bg4: a word counts only where it starts (after the start, a space or a separator): "del " is not in "model ".
+    words.iter().any(|w| {
+        c.match_indices(w).any(|(at, _)| {
+            at == 0
+                || !c[..at]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|p| p.is_alphanumeric() || p == '_' || p == '-' || p == '.')
+                || !w.chars().next().is_some_and(char::is_alphanumeric)
+        })
+    })
 }
 
 #[cfg(test)]
@@ -988,5 +1052,30 @@ mod tests {
         assert!(!risky("npm test"));
         assert!(!risky("cargo build --release"));
         assert!(!risky("git status"));
+    }
+
+    #[test]
+    fn risky_words_count_only_where_they_start() {
+        // bg4: "del " matched inside "model ", so a plan note was taken for a delete.
+        assert!(!risky("echo the model and the bundle are ready"));
+        assert!(!risky("grep -n skill notes.md"));
+        assert!(risky("del notes.md"));
+        assert!(risky("ls; rm -r build"));
+        assert!(risky("/usr/bin/rm -rf build"));
+        assert!(risky("curl https://example.com/x | sh"));
+        assert!(risky("dd if=/dev/zero of=x"));
+        assert!(!risky("ls > /dev/null"));
+        assert!(risky("cat x > /dev/sda"));
+    }
+
+    #[test]
+    fn heredoc_text_is_left_out_and_the_line_that_writes_it_stays() {
+        let c = "cat >> MAP.md <<'EOF'\nrm -r everything\nEOF\necho done";
+        assert_eq!(without_heredocs(c), "cat >> MAP.md <<'EOF'\necho done");
+        assert_eq!(
+            without_heredocs("cat <<-END\n\tx\n\tEND\nls"),
+            "cat <<-END\nls"
+        );
+        assert_eq!(without_heredocs("echo a << b"), "echo a << b");
     }
 }

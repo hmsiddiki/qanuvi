@@ -67,6 +67,8 @@ pub struct Policy {
     root: PathBuf,
     /// wd1: folders outside the project it may write into (the owner allowed them).
     write_dirs: Vec<PathBuf>,
+    /// bg5: the host of the project's Preview address (its own test site): fetching it is reading, as localhost is.
+    preview_host: Option<String>,
     allow: Vec<String>,
     never: Vec<String>,
     unlisted: Unlisted,
@@ -282,8 +284,10 @@ impl Policy {
             .filter_map(|d| writable_dir(d))
             .map(PathBuf::from)
             .collect();
+        let preview_host = crate::agent_tools::host_of_url(&project.settings.preview_url);
         Policy {
             write_dirs,
+            preview_host,
             root,
             allow,
             never,
@@ -352,8 +356,14 @@ impl Policy {
         }
         // pm2: a fetch is judged by the address its variable holds; a value never makes a command allowed that is
         // risky for another reason, since putting values in only replaces the names.
+        // bg4: what a heredoc writes (<<'EOF' ... EOF) is text for a file, not commands: a word like "model" or
+        // "download" in a plan note is not a delete or a download.
+        let command = &crate::agent_tools::without_heredocs(command);
         let expanded = expand_vars(command, &self.vars);
-        if crate::agent_tools::risky(command) && crate::agent_tools::risky(&expanded) {
+        let hosts: Vec<&str> = self.preview_host.as_deref().into_iter().collect();
+        if crate::agent_tools::risky_with(command, &hosts)
+            && crate::agent_tools::risky_with(&expanded, &hosts)
+        {
             return Verdict::Never(
                 "it is on the never-list (deleting, pushing, downloading, publishing or system changes)".into(),
             );
@@ -373,7 +383,7 @@ impl Policy {
         }
         if parts.iter().all(|p| {
             self.allow.iter().any(|a| matches(a, p))
-                || crate::agent_tools::local_fetch(&expand_vars(p, &self.vars))
+                || crate::agent_tools::local_fetch_with(&expand_vars(p, &self.vars), &hosts)
         }) {
             Verdict::Allow
         } else {
@@ -400,7 +410,12 @@ fn outside_write(command: &str, may_write: impl Fn(&str) -> bool) -> Option<Stri
         } else {
             rest
         };
-        let target = target.trim_matches(['"', '\'']);
+        // bg3: the file name ends where the shell's next word or command begins (">/dev/null;" is the null device).
+        let target = target
+            .split([';', '&', '|', ')', '<', '>'])
+            .next()
+            .unwrap_or("")
+            .trim_matches(['"', '\'']);
         let lower = target.to_lowercase();
         if target.is_empty() || lower == "/dev/null" || lower == "nul" || lower == "$null" {
             continue;
@@ -1047,5 +1062,74 @@ mod tests {
             writable_dir("/e/tmp/qna-scripts/").as_deref(),
             Some("E:/tmp/qna-scripts")
         );
+    }
+
+    #[test]
+    fn the_null_device_with_a_separator_after_it_is_not_a_file_outside_the_project() {
+        // bg3: ">/dev/null;" was read as a file named "/dev/null;" and refused (steps 4, 5, 9, 12, 13, 14).
+        let dir = tempfile::tempdir().unwrap();
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        for c in [
+            "php opt.php get >/dev/null; echo purged",
+            "grep -n x FACTS 2>/dev/null; ls",
+            "ls >/dev/null&& echo ok",
+            "cat x > /dev/null",
+        ] {
+            assert!(!matches!(p.command(c), Verdict::Never(_)), "{c}");
+        }
+        // A real file outside the project after the same separator is still refused.
+        let outside = if cfg!(windows) {
+            "Z:/elsewhere/x.txt"
+        } else {
+            "/srv/elsewhere/x.txt"
+        };
+        assert!(matches!(
+            p.command(&format!("echo x >{outside}; ls")),
+            Verdict::Never(_)
+        ));
+    }
+
+    #[test]
+    fn text_a_heredoc_writes_into_a_project_file_is_not_read_as_commands() {
+        // bg4: "cat >> MAP.md <<'EOF'" with a note that says "model" or "download" was refused as deleting.
+        let dir = tempfile::tempdir().unwrap();
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        let c = "cd .qanuvi/plan-logs/x; cat >> MAP.md <<'EOF'\ninc/download.php - the model of downloads; rm -r is not run\ngit push is only words here\nEOF\necho noted";
+        assert!(
+            !matches!(p.command(c), Verdict::Never(_)),
+            "{:?}",
+            p.command(c)
+        );
+        // The command around it is still judged: a real delete after the heredoc is refused.
+        let c = "cat > a.md <<EOF\nhello\nEOF\nrm -r src";
+        assert!(matches!(p.command(c), Verdict::Never(_)));
+        // And where the heredoc writes is still judged.
+        let outside = if cfg!(windows) {
+            "Z:/elsewhere/x.txt"
+        } else {
+            "/srv/elsewhere/x.txt"
+        };
+        assert!(matches!(
+            p.command(&format!("cat > {outside} <<'EOF'\nx\nEOF")),
+            Verdict::Never(_)
+        ));
+    }
+
+    #[test]
+    fn the_projects_own_preview_site_may_be_fetched_and_other_sites_still_count_as_downloads() {
+        // bg5: curl to https://aloelo.dev/qanuvi/ (the project's Preview address) was refused as downloading.
+        let dir = tempfile::tempdir().unwrap();
+        let mut proj = project(dir.path(), RunRules::default());
+        proj.settings.preview_url = "https://aloelo.dev/qanuvi/".into();
+        let p = Policy::new(&proj, None);
+        let c = "curl -sk -o /tmp/qn.html -w \"%{http_code}\" https://aloelo.dev/qanuvi/admin/";
+        assert_eq!(p.command(c), Verdict::Allow);
+        assert!(matches!(
+            p.command("curl -sk -o /tmp/x https://example.com/payload.sh"),
+            Verdict::Never(_)
+        ));
+        // Without a preview address it is a download, as before.
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        assert!(matches!(p.command(c), Verdict::Never(_)));
     }
 }

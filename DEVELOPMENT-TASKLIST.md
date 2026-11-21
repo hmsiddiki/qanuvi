@@ -1478,7 +1478,7 @@ runs on or off; with it off nothing is sent anywhere.
       (old latest.json in E:/Backups/qanuvi/channel-before-0.1.35). Online: all 9 files 200, sizes match. Tagged
       v0.1.35. Next: owner updates This PC + laptop; check both on "own port" (relay log shows the TLS links) and a
       big chat from the laptop; then 24rl part 1 is DONE; then sl1 (fresh session).
-    bg1 OWNER FOUND, NOT FIXED YET (2026-11-21, installed 0.1.34, QANUVI-THEME-PLAN.md step 13 "stopped"): at 11:50:47
+    bg1 OWNER FOUND + FIXED (2026-11-21, installed 0.1.34, QANUVI-THEME-PLAN.md step 13 "stopped"): at 11:50:47
       the step's agent ran a command with `find / -maxdepth 6 -name docs.html ...` (whole disk); Claude Code moved it
       to the background after its 120 s limit (task_updated is_backgrounded); the agent went on, finished and ticked
       step 13 at 11:55:26 without stopping it; the z4 hold (turn.rs: idle + background > 0) then held the step for
@@ -1490,6 +1490,23 @@ runs on or off; with it off nothing is sent anywhere.
     bg2 FOUND (same run): the run's message stayed "Waiting for you (1 answer)" after step 1's question was settled
       (Inbox empty, waitingAnswers 0, run running step 14): a stale message, the Run panel shows it as waiting.
       Fix: the message is set again when a held step is answered / the run goes on.
+    bg1-bg5 FIXED (owner "fix it now", "check the whole run again", 2026-11-21; whole run 7d8243f0 read: every
+      step's tries, decisions and every guard refusal with its command):
+      bg1: turn.rs step_ticked(): no z4 hold when the step is ticked [x] in the plan at the idle (StepWatch.plan_step
+        = plan file + step key, set by the runner per step); not ticked: held as before. Test fails without it.
+      bg2: run.rs: the waiting line is cleared when the wait for answers ends and the run goes on. Scenario test
+        (step 1 held, answered, step 2 running: no "Waiting for you"); fails without it.
+      bg3 (steps 4, 5, 9, 12, 13, 14 had commands refused "it writes /dev/null;, outside the project"): the
+        redirect's file ends at ; & | ) < >, and "> /dev/null" (with a space) no longer matches the never-list's
+        "> /dev/" (that is for writing over a disk). A real file outside after the same separator: still refused.
+      bg4 (steps 1, 12: "cat >> MAP.md <<'EOF'" plan notes refused as "deleting"): the never-list matched inside
+        words ("del " in "model "), and heredoc text was read as commands. Now words count only where they start,
+        heredoc text is left out (the << line and everything after the heredoc are still judged; where it writes is
+        still judged).
+      bg5 (steps 1, 6: curl -o to https://aloelo.dev/qanuvi/ refused as downloading): the project's Preview address
+        host counts as this computer for fetches (allowed in the run, like localhost); other sites still downloads.
+      Left as designed: rm -r / rm -f (deleting, even inside the project) stays on the never-list.
+      Tests: Rust lib 611 (7 new), clippy clean both builds.
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
