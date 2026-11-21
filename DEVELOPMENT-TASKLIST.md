@@ -4083,6 +4083,17 @@ runs on or off; with it off nothing is sent anywhere.
   Tailscale / ZeroTier / Cloudflare Tunnel addresses used as they are; (5) community relays (volunteers, picked by
   nearness, like Syncthing); (6) money only for what is left (GitHub Sponsors / Open Collective; maybe later an
   optional paid hosted relay, everything staying free and self-hostable). Plan it in detail with the owner first.
+  OWNER DECISIONS (2026-11-21): target 50-100k devices connected at once (mostly idle; active traffic kept off the
+  relay by direct links, SSH for VPS masters, and a daily fallback cap per user). Free relays: own relay + volunteer
+  relays, a volunteer relay used only after the user says yes. Build the relay ONCE for both ways of running, so it
+  is not touched again: (a) behind nginx (today, wss://relay.qanuvi.com on 443) and (b) its own TLS on its own port
+  (rustls, reads the Let's Encrypt files ISPConfig keeps in /var/www/relay.qanuvi.com/ssl/ and picks up renewals by
+  itself), so it can also move to its own small VPS later with no code change. Clients try the relay's own port
+  first and fall back to 443 through nginx (some networks block other ports). basevm376 measured 2026-11-21: 4
+  cores, 8 GB (5.2 GB free), nginx worker_connections 768 x 4 workers (shared with all sites; a relay device takes
+  2), relay LimitNOFILE 65536, TasksMax 9440, UFW active (a new port = firewall change, ask; open it in the
+  ISPConfig panel's firewall if ISPConfig manages it). nginx's main config is not changed (an ISPConfig update may
+  rewrite it).
   Now (2026-11-20): the official relay runs for the owner's own devices on basevm376 (see "relay.qanuvi.com" below).
   relay.qanuvi.com (2026-11-20, owner: "make subdomain and do it"): qanuvi-relay (Linux build of 12f7305, 678 KB)
   in /usr/local/bin on basevm376 (109.123.234.13), systemd unit qanuvi-relay (system user qanuvi-relay, data
