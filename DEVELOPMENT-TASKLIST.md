@@ -1478,6 +1478,18 @@ runs on or off; with it off nothing is sent anywhere.
       (old latest.json in E:/Backups/qanuvi/channel-before-0.1.35). Online: all 9 files 200, sizes match. Tagged
       v0.1.35. Next: owner updates This PC + laptop; check both on "own port" (relay log shows the TLS links) and a
       big chat from the laptop; then 24rl part 1 is DONE; then sl1 (fresh session).
+    bg1 OWNER FOUND, NOT FIXED YET (2026-11-21, installed 0.1.34, QANUVI-THEME-PLAN.md step 13 "stopped"): at 11:50:47
+      the step's agent ran a command with `find / -maxdepth 6 -name docs.html ...` (whole disk); Claude Code moved it
+      to the background after its 120 s limit (task_updated is_backgrounded); the agent went on, finished and ticked
+      step 13 at 11:55:26 without stopping it; the z4 hold (turn.rs: idle + background > 0) then held the step for
+      that command until BACKGROUND_WAIT_MS (30 min) gave up at 12:22:51; step 14 started 12:23. ~27 min lost, run
+      looked stopped. Fix to make: no z4 hold when the step is already marked done in the plan at the idle (nothing
+      is waiting on the command; end the session so its shell goes too), and/or hold only for commands the agent
+      started with run_in_background itself, not ones Claude Code moved there on its 120 s limit. Test: idle with a
+      moved-to-background task after the step is ticked -> turn ends at once.
+    bg2 FOUND (same run): the run's message stayed "Waiting for you (1 answer)" after step 1's question was settled
+      (Inbox empty, waitingAnswers 0, run running step 14): a stale message, the Run panel shows it as waiting.
+      Fix: the message is set again when a held step is answered / the run goes on.
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
