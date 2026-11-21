@@ -1370,7 +1370,27 @@ runs on or off; with it off nothing is sent anywhere.
       Claude Code 2.1.330 out, here 2.1.329): rl4 (long lines in parts, sealing writer fix), r5, rl3. Built into
       E:/qc-scratch/release-0.1.34/chan (Linux app on the laptop), copied to qanuvi-updates/dev (old latest.json in
       E:/Backups/qanuvi/channel-before-0.1.34). Online: all files 200, sizes match. Tagged v0.1.34.
-    CHECKPOINT (newest, 2026-11-21 after 0.1.34, fresh conversation starts here): nothing unpublished, all pushed.
+    0.1.34 ON BOTH MACHINES (2026-11-21): This PC (D:\qanuvi, 08:53) and the laptop (~/.local/lib/qanuvi, 08:54:
+      the first real one-click Linux update, binaries swapped and app back up by itself) report 0.1.34.
+    rl4 DRIVEN LIVE (2026-11-21 ~09:05): the laptop's installed master called Home PC over the relay
+      (remote_call agent_session_events, the window's chat load) for This PC's three biggest chats: 8.8 MB answer
+      in 2.9 s (618 events), 7.0 MB in 2.1 s, 4.9 MB in 1.6 s; the link stayed "on" after all three. Relay log on
+      basevm376: the only "Message too long" lines are 09:39 + 09:40 server time (before the 10:15 rl4 deploy);
+      since both machines updated (10:55) not one link ended. The 10:54:54 "master silent for 90 s" line is This
+      PC's old master going away in the 0.1.34 update. All PASS.
+    r5 DRIVEN LIVE (2026-11-21, test build + test data .source, scratch E:/qc-scratch/r5-plan PLAN-HOLD.md, Haiku,
+      started by master calls): step 1 needs notes/key.txt (missing) -> agent marked it [!] with a Blocked line,
+      step 2 done, run waited with the hold question in the Inbox (Try again / Skip / End card); run ended without
+      an answer (finish_without) -> "needs you", step still [!]. Owner side: key.txt added, inbox_answer go + "key.txt
+      added now, try again" -> PLAN-HOLD.md step 1 went [!] -> [ ] at once. Next Run: step 1 done (copied.md =
+      the key's first line, the Done line says the owner added it), run done, the hold question gone from the Inbox
+      (not asked again). PASS. Test window stopped; the installed app left running.
+    CHECKPOINT (newest, 2026-11-21 after r5 + rl4 driven, fresh conversation starts here): nothing unpublished,
+      all pushed, nothing open from 0.1.34. Next: 24rl part 1, plan written in detail first and agreed with the
+      owner before building (relay event-driven, own TLS port beside nginx, clients own port then 443, 100k-link
+      load test on This PC or the laptop, never on basevm376; see 24rl OWNER DECISIONS). Then sl1. Open watch:
+      relay link drops other than rl4 (rl3 log).
+    CHECKPOINT (before, 2026-11-21 after 0.1.34): nothing unpublished, all pushed.
       basevm376 relay = rl4 build (64bc403, .prev = rl3). Next, in order: (1) owner updates PC + laptop to 0.1.34
       (laptop: first real one-click Linux update, watch it); (2) drive live: a long chat (over 4 MB) opened from the
       laptop stays connected and opens fast; relay log (journalctl -u qanuvi-relay) shows no "Message too long";
