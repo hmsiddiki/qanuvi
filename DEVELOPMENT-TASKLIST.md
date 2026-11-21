@@ -1469,6 +1469,15 @@ runs on or off; with it off nothing is sent anywhere.
       (2.9 s on the rl4 relay this morning, first cold try 5.0 s), 4.9 MB 1.69 s (1.64): same; link stayed on.
     0.1.35 HELD by the release rule (Claude Code 2.1.330 out, here 2.1.329), before any build; script ready:
       E:/qc-scratch/release-0.1.35/run.sh (QANUVI_RELEASE_ANYWAY=1 to skip the rule). Holds R3 + wd1.
+    ISPConfig firewall: owner added 47443 (2026-11-21); firewall table now ends ...,40110:40210,47443 and UFW still
+      allows 47443 (v4 + v6) after ISPConfig rewrote it.
+    0.1.35 PUBLISHED (owner "publish anyway", 2026-11-21 11:49; release rule skipped with QANUVI_RELEASE_ANYWAY=1:
+      Claude Code 2.1.330 out, here 2.1.329): R3 (apps use the relay's own port 47443 first, 443 as fallback, the
+      panel says which) + wd1 (an allowed folder outside the project becomes a run rule). Built into
+      E:/qc-scratch/release-0.1.35/chan (Linux app on the laptop), all 4 platforms; copied to qanuvi-updates/dev
+      (old latest.json in E:/Backups/qanuvi/channel-before-0.1.35). Online: all 9 files 200, sizes match. Tagged
+      v0.1.35. Next: owner updates This PC + laptop; check both on "own port" (relay log shows the TLS links) and a
+      big chat from the laptop; then 24rl part 1 is DONE; then sl1 (fresh session).
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
