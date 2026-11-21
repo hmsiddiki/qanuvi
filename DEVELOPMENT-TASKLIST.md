@@ -1532,8 +1532,10 @@ runs on or off; with it off nothing is sent anywhere.
       (default) · Change" (Qanuvi relay / Your own relay, the only address box) in remote access and both pairing
       forms; A3 pairing assumes Qanuvi's relay, the code card names a custom relay. The window sends the default
       written out, so masters from before A1 (VPS) take it too.
-    PICKUP POINT (newest, fresh conversation starts here): drive 2a live on a scratch setup (turn on with nothing
-      typed, Windows + laptop, own port; pair with only the code; custom relay shown next to the code and paired;
+    2a DRIVEN (This PC test build, 2026-11-21): Turn on with nothing typed connected to Qanuvi's relay (443 first,
+      own port after the restart); relay line moved above Turn on. The owner saw the old box in the installed 0.1.36.
+    PICKUP POINT (newest, fresh conversation starts here): drive 2a live on a scratch setup (laptop turn on with nothing
+      typed; pair with only the code; custom relay shown next to the code and paired;
       older records with an address keep it), then 0.1.37 (ask). Then part 3, relay kit, sl1.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
