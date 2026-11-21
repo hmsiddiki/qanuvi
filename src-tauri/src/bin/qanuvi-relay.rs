@@ -4,10 +4,12 @@
 //!
 //! qanuvi-relay [--listen 127.0.0.1:47300] [--tls-listen 0.0.0.0:47443 --cert <file> --key <file>]
 //!              [--public-direct wss://relay.example.com:47443] [--data <folder>]
+//!              [--cap-per-day <MB> [--slow-to <KB/s>]]   (24rl F3: a daily share per computer, slowed after it)
 
 const USAGE: &str = "Usage: qanuvi-relay [--listen 127.0.0.1:47300] \
 [--tls-listen 0.0.0.0:47443 --cert <fullchain.pem> --key <key.pem>] \
-[--public-direct wss://relay.example.com:47443] [--data <folder>] [--ping-every 30]\n\
+[--public-direct wss://relay.example.com:47443] [--data <folder>] [--ping-every 30] \
+[--cap-per-day <MB> [--slow-to <KB/s, default 256>]]\n\
 With no --listen and no --tls-listen it listens on 127.0.0.1:47300 (for a TLS proxy in front).";
 
 fn main() {
@@ -42,6 +44,15 @@ fn main() {
             .and_then(|v| v.parse::<u64>().ok())
             .filter(|v| *v > 0)
             .map(std::time::Duration::from_secs),
+        // 24rl F3: a daily share per computer (MB of relayed traffic), slowed after it (KB/s); none = no cap.
+        cap_per_day: value("--cap-per-day")
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|v| *v > 0)
+            .map(|mb| mb << 20),
+        slow_to: value("--slow-to")
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|v| *v > 0)
+            .map(|kb| kb << 10),
     };
     for (what, addr) in [("", &options.listen), (" (TLS)", &options.tls_listen)] {
         if let Some(a) = addr {

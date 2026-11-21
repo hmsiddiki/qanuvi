@@ -617,6 +617,17 @@ pub struct Status {
     pub error: String,
     /// 24rl R3: the road the link to the relay took (OWN_PORT or THROUGH_SAVED; empty before the first link).
     pub road: String,
+    /// 24rl F3: today's use of the relay as it last told it (None before it said; older relays never do).
+    pub usage: Option<Usage>,
+}
+
+/// 24rl F3: relayed bytes today, the relay's daily cap (0 = none) and when slowing ends (unix seconds, 0 = not slowed).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Usage {
+    pub used: u64,
+    pub cap: u64,
+    pub slowed_until: i64,
 }
 
 struct Pending {
@@ -644,6 +655,8 @@ struct Inner {
     activity: Vec<Activity>,
     /// Bumped to make the running link reconnect or stop (settings changed).
     generation: u64,
+    /// 24rl F3: what the relay last said about today's use.
+    usage: Option<Usage>,
 }
 
 /// The master's relay side, shared by its link thread, its sessions and the commands that manage it.
@@ -793,6 +806,8 @@ impl RelayMaster {
                 .map(|p| (p.code.shown(), (p.until - now).as_secs())),
             error: i.error.clone(),
             road: road_of(&i.config.relay).last,
+            // A count from another UTC day is gone (the relay starts each day at nothing).
+            usage: i.usage.filter(|u| u.slowed_until == 0 || u.slowed_until > now_secs()),
         }
     }
 
@@ -831,6 +846,7 @@ impl RelayMaster {
             // ra1: the old link gives way now; "connected" waits for the new one's welcome (turned off: never).
             i.connected = false;
             i.error.clear();
+            i.usage = None;
             let c = i.config.clone();
             drop(i);
             self.save(&c);
@@ -949,6 +965,17 @@ impl RelayMaster {
             }
             Msg::Error { message } => {
                 self.inner.lock().unwrap_or_else(|e| e.into_inner()).error = message;
+            }
+            Msg::Usage {
+                used,
+                cap,
+                slowed_until,
+            } => {
+                self.inner.lock().unwrap_or_else(|e| e.into_inner()).usage = Some(Usage {
+                    used,
+                    cap,
+                    slowed_until,
+                });
             }
             Msg::PairJoin {
                 slot,
@@ -1339,6 +1366,41 @@ mod tests {
         );
         wait_connected(&rm);
         rm.configure(&relay2, "Home PC", false, master).unwrap();
+    }
+
+    /// 24rl F3: what a capped relay says about today's use shows in the master's status; a change of relay forgets it.
+    #[test]
+    fn the_relays_daily_use_shows_in_the_status() {
+        let (relay, _) = crate::relay_server::start_local_capped(1 << 20, 256 << 10).unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !rm.status().connected {
+            assert!(Instant::now() < deadline, "not connected: {:?}", rm.status());
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(rm.status().usage, None);
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+        let mut c = open_session(&paired).unwrap();
+        c.send_line(&serde_json::json!({"id": 1, "cmd": "projects_list", "args": {}}).to_string())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let usage = loop {
+            let _ = c.poll_line();
+            if let Some(u) = rm.status().usage {
+                break u;
+            }
+            assert!(Instant::now() < deadline, "no use told");
+        };
+        assert_eq!(usage.cap, 1 << 20);
+        assert!(usage.used > 0);
+        assert_eq!(usage.slowed_until, 0);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+        assert_eq!(rm.status().usage, None);
     }
 
     /// rl1: a handler whose link died quietly (it reads nothing, so it answers no ping) is dropped by the relay, and

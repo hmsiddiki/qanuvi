@@ -116,6 +116,34 @@ struct State {
     by_conn: HashMap<u64, Vec<u64>>,
     /// Registered masters: id -> hash of their secret (kept in a file).
     registered: HashMap<String, String>,
+    /// 24rl F3: today's relayed bytes per master id (memory only: a relay restart starts the day's count again).
+    usage: HashMap<String, Use>,
+    /// The day `usage` was last cleared of other days.
+    pruned: i64,
+}
+
+/// 24rl F3: one master's use of the relay today.
+struct Use {
+    /// UTC day number (unix seconds / 86400).
+    day: i64,
+    bytes: u64,
+    /// Over the cap: when the next message may pass (the links are slowed to `slow_to`).
+    next_free: Instant,
+    /// When the master was last told (Usage), and at what level (0 under 80%, 1 near, 2 over).
+    told: Option<(Instant, u8)>,
+}
+
+/// 24rl F3: a master is told its use at most this often while it changes (and at once when it gets near or over).
+const TELL_EVERY: Duration = Duration::from_secs(60);
+/// 24rl F3: the speed a master over its daily cap is slowed to, unless the relay is told another (--slow-to).
+pub const SLOW_TO: u64 = 256 << 10;
+
+fn today() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+        / 86_400
 }
 
 pub struct Relay {
@@ -132,6 +160,9 @@ pub struct Relay {
     cut_now: tokio::sync::Notify,
     /// Test relays write no log lines (rl3).
     quiet: bool,
+    /// 24rl F3: relayed bytes a master may use a day at full speed (None = no cap), and the speed after (bytes/s).
+    cap: Option<u64>,
+    slow_to: u64,
 }
 
 fn hash(secret: &str) -> String {
@@ -168,7 +199,88 @@ impl Relay {
             cut_masters: Default::default(),
             cut_now: Default::default(),
             quiet: false,
+            cap: None,
+            slow_to: SLOW_TO,
         })
+    }
+
+    /// 24rl F3: counts a Data message against its master's daily share (both ways) and answers when it may pass:
+    /// None at once, or a moment to wait for when the master is over its cap. Tells the master its use when due.
+    fn charge(&self, me: u64, msg: &Msg, master_of: &Option<String>) -> Option<Instant> {
+        let Msg::Data { session, body, .. } = msg else {
+            return None;
+        };
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let (handler, master, master_conn) = st.sessions.get(session).cloned()?;
+        if master_of.as_ref() != Some(&master) && me != handler {
+            return None;
+        }
+        let now = Instant::now();
+        let day = today();
+        let u = st.usage.entry(master).or_insert(Use {
+            day,
+            bytes: 0,
+            next_free: now,
+            told: None,
+        });
+        if u.day != day {
+            *u = Use {
+                day,
+                bytes: 0,
+                next_free: now,
+                told: None,
+            };
+        }
+        u.bytes += body.len() as u64;
+        let wait = match self.cap {
+            Some(cap) if u.bytes > cap => {
+                let start = u.next_free.max(now);
+                u.next_free = start
+                    + Duration::from_secs_f64(body.len() as f64 / self.slow_to.max(1) as f64);
+                (start > now).then_some(start)
+            }
+            _ => None,
+        };
+        let usage = Self::usage_due(u, self.cap, now);
+        if let Some(m) = usage
+            && let Some(tx) = st.conns.get(&master_conn)
+        {
+            tx.send(text(&m));
+        }
+        wait
+    }
+
+    /// 24rl F3: the Usage message for a master when it is due: its level changed (near 80%, over), or a minute passed.
+    /// A relay with no cap says nothing (no share to keep an eye on, and no extra messages).
+    fn usage_due(u: &mut Use, cap: Option<u64>, now: Instant) -> Option<Msg> {
+        cap?;
+        let level = Self::level(u, cap);
+        if let Some((at, was)) = u.told
+            && was == level
+            && now.duration_since(at) < TELL_EVERY
+        {
+            return None;
+        }
+        u.told = Some((now, level));
+        Some(Self::usage_msg(u, cap))
+    }
+
+    /// 0 under 80% of the cap (or no cap), 1 near it, 2 over it.
+    fn level(u: &Use, cap: Option<u64>) -> u8 {
+        match cap {
+            Some(c) if u.bytes > c => 2,
+            Some(c) if u.bytes * 5 >= c * 4 => 1,
+            _ => 0,
+        }
+    }
+
+    fn usage_msg(u: &Use, cap: Option<u64>) -> Msg {
+        let over = cap.is_some_and(|c| u.bytes > c);
+        Msg::Usage {
+            used: u.bytes,
+            cap: cap.unwrap_or(0),
+            slowed_until: if over { (u.day + 1) * 86_400 } else { 0 },
+        }
     }
 
     /// Tests: cut every master's connection (and keep cutting new ones) while `on`.
@@ -233,6 +345,19 @@ impl Relay {
                     st.masters.insert(id.clone(), (me, tx));
                 }
                 *master_of = Some(id.clone());
+                // 24rl F3: other days' counts go once a day (not on every hello: 100k at once after a restart).
+                let day = today();
+                if st.pruned != day {
+                    st.usage.retain(|_, u| u.day == day);
+                    st.pruned = day;
+                }
+                let usage = match st.usage.get_mut(&id) {
+                    Some(u) if u.day == day && self.cap.is_some() => {
+                        u.told = Some((Instant::now(), Self::level(u, self.cap)));
+                        Some(Self::usage_msg(u, self.cap))
+                    }
+                    _ => None,
+                };
                 reply(
                     &st,
                     me,
@@ -242,6 +367,10 @@ impl Relay {
                         direct: self.direct.clone(),
                     },
                 );
+                // A master coming back learns today's use at once (a new one: with its first relayed message).
+                if let Some(m) = usage {
+                    reply(&st, me, m);
+                }
             }
             Msg::PairOpen { slot } => {
                 let Some(id) = master_of.clone() else { return };
@@ -498,6 +627,11 @@ impl Relay {
                     Some(Ok(Message::Text(text))) => {
                         heard = Instant::now();
                         if let Ok(msg) = serde_json::from_str::<Msg>(text.as_str()) {
+                            // 24rl F3: over its daily cap, a master's messages wait their turn here (this link
+                            // reads nothing meanwhile, so its sender is slowed too); at most a few seconds each.
+                            if let Some(at) = self.charge(me, &msg, &master_of) {
+                                tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await;
+                            }
                             self.handle(me, msg, &mut master_of);
                         }
                     }
@@ -811,6 +945,10 @@ pub struct Options {
     pub data: Option<PathBuf>,
     /// How often each link is pinged (default 30 s); a link silent for three of these is gone.
     pub ping_every: Option<Duration>,
+    /// 24rl F3: relayed bytes a master may use a day at full speed (--cap-per-day, in MB); None = no cap.
+    pub cap_per_day: Option<u64>,
+    /// 24rl F3: the speed over the cap, bytes a second (--slow-to, in KB/s); None = SLOW_TO.
+    pub slow_to: Option<u64>,
 }
 
 /// Runs the relay as `options` says until it is stopped.
@@ -832,6 +970,8 @@ pub fn run_with(options: &Options) -> Result<(), String> {
     let mut relay = Relay::new(options.data.as_deref());
     if let Some(r) = Arc::get_mut(&mut relay) {
         r.direct = options.direct.clone();
+        r.cap = options.cap_per_day;
+        r.slow_to = options.slow_to.unwrap_or(SLOW_TO);
         if let Some(p) = options.ping_every {
             r.ping_every = p;
             r.silent = p * 3;
@@ -911,10 +1051,24 @@ pub fn start_local_relay(
     start_test_relay(ping_every, silent, MAX_QUEUED)
 }
 
+/// 24rl F3: a test relay with a daily cap (bytes) and the speed over it (bytes a second).
+pub fn start_local_capped(cap: u64, slow_to: u64) -> Result<(String, Arc<Relay>), String> {
+    start_test_relay_with(PING_EVERY, SILENT, MAX_QUEUED, Some((cap, slow_to)))
+}
+
 fn start_test_relay(
     ping_every: Duration,
     silent: Duration,
     max_queued: usize,
+) -> Result<(String, Arc<Relay>), String> {
+    start_test_relay_with(ping_every, silent, max_queued, None)
+}
+
+fn start_test_relay_with(
+    ping_every: Duration,
+    silent: Duration,
+    max_queued: usize,
+    cap: Option<(u64, u64)>,
 ) -> Result<(String, Arc<Relay>), String> {
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
@@ -924,6 +1078,10 @@ fn start_test_relay(
         r.silent = silent;
         r.max_queued = max_queued;
         r.quiet = true;
+        if let Some((c, slow)) = cap {
+            r.cap = Some(c);
+            r.slow_to = slow;
+        }
     }
     let handle = relay.clone();
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -1213,6 +1371,60 @@ mod tests {
             },
         );
         (session, next(handler, 5).expect("an answer"))
+    }
+
+    /// 24rl F3: the handler sends 40 KB to its master; answers how long it took and the Usage messages the master got.
+    fn send_40kb(relay: &str) -> (Duration, Vec<(u64, u64, i64)>) {
+        let mut master = link(relay);
+        let (id, _) = hello_master(&mut master);
+        let mut handler = link(relay);
+        let (session, _) = open_session(&mut master, &mut handler, &id);
+        let body = "x".repeat(4 << 10);
+        let started = Instant::now();
+        for _ in 0..10 {
+            say(
+                &mut handler,
+                &Msg::Data {
+                    session,
+                    body: body.clone(),
+                    more: false,
+                },
+            );
+        }
+        let (mut got, mut usage) = (0, Vec::new());
+        let until = Instant::now() + Duration::from_secs(15);
+        while got < 10 && Instant::now() < until {
+            match next(&mut master, 1) {
+                Some(Msg::Data { .. }) => got += 1,
+                Some(Msg::Usage {
+                    used,
+                    cap,
+                    slowed_until,
+                }) => usage.push((used, cap, slowed_until)),
+                _ => {}
+            }
+        }
+        assert_eq!(got, 10, "not every message came through");
+        (started.elapsed(), usage)
+    }
+
+    #[test]
+    fn a_master_over_its_daily_cap_is_slowed_not_cut_and_is_told() {
+        // No cap: 40 KB passes at once, and nothing is said about use.
+        let open = start_local().unwrap();
+        let (took, usage) = send_40kb(&open);
+        assert!(took < Duration::from_millis(800), "no cap, yet slow: {took:?}");
+        assert!(usage.is_empty(), "{usage:?}");
+
+        // A 10 KB cap, 20 KB/s after it: the 30 KB over the cap take about 1.5 s, and all of it arrives.
+        let (capped, _) = start_local_capped(10 << 10, 20 << 10).unwrap();
+        let (took, usage) = send_40kb(&capped);
+        assert!(took >= Duration::from_millis(1200), "over the cap, yet fast: {took:?}");
+        assert!(took < Duration::from_secs(6), "slowed too far: {took:?}");
+        // Told when near (80%) and when over, with the cap and the end of the slow time (next UTC midnight).
+        assert!(usage.iter().any(|(used, cap, slowed)| *cap == 10 << 10 && *used * 5 >= *cap * 4 && *slowed == 0), "{usage:?}");
+        let midnight = (today() + 1) * 86_400;
+        assert!(usage.iter().any(|(_, _, slowed)| *slowed == midnight), "{usage:?}");
     }
 
     #[test]

@@ -284,6 +284,16 @@ pub enum Msg {
     Close {
         session: u64,
     },
+    /// 24rl F3: relay -> master, how much of today's share it used (relayed bytes both ways, UTC day). `cap` 0 = this
+    /// relay has no cap; `slowed_until` (unix seconds, 0 = not slowed) is when its links get full speed again. Older
+    /// apps skip it (they ignore messages they do not know).
+    Usage {
+        used: u64,
+        #[serde(default)]
+        cap: u64,
+        #[serde(default)]
+        slowed_until: i64,
+    },
     /// Anything the relay wants to say (master not online, slot taken).
     Error {
         message: String,
