@@ -1554,6 +1554,11 @@ runs on or off; with it off nothing is sent anywhere.
         new welcome (turned off: for ever), so Pair was offered on a gone link. configure() now clears it; test
         connected_waits_for_the_new_link_after_a_change fails without it. Relay tests 11/11, clippy clean (laptop).
       Next: 0.1.37 (ask). Then part 3, relay kit, sl1.
+    0.1.37 PUBLISHED (owner "publish anyway", 2026-11-22; release rule skipped with QANUVI_RELEASE_ANYWAY=1): 24rl
+      part 2a + ra1 on top of 0.1.36. All 4 platforms built into E:/qc-scratch/release-0.1.37/chan, copied to
+      qanuvi-updates/dev (old latest.json = 0.1.36 in E:/Backups/qanuvi/channel-before-0.1.37). Online: all 9 files
+      200, sizes match, latest.json says 0.1.37. Tagged v0.1.37. The code card's own-relay line is still not driven
+      in a window. Next: owner updates both machines; then 24rl part 3 (free relays), relay kit, sl1.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
