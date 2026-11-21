@@ -1384,6 +1384,11 @@ runs on or off; with it off nothing is sent anywhere.
       marks the window (no frame/shadow without the system's bar). Edge resize comes from tao (undecorated windows
       resize at their edges on Linux). Found on the way: project and machine windows were already opened without the
       system's bar on every OS, so on Linux they had no window buttons at all; now they get Qanuvi's.
+    LT DRIVEN on the laptop (X11, test build d5a9880, own test data .source, 06:22-06:41): opens with no system bar,
+      Qanuvi's bar + Minimise/Maximise/Close + thin edge; Maximise -> 1920x1028 + "Restore"; Restore back; double-click
+      on the bar maximises; Settings > Appearance "Use the system title bar" on -> system bar back, own buttons and
+      edge gone; kept after a restart (on and off). NOT driven (needs a real mouse): drag by the bar, edge resize
+      (tao does it for undecorated windows), snapping; Wayland (the laptop runs X11).
     PICKUP POINT (before, 2026-11-21 00:15): 0.1.32 PUBLISHED, laptop on 0.1.32 in ~/.local,
     nothing unpublished. Next: 24y part 2 (docs/PLAN-24Y.md: Y3 undo a failed step, Y4 checks per step, Y5 end
     report), driven live on a scratch project; then 24rl. Watch: the first real one-click Linux update (0.1.33) on
