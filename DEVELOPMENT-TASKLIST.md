@@ -1507,6 +1507,14 @@ runs on or off; with it off nothing is sent anywhere.
         host counts as this computer for fetches (allowed in the run, like localhost); other sites still downloads.
       Left as designed: rm -r / rm -f (deleting, even inside the project) stays on the never-list.
       Tests: Rust lib 611 (7 new), clippy clean both builds.
+    0.1.36 PUBLISHED (owner "fix it now then publish anyway", 2026-11-21; release rule skipped with
+      QANUVI_RELEASE_ANYWAY=1, Claude Code 2.1.330 out, here 2.1.329): bg1-bg5 on top of 0.1.35 (R3 + wd1); a new
+      number, not 0.1.35 again, so a copy that already took 0.1.35 still gets the fixes. All 4 platforms built into
+      E:/qc-scratch/release-0.1.36/chan, copied to qanuvi-updates/dev (old latest.json = 0.1.35 in
+      E:/Backups/qanuvi/channel-before-0.1.36). Online: all 9 files 200, sizes match, latest.json says 0.1.36.
+      Tagged v0.1.36. Owner's theme plan run (installed 0.1.34) was on step 14: updating mid-run restarts its master.
+      Next: owner updates This PC + laptop (after the run is best); check both on "own port" + a big chat; then
+      24rl part 1 DONE; then sl1 (fresh session).
     CHECKPOINT (newest, 2026-11-21 after 24rl R1-R4, fresh conversation starts here): all pushed. Unpublished:
       R3 (apps own port then 443) + wd1 (allowed folder becomes a run rule); both go out in 0.1.35, ask. Not deployed: R1+R2+R4 relay (basevm376 still runs the
       rl4 relay). Next: R5 deploy on basevm376, every step asked first (relay build swap with .prev, deploy/relay/
