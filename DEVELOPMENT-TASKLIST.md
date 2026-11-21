@@ -1025,7 +1025,7 @@ runs on or off; with it off nothing is sent anywhere.
     - r3 FIXED: `node --check` (a syntax check, like php -l) added to the check tools (step 1 had been refused it).
     - r4 FIXED: the refusal message says where the user allows a command (Run panel, Run rules, Change, "May also
       run without asking"); the agent had written "I don't know where your hook keeps its run rules".
-    - r5 OPEN (proposal, n1 behaviour, not 24y): "Try again" in the Inbox on a blocked step whose run has ended only
+    - r5 BUILT 2026-11-21 (see r5 below; was a proposal, n1 behaviour, not 24y): "Try again" in the Inbox on a blocked step whose run has ended only
       keeps the answer for the next run; the step stays [!] and Start at leaves it out until its circle is clicked.
       Proposal: Try again on an ended run's blocked step reopens it in the plan, so Run picks it up.
     - Note: the check before the run still listed "allow node scripts/stamp.js" as a to-do although it was allowed
@@ -1336,7 +1336,19 @@ runs on or off; with it off nothing is sent anywhere.
       way); a switch that makes many calls one after another adds that per call. Proposal to the owner: measure a
       switch (calls, time each), then send at once instead of after the read wait, and fewer/parallel calls on
       switch; 24rl (direct links) cuts the network part for machines on the same network.
-    PICKUP POINT (newest, 2026-11-21 rl3 deployed): next owner picks: sl1 (measure + fix switch speed), r5, 24rl.
+    r5 AGREED + BUILT (owner "r5 needed", 2026-11-21, not driven live, unpublished): a held step's Inbox question
+      answered after its run ended (Try again, Go ahead, Decide, or own words) now opens the step in the plan at
+      once ([!] -> [ ], plan/run.rs on_answer -> reopen_answered_hold), so Run picks it up and goes on with the
+      answer (kept from the Inbox at start, as before). Skip and End leave it held; a run still going or paused
+      (its runId's saved status) takes the answer itself and the file is not touched; a step opened, done or
+      changed by hand meanwhile is left as it is. Tests: answered after the end -> opened, next run done with the
+      answer (fails without the fix); end/skip stay held; Go ahead to a live run leaves the plan. Rust lib 588
+      pass, clippy clean.
+    ORDER (owner, 2026-11-21): r5, then 24rl (relay for 50-100k users at once + free relays), then sl1, then the
+      basics for big plans and a stable Windows + Linux Qanuvi, then cosmetics, later voice training + commands.
+    PICKUP POINT (newest, 2026-11-21 r5 built): drive r5 live on a scratch plan (with the next drive batch), then
+      plan 24rl in parts with the owner.
+    PICKUP POINT (before, 2026-11-21 rl3 deployed): next owner picks: sl1 (measure + fix switch speed), r5, 24rl.
     PICKUP POINT (before, 2026-11-21 07:10): 0.1.33 published, nothing unpublished. Next: (1) cause of the relay link
       drops (rl2 note: relay-side log of why a link ends, deploy on basevm376 = ask); (2) LT by hand on the laptop:
       drag, edge resize, snapping; Wayland later; (3) r5 Inbox Try-again proposal; (4) 24rl free connections.

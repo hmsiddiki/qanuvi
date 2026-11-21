@@ -4081,6 +4081,61 @@ pub fn on_answer(env: &dyn RunEnv, item: &crate::inbox::InboxItem) {
         s.changes_from = "qanuvi".into();
         let _ = env.set_project_settings(&s);
     }
+    if kind == Some("hold") {
+        reopen_answered_hold(env, item);
+    }
+}
+
+/// r5: a held step answered (Try again, Go ahead, Decide, or own words) after its run has ended is opened again in
+/// the plan, so the next Run picks it up and goes on with the answer (kept from the Inbox at start). A run still
+/// going, or paused, takes the answer itself; Skip and End leave the step as it is.
+fn reopen_answered_hold(env: &dyn RunEnv, item: &crate::inbox::InboxItem) {
+    let Some(src) = item.source.as_ref() else {
+        return;
+    };
+    let field = |name: &str| src.get(name).and_then(Value::as_str).unwrap_or("");
+    let (file, step, run_id) = (field("file"), field("step"), field("runId"));
+    if file.is_empty() || step.is_empty() {
+        return;
+    }
+    let goes_on = item
+        .answer
+        .as_ref()
+        .and_then(|a| serde_json::from_value::<InboxAnswer>(a.clone()).ok())
+        .is_some_and(|a| hold_reply(&a).choice == holdask::AnswerChoice::Go);
+    if !goes_on {
+        return;
+    }
+    let live = [
+        status_word(RunStatus::Running),
+        status_word(RunStatus::Paused),
+    ];
+    let still_going = env.list_runs().ok().is_some_and(|runs| {
+        runs.iter().any(|r| {
+            r.id == run_id
+                && serde_json::from_str::<Value>(&r.data)
+                    .ok()
+                    .and_then(|d| d.get("status").and_then(Value::as_str).map(String::from))
+                    .is_some_and(|s| live.contains(&s))
+        })
+    });
+    if still_going {
+        return;
+    }
+    let Ok(now) = env.read(file) else { return };
+    let Some(s) = parse_plan(&now.text)
+        .steps
+        .into_iter()
+        .find(|x| x.number.clone().unwrap_or_else(|| x.title.clone()) == step)
+    else {
+        return;
+    };
+    if s.status != StepStatus::Blocked {
+        return; // Opened, done or changed by hand meanwhile: left as the owner has it.
+    }
+    if let Ok(next) = set_step_status(&now.text, s.line, StepStatus::Open, Some(&s.title)) {
+        let _ = env.write(file, &next, Some(&now.hash));
+    }
 }
 
 #[cfg(test)]

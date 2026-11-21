@@ -344,7 +344,7 @@ impl Relay {
             .unwrap_or_else(|_| "?".into());
         // The error type is tungstenite's own (an HTTP answer), not ours to make smaller.
         #[allow(clippy::result_large_err)]
-        let callback =|req: &tungstenite::handshake::server::Request,
+        let callback = |req: &tungstenite::handshake::server::Request,
                         res: tungstenite::handshake::server::Response| {
             let header = |name: &str| {
                 req.headers()

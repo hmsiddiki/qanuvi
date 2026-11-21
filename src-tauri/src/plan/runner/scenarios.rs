@@ -1567,6 +1567,131 @@ fn an_answer_given_in_the_inbox_while_no_run_went_on_counts_at_the_next_start() 
     assert_eq!(questions(&env), 0);
 }
 
+/// r5: a run held on step 1 and ended without the answer; then the owner answers the question in the Inbox (as the
+/// master does it: the answer, then its after-answer work).
+fn end_held_then_answer(choice: &str) -> (Arc<FakeEnv>, Arc<std::sync::atomic::AtomicBool>) {
+    let env = world("# Plan\n\n- [ ] **1. Needs a key**\n- [ ] **2. Other**\n");
+    let blocked = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let b = blocked.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" && b.load(std::sync::atomic::Ordering::SeqCst) {
+            c.env.mark(FILE, "1", '!');
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let first = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop,
+    );
+    wait_for_question(&first);
+    sh.finish_without();
+    assert_eq!(first.wait().status, RunStatus::NeedsYou);
+    let key = open_question(&env).expect("a question").key.unwrap();
+    env.answer(
+        &key,
+        json!({"choice": choice, "text": "the key is set now"}),
+    );
+    let item = env.inbox_by_key(&key).unwrap().expect("answered");
+    crate::plan::run::on_answer(env.as_ref(), &item);
+    (env, blocked)
+}
+
+fn wait_for_question(r: &Run) {
+    let until = std::time::Instant::now() + Duration::from_secs(3);
+    while r.waiting_answers() == 0 {
+        assert!(std::time::Instant::now() < until, "the run never waited");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+#[test]
+fn try_again_on_an_ended_runs_held_step_opens_it_and_the_next_run_goes_on() {
+    let (env, blocked) = end_held_then_answer("go");
+    assert!(
+        env.text(FILE).contains("- [ ] **1. Needs a key**"),
+        "{}",
+        env.text(FILE)
+    );
+    blocked.store(false, std::sync::atomic::Ordering::SeqCst);
+    let r = run(
+        &env,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+    );
+    assert_eq!(r.status, RunStatus::Done);
+    assert!(
+        env.prompts()
+            .last()
+            .unwrap()
+            .1
+            .contains("the key is set now")
+    );
+    assert_eq!(questions(&env), 0);
+}
+
+#[test]
+fn ending_or_skipping_an_ended_runs_held_step_leaves_it_held() {
+    for choice in ["end", "skip"] {
+        let (env, _) = end_held_then_answer(choice);
+        assert!(
+            env.text(FILE).contains("- [!] **1. Needs a key**"),
+            "{choice}: {}",
+            env.text(FILE)
+        );
+    }
+}
+
+#[test]
+fn a_go_ahead_while_the_run_still_waits_leaves_the_plan_to_the_run() {
+    let env = world("# Plan\n\n- [ ] **1. Needs a key**\n- [ ] **2. Other**\n");
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, if n == "1" { '!' } else { 'x' });
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    let live = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop,
+    );
+    wait_for_question(&live);
+    let mut go = open_question(&env).expect("a question");
+    go.status = "answered".into();
+    go.answer = Some(json!({"choice": "go"}));
+    crate::plan::run::on_answer(env.as_ref(), &go);
+    assert!(
+        env.text(FILE).contains("- [!] **1. Needs a key**"),
+        "{}",
+        env.text(FILE)
+    );
+    sh.finish_without();
+    live.wait();
+}
+
 // ---------- The owner's messages in a step's chat (R2c part 2) ----------
 
 /// A run whose turns have Qanuvi's free models set up (the decider that sorts the owner's messages).
