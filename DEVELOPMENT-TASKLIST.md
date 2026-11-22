@@ -1826,7 +1826,15 @@ runs on or off; with it off nothing is sent anywhere.
       step "Changes after your look" after the last step looked at (next run does it). End report and Run panel:
       "To look at". Every step prompt says how to leave a To look at line instead of stopping. Rust 647 pass, clippy
       clean; window 574 pass. Not driven in a window.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y6): 24y part 3 built apart from Y9
+    0.1.44 PUBLISHED (owner "publish anyway", 2026-11-23; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+      tag v0.1.44, Y8 + Y7 + Y6 (and the settings-save, Windows check quoting and status exit fixes) on top of
+      0.1.43. All 4 platforms via E:/qc-scratch/release-0.1.44/chan (Linux app built on the laptop). Old
+      latest.json (0.1.43) in E:/Backups/qanuvi/channel-before-0.1.44. Online: latest.json + all 8 files 200, sizes
+      match, latest.json says 0.1.44.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.44): owner updates both machines,
+      then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
+      from This PC).
+    PICKUP POINT (before, 2026-11-23 after Y6): 24y part 3 built apart from Y9
       (Y8 3cc7e96, Y7 1b34aec, Y6), all unpublished. NEXT: Y9 benchmark on the Linux laptop (R1-R5 plan on a
       scratch copy of Qanuvi from the commit before R1, watched from This PC; needs a build with Y6-Y8 on the
       laptop first, so 0.1.44 (ask) or a laptop test build).
