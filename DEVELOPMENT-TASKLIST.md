@@ -1694,7 +1694,19 @@ runs on or off; with it off nothing is sent anywhere.
       laptop over SSH, B on This PC): one call ~120 -> ~5 ms, 10 in a row 1.3 s -> 44 ms; laptop UFW let 47444 in.
       Tests: Rust 623 + window 572, clippy + svelte-check + prettier clean. No settings switch (owner rule: nothing to
       set up); QANUVI_DIRECT_LOOPBACK is only for one-computer checks.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after sl1 S3): all pushed, unpublished: sl1
+    sl1 S2 + S3 DRIVEN IN A TEST WINDOW (owner "go on do it", 2026-11-22 20:35): release test build of 6238927 on
+      This PC, scratch master on the laptop (debug fe00b6e, ~/s3w-scratch, scratch git project with big.txt + src/
+      f0-f5.js), paired over relay.qanuvi.com into the test master. Switcher: "S3 test laptop connected · direct"
+      (dot on screen, words on hover / accessible name, as for every machine state); test master held a TCP link to
+      192.168.0.230:47444. S2: five restored tabs (big.txt 4,000 lines, README, f0-f2) came back in order with the
+      active tab after a switch to This PC and back, well under a second (925 ms measured incl. ~550 ms of UIA
+      polling). Old master next to it (Laptop (lm test), installed 0.1.39) stayed connected via relay. NOT driven:
+      falling back when the direct link is cut (needs a firewall change; covered by the loopback Rust tests only).
+      Cleaned up: server removed + unpaired, laptop scratch master stopped and folder deleted, test window closed.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after S2+S3 window drive): all pushed,
+      unpublished: sl1 S1-S4. NEXT: 0.1.40 (ask; its installer build is the first compile of the firewall hook).
+      After 0.1.40 both machines link directly at home; watch the first real fallback (laptop leaves home Wi-Fi).
+    PICKUP POINT (before, 2026-11-22 after sl1 S3): all pushed, unpublished: sl1
       S1-S4. NEXT: drive S2 + S3 in a test window (ask before driving at the PC), then 0.1.40 (ask; its installer build
       is the first compile of the firewall hook). After 0.1.40 both machines link directly at home.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
