@@ -105,8 +105,8 @@
         />
         <p class="kit">
           Run your own on any Linux server (an IP address is enough, no domain):
-          <button type="button" class="link" onclick={() => openUrl(RELAY_KIT_URL)}>download the relay kit</button>,
-          run <code>sudo ./setup.sh</code> there, and paste the address it prints.
+          <button type="button" class="link" onclick={() => openUrl(RELAY_KIT_URL)}>download the relay kit</button>, run
+          <code>sudo ./setup.sh</code> there, and paste the address it prints.
         </p>
       {/if}
     </div>

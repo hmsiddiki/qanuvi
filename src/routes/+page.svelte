@@ -51,6 +51,7 @@
   import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
   import FolderPicker from "$lib/components/FolderPicker.svelte";
   import { draftPreview, drafts } from "$lib/stores/drafts";
+  import type { Draft } from "$lib/api";
   import { machineName, shownMachine } from "$lib/remote";
 
   let ready = $state(false);
@@ -188,15 +189,23 @@
   async function restore(id: string, sessions: Promise<void>) {
     const w = workspace.read(id);
     if (!workspace.restored.has(id)) {
+      // sl1 S2: the saved tabs are read together, and the machine's drafts asked for beside them (each was one round
+      // trip after the other before: ~7 in a row for 5 tabs over a relay).
+      const machine = projects.machine;
+      const kept = drafts.take(machine, id);
+      const before = new Set(editorStore.tabs.map((x) => x.key));
+      await editorStore.openMany(id, w.tabs, 0);
+      // A file that is gone is not reopened.
       for (const t of w.tabs) {
-        if (projects.currentId !== id) return;
-        if (editorStore.tabs.some((x) => x.key === tabKey(id, t.path))) continue;
-        await editorStore.open(id, t.path, t.line, t.column, 0);
-        // A file that is gone is not reopened.
-        const tab = editorStore.tabs.find((x) => x.key === tabKey(id, t.path));
+        const key = tabKey(id, t.path);
+        const tab = before.has(key) ? null : editorStore.tabs.find((x) => x.key === key);
         if (tab?.error) await editorStore.close(tab.key);
       }
-      if (projects.currentId !== id) return;
+      if (projects.currentId !== id) {
+        // Left already: what was taken from the machine is kept again, not lost.
+        await giveBackDrafts(id, machine, kept);
+        return;
+      }
       if (w.active && editorStore.tabs.some((x) => x.key === tabKey(id, w.active!)))
         editorStore.activate(tabKey(id, w.active), 0);
       // The split editor as it was: which files the second group shows (15i part 4).
@@ -210,7 +219,7 @@
         );
       if (w.view) ui.show(w.view);
       if (terminals.forProject(id).length === 0) for (const shell of w.terminals) terminals.open(id, shell);
-      await giveBackDrafts(id);
+      await giveBackDrafts(id, machine, kept);
       if (projects.currentId !== id) return;
       workspace.restored.add(id);
     }
@@ -223,9 +232,15 @@
    * Unsaved text the project's machine kept while it was hidden (24z3 Part B2): back in its files, as typed, with
    * no question. A project left before they are all back keeps the rest for next time.
    */
-  async function giveBackDrafts(id: string) {
-    const machine = projects.machine;
-    const list = await drafts.take(machine, id);
+  async function giveBackDrafts(id: string, machine: string | null, taken: Promise<Draft[]>) {
+    const list = await taken;
+    // Their files are read together first (sl1 S2), then each draft goes into its tab as before.
+    if (list.length && projects.currentId === id)
+      await editorStore.openMany(
+        id,
+        list.map((d) => ({ path: d.path })),
+        0,
+      );
     for (let i = 0; i < list.length; i++) {
       const d = list[i];
       if (projects.currentId !== id) {

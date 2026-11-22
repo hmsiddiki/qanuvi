@@ -152,8 +152,7 @@ class RunnerStore {
         // A run that went on while no window was open (the master keeps it): show it.
         const active = await api.planRun.active().catch(() => [] as string[]);
         if (active.length && !this.#running) {
-          await this.#watch(active[0]);
-          this.#take(await api.planRun.state(active[0]));
+          if (!(await this.#watch(active[0]))) this.#take(await api.planRun.state(active[0]));
         }
       } catch {
         // No master (tests, a browser preview): nothing to follow.
@@ -162,11 +161,14 @@ class RunnerStore {
     return this.#ready;
   }
 
-  /** Follows a project's run on its machine's stream (once per link). */
-  async #watch(projectId: string): Promise<void> {
+  /**
+   * Follows a project's run on its machine's stream (once per link). Answers the run's view when it started
+   * following now (the watch answers what plan_run_state would, so that call is saved: sl1 S2), else null.
+   */
+  async #watch(projectId: string): Promise<RunView | null> {
     const owner = ownerOf(projectId);
     const link = owner ?? THIS_PC;
-    if (this.#watched.get(projectId) === link) return;
+    if (this.#watched.get(projectId) === link) return null;
     this.#watched.set(projectId, link);
     type Streamed =
       | { kind: "view"; view: RunView }
@@ -181,10 +183,13 @@ class RunnerStore {
       else if (owner && m.kind === "event" && m.event === "qanuvi-plan-data") planData.heard(m.value as Entry);
     };
     try {
-      this.#take(await callOn<RunView>(owner, "plan_run_watch", { projectId, onEvent: events }));
+      const view = await callOn<RunView>(owner, "plan_run_watch", { projectId, onEvent: events });
+      this.#take(view);
+      return view;
     } catch {
       // An older master: no run news from it.
       this.#watched.delete(projectId);
+      return null;
     }
   }
 
@@ -389,8 +394,7 @@ class RunnerStore {
     await this.#listen();
     if ((this.#running || this.finishing) && this.#project !== projectId) return;
     try {
-      await this.#watch(projectId);
-      const v = await api.planRun.state(projectId);
+      const v = (await this.#watch(projectId)) ?? (await api.planRun.state(projectId));
       // Shown as it is now, also when another project was shown before.
       this.#project = projectId;
       this.#take(v);

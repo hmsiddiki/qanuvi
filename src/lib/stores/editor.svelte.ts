@@ -57,6 +57,42 @@ async function readTab(tab: EditorTab) {
     : api.files.read(tab.projectId, tab.path);
 }
 
+function newTab(projectId: string, path: string, line: number | null, column: number | null): EditorTab {
+  return {
+    key: tabKey(projectId, path),
+    projectId,
+    path,
+    language: languageFor(path),
+    hash: "",
+    savedText: "",
+    dirty: false,
+    binary: false,
+    tooLarge: false,
+    conflict: false,
+    error: "",
+    revealLine: line,
+    revealColumn: column,
+    saveError: "",
+  };
+}
+
+/** Reads a tab's file into it; a file that cannot be read leaves its reason in `error`. */
+async function fillTab(tab: EditorTab): Promise<void> {
+  try {
+    const file = await readTab(tab);
+    if (tab.config) {
+      tab.path = file.path;
+      tab.language = languageFor(file.path);
+    }
+    tab.hash = file.hash;
+    tab.savedText = file.text;
+    tab.binary = file.binary;
+    tab.tooLarge = file.too_large;
+  } catch (e) {
+    tab.error = errorText(e);
+  }
+}
+
 async function writeTab(tab: EditorTab, text: string, expected: string | null) {
   return tab.config
     ? api.agentConfig.write(tab.config.provider, tab.config.id, tab.config.projectId, text, expected)
@@ -193,25 +229,36 @@ class EditorStore {
       this.activate(key, group ?? this.#target());
       return;
     }
-    const tab: EditorTab = {
-      key,
-      projectId,
-      path,
-      language: languageFor(path),
-      hash: "",
-      savedText: "",
-      dirty: false,
-      binary: false,
-      tooLarge: false,
-      conflict: false,
-      error: "",
-      revealLine: line,
-      revealColumn: column,
-      saveError: "",
-    };
+    const tab = newTab(projectId, path, line, column);
     // A state kept from before its machine was hidden (24z3 Part B2) is not this file's any more.
     this.states.delete(key);
     await this.#load(tab, key, group ?? this.#target());
+  }
+
+  /**
+   * sl1 S2: opens several files of a project at once (a project's saved tabs, drafts coming back). All are read
+   * together (one round trip's wait over a relay, not one per file), then added in the order given and activated in
+   * that order, as open() one after another would. Files already open are left as they are.
+   */
+  async openMany(
+    projectId: string,
+    files: { path: string; line?: number | null; column?: number | null }[],
+    group = 0,
+  ): Promise<void> {
+    const seen = new Set<string>();
+    const fresh = files.filter((f) => {
+      const key = tabKey(projectId, f.path);
+      if (seen.has(key) || this.tabs.some((t) => t.key === key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const tabs = fresh.map((f) => newTab(projectId, f.path, f.line ?? null, f.column ?? null));
+    for (const t of tabs) this.states.delete(t.key);
+    // Filled before they go into the state (a tab changed after that would be the plain copy, not the shown one).
+    await Promise.all(tabs.map((t) => fillTab(t)));
+    const add = tabs.filter((t) => !this.tabs.some((x) => x.key === t.key));
+    if (add.length) this.tabs = [...this.tabs, ...add];
+    for (const t of add) this.activate(t.key, group);
   }
 
   /** Where a newly opened file goes: the focused group, if it is one shown for this project. */
@@ -246,19 +293,7 @@ class EditorStore {
   }
 
   async #load(tab: EditorTab, key: string, group: number): Promise<void> {
-    try {
-      const file = await readTab(tab);
-      if (tab.config) {
-        tab.path = file.path;
-        tab.language = languageFor(file.path);
-      }
-      tab.hash = file.hash;
-      tab.savedText = file.text;
-      tab.binary = file.binary;
-      tab.tooLarge = file.too_large;
-    } catch (e) {
-      tab.error = errorText(e);
-    }
+    await fillTab(tab);
     if (this.tabs.some((t) => t.key === key)) return this.activate(key, group);
     this.tabs = [...this.tabs, tab];
     this.activate(key, group);

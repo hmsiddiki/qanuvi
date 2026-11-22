@@ -34,7 +34,9 @@ if (!Array.isArray(list.relays)) {
 }
 const seen = new Set();
 for (const r of list.relays) {
-  const url = String(r.url ?? "").trim().replace(/\/+$/, "");
+  const url = String(r.url ?? "")
+    .trim()
+    .replace(/\/+$/, "");
   if (!url.startsWith("wss://") || url.length <= 6) throw new Error(`Not a wss:// relay address: ${r.url}`);
   if (url.toLowerCase() === "wss://relay.qanuvi.com") throw new Error("Qanuvi's own relay is not a free relay.");
   if (seen.has(url.toLowerCase())) throw new Error(`Listed twice: ${url}`);
