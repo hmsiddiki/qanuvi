@@ -61,6 +61,8 @@ futures-util = { version = "0.3.34", default-features = false, features = ["sink
 # 24rl R2: the relay's own TLS port (ring, as tungstenite's client side already uses).
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"] }
+# Relay kit K1: a relay with no domain makes its own certificate (apps check it by the pin in its address).
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 # 24rl R4: the relay listens with a deep queue (a crowd coming back after a restart).
 socket2 = "0.6.5"
 base64 = "0.23.1"
@@ -97,8 +99,6 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3.27.0"
-# 24rl R2 tests: certificates made on the spot for the relay's TLS port.
-rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Diagnostics_ToolHelp", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }

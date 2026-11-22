@@ -91,44 +91,51 @@ Decisions taken (owner said go forward): cap 2 GB/day per computer, slowed to 25
 list on the update channel, edited by the owner by hand; built and tested with local relays and shipped with an
 empty list; relay kit after. Deploying the cap on basevm376 and publishing still ask first.
 
-## Relay kit in detail (proposal, 2026-11-22)
+## Relay kit in detail (2026-11-22; revised after the owner: no domain, no port 80)
 
-Why: "Your own relay" is only a box today; nobody can fill it without reading deploy/relay/README.md and
-copying commands. The kit makes it one download and one command on any Linux server with a domain name, and
-it is also what a volunteer runs before asking to be on the free list (part 3).
+Why: "Your own relay" is only a box today. The kit makes it one download and one command on the servers people
+really have: a bare VPS with only an IP address (no domain, no hosting), or a full hosting server like basevm376
+(nginx/ISPConfig own 80 and 443, nothing there may be touched). A domain, port 80, certbot and nginx are never
+needed. It is also what a volunteer runs before asking to be on the free list (part 3).
 
-- K1. **setup.sh, one command.** `sudo ./setup.sh relay.example.com` on the server. It checks first (Linux,
-  systemd, root, the domain points at this server, the port is free) and stops with a plain reason if not. Then:
-  the relay's own user and folder, the program in /usr/local/bin (old one kept as .prev), the service unit written
-  for this host (same hardening as ours), the firewall port opened (ufw or firewalld when active, else a line saying
-  which port to open). Options: `--port 47443` (default), `--cert <file> --key <file>` (a certificate the server
-  already has), `--cap-per-day <MB>` (none by default; volunteers choose), `--remove` (stops and removes it all,
-  the data folder kept unless `--purge`). Run again with a newer program = update, nothing else changes.
-- K2. **The certificate.** With `--cert/--key`: those files are copied to the relay's folder and watched by a path
-  unit, as ISPConfig's are on basevm376 (the same two units, written for the given paths). With none: certbot gets a
-  Let's Encrypt certificate for the domain (installed through apt or dnf if missing; standalone on port 80, so port
-  80 must be free; a web server on 80 = use `--cert/--key` instead, the script says so). Renewal: certbot's own
-  timer, with a deploy hook that copies the files to the relay's folder; the relay picks them up by itself (R2).
-- K3. **It checks itself and prints the address.** A new `qanuvi-relay check <address>` connects like an app would
-  (TLS, the relay's hello, a ping) and prints OK or why not. setup.sh runs it at the end against the public
-  address, then prints: "Your relay: wss://relay.example.com:47443. In Qanuvi: Settings, Reach this computer from
-  anywhere, Relay · Change, Your own relay, paste it."
-- K4. **The download.** `qanuvi-relay-kit-<version>-linux-x86_64.tar.gz` (program + setup.sh + a short
-  README), with a .sha256 and a .sig signed by the update key. Built on the laptop by `scripts/build-relay-kit.sh`
-  and put on the update channel beside latest.json (qlopy.top today, qanuvi.com with the channel move). Linux
-  x86_64 first; ARM (Raspberry Pi, ARM VPS) and Windows later.
-- K5. **In the app.** Under the "Your own relay" box: "Run your own: download the relay kit" (the channel's kit
-  link) and the one command, so nobody has to find a guide. Nothing else changes in the window.
-- Validate: on the laptop (Zorin, systemd) with a test certificate: setup, check OK, a scratch master and device
-  paired through it, rerun = update, --remove leaves nothing running; the certbot road read and shell-checked but
-  not driven (needs a public server with a free port 80; driven when there is a throwaway one); a fresh-unpacked
-  kit's .sig verified; the window link drives to the file.
+Why no real certificate is needed: pairing is SPAKE2 on the code and every message is sealed end to end
+(relay.rs), so the relay's TLS never protected the messages; it only hides who talks to the relay from the network
+and looks like ordinary TLS to firewalls. A certificate the relay makes for itself does that just as well, as long as
+the apps know it is the right one: its fingerprint travels inside the address.
 
-Questions for the owner (defaults in brackets; "go" takes them all):
-1. Certificate when none is given: certbot standalone on port 80, installed if missing? [yes]
-2. The kit on the update channel now (qlopy.top), moving with it to qanuvi.com? [yes]
-3. Linux x86_64 only for now? [yes; ARM next, Windows later]
-4. No cap unless the volunteer sets one? [yes]
+- K1. **The relay makes its own certificate.** `--tls-self` (with `--tls-listen`): at first start the relay makes
+  a key and a certificate (rcgen, already in the build for tests; 20 years, ECDSA P-256) in its data folder and
+  keeps them, so the fingerprint never changes. `qanuvi-relay address --host 203.0.113.5 --port 47443` prints the
+  address: `wss://203.0.113.5:47443#pin=<sha256 of the certificate, base64url>`. Works with an IP or a name.
+- K2. **Apps pin it.** An address with `#pin=` is checked by that fingerprint only (no certificate authority, no
+  name check, any IP); without it, as today (public certificates). The pin travels with the address everywhere it
+  already goes: Your own relay box, relay.json, the code card and pairing (A3), the free list (F1). The `#pin` part
+  is never sent to the relay. A wrong certificate = "this is not the relay you set up" and no link.
+- K3. **setup.sh, one command.** `sudo ./setup.sh` on the server. Checks first (Linux, systemd, root, the port
+  free) and stops with a plain reason if not. Then: the relay's own user and folder, the program in /usr/local/bin
+  (old kept as .prev), the service unit (same hardening as ours, own port only, `--tls-self`), the firewall port
+  opened (ufw or firewalld when active, else a line saying which port to open, and a reminder about a hosting
+  panel's or cloud provider's firewall). Host: the server's own public address found from its network setup;
+  `--host <IP or name>` to say it (a NAT or a name). Options: `--port 47443` (default), `--cert/--key` for those who
+  want a public certificate they already have (then no pin; watched for renewals as on basevm376), `--cap-per-day
+  <MB>` (none by default), `--remove` (stops and removes it, data kept unless `--purge`). Run again with a newer
+  program = update; the certificate and the address stay the same.
+- K4. **It checks itself.** `qanuvi-relay check <address>` connects like an app (TLS with the pin, the relay's
+  hello, a ping) and prints OK or why not. setup.sh runs it at the end, then prints the address and where to paste
+  it (Settings, Reach this computer from anywhere, Relay · Change, Your own relay). If the check fails from outside
+  only (a cloud firewall), the app's own test says so when it is pasted.
+- K5. **The download.** `qanuvi-relay-kit-<version>-linux-x86_64.tar.gz` (program + setup.sh + short README) with
+  .sha256 and .sig (update key), built on the laptop by `scripts/build-relay-kit.sh`, put on the update channel
+  beside latest.json (moves to qanuvi.com with the channel). Linux x86_64 first; ARM and Windows later.
+- K6. **In the app.** Under the "Your own relay" box: "Run your own on any Linux server: download the relay kit,
+  run sudo ./setup.sh, paste the address it prints." The box takes the pinned address.
+- Validate: relay tests: a self-made certificate kept across restarts; the right pin connects, a wrong pin and a
+  missing pin are refused; `check` OK and refused. On the laptop (Zorin, systemd, LAN IP only, no domain): setup,
+  check OK, a scratch master on This PC turned on with the pinned address and a device paired through it, rerun =
+  update with the same address, --remove leaves nothing running. The kit's .sig verified after unpacking.
+
+Defaults taken (owner's push-back = go): IP and self-made certificate is the normal road; public certificate only
+when given; no cap unless set; Linux x86_64 first; the kit on the update channel. Deploying or publishing asks.
 
 ## Part 1 in detail
 

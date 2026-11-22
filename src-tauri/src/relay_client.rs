@@ -38,9 +38,16 @@ pub fn check_relay_url(url: &str) -> Result<String, String> {
     if u.is_empty() {
         return Ok(DEFAULT_RELAY.to_string());
     }
-    let lower = u.to_ascii_lowercase();
+    let (base, pin) = split_pin(u);
+    if pin.is_some_and(|p| !pin_ok(p)) || (u.contains('#') && pin.is_none()) {
+        return Err("The relay address has a broken #pin= part (copy the whole address the relay printed).".into());
+    }
+    if pin.is_some() && !base.to_ascii_lowercase().starts_with("wss://") {
+        return Err("A relay address with #pin= must start with wss://.".into());
+    }
+    let lower = base.to_ascii_lowercase();
     let local = lower.starts_with("ws://127.0.0.1") || lower.starts_with("ws://localhost");
-    if (lower.starts_with("wss://") && u.len() > 6 || local)
+    if (lower.starts_with("wss://") && base.len() > 6 || local)
         && u.len() <= 300
         && !u.chars().any(|c| c.is_whitespace() || "\"<>\\".contains(c))
     {
@@ -51,6 +58,103 @@ pub fn check_relay_url(url: &str) -> Result<String, String> {
                 .into(),
         )
     }
+}
+
+/// Relay kit K2: an address may end in `#pin=<sha256 of the relay's certificate, base64url>`, for a relay with a
+/// certificate it made itself (an IP address and no domain). The pin is never sent to the relay.
+pub fn split_pin(url: &str) -> (&str, Option<&str>) {
+    match url.split_once('#') {
+        Some((base, frag)) => (base, frag.strip_prefix("pin=")),
+        None => (url, None),
+    }
+}
+
+fn pin_ok(pin: &str) -> bool {
+    pin.len() == 43
+        && pin
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// The pin of a certificate (DER): its SHA-256, base64url without padding.
+pub fn pin_of(der: &[u8]) -> String {
+    use base64::Engine;
+    use sha2::Digest;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(der))
+}
+
+/// Takes the relay's certificate only when its pin matches; the TLS signatures are still checked as usual.
+#[derive(Debug)]
+struct PinVerifier {
+    pin: String,
+    provider: Arc<rustls::crypto::CryptoProvider>,
+}
+
+impl rustls::client::danger::ServerCertVerifier for PinVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        if pin_of(end_entity.as_ref()) == self.pin {
+            Ok(rustls::client::danger::ServerCertVerified::assertion())
+        } else {
+            Err(rustls::Error::General(
+                "this is not the relay you set up (its certificate does not match the address's pin)".into(),
+            ))
+        }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls::pki_types::CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls::pki_types::CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        self.provider
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
+}
+
+fn pinned_connector(pin: &str) -> Option<tungstenite::Connector> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider.clone())
+        .with_safe_default_protocol_versions()
+        .ok()?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(PinVerifier {
+            pin: pin.to_string(),
+            provider,
+        }))
+        .with_no_client_auth();
+    Some(tungstenite::Connector::Rustls(Arc::new(config)))
 }
 
 /// 24rl R3: how this computer reaches each relay: the relay's own TLS address (learned from the relay), until when
@@ -125,7 +229,7 @@ pub fn road_of(relay: &str) -> Road {
 
 fn host_of(url: &str) -> String {
     let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
-    let authority = rest.split('/').next().unwrap_or("");
+    let authority = rest.split(['/', '#', '?']).next().unwrap_or("");
     let host = match authority.strip_prefix('[') {
         Some(v6) => v6.split(']').next().unwrap_or(""),
         None => authority
@@ -142,7 +246,10 @@ fn learn(relay: &str, direct: &str) {
     let Ok(direct) = check_relay_url(direct) else {
         return;
     };
-    if !direct.to_ascii_lowercase().starts_with("wss://") || host_of(&direct) != host_of(relay) {
+    if !direct.to_ascii_lowercase().starts_with("wss://")
+        || host_of(&direct) != host_of(relay)
+        || split_pin(relay).1.is_some()
+    {
         return;
     }
     let mut book = roads();
@@ -200,10 +307,11 @@ fn connector(_url: &str) -> Option<tungstenite::Connector> {
 /// A WebSocket to `url`, connected and shaken hands with within `limit`.
 fn open_ws(url: &str, limit: Duration) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, String> {
     use std::net::ToSocketAddrs;
+    let (url, pin) = split_pin(url);
     let tls = url.to_ascii_lowercase().starts_with("wss://");
     let host = host_of(url);
     let rest = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
-    let authority = rest.split('/').next().unwrap_or("");
+    let authority = rest.split(['/', '?']).next().unwrap_or("");
     let port = match authority.strip_prefix('[') {
         Some(v6) => v6.split_once("]:").map(|(_, p)| p),
         None => authority.rsplit_once(':').map(|(_, p)| p),
@@ -236,7 +344,12 @@ fn open_ws(url: &str, limit: Duration) -> Result<WebSocket<MaybeTlsStream<TcpStr
         .max(Duration::from_millis(100));
     let _ = stream.set_read_timeout(Some(left));
     let _ = stream.set_write_timeout(Some(left));
-    let (ws, _) = tungstenite::client_tls_with_config(url, stream, None, connector(url))
+    let (ws, _) = tungstenite::client_tls_with_config(
+        url,
+        stream,
+        None,
+        pin.and_then(pinned_connector).or_else(|| connector(url)),
+    )
         .map_err(|e| e.to_string())?;
     let tcp = match ws.get_ref() {
         MaybeTlsStream::Plain(s) => s,
@@ -1251,6 +1364,14 @@ mod tests {
         assert_eq!(check_relay_url("  ").as_deref(), Ok(DEFAULT_RELAY));
         assert!(check_relay_url("ws://127.0.0.1:47300").is_ok());
         assert!(check_relay_url("ws://relay.example.com").is_err());
+        // Relay kit K2: a pinned address (IP, no domain); a broken pin or a pin on ws:// is refused.
+        let pin = "x".repeat(43);
+        assert!(check_relay_url(&format!("wss://203.0.113.5:47443#pin={pin}")).is_ok());
+        assert!(check_relay_url(&format!("wss://[2001:db8::5]:47443#pin={pin}")).is_ok());
+        assert!(check_relay_url("wss://203.0.113.5:47443#pin=short").is_err());
+        assert!(check_relay_url("wss://203.0.113.5:47443#other").is_err());
+        assert!(check_relay_url(&format!("ws://127.0.0.1:47443#pin={pin}")).is_err());
+        assert_eq!(host_of(&format!("wss://203.0.113.5:47443#pin={pin}")), "203.0.113.5");
         assert!(check_relay_url("https://relay.example.com").is_err());
     }
 

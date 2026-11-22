@@ -9,7 +9,14 @@
    * shown machine, and switches only after the user says yes to what that relay can see.
    */
   import { untrack } from "svelte";
-  import { freeRelayAsk, freeRelays, isDefaultRelay, type FreeRelay } from "$lib/stores/remoteAccess.svelte";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import {
+    RELAY_KIT_URL,
+    freeRelayAsk,
+    freeRelays,
+    isDefaultRelay,
+    type FreeRelay,
+  } from "$lib/stores/remoteAccess.svelte";
 
   let { value = $bindable(""), disabled = false }: { value?: string; disabled?: boolean } = $props();
 
@@ -93,9 +100,14 @@
           class="address"
           bind:value={typed}
           oninput={() => put(typed)}
-          placeholder="wss://relay.example.com"
+          placeholder="wss://203.0.113.5:47443#pin=… or wss://relay.example.com"
           spellcheck="false"
         />
+        <p class="kit">
+          Run your own on any Linux server (an IP address is enough, no domain):
+          <button type="button" class="link" onclick={() => openUrl(RELAY_KIT_URL)}>download the relay kit</button>,
+          run <code>sudo ./setup.sh</code> there, and paste the address it prints.
+        </p>
       {/if}
     </div>
     {#if kind === "free"}
@@ -195,6 +207,11 @@
     gap: 4px;
   }
 
+  .kit {
+    margin: 4px 0 0;
+    font-size: 12px;
+    opacity: 0.8;
+  }
   .free p {
     margin: 2px 0;
   }

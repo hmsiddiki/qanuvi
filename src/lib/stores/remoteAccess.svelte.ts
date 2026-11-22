@@ -73,7 +73,7 @@ export function usageText(u: RelayUsage | null | undefined, now = Date.now() / 1
 function ownPortAddress(relay: string | undefined): boolean {
   const r = (relay ?? "").trim().toLowerCase();
   if (r.startsWith("ws://")) return true;
-  const host = r.replace(/^wss:\/\//, "").split("/")[0];
+  const host = r.replace(/^wss:\/\//, "").split(/[/#?]/)[0];
   const port = host.match(/:(\d+)$/)?.[1];
   return !!port && port !== "443";
 }
@@ -85,6 +85,9 @@ export function connectedText(st: Pick<RelayStatus, "road"> & { relay?: string }
   if (st.road === "443" && !ownPortAddress(st.relay)) return "Connected to the relay (through port 443)";
   return "Connected to the relay";
 }
+
+/** Relay kit K5/K6: the kit for running your own relay, on the update channel (moves to qanuvi.com with it). */
+export const RELAY_KIT_URL = "https://qlopy.top/qanuvi-updates/dev/qanuvi-relay-kit-linux-x86_64.tar.gz";
 
 /** 24rl A1: Qanuvi's relay, used when no relay is given (the master has the same default). */
 export const DEFAULT_RELAY = "wss://relay.qanuvi.com";

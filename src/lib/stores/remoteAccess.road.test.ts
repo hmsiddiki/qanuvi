@@ -11,6 +11,9 @@ describe("relay road (24rl R3)", () => {
     expect(connectedText({ road: "443", relay: "wss://relay.qanuvi.com:47443" })).toBe("Connected to the relay");
     expect(connectedText({ road: "443", relay: "ws://127.0.0.1:47391" })).toBe("Connected to the relay");
     expect(connectedText({ road: "443", relay: "wss://relay.example.com:443/" })).toBe("Connected to the relay (through port 443)");
+    // Relay kit K2: a pinned address (IP, own port) is read without its #pin= part.
+    const pinned = `wss://203.0.113.5:47443#pin=${"a".repeat(43)}`;
+    expect(connectedText({ road: "443", relay: pinned })).toBe("Connected to the relay");
   });
 });
 

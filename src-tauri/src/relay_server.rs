@@ -857,6 +857,51 @@ pub struct TlsFiles {
     pub key: PathBuf,
 }
 
+/// Relay kit K1: the certificate the relay made for itself in `data`/tls-self (made on first use and kept, so its
+/// pin and the relay's address never change). For a relay with only an IP address and no domain: apps check it by
+/// the pin in the address (relay_client::split_pin), not by a certificate authority.
+pub fn self_made(data: &Path) -> Result<TlsFiles, String> {
+    let dir = data.join("tls-self");
+    let files = TlsFiles {
+        cert: dir.join("cert.pem"),
+        key: dir.join("key.pem"),
+    };
+    if files.cert.is_file() && files.key.is_file() {
+        return Ok(files);
+    }
+    let fail = |e: &dyn std::fmt::Display| format!("The relay could not make its certificate in {}: {e}", dir.display());
+    std::fs::create_dir_all(&dir).map_err(|e| fail(&e))?;
+    let made = rcgen::generate_simple_self_signed(vec!["qanuvi-relay".to_string()]).map_err(|e| fail(&e))?;
+    let key_tmp = dir.join("key.pem.new");
+    {
+        let mut o = std::fs::OpenOptions::new();
+        o.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            o.mode(0o600);
+        }
+        let mut file = o.open(&key_tmp).map_err(|e| fail(&e))?;
+        std::io::Write::write_all(&mut file, made.signing_key.serialize_pem().as_bytes()).map_err(|e| fail(&e))?;
+    }
+    std::fs::write(dir.join("cert.pem.new"), made.cert.pem()).map_err(|e| fail(&e))?;
+    std::fs::rename(&key_tmp, &files.key).map_err(|e| fail(&e))?;
+    std::fs::rename(dir.join("cert.pem.new"), &files.cert).map_err(|e| fail(&e))?;
+    Ok(files)
+}
+
+/// The pin of the first certificate in a PEM file (what goes after #pin= in the relay's address).
+pub fn pin_of_file(cert: &Path) -> Result<String, String> {
+    use rustls::pki_types::CertificateDer;
+    use rustls::pki_types::pem::PemObject;
+    let der = CertificateDer::pem_file_iter(cert)
+        .ok()
+        .and_then(|mut it| it.next())
+        .and_then(|c| c.ok())
+        .ok_or_else(|| format!("{} holds no certificate.", cert.display()))?;
+    Ok(crate::relay_client::pin_of(der.as_ref()))
+}
+
 /// The certificate in use, and when its files were last changed.
 pub struct Certs {
     files: TlsFiles,
@@ -939,6 +984,8 @@ pub struct Options {
     /// 24rl R2: the relay's own TLS port, for example 0.0.0.0:47443.
     pub tls_listen: Option<String>,
     pub tls: Option<TlsFiles>,
+    /// Relay kit K1: no certificate given, so the relay uses one it made itself (`--tls-self`, kept in `data`).
+    pub tls_self: bool,
     /// The address apps use for the TLS port (told to them in Welcome and Accept), for example
     /// wss://relay.qanuvi.com:47443.
     pub direct: Option<String>,
@@ -959,10 +1006,12 @@ pub fn run_with(options: &Options) -> Result<(), String> {
     let plain = options.listen.as_deref().map(bind).transpose()?;
     let tls = match options.tls_listen.as_deref() {
         Some(addr) => {
-            let files = options
-                .tls
-                .clone()
-                .ok_or("--tls-listen needs --cert and --key.")?;
+            let files = match (&options.tls, options.tls_self, &options.data) {
+                (Some(files), _, _) => files.clone(),
+                (None, true, Some(data)) => self_made(data)?,
+                (None, true, None) => return Err("--tls-self needs --data <folder> (the certificate is kept there).".into()),
+                (None, false, _) => return Err("--tls-listen needs --cert and --key, or --tls-self.".into()),
+            };
             Some((bind(addr)?, Certs::load(files)?))
         }
         None => None,
@@ -1701,5 +1750,27 @@ mod tests {
         };
         assert_eq!(count_pings(true), 0);
         assert!(count_pings(false) >= 5);
+    }
+
+    /// Relay kit K1/K2: a relay with no domain makes its own certificate once and keeps it; apps reach it only by the
+    /// pin in its address (right pin connects, a wrong or a missing pin is refused).
+    #[test]
+    fn a_self_made_certificate_is_kept_and_apps_reach_it_only_by_its_pin() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = self_made(dir.path()).unwrap();
+        let pin = pin_of_file(&files.cert).unwrap();
+        let again = self_made(dir.path()).unwrap();
+        assert_eq!(pin_of_file(&again.cert).unwrap(), pin, "made once, then kept");
+        let (_plain, port, _relay) = start_both(files);
+        let right = format!("wss://127.0.0.1:{port}#pin={pin}");
+        assert!(crate::relay_client::check_relay_url(&right).is_ok());
+        assert!(crate::relay_client::Link::connect(&right).is_ok(), "the right pin connects");
+        let wrong = format!("wss://127.0.0.1:{port}#pin={}", "A".repeat(43));
+        let e = crate::relay_client::Link::connect(&wrong).err().expect("a wrong pin is refused");
+        assert!(e.contains("not the relay you set up"), "{e}");
+        assert!(
+            crate::relay_client::Link::connect(&format!("wss://127.0.0.1:{port}")).is_err(),
+            "without the pin a self-made certificate is not trusted"
+        );
     }
 }
