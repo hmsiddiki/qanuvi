@@ -674,7 +674,7 @@ const PACKED: u8 = 1;
 const PACK_PROBE: &str = "\u{2}pack";
 
 /// The line packed, when packing makes it clearly smaller.
-fn pack(line: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn pack(line: &[u8]) -> Option<Vec<u8>> {
     use flate2::{Compression, write::DeflateEncoder};
     if line.len() < PACK_OVER {
         return None;
@@ -687,7 +687,7 @@ fn pack(line: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// A line as it was sent: unpacked when it came packed (never past MAX_LINE).
-fn unpack(line: Vec<u8>) -> Result<Vec<u8>, String> {
+pub(crate) fn unpack(line: Vec<u8>) -> Result<Vec<u8>, String> {
     use flate2::read::DeflateDecoder;
     if line.first() != Some(&PACKED) {
         return Ok(line);
@@ -836,6 +836,11 @@ impl Conversation {
         self.sender().send_line(line)
     }
 
+    /// The relay session id (S3: a direct link names the session it joins).
+    pub fn session(&self) -> u64 {
+        self.session
+    }
+
     pub fn sender(&self) -> ConversationSender {
         ConversationSender {
             link: self.link.sender(),
@@ -966,6 +971,10 @@ struct LiveSession {
     packing: Arc<AtomicBool>,
     /// What the session's answers are written to (sealed in order); the probe's answer goes here too.
     out: Arc<Mutex<Box<dyn Write + Send>>>,
+    /// S3: the pairing it was opened with, its key, and the direct link its answers take while one is up.
+    pairing: String,
+    key: [u8; 32],
+    direct: crate::direct::Slot,
 }
 
 #[derive(Default)]
@@ -987,6 +996,20 @@ pub struct RelayMaster {
     inner: Mutex<Inner>,
     outbox: Mutex<Option<Sender<Msg>>>,
     file: PathBuf,
+    /// S3: the port this master takes direct links on (once listening; None before, or when no port was free).
+    direct_port: Mutex<Option<Option<u16>>>,
+}
+
+impl crate::direct::Sessions for RelayMaster {
+    fn attach(&self, session: u64, pairing: &str) -> Option<crate::direct::Attach> {
+        let i = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let live = i.sessions.get(&session).filter(|s| s.pairing == pairing)?;
+        Some(crate::direct::Attach {
+            key: live.key,
+            input: live.input.clone(),
+            slot: live.direct.clone(),
+        })
+    }
 }
 
 /// Reads lines from a channel (a session's decrypted input) as a stream.
@@ -1021,6 +1044,8 @@ struct SealingWriter {
     outbox: Sender<Msg>,
     pending: Vec<u8>,
     packing: Arc<AtomicBool>,
+    /// S3: while a direct link is up, lines go there instead of the relay.
+    direct: crate::direct::Slot,
 }
 
 impl Write for SealingWriter {
@@ -1033,6 +1058,9 @@ impl Write for SealingWriter {
             let i = from + at;
             from = 0;
             let line: Vec<u8> = self.pending.drain(..=i).collect();
+            if crate::direct::try_send(&self.direct, &line[..line.len() - 1]) {
+                continue;
+            }
             let sealed = seal_line(
                 &mut self.crypto.lock().unwrap_or_else(|e| e.into_inner()),
                 self.session,
@@ -1071,7 +1099,27 @@ impl RelayMaster {
             }),
             outbox: Mutex::new(None),
             file,
+            direct_port: Mutex::new(None),
         })
+    }
+
+    /// S3: listens for direct links the first time remote access is on (tests take any free port).
+    fn listen_direct(self: &Arc<Self>) {
+        let mut port = self.direct_port.lock().unwrap_or_else(|e| e.into_inner());
+        if port.is_none() {
+            let from = if cfg!(test) { 0 } else { crate::direct::PORT };
+            *port = Some(crate::direct::serve(self.clone(), from));
+        }
+    }
+
+    /// The direct road offered to a paired app (None: no port, or no private-network address).
+    fn direct_offer(&self) -> Option<crate::direct::Offer> {
+        let port = (*self.direct_port.lock().unwrap_or_else(|e| e.into_inner()))??;
+        let addrs: Vec<String> = crate::direct::local_addresses()
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        (!addrs.is_empty()).then_some(crate::direct::Offer { port, addrs })
     }
 
     fn save(&self, c: &Config) {
@@ -1194,6 +1242,7 @@ impl RelayMaster {
         if !enabled {
             return;
         }
+        self.listen_direct();
         let me = self.clone();
         std::thread::spawn(move || me.run(generation, master));
     }
@@ -1429,6 +1478,7 @@ impl RelayMaster {
                 )?));
                 let (input, rx) = channel::<Vec<u8>>();
                 let packing = Arc::new(AtomicBool::new(false));
+                let direct = crate::direct::Slot::default();
                 let out: Arc<Mutex<Box<dyn Write + Send>>> =
                     Arc::new(Mutex::new(Box::new(SealingWriter {
                         session,
@@ -1436,6 +1486,7 @@ impl RelayMaster {
                         outbox: tx.clone(),
                         pending: Vec::new(),
                         packing: packing.clone(),
+                        direct: direct.clone(),
                     })));
                 self.inner
                     .lock()
@@ -1451,6 +1502,9 @@ impl RelayMaster {
                             joiner: Joiner::default(),
                             packing,
                             out: out.clone(),
+                            pairing: device.pairing.clone(),
+                            key,
+                            direct,
                         },
                     );
                 self.log(&device.name, "connected");
@@ -1489,6 +1543,22 @@ impl RelayMaster {
                         other => Ok(other),
                     });
                 match plain {
+                    // S3: the app asks for a direct road; answered (sealed, over the relay) when this master has one.
+                    Ok(Some(line)) if line == crate::direct::ASK.as_bytes() => {
+                        let out = live.out.clone();
+                        drop(i);
+                        if let Some(offer) = self.direct_offer() {
+                            let text = serde_json::to_string(&offer).unwrap_or_default();
+                            let _ = out.lock().unwrap_or_else(|e| e.into_inner()).write_all(
+                                format!(
+                                    "{}{text}
+",
+                                    crate::direct::OFFER
+                                )
+                                .as_bytes(),
+                            );
+                        }
+                    }
                     // S4: the app unpacks long lines; it is told this master does too, and answers go packed.
                     Ok(Some(line)) if line == PACK_PROBE.as_bytes() => {
                         live.packing.store(true, Ordering::SeqCst);
@@ -2164,6 +2234,99 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(unpack(whole.unwrap()).unwrap(), text);
+    }
+
+    /// S3: inside a relay session the app asks for a direct road, the master offers its private address, the app
+    /// links directly and calls go that way; when the direct link is cut, the same session answers over the relay.
+    #[test]
+    fn a_session_moves_to_a_direct_link_and_back_to_the_relay_when_it_drops() {
+        let relay = crate::relay_server::start_local().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !rm.status().connected {
+            assert!(
+                Instant::now() < deadline,
+                "the master did not reach the relay"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+        let mut c = open_session(&paired).unwrap();
+        c.send_line(crate::direct::ASK).unwrap();
+        let offer = loop {
+            assert!(
+                Instant::now() < deadline + Duration::from_secs(10),
+                "no offer"
+            );
+            if let Some(line) = c.poll_line().unwrap()
+                && let Some(o) = line.strip_prefix(crate::direct::OFFER)
+            {
+                break serde_json::from_str::<crate::direct::Offer>(o).unwrap();
+            }
+        };
+        assert!(offer.addrs.contains(&"127.0.0.1".to_string()));
+        let key: [u8; 32] = unb64(&paired.key).unwrap().try_into().unwrap();
+        let slot = crate::direct::Slot::default();
+        let (heard_tx, heard) = channel::<Vec<u8>>();
+        crate::direct::connect(
+            &offer,
+            &key,
+            &paired.pairing,
+            c.session(),
+            &slot,
+            move |l| {
+                let _ = heard_tx.send(l);
+            },
+            || {},
+        )
+        .unwrap();
+        // A call over the direct link is answered over it.
+        assert!(crate::direct::try_send(
+            &slot,
+            br#"{"id":1,"cmd":"projects_list","args":{}}"#
+        ));
+        let answer: serde_json::Value =
+            serde_json::from_slice(&heard.recv_timeout(Duration::from_secs(10)).unwrap()).unwrap();
+        assert_eq!(answer["id"], 1);
+        assert!(answer.get("ok").is_some());
+        // Cut: the master's side notices, and the next call goes and comes back over the relay.
+        slot.lock().unwrap().take().unwrap().close();
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            let live = rm
+                .inner
+                .lock()
+                .unwrap()
+                .sessions
+                .values()
+                .any(|s| crate::direct::is_up(&s.direct));
+            if !live {
+                break;
+            }
+            assert!(Instant::now() < until, "the master kept the cut link");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        c.send_line(r#"{"id":2,"cmd":"projects_list","args":{}}"#)
+            .unwrap();
+        loop {
+            assert!(
+                Instant::now() < until + Duration::from_secs(5),
+                "no answer over the relay"
+            );
+            if let Some(line) = c.poll_line().unwrap() {
+                let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+                if v["id"] == 2 {
+                    break;
+                }
+            }
+        }
+        rm.configure(&relay, "Home PC", false, master).unwrap();
     }
 
     #[test]

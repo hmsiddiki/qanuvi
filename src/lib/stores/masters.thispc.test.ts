@@ -193,6 +193,24 @@ describe("This PC's servers are held by This PC's master", () => {
     expect(masters.status.vps).toBeUndefined();
   });
 
+  it("shows a connection's road: direct at home, back to the relay, and news that came before it was on (sl1 S3)", async () => {
+    await masters.followThisPc();
+    // The direct link is up a moment after hello, sometimes before this window marks the machine on.
+    thisPcWatch!({ road: "vps", direct: true });
+    await masters.connect(vps);
+    expect(masters.statusOf("vps")).toMatchObject({ state: "on", direct: true });
+    thisPcWatch!({ road: "vps", direct: false });
+    await flush();
+    expect(masters.statusOf("vps").direct).toBe(false);
+    thisPcWatch!({ road: "vps", direct: true });
+    await flush();
+    expect(masters.statusOf("vps").direct).toBe(true);
+    // Disconnected: the road is forgotten, so a new connection starts as relayed until told.
+    await masters.disconnect("vps");
+    await masters.connect(vps);
+    expect(masters.statusOf("vps").direct).toBeUndefined();
+  });
+
   it("This PC's own link ended: the servers its master held go with why, the window's own stay", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
     try {

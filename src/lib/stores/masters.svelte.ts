@@ -63,6 +63,8 @@ export interface MasterStatus {
   error?: string;
   /** A machine reached by another way already (its key): picking this one shows that one. */
   twin?: string;
+  /** sl1 S3: its calls go straight over the home network now (the relay only when that link drops). */
+  direct?: boolean;
 }
 
 /** What a master says on its `remote_watch` stream when one of its servers comes or goes. */
@@ -72,6 +74,9 @@ export interface WatchEvent {
   closed?: string;
   error?: string;
   removed?: boolean;
+  /** S3: this server's connection moved to a direct link (direct) or back to the relay. */
+  road?: string;
+  direct?: boolean;
 }
 
 /**
@@ -221,6 +226,7 @@ class MastersStore {
   /** One of a followed master's servers came or went. */
   async #watched(parent: string, e: WatchEvent): Promise<void> {
     if (this.statusOf(parent).state !== "on") return;
+    if (e.road) return this.#road(`${parent}/${e.road}`, !!e.direct);
     if (e.connected && e.info) {
       await this.#readNested(parent).catch(() => {});
       await this.#nestedState(`${parent}/${e.connected}`, { state: "on", info: e.info });
@@ -333,6 +339,8 @@ class MastersStore {
   }
 
   #set(id: string, s: MasterStatus) {
+    if (s.state === "on" && s.direct === undefined && this.#roads.has(id)) s = { ...s, direct: this.#roads.get(id) };
+    if (s.state === "off" || s.state === "error") this.#roads.delete(id);
     this.status = { ...this.status, [id]: s };
   }
 
@@ -587,8 +595,20 @@ class MastersStore {
     }
   }
 
+  /** S3: a connected machine's road changed (direct at home, or the relay again). */
+  #road(key: string, direct: boolean): void {
+    // Kept also when it comes before this window marks the machine connected (the link is up a moment after hello).
+    this.#roads.set(key, direct);
+    const now = this.statusOf(key);
+    if (now.state === "on" && !!now.direct !== direct) this.#set(key, { ...now, direct });
+  }
+
+  /** S3: each machine's last road news, for a connection this window marks "on" after the news came. */
+  #roads = new Map<string, boolean>();
+
   /** One of This PC's servers came or went, as This PC's master says. */
   async #thisPcWatched(e: WatchEvent): Promise<void> {
+    if (e.road) return this.#road(e.road, !!e.direct);
     const id = e.connected ?? e.closed;
     if (!id) return;
     let m = this.list.find((x) => x.id === id);

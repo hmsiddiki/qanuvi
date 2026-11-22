@@ -29,6 +29,8 @@ pub struct Connection {
     streams: Mutex<HashMap<String, Sink<Value>>>,
     next: AtomicU64,
     pub info: Mutex<Value>,
+    /// sl1 S3: the direct link a relay connection's lines take while one is up (always empty for SSH and local).
+    direct: crate::direct::Slot,
 }
 
 #[derive(Default)]
@@ -43,7 +45,11 @@ pub struct Remotes {
     through: Mutex<Option<String>>,
     /// The machines a connect is under way to (their hello not in yet).
     starting: Mutex<std::collections::HashSet<String>>,
+    /// S3: told when a connection's road changes (true: straight over the home network, false: back on the relay).
+    on_road: Mutex<Option<OnRoad>>,
 }
+
+pub type OnRoad = Arc<dyn Fn(&str, bool) + Send + Sync>;
 
 /// How many machines a path may hold below the window (owner, M3: at most 3 levels).
 pub const MAX_DEPTH: usize = 3;
@@ -207,6 +213,56 @@ pub fn command_for(
         "--stdio",
     ]);
     Ok(c)
+}
+
+/// S3: the master offered a direct road: tried on a thread of its own (the relay goes on meanwhile). A link that
+/// later ends is asked for again after a minute; addresses that did not answer (another network) after five.
+fn go_direct(
+    c: &Arc<Connection>,
+    ended: &Arc<AtomicBool>,
+    conversation: &crate::relay_client::Conversation,
+    paired: &crate::relay_client::Paired,
+    offer: &str,
+    road: &Arc<dyn Fn(bool) + Send + Sync>,
+) {
+    let Ok(offer) = serde_json::from_str::<crate::direct::Offer>(offer) else {
+        return;
+    };
+    let Some(key) = crate::relay::unb64(&paired.key)
+        .ok()
+        .and_then(|k| <[u8; 32]>::try_from(k).ok())
+    else {
+        return;
+    };
+    let (c, ended, asker) = (c.clone(), ended.clone(), conversation.sender());
+    let (pairing, session) = (paired.pairing.clone(), conversation.session());
+    let road = road.clone();
+    std::thread::spawn(move || {
+        let ask_later = |wait: Duration| {
+            let (c, ended, asker, road) = (c.clone(), ended.clone(), asker.clone(), road.clone());
+            move || {
+                road(false);
+                std::thread::sleep(wait);
+                if !c.closed.load(Ordering::SeqCst) && !ended.load(Ordering::SeqCst) {
+                    let _ = asker.send_line(crate::direct::ASK);
+                }
+            }
+        };
+        let lines = c.clone();
+        let tried = crate::direct::connect(
+            &offer,
+            &key,
+            &pairing,
+            session,
+            &c.direct,
+            move |l| lines.on_line(&String::from_utf8_lossy(&l)),
+            ask_later(Duration::from_secs(60)),
+        );
+        match tried {
+            Ok(_) => road(true),
+            Err(_) => ask_later(Duration::from_secs(300))(),
+        }
+    });
 }
 
 impl Connection {
@@ -561,6 +617,7 @@ impl Remotes {
             streams: Mutex::default(),
             next: AtomicU64::new(0),
             info: Mutex::new(Value::Null),
+            direct: Default::default(),
         });
         // What SSH or the master says on its error output explains a failed connection.
         std::thread::spawn(move || {
@@ -598,15 +655,23 @@ impl Remotes {
             streams: Mutex::default(),
             next: AtomicU64::new(0),
             info: Mutex::new(Value::Null),
+            direct: Default::default(),
         });
         // sl1: calls go out at once on their own thread; the reader below only reads (its wait held them before).
         let ended = Arc::new(AtomicBool::new(false));
+        // S3: asks for a direct road (an older master leaves the ask, and everything stays on the relay).
+        let _ = conversation.send_line(crate::direct::ASK);
+        let direct = conn.direct.clone();
         {
-            let (out, ended) = (conversation.sender(), ended.clone());
+            let (out, ended, direct) = (conversation.sender(), ended.clone(), direct.clone());
             std::thread::spawn(move || {
                 while !ended.load(Ordering::SeqCst) {
                     match rx.recv_timeout(Duration::from_millis(500)) {
                         Ok(line) => {
+                            // S3: straight to the master while a direct link is up, else over the relay.
+                            if crate::direct::try_send(&direct, line.as_bytes()) {
+                                continue;
+                            }
                             if out.send_line(&line).is_err() {
                                 ended.store(true, Ordering::SeqCst);
                             }
@@ -621,6 +686,21 @@ impl Remotes {
             });
         }
         let (c, id, on_end) = (conn.clone(), id.to_string(), on_end.clone());
+        let paired = paired.clone();
+        let road: Arc<dyn Fn(bool) + Send + Sync> = {
+            let (f, id) = (
+                self.on_road
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone(),
+                id.clone(),
+            );
+            Arc::new(move |direct| {
+                if let Some(f) = &f {
+                    f(&id, direct);
+                }
+            })
+        };
         std::thread::spawn(move || {
             loop {
                 if c.closed.load(Ordering::SeqCst) {
@@ -631,7 +711,10 @@ impl Remotes {
                     break;
                 }
                 match conversation.poll_line() {
-                    Ok(Some(line)) => c.on_line(&line),
+                    Ok(Some(line)) => match line.strip_prefix(crate::direct::OFFER) {
+                        Some(offer) => go_direct(&c, &ended, &conversation, &paired, offer, &road),
+                        None => c.on_line(&line),
+                    },
                     Ok(None) => {}
                     Err(_) => break,
                 }
@@ -664,6 +747,20 @@ impl Remotes {
     }
 
     /// What each connected master said when it answered (its hello), by id.
+    /// S3: who hears about road changes (the master's server watchers).
+    pub fn set_on_road(&self, f: OnRoad) {
+        *self.on_road.lock().unwrap_or_else(|e| e.into_inner()) = Some(f);
+    }
+
+    /// S3: whether the connection to `id` goes straight over the home network now (not through the relay).
+    pub fn is_direct(&self, id: &str) -> bool {
+        self.map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .is_some_and(|c| crate::direct::is_up(&c.direct))
+    }
+
     pub fn infos(&self) -> Vec<(String, Value)> {
         self.map
             .lock()
@@ -825,6 +922,7 @@ mod tests {
             streams: Mutex::default(),
             next: AtomicU64::new(0),
             info: Mutex::new(info),
+            direct: Default::default(),
         })
     }
 

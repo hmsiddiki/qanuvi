@@ -26,3 +26,31 @@
 !macro NSIS_HOOK_PREUNINSTALL
   !insertmacro QanuviStopMaster
 !macroend
+
+; sl1 S3 (owner, 2026-11-22): direct links between paired computers at home. The master takes them on ports
+; 47444-47454; Windows would otherwise ask about it with its own dialog. The rule is for this install's
+; qanuvi-master.exe on private (home) networks only. Looking for the rule needs no admin rights, so it is only added
+; (one Windows "allow changes" question) when it is missing, never again on each update. Said no to: nothing is
+; added, and the computers keep using the relay.
+!define QANUVI_FW_RULE "Qanuvi home links"
+
+!macro NSIS_HOOK_POSTINSTALL
+  nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${QANUVI_FW_RULE}"'
+  Pop $0
+  Pop $1
+  ${If} $0 != 0
+    ExecShellWait "runas" "netsh" 'advfirewall firewall add rule name="${QANUVI_FW_RULE}" dir=in action=allow program="$INSTDIR\qanuvi-master.exe" enable=yes profile=private protocol=TCP localport=47444-47454' SW_HIDE
+  ${EndIf}
+!macroend
+
+!macro NSIS_HOOK_POSTUNINSTALL
+  ; An uninstall that is part of an update leaves the rule (the new version keeps using it).
+  ${If} $UpdateMode <> 1
+    nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${QANUVI_FW_RULE}"'
+    Pop $0
+    Pop $1
+    ${If} $0 = 0
+      ExecShellWait "runas" "netsh" 'advfirewall firewall delete rule name="${QANUVI_FW_RULE}"' SW_HIDE
+    ${EndIf}
+  ${EndIf}
+!macroend

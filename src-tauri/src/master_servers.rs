@@ -97,7 +97,9 @@ impl Master {
             let state = match (infos.get(&id), errors.get(&id)) {
                 // Its hello is not in yet (finding n3): it is still connecting, not on with nothing known of it.
                 (Some(info), _) if info.is_null() => json!({"state": "connecting"}),
-                (Some(info), _) => json!({"state": "on", "info": info}),
+                (Some(info), _) => {
+                    json!({"state": "on", "info": info, "direct": self.remotes.is_direct(&id)})
+                }
                 (None, Some(e)) => json!({"state": "error", "error": e}),
                 (None, None) => json!({"state": "off"}),
             };
@@ -147,6 +149,14 @@ impl Master {
         if id.is_empty() {
             return Err("A server needs an id.".into());
         }
+        // S3: the window hears when a connection moves to a direct link at home and back to the relay.
+        let watcher = self.me.get().cloned().unwrap_or_default();
+        self.remotes
+            .set_on_road(Arc::new(move |id: &str, direct: bool| {
+                if let Some(m) = watcher.upgrade() {
+                    m.servers_changed(json!({"road": id, "direct": direct}));
+                }
+            }));
         let result = transport_for(server).and_then(|transport| {
             let me = self.me.get().cloned().unwrap_or_default();
             let on_end: OnEnd = Arc::new(move |id: &str| {

@@ -74,7 +74,13 @@
 
   /** On hover: how the machine is reached. */
   const reach = (m: MasterSettings) => {
-    const how = m.relay ? "through the relay" : m.target === "local" ? "on this PC (test master)" : `SSH: ${m.target}`;
+    const how = m.relay
+      ? masters.statusOf(m.id).direct
+        ? "directly on the home network (the relay if that drops)"
+        : "through the relay"
+      : m.target === "local"
+        ? "on this PC (test master)"
+        : `SSH: ${m.target}`;
     const parent = parentOf(m.id);
     // A nested machine is reached by its master, the way that master reaches it.
     if (parent) return `Through ${masters.route(parent)}, ${how}`;
@@ -86,7 +92,9 @@
     if (s.twin) return `the same computer as ${nameOf(s.twin)}`;
     if (switcher.held?.id === m.id && switcher.held.mode === "lost" && s.state !== "on") return "reconnecting…";
     return s.state === "on"
-      ? "connected"
+      ? s.direct
+        ? "connected · direct"
+        : "connected"
       : s.state === "connecting"
         ? "connecting…"
         : s.state === "error"

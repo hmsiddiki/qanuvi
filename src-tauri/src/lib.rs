@@ -15,6 +15,7 @@ pub mod checks;
 pub mod claude_update;
 pub mod dap;
 pub mod data_location;
+pub mod direct;
 pub mod drafts;
 pub mod files;
 pub mod free_relays;
