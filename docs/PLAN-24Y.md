@@ -1,6 +1,6 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 built 2026-11-21 (not driven live). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
 part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line
@@ -83,3 +83,6 @@ right.
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
 24y keeps this as it is.
+6. **Part 3 order and benchmark** (owner, 2026-11-23): Y8 -> Y7 -> Y6 -> Y9. The benchmark re-runs the R1 to R5
+   plan on a scratch copy of Qanuvi taken from the commit before R1, so the right result is known. The paid run's
+   cost is fine.
