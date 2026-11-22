@@ -1773,9 +1773,16 @@ runs on or off; with it off nothing is sent anywhere.
         the app's own install (~/.local/lib/qanuvi, /usr/lib/qanuvi, next to the app binary) uses the app's data
         folder; servers without the app keep ~/.local/share/qanuvi. Also: the updater's wait only counts a master
         on the app's data folder. Check Windows the same way (its status without --data said "Not running").
+      h4 FOUND (owner, laptop showing Home PC's Settings -> Servers, 0.1.42): the shown machine's side does not
+        tell the road of who uses it: "In use now: Zorin Laptop" has no road, and the status bar's "Used from Zorin
+        Laptop" hover says "Being reached from Zorin Laptop through the relay" (StatusBar.svelte) while the
+        session is direct. Proposal: the master marks each session in use as direct or relay (it holds the direct
+        link per session), "In use now: Zorin Laptop · direct on the home network", the hover the same. Owner also
+        read Home PC's own "Connected to the relay (its own port)" as the laptop's road: that line could say
+        "(kept for when the direct link drops and for reaching it from outside)" or similar; ask.
     PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.42 on both): all pushed, nothing
-      unpublished. NEXT: owner checks the laptop's Settings -> Servers says "Home PC directly on the home network";
-      owner says on h3 (and the stray folder). Then the roadmap (big-plan basics + stable Windows/Linux, planned
+      unpublished. NEXT: owner checks the laptop's Settings -> Servers (This PC picked) says "Home PC directly on
+      the home network"; owner says on h3 (and the stray folder) and h4. Then the roadmap (big-plan basics + stable Windows/Linux, planned
       with the owner first) in a fresh conversation.
     PICKUP POINT (before, 2026-11-23 after 0.1.42): all pushed, nothing
       unpublished. NEXT: owner updates both machines; on the laptop Settings -> Servers should say "Home PC
