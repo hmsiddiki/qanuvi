@@ -11,15 +11,22 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
-/// A WebSocket to the relay.
+type Ws = WebSocket<MaybeTlsStream<TcpStream>>;
+
+/// A WebSocket to the relay. sl1: sends go out at once from any thread (LinkSender). The reader waits on the socket
+/// itself (a peek, the WebSocket not held), so a send never waits for the reader's wait to end.
 pub struct Link {
-    ws: WebSocket<MaybeTlsStream<TcpStream>>,
+    ws: Arc<Mutex<Ws>>,
+    /// The socket under the WebSocket (a second handle to it), for the reader's wait; None for a stream kind with no
+    /// TCP socket to reach (then the reader waits inside the read, as before sl1).
+    sock: Option<TcpStream>,
     /// The relay's saved address (24rl R3: what it tells about its own port is kept under this).
     relay: String,
     /// rl1: when the relay was last heard from, and last pinged; a link quiet for too long has died.
@@ -375,15 +382,44 @@ fn open_ws(url: &str, limit: Duration) -> Result<WebSocket<MaybeTlsStream<TcpStr
         _ => tungstenite::client_tls_with_config(url, stream, None, connector(url))
             .map_err(|e| e.to_string())?,
     };
-    let tcp = match ws.get_ref() {
-        MaybeTlsStream::Plain(s) => s,
-        MaybeTlsStream::Rustls(s) => s.get_ref(),
-        _ => return Ok(ws),
+    let Some(tcp) = tcp_of(&ws) else {
+        return Ok(ws);
     };
-    tcp.set_read_timeout(Some(Duration::from_millis(50)))
+    // sl1: small frames (a call, its answer) go out at once, not held for the next one.
+    let _ = tcp.set_nodelay(true);
+    tcp.set_read_timeout(Some(READ_TICK))
         .map_err(|e| e.to_string())?;
     tcp.set_write_timeout(None).map_err(|e| e.to_string())?;
     Ok(ws)
+}
+
+/// How long the reader waits for bytes before it looks at pings and the caller's own checks again. Sends do not wait
+/// for it (sl1).
+const READ_TICK: Duration = Duration::from_millis(50);
+
+fn tcp_of(ws: &Ws) -> Option<&TcpStream> {
+    match ws.get_ref() {
+        MaybeTlsStream::Plain(s) => Some(s),
+        MaybeTlsStream::Rustls(s) => Some(s.get_ref()),
+        _ => None,
+    }
+}
+
+/// Sends on a link from any thread, at once (sl1).
+#[derive(Clone)]
+pub struct LinkSender {
+    ws: Arc<Mutex<Ws>>,
+}
+
+impl LinkSender {
+    pub fn send(&self, m: &Msg) -> Result<(), String> {
+        let text = serde_json::to_string(m).unwrap_or_default();
+        self.ws
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .send(Message::text(text))
+            .map_err(|_| "The connection to the relay ended.".to_string())
+    }
 }
 
 impl Link {
@@ -408,9 +444,11 @@ impl Link {
         Ok(Self::with(ws, relay))
     }
 
-    fn with(ws: WebSocket<MaybeTlsStream<TcpStream>>, relay: String) -> Self {
+    fn with(ws: Ws, relay: String) -> Self {
+        let sock = tcp_of(&ws).and_then(|t| t.try_clone().ok());
         Self {
-            ws,
+            ws: Arc::new(Mutex::new(ws)),
+            sock,
             relay,
             heard: Instant::now(),
             pinged: Instant::now(),
@@ -429,11 +467,12 @@ impl Link {
 
     /// Ends the link the polite way (WebSocket close, answered by the relay), so a quick test leaves no "closed
     /// without close_notify" line in the relay's log.
-    pub fn end(mut self) {
-        let _ = self.ws.close(None);
+    pub fn end(self) {
+        let mut ws = self.ws.lock().unwrap_or_else(|e| e.into_inner());
+        let _ = ws.close(None);
         let until = Instant::now() + Duration::from_secs(1);
         while Instant::now() < until {
-            match self.ws.read() {
+            match ws.read() {
                 Ok(_) => {}
                 Err(tungstenite::Error::Io(e))
                     if e.kind() == std::io::ErrorKind::WouldBlock
@@ -444,23 +483,56 @@ impl Link {
     }
 
     pub fn send(&mut self, m: &Msg) -> Result<(), String> {
-        self.ws
-            .send(Message::text(serde_json::to_string(m).unwrap_or_default()))
-            .map_err(|_| "The connection to the relay ended.".to_string())
+        self.sender().send(m)
+    }
+
+    /// A handle that sends on this link from another thread, at once (sl1).
+    pub fn sender(&self) -> LinkSender {
+        LinkSender {
+            ws: self.ws.clone(),
+        }
+    }
+
+    /// One frame: what is already in hand first (no wait); else, with `wait`, bytes are waited for on the socket
+    /// (up to READ_TICK) with the WebSocket left free for senders, then read without blocking.
+    fn read_once(
+        &self,
+        wait: bool,
+    ) -> Result<crate::relay_server::Frame, crate::relay_server::Gone> {
+        use crate::relay_server::read_frame;
+        if wait && let Some(sock) = &self.sock {
+            let _ = sock.peek(&mut [0u8; 1]);
+        }
+        let mut ws = self.ws.lock().unwrap_or_else(|e| e.into_inner());
+        match &self.sock {
+            Some(sock) => {
+                let _ = sock.set_nonblocking(true);
+                let f = read_frame(&mut ws);
+                let _ = sock.set_nonblocking(false);
+                f
+            }
+            None => read_frame(&mut ws),
+        }
     }
 
     /// The next message, or None after a short wait. rl1: the relay is pinged now and then, and a relay that has said
     /// nothing at all (not even a pong) for too long counts as gone, so the caller connects again.
     pub fn poll(&mut self) -> Result<Option<Msg>, String> {
-        use crate::relay_server::{Frame, Gone, read_frame};
+        use crate::relay_server::{Frame, Gone};
         const ENDED: &str = "The connection to the relay ended.";
         if self.pinged.elapsed() >= self.ping_every {
             self.pinged = Instant::now();
             self.ws
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
                 .send(Message::Ping(Vec::new().into()))
                 .map_err(|_| ENDED.to_string())?;
         }
-        match read_frame(&mut self.ws) {
+        let frame = match self.read_once(false) {
+            Ok(Frame::Nothing) if self.sock.is_some() => self.read_once(true),
+            other => other,
+        };
+        match frame {
             Ok(Frame::Text(t)) => {
                 self.heard = Instant::now();
                 let m: Option<Msg> = serde_json::from_str(&t).ok();
@@ -643,8 +715,33 @@ impl Joiner {
 pub struct Conversation {
     link: Link,
     session: u64,
-    crypto: Session,
+    crypto: Arc<Mutex<Session>>,
     joiner: Joiner,
+}
+
+/// Sends a conversation's lines from another thread, at once (sl1): the reader's wait never holds them.
+#[derive(Clone)]
+pub struct ConversationSender {
+    link: LinkSender,
+    session: u64,
+    crypto: Arc<Mutex<Session>>,
+}
+
+impl ConversationSender {
+    pub fn send_line(&self, line: &str) -> Result<(), String> {
+        // Held while the parts go out, so their order matches the order they were sealed in.
+        let mut crypto = self.crypto.lock().unwrap_or_else(|e| e.into_inner());
+        for m in seal_line(&mut crypto, self.session, line.as_bytes())? {
+            self.link.send(&m)?;
+        }
+        Ok(())
+    }
+
+    pub fn close(&self) {
+        let _ = self.link.send(&Msg::Close {
+            session: self.session,
+        });
+    }
 }
 
 pub fn open_session(p: &Paired) -> Result<Conversation, String> {
@@ -669,7 +766,7 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
             Ok(Conversation {
                 link,
                 session,
-                crypto,
+                crypto: Arc::new(Mutex::new(crypto)),
                 joiner: Joiner::default(),
             })
         }
@@ -680,10 +777,15 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
 
 impl Conversation {
     pub fn send_line(&mut self, line: &str) -> Result<(), String> {
-        for m in seal_line(&mut self.crypto, self.session, line.as_bytes())? {
-            self.link.send(&m)?;
+        self.sender().send_line(line)
+    }
+
+    pub fn sender(&self) -> ConversationSender {
+        ConversationSender {
+            link: self.link.sender(),
+            session: self.session,
+            crypto: self.crypto.clone(),
         }
-        Ok(())
     }
 
     /// The next line from the master, None after a short wait (or while a long line's parts still come); Err when
@@ -695,7 +797,11 @@ impl Conversation {
                 body,
                 more,
             }) if session == self.session => {
-                let plain = self.crypto.open(&unb64(&body)?)?;
+                let plain = self
+                    .crypto
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .open(&unb64(&body)?)?;
                 Ok(self
                     .joiner
                     .add(plain, more)?
@@ -709,9 +815,7 @@ impl Conversation {
     }
 
     pub fn close(&mut self) {
-        let _ = self.link.send(&Msg::Close {
-            session: self.session,
-        });
+        self.sender().close();
     }
 }
 
@@ -1084,17 +1188,44 @@ impl RelayMaster {
         })?;
         let (tx, rx) = channel::<Msg>();
         *self.outbox.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx.clone());
-        loop {
+        // sl1: what the sessions answer goes out at once on its own thread, not after the reader's next wait.
+        let ended = Arc::new(AtomicBool::new(false));
+        let writer = {
+            let (out, ended) = (link.sender(), ended.clone());
+            std::thread::spawn(move || {
+                while !ended.load(Ordering::SeqCst) {
+                    match rx.recv_timeout(Duration::from_millis(500)) {
+                        Ok(m) => {
+                            if out.send(&m).is_err() {
+                                ended.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        Err(RecvTimeoutError::Timeout) => {}
+                        Err(RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+            })
+        };
+        let result = loop {
             if !self.current(generation) {
-                return Ok(());
+                break Ok(());
             }
-            if let Some(m) = link.poll()? {
-                self.on_message(m, &tx, master)?;
+            if ended.load(Ordering::SeqCst) {
+                break Err("The connection to the relay ended.".to_string());
             }
-            while let Ok(out) = rx.try_recv() {
-                link.send(&out)?;
+            match link.poll() {
+                Ok(Some(m)) => {
+                    if let Err(e) = self.on_message(m, &tx, master) {
+                        break Err(e);
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => break Err(e),
             }
-        }
+        };
+        ended.store(true, Ordering::SeqCst);
+        let _ = writer.join();
+        result
     }
 
     fn on_message(
@@ -1827,6 +1958,67 @@ mod tests {
         assert!(again.get("ok").is_some());
         assert!(rm.status().connected);
         assert_eq!(rm.status().sessions.len(), 1);
+        rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    /// sl1: a call sent from another thread while the reader waits, and the master's answer, both go out at once.
+    /// Before, each side held what it had to send until its 50 ms read wait ended (~50 ms a call on a local relay).
+    #[test]
+    fn calls_and_answers_go_out_at_once_while_the_reader_waits() {
+        let relay = crate::relay_server::start_local().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let master = crate::master::Master::open(data.path()).unwrap().shared();
+        let rm = RelayMaster::open(data.path());
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !rm.status().connected {
+            assert!(
+                Instant::now() < deadline,
+                "the master did not reach the relay"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let code = rm.pair_start().unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let paired = pair(&relay, &code, "Laptop").unwrap();
+        let mut c = open_session(&paired).unwrap();
+        let (tx, rx) = channel::<u64>();
+        let out = c.sender();
+        let writer = std::thread::spawn(move || {
+            for id in rx {
+                out.send_line(
+                    &serde_json::json!({"id": id, "cmd": "hello", "args": {}}).to_string(),
+                )
+                .unwrap();
+            }
+        });
+        let mut times = Vec::new();
+        for id in 1..=25u64 {
+            let start = Instant::now();
+            tx.send(id).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                assert!(Instant::now() < deadline, "no answer to call {id}");
+                if let Some(line) = c.poll_line().unwrap() {
+                    let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+                    if v["id"] == id {
+                        break;
+                    }
+                }
+            }
+            times.push(start.elapsed());
+            // Lets the reader settle into its wait, as between a window's calls.
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        drop(tx);
+        writer.join().unwrap();
+        times.sort();
+        let median = times[times.len() / 2];
+        assert!(
+            median < Duration::from_millis(20),
+            "calls still wait: median {median:?}, all {times:?}"
+        );
         rm.configure(&relay, "Home PC", false, master).unwrap();
     }
 

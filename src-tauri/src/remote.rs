@@ -596,11 +596,35 @@ impl Remotes {
             next: AtomicU64::new(0),
             info: Mutex::new(Value::Null),
         });
+        // sl1: calls go out at once on their own thread; the reader below only reads (its wait held them before).
+        let ended = Arc::new(AtomicBool::new(false));
+        {
+            let (out, ended) = (conversation.sender(), ended.clone());
+            std::thread::spawn(move || {
+                while !ended.load(Ordering::SeqCst) {
+                    match rx.recv_timeout(Duration::from_millis(500)) {
+                        Ok(line) => {
+                            if out.send_line(&line).is_err() {
+                                ended.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        Err(mpsc::RecvTimeoutError::Timeout) => {}
+                        Err(mpsc::RecvTimeoutError::Disconnected) => {
+                            out.close();
+                            ended.store(true, Ordering::SeqCst);
+                        }
+                    }
+                }
+            });
+        }
         let (c, id, on_end) = (conn.clone(), id.to_string(), on_end.clone());
         std::thread::spawn(move || {
-            'session: loop {
+            loop {
                 if c.closed.load(Ordering::SeqCst) {
                     conversation.close();
+                    break;
+                }
+                if ended.load(Ordering::SeqCst) {
                     break;
                 }
                 match conversation.poll_line() {
@@ -608,21 +632,8 @@ impl Remotes {
                     Ok(None) => {}
                     Err(_) => break,
                 }
-                loop {
-                    match rx.try_recv() {
-                        Ok(line) => {
-                            if conversation.send_line(&line).is_err() {
-                                break 'session;
-                            }
-                        }
-                        Err(mpsc::TryRecvError::Empty) => break,
-                        Err(mpsc::TryRecvError::Disconnected) => {
-                            conversation.close();
-                            break 'session;
-                        }
-                    }
-                }
             }
+            ended.store(true, Ordering::SeqCst);
             c.ended(&on_end, &id);
         });
         Ok(conn)
