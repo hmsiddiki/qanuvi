@@ -241,6 +241,11 @@ fn go_direct(
         let ask_later = |wait: Duration| {
             let (c, ended, asker, road) = (c.clone(), ended.clone(), asker.clone(), road.clone());
             move || {
+                // Finding d1: a link of a session that has ended (the computer changed network) says nothing; the
+                // session that took over tells its own road.
+                if c.closed.load(Ordering::SeqCst) || ended.load(Ordering::SeqCst) {
+                    return;
+                }
                 road(false);
                 std::thread::sleep(wait);
                 if !c.closed.load(Ordering::SeqCst) && !ended.load(Ordering::SeqCst) {

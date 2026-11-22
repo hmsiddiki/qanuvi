@@ -603,6 +603,28 @@ class MastersStore {
     if (now.state === "on" && !!now.direct !== direct) this.#set(key, { ...now, direct });
   }
 
+  /**
+   * S3: the road as the master holding the link says. A "direct" note that came while the machine was still coming
+   * back is dropped with a failed try in between (finding d1: back home, the laptop's window said "connected" while
+   * its link was direct), so a machine that comes on reads it.
+   */
+  async #readRoad(key: string): Promise<void> {
+    const parent = parentOf(key);
+    if (!parent) {
+      const m = this.list.find((x) => x.id === key);
+      if (!m || appHeld(m) || !m.relay) return;
+    }
+    try {
+      const states = parent
+        ? await callMaster<Record<string, MasterStatus>>(parent, "remote_states", {})
+        : await callThisPc<Record<string, MasterStatus>>("remote_states", {});
+      const st = states?.[parent ? key.slice(parent.length + 1) : key];
+      if (st?.state === "on" && typeof st.direct === "boolean" && !this.#roads.has(key)) this.#road(key, st.direct);
+    } catch {
+      // An older master without remote_states: road news still comes as events.
+    }
+  }
+
   /** S3: each machine's last road news, for a connection this window marks "on" after the news came. */
   #roads = new Map<string, boolean>();
 
@@ -689,6 +711,8 @@ class MastersStore {
       );
     this.projectCount = { ...this.projectCount, [key]: theirs.length };
     this.#set(key, { state: "on", info });
+    // S3: no road news kept for this connection (it can be lost while the machine came back): asked for.
+    if (!this.#roads.has(key)) void this.#readRoad(key);
     // A project window opened for one of its projects shows this machine.
     const want = projects.startWith;
     if (want && !projects.list.some((p) => p.id === want) && theirs.some((p) => p.id === want)) void show(key);

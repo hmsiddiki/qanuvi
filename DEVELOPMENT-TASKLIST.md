@@ -1714,7 +1714,26 @@ runs on or off; with it off nothing is sent anywhere.
       opened 192.168.0.230 -> 192.168.0.167:47444 one second after its new relay session; its remote_states says
       Home PC "direct": true, state on, version 0.1.40. S3 DONE on the real installs. Open watch: the first real
       fallback (laptop leaves home Wi-Fi, link should move to the relay and come back direct at home).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.40 direct check): all pushed, nothing
+    HOTSPOT DRIVE (owner, 2026-11-23 00:01-00:06, installed 0.1.40 both sides; watched from This PC): laptop to the
+      phone hotspot: This PC saw the old direct link go ~00:02, the laptop's new relay session at 00:02:18 (old one
+      cleaned by 00:02:55); no direct try from the hotspot (right). Back on home Wi-Fi (on the LAN by 00:04:43): new
+      relay session + direct link both at 00:05:37; the laptop master said direct: true. FALLBACK WORKS.
+      d1 FIXED (unpublished, not driven): the laptop's window still said "connected" (relay) with the link direct.
+        A "direct" note that came while the window was still bringing the machine back is lost with a failed retry
+        in between (#roads cleared on error), and nothing read it again. Window: a machine that comes on with no
+        road news reads remote_states from the master holding the link (#readRoad). Master: an ended session's
+        direct link no longer sends a late "back to relay" note. Window 572 tests, svelte-check, clippy, direct
+        tests clean.
+      d2 FOUND (owner sees "reconnecting" for about a minute each way): on a network change the laptop's master
+        waits on its dead relay session until the relay pings time out (~1 min) before opening a new one; plan D4
+        said "tried again when the network changes", not built. Proposal: the master looks at its own addresses
+        every few seconds; when they change, its relay and direct links bound to a gone address are ended and opened
+        again at once (expected: a few seconds of "reconnecting"). Owner to say.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after the hotspot drive): all pushed,
+      unpublished: d1 (window road read). NEXT: owner says on d2 (network change found at once); build d2 if yes,
+      drive d1 + d2 with the hotspot again, then 0.1.41 (ask). Then the roadmap (big-plan basics + stable
+      Windows/Linux, planned with the owner first).
+    PICKUP POINT (before, 2026-11-23 after 0.1.40 direct check): all pushed, nothing
       unpublished. NEXT: roadmap after sl1: big-plan basics + stable Windows/Linux, then cosmetics, later voice; plan
       the next part with the owner first. Watch: first real direct-to-relay fallback.
     PICKUP POINT (before, 2026-11-22 after 0.1.40): all pushed, nothing unpublished.
