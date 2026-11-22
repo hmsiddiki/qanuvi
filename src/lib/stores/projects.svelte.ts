@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, type Project, type ProjectSettings } from "$lib/api";
-import { own, shownMachine } from "$lib/remote";
+import { Channel } from "@tauri-apps/api/core";
+import { callMaster, callThisPc, onThisPcLinkEnd, own, shownMachine } from "$lib/remote";
 import { folderPicker } from "./folderPicker.svelte";
 
 /** The project each machine opens with: This PC keeps the old key, a master its own. */
@@ -30,6 +31,48 @@ class ProjectsStore {
 
   get current(): Project | null {
     return this.list.find((p) => p.id === this.currentId) ?? null;
+  }
+
+  /** Machines whose project list this window follows. */
+  #following = new Set<string>();
+
+  /**
+   * Follows This PC's project list: a project added, removed or changed by anyone else (its master's terminal,
+   * another window) shows here at once. Followed again after This PC's master restarted.
+   */
+  async followThisPc(): Promise<void> {
+    await onThisPcLinkEnd(() => void this.#followThisPc().catch(() => {}));
+    await this.#followThisPc().catch(() => {});
+  }
+
+  async #followThisPc(): Promise<void> {
+    const events = new Channel<unknown>();
+    events.onmessage = () => {
+      if (!this.machine) void this.load();
+    };
+    await callThisPc("projects_watch", { onEvent: events });
+  }
+
+  /** Follows a connected machine's project list; `changed` hears each change (its project count). */
+  async followMaster(master: string, changed?: () => void): Promise<void> {
+    if (this.#following.has(master)) return;
+    this.#following.add(master);
+    const events = new Channel<unknown>();
+    events.onmessage = () => {
+      if (this.machine === master) void this.load();
+      changed?.();
+    };
+    try {
+      await callMaster(master, "projects_watch", { onEvent: events });
+    } catch {
+      // An older master without the stream: its list is read when it is shown, as before.
+      this.#following.delete(master);
+    }
+  }
+
+  /** The connection to a machine ended: followed again when it is back. */
+  dropMaster(master: string): void {
+    this.#following.delete(master);
   }
 
   /** Lists the shown machine's projects (calls without an id go to it, remote.ts). */

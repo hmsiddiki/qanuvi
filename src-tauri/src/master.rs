@@ -78,6 +78,9 @@ pub struct Master {
     /// why each away one is away.
     remotes: crate::remote::Remotes,
     remote_watchers: inbox_cmds::InboxWatchers,
+    /// Windows following this master's project list: told when a project is added, removed or changed by anyone
+    /// (its own terminal, another window), so an open window's list follows.
+    projects_watchers: inbox_cmds::InboxWatchers,
     /// The desktop app's links to This PC's master (migration M4c): the tray's Open and Quit reach the app on them.
     app_links: inbox_cmds::InboxWatchers,
     /// The tray's Quit question while it is up (t1): asked in Qanuvi's own dialog, answered on `app_quit_answer`.
@@ -239,6 +242,7 @@ impl Master {
             plan_data_watchers: Arc::default(),
             remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
+            projects_watchers: inbox_cmds::InboxWatchers::default(),
             app_links: inbox_cmds::InboxWatchers::default(),
             quit_question: Default::default(),
             remote_errors: Mutex::default(),
@@ -351,7 +355,21 @@ impl Master {
             }
             // Projects (folders on this master).
             "projects_list" => to(projects::list(db)),
-            "projects_add" => to(projects::add(db, &s(args, "path"))),
+            // The list, and a note on the stream whenever it changes (a project added from this master's terminal
+            // reaches an open window).
+            "projects_watch" => {
+                if let Some(name) = opt(args, "onEvent").filter(|n| !n.is_empty()) {
+                    self.projects_watchers.add(stream(&name));
+                }
+                to(projects::list(db))
+            }
+            "projects_add" => {
+                let added = projects::add(db, &s(args, "path"));
+                if added.is_ok() {
+                    self.projects_watchers.send(&json!({"change": "add"}));
+                }
+                to(added)
+            }
             // The window's folder picker for this machine (there is no system picker for a server's folders).
             "dirs_list" => to(projects::list_folders(&s(args, "path"))),
             "projects_remove" => {
@@ -359,20 +377,29 @@ impl Master {
                 self.terminals.kill_project(&id);
                 self.agents.stop_project(&id);
                 let _ = crate::drafts::drop_project(db, &id);
-                to(projects::remove(db, &id))
+                let gone = projects::remove(db, &id);
+                if gone.is_ok() {
+                    self.projects_watchers.send(&json!({"change": "remove"}));
+                }
+                to(gone)
             }
             "projects_update" => {
                 let settings: projects::ProjectSettings =
                     serde_json::from_value(args["settings"].clone()).map_err(|e| e.to_string())?;
-                to(projects::update(
-                    db,
-                    &s(args, "id"),
-                    &s(args, "name"),
-                    &settings,
-                ))
+                let updated = projects::update(db, &s(args, "id"), &s(args, "name"), &settings);
+                if updated.is_ok() {
+                    self.projects_watchers.send(&json!({"change": "update"}));
+                }
+                to(updated)
             }
             "projects_touch" => to(projects::touch(db, &s(args, "id"))),
-            "projects_redetect" => to(projects::redetect(db, &s(args, "id"))),
+            "projects_redetect" => {
+                let found = projects::redetect(db, &s(args, "id"));
+                if found.is_ok() {
+                    self.projects_watchers.send(&json!({"change": "update"}));
+                }
+                to(found)
+            }
             // Files.
             "files_list_dir" => to(files::list_dir(&self.root(args)?, &s(args, "path"))),
             "files_list_all" => {
@@ -4297,6 +4324,55 @@ mod tests {
         drop(m);
         let m = Master::open(data.path()).unwrap();
         assert_eq!(m.cut_off.lock().unwrap().0, "");
+    }
+
+    /// A project added from the master's own terminal (`qanuvi-master projects add`), removed or changed reaches the
+    /// windows following its list, so an open window shows it without switching machines.
+    #[test]
+    fn project_list_changes_reach_the_windows_following_it() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let m = Master::open(data.path()).unwrap().shared();
+        let heard: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let h = heard.clone();
+        let streams = move |_: &str| {
+            let h = h.clone();
+            Sink::new(move |v: Value| {
+                h.lock().unwrap().push(v);
+                true
+            })
+        };
+        let open = Mutex::new(HashSet::new());
+        let first = m
+            .dispatch("projects_watch", &json!({"onEvent": "p1"}), &streams, &open)
+            .unwrap();
+        assert_eq!(first, json!([]));
+        let p = call(
+            &m,
+            "projects_add",
+            json!({"path": project.path().to_string_lossy()}),
+        )
+        .unwrap();
+        let id = p["id"].as_str().unwrap().to_string();
+        call(&m, "projects_redetect", json!({"id": id})).unwrap();
+        call(&m, "projects_remove", json!({"id": id})).unwrap();
+        let changes: Vec<Value> = heard
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|v| v["change"].clone())
+            .collect();
+        assert_eq!(changes, [json!("add"), json!("update"), json!("remove")]);
+        // A failed add tells nobody.
+        assert!(
+            call(
+                &m,
+                "projects_add",
+                json!({"path": "/no/such/folder/at/all"})
+            )
+            .is_err()
+        );
+        assert_eq!(heard.lock().unwrap().len(), 3);
     }
 
     /// M5a: what the app's core did for This PC's windows, its master does: plan data told to every follower (a

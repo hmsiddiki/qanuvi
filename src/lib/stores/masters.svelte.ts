@@ -393,6 +393,7 @@ class MastersStore {
     const { [id]: _gone, ...counts } = this.projectCount;
     this.projectCount = counts;
     inbox.dropMaster(id);
+    projects.dropMaster(id);
     runner.dropMaster(id);
     this.#set(id, error ? { state: "error", error } : { state: "off" });
   }
@@ -721,6 +722,14 @@ class MastersStore {
     void planData.loadMaster(key);
     // Questions a run on the server asks wait in its own Inbox: shown here with this computer's.
     void inbox.followMaster(key);
+    // Its project list as it changes there (a project added from its own terminal shows here at once).
+    void projects.followMaster(key, () => {
+      void callMaster<Project[]>(key, "projects_list", {})
+        .then((l) => {
+          this.projectCount = { ...this.projectCount, [key]: l.filter((p) => !projects.isLocal(p.id)).length };
+        })
+        .catch(() => {});
+    });
     // A run going on there (it goes on when no computer is connected) is shown.
     void runner.masterConnected(key);
     // The machines it connects to itself show under it (migration M3c).

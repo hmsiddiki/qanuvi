@@ -1831,6 +1831,13 @@ runs on or off; with it off nothing is sent anywhere.
       0.1.43. All 4 platforms via E:/qc-scratch/release-0.1.44/chan (Linux app built on the laptop). Old
       latest.json (0.1.43) in E:/Backups/qanuvi/channel-before-0.1.44. Online: latest.json + all 8 files 200, sizes
       match, latest.json says 0.1.44.
+    pl1 FIXED (2026-11-23, found when the owner saw "Add a project first" after the Y9 project was added from the
+      laptop master's terminal): a project added, removed or changed outside the window (its master's terminal,
+      another window) never reached an open window; the list was read only on connect or machine switch. Now
+      projects_watch on the master (stream; add/update/remove sent after projects_add, _update, _redetect,
+      _remove), followed for This PC at start and for each connected machine (project count kept too). Test
+      project_list_changes_reach_the_windows_following_it. Unpublished. Chat needs a project by design (agent
+      sessions run in a project folder); owner question answered.
     Y9 SET UP (2026-11-23, both machines on 0.1.44): scratch copy on the laptop at ~/qc-scratch/y9/qanuvi =
       05d76c1 (the commit before R1, from a git bundle, no remote) + the benchmark plan docs/PLAN-24Z-A.md (22 steps
       over R1-R5 as the hand-built work went; its own Run rules: branch yes, allow cargo/npm/npx/node, never

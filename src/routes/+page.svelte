@@ -63,6 +63,8 @@
     void settings.loadMachine();
     // First: what plans keep (picks, plan state, notes, run settings) reads at once from its copy.
     planData.start().catch(() => {});
+    // This PC's project list as it changes (a project added from its master's terminal shows at once).
+    void projects.followThisPc();
     ready = true;
     platform.load();
     // A project window opens with its own project and leaves the main window's choice alone; so does a machine window
