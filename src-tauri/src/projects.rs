@@ -18,6 +18,8 @@ pub struct ProjectSettings {
     pub run_rules: crate::run_rules::RunRules,
     /// PM e: the plans' notes from before the project memory was used were read once into memory suggestions.
     pub memory_read: bool,
+    /// 24y Y8: how a plan run test-builds the app (built into its own folder, started on fresh data, checked).
+    pub test_build: crate::test_build::TestBuild,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -154,6 +156,9 @@ pub fn detect(dir: &Path) -> Detection {
     }
     if settings.test_command.is_empty() && dir.join("tests").join("run.php").exists() {
         settings.test_command = "php tests/run.php".into();
+    }
+    if let Some(t) = crate::test_build::suggest(dir) {
+        settings.test_build = t;
     }
 
     Detection {
@@ -364,6 +369,10 @@ pub fn redetect(db: &Db, id: &str) -> Result<Project, String> {
     // f2: commands the owner set stay; only the old guesses for a Node project ("npm run dev", "npm test", filled in
     // before Qanuvi read package.json) give way to what package.json really has.
     let mut settings = project.settings.clone();
+    // Y8: a project without a test build recipe gets the one Qanuvi knows for it (a recipe set is kept).
+    if !settings.test_build.is_set() && found.settings.test_build.is_set() {
+        settings.test_build = found.settings.test_build.clone();
+    }
     if found.kind == "node" {
         if settings.run_command == "npm run dev" {
             settings.run_command = found.settings.run_command.clone();

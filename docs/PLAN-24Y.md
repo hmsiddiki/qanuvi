@@ -1,6 +1,6 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9). Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9); Y8 built 2026-11-23. Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
 part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line
@@ -81,6 +81,26 @@ right.
 6. **Part 3 order and benchmark** (owner, 2026-11-23): Y8 -> Y7 -> Y6 -> Y9. The benchmark re-runs the R1 to R5
    plan on a scratch copy of Qanuvi taken from the commit before R1, so the right result is known. Paid runs are
    fine (Max plan): run them without asking.
+
+## Y8 in detail (owner "ok do", 2026-11-23; built)
+
+1. **The recipe** is in the project's settings (Project settings, "Test build"): Build, Start (optional), Check,
+   and the free memory it waits for (GB, default 4). A plan file's own "## Test build" section (lines "Build:",
+   "Start:", "Check:", "Memory: 6 GB") wins for that plan, so a scratch copy needs nothing set up. Qanuvi fills in
+   `{out}` (the project's own build folder in Qanuvi's data, kept so later builds are quick) and `{data}` (fresh
+   each time, removed after).
+2. **When:** a step with the line "Check: test build". It runs after the step's other checks pass, with the same
+   fix rounds as Y4; still failing, the step is undone and set aside.
+3. **Memory first:** while free memory is under the recipe's GB the build waits (looked at every 30 s; the Run
+   panel says "test build waits for N GB of free memory"); after 20 minutes the step is set aside with the numbers.
+4. **Never over the installed app:** a recipe that names Qanuvi's data folders or the running Qanuvi's folder is
+   refused before any work, as is one with a command on the run rules' never-list. A recipe that starts the app
+   but has no Check, or no recipe at all, is refused the same way.
+5. **Closed after:** whatever Start runs is stopped (its whole process tree), pass or fail.
+6. **Qanuvi's own repository** gets its recipe when added or on "Look again": `cargo build --release --bin
+   qanuvi-master --target-dir {out}`, start `{out}/release/qanuvi-master core --data {data}`, check
+   `{out}/release/qanuvi-master status --data {data}` (status ends with exit code 1 when the master is not running).
+   Unattended runs build the headless master only; the window build stays with live drives.
 
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.

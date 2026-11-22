@@ -367,6 +367,8 @@ struct Loop<'a> {
     plan_refs: Vec<String>,
     wait_list: Vec<preflight::StepWhy>,
     extra_checks: HashMap<String, String>,
+    /// Y8: the plan file's own "Test build" section (it wins over the project's recipe for this plan).
+    plan_test_build: Option<crate::test_build::TestBuild>,
     assignment: HashMap<String, Assignment>,
     stats: Stats,
     free_first: bool,
@@ -524,6 +526,7 @@ impl<'a> Loop<'a> {
             plan_refs: vec![],
             wait_list: vec![],
             extra_checks: HashMap::new(),
+            plan_test_build: None,
             assignment: HashMap::new(),
             stats: Stats::new(),
             free_first: false,
@@ -573,6 +576,7 @@ impl<'a> Loop<'a> {
         // 24y: the run's sessions are answered by the run rules (the project's, the plan file's section winning).
         self.s.turns.ruled = true;
         self.s.turns.plan_rules = crate::run_rules::plan_rules(text);
+        self.plan_test_build = crate::test_build::plan_test_build(text);
         // Y3: the user said yes to the plan's own branch (on the card, or the plan's "Branch: yes"): the work goes
         // there, a commit per finished step. Before the start snapshot: making the branch changes no file.
         let wants_branch = self
@@ -2027,6 +2031,16 @@ impl<'a> Loop<'a> {
             // Y4: the checks the step names, run by Qanuvi after it; a check the run rules refuse sets the step aside
             // before any work (no try could pass it).
             let (checks, refused_checks) = self.step_checks(&fresh, &test_command);
+            // Y8: the step asks for the app's test build; one that cannot run sets the step aside before any work.
+            let test_build = match self.step_test_build(&fresh) {
+                Ok(t) => t,
+                Err(why) => {
+                    self.run.steps[i].status = RunStepStatus::Blocked;
+                    self.run.steps[i].reason = Some(why);
+                    self.mark_blocked_in_plan(i);
+                    break;
+                }
+            };
             if !refused_checks.is_empty() {
                 self.run.steps[i].status = RunStepStatus::Blocked;
                 self.run.steps[i].reason = Some(format!(
@@ -2117,6 +2131,13 @@ impl<'a> Loop<'a> {
                     "\n\nAfter this step Qanuvi runs its checks ({}); it counts as done only when they pass.",
                     list.join(", ")
                 ));
+            }
+            if test_build.is_some() {
+                prompt.push_str(
+                    "\n\nAfter this step Qanuvi test-builds the app itself (builds it into its own folder, starts it on \
+                     fresh data, checks it, closes it); it counts as done only when that passes. Do not build or start \
+                     the app for this yourself, and never over the installed copy.",
+                );
             }
             // Every step's snapshot from its first try: a review sees the whole step's work, and a failed step is
             // undone back to it (Y3).
@@ -2209,6 +2230,7 @@ impl<'a> Loop<'a> {
                 title,
                 test_command: test_command.clone(),
                 checks: checks.clone(),
+                test_build: test_build.clone(),
                 resume,
             };
             // The window learns the step is at work before its agent starts: a model picked for it and words typed
@@ -2383,11 +2405,13 @@ impl<'a> Loop<'a> {
                 };
                 // With Qanuvi running the tests, "done" also needs them to pass.
                 if attempt.outcome == Outcome::Done
-                    && (!test_command.is_empty() || !checks.is_empty())
+                    && (!test_command.is_empty() || !checks.is_empty() || test_build.is_some())
                     && attempt.tests_passed == Some(false)
                 {
                     attempt.outcome = Outcome::Open;
-                    if !attempt.note.starts_with(turn::CHECKS_FAILED) {
+                    if !attempt.note.starts_with(turn::CHECKS_FAILED)
+                        && !attempt.note.starts_with(crate::test_build::NO_MEMORY)
+                    {
                         attempt.note = "Marked done, but the tests still fail.".into();
                     }
                 }
@@ -2437,6 +2461,14 @@ impl<'a> Loop<'a> {
                         format!("{} Done without: {why}", attempt.note)
                     };
                 }
+            }
+            // Y8: its test build waited too long for free memory: set aside with the reason (another try would wait
+            // the same way); the run goes on with the other steps.
+            if attempt.outcome != Outcome::Done
+                && let Some(why) = attempt.note.strip_prefix(crate::test_build::NO_MEMORY)
+            {
+                attempt.outcome = Outcome::Blocked;
+                attempt.note = format!("its test build found too little free memory ({why})");
             }
             let outcome = attempt.outcome;
             let note = attempt.note.clone();
@@ -2500,6 +2532,10 @@ impl<'a> Loop<'a> {
         let mut checks = Vec::new();
         let mut refused = Vec::new();
         for c in super::tasklist::step_checks(step) {
+            // Y8: "Check: test build" is the app's test build, run by its recipe (step_test_build).
+            if crate::test_build::names_test_build(&c.command) {
+                continue;
+            }
             let program = c.command.split_whitespace().next().unwrap_or("");
             if c.command == test_command || !c.quoted && !self.env.has_program(program) {
                 continue;
@@ -2521,6 +2557,39 @@ impl<'a> Loop<'a> {
             }
         }
         (checks, refused)
+    }
+
+    /// Y8: the test build the step asks for ("Check: test build"): the plan's own recipe, else the project's. Err
+    /// says why it cannot run (no recipe, it would reach the installed app, or the run rules forbid one of its
+    /// commands), for setting the step aside.
+    fn step_test_build(&self, step: &Step) -> Result<Option<crate::test_build::TestBuild>, String> {
+        use crate::run_rules::Verdict;
+        if !super::tasklist::step_checks(step)
+            .iter()
+            .any(|c| crate::test_build::names_test_build(&c.command))
+        {
+            return Ok(None);
+        }
+        let recipe = self
+            .plan_test_build
+            .clone()
+            .filter(crate::test_build::TestBuild::is_set)
+            .or_else(|| self.env.project_settings().ok().map(|p| p.test_build))
+            .unwrap_or_default();
+        if let Some(why) = recipe.problem() {
+            return Err(why);
+        }
+        for c in recipe.commands() {
+            if let Verdict::Never(why) =
+                self.env
+                    .rules_verdict(c, self.s.turns.plan_rules.as_ref(), &self.run.options.mode)
+            {
+                return Err(format!(
+                    "its test build runs `{c}`, which the run rules never allow ({why})"
+                ));
+            }
+        }
+        Ok(Some(recipe))
     }
 
     /// Y3: puts back what a failed step changed (from its first try's snapshot; the plan's own files stay). Answers

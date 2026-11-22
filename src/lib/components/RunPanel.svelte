@@ -1337,7 +1337,9 @@
           {#if current}
             Step {current.number ?? ""} · {current.title} · {label(runner.currentModel)}
             {#if currentAttempt > 1}<span class="dim"> (try {currentAttempt})</span>{/if}
-            {#if runner.checking}<span class="dim"> · running the tests</span>{/if}
+            {#if runner.waitingMemory}<span class="dim">
+                · test build waits for {runner.waitingMemory} GB of free memory</span
+              >{:else if runner.checking}<span class="dim"> · running the tests</span>{/if}
             {#if runner.waitingUntil}<span class="dim">
                 · usage limit reached: goes on by itself at {runner.waitingUntil.toLocaleTimeString([], {
                   hour: "2-digit",

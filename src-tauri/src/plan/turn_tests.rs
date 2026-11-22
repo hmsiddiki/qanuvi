@@ -36,6 +36,7 @@ fn ask(test_command: &str) -> AttemptAsk {
         test_command: test_command.into(),
         resume: None,
         checks: Vec::new(),
+        test_build: None,
     }
 }
 

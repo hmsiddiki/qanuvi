@@ -18,6 +18,11 @@
   let test = $state("");
   let preview = $state("");
   let changesFrom = $state("qanuvi");
+  /** Y8: the test build recipe. */
+  let tbBuild = $state("");
+  let tbStart = $state("");
+  let tbCheck = $state("");
+  let tbMemory = $state("");
   let error = $state("");
 
   /** Secrets: names shown, values never (they go to the credential store and to the agents' environment). */
@@ -70,12 +75,21 @@
     test = project.settings.test_command;
     preview = project.settings.preview_url;
     changesFrom = project.settings.changes_from === "git" ? "git" : "qanuvi";
+    const tb = project.settings.test_build;
+    tbBuild = tb?.build ?? "";
+    tbStart = tb?.start ?? "";
+    tbCheck = tb?.check ?? "";
+    tbMemory = tb?.min_free_gb ? String(tb.min_free_gb) : "";
   });
 
   async function save(event: SubmitEvent) {
     event.preventDefault();
     if (!project) return;
+    const gb = Math.max(0, Math.min(1024, Math.round(Number(tbMemory) || 0)));
+    // Everything this form does not show (run rules, memory flags) is kept as it was.
     error = await projects.update(project.id, name, {
+      ...project.settings,
+      test_build: { build: tbBuild.trim(), start: tbStart.trim(), check: tbCheck.trim(), min_free_gb: gb },
       run_command: run.trim(),
       test_command: test.trim(),
       preview_url: preview.trim(),
@@ -120,6 +134,42 @@
         What a plan step's review looks at. With git, files no repository sees (no git, or a folder it ignores) still
         come from Qanuvi's snapshots, and the run tells you which.
       </p>
+
+      <h3>Test build</h3>
+      <p class="note">
+        How a plan run test-builds the app: a step with the line <code>Check: test build</code> is done only when this
+        passes. Qanuvi fills in <code>{"{out}"}</code> (its own build folder) and <code>{"{data}"}</code> (fresh data, removed
+        after); whatever Start runs is closed after. It never runs over the installed app.
+      </p>
+      <label
+        >Build <input
+          bind:value={tbBuild}
+          placeholder={"for example cargo build --release --target-dir {out}"}
+          spellcheck="false"
+        /></label
+      >
+      <label
+        >Start (optional) <input
+          bind:value={tbStart}
+          placeholder={"for example {out}/release/app --data {data}"}
+          spellcheck="false"
+        /></label
+      >
+      <label
+        >Check <input
+          bind:value={tbCheck}
+          placeholder={"for example {out}/release/app status --data {data}"}
+          spellcheck="false"
+        /></label
+      >
+      <label
+        >Waits for free memory (GB) <input
+          bind:value={tbMemory}
+          inputmode="numeric"
+          placeholder="4"
+          spellcheck="false"
+        /></label
+      >
 
       <h3>Secrets</h3>
       {#if secretStore === "environment"}

@@ -15,6 +15,17 @@ export interface ProjectSettings {
   run_rules?: import("./plan/runRules").RunRules;
   /** PM e: the plans' notes from before the project memory were read once into suggestions (kept by the core). */
   memory_read?: boolean;
+  /** 24y Y8: how a plan run test-builds the app; {out} and {data} are filled in by Qanuvi. */
+  test_build?: TestBuild;
+}
+
+/** A project's test build recipe (24y Y8), run after a step that has the line "Check: test build". */
+export interface TestBuild {
+  build: string;
+  start: string;
+  check: string;
+  /** Free memory (GB) the build waits for; absent or 0 = 4 GB. */
+  min_free_gb?: number;
 }
 
 /** Qanuvi's own record of a project's files (git or not). */
@@ -301,6 +312,8 @@ export interface RunView {
   stopping: boolean;
   /** Qanuvi runs the project's checks now. */
   checking: boolean;
+  /** Y8: the step's test build waits for free memory: the GB it needs. */
+  waitingMemory?: number | null;
   /** The step's agent session at work. */
   sessionId: string | null;
   /** Owner messages typed into the step's chat that its turn has not taken yet. */

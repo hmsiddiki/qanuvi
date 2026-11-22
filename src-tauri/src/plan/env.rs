@@ -215,6 +215,24 @@ pub trait RunEnv: Send + Sync {
 
     /// Runs a command in the project's folder (the test command, a step's check).
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String>;
+    /// Y8: free memory here in MB (a test build waits while it is low); None when it cannot be read.
+    fn free_memory_mb(&self) -> Option<u64> {
+        None
+    }
+    /// Y8: runs the project's test build recipe (build, start on fresh data, check, close).
+    fn test_build(
+        &self,
+        _recipe: &crate::test_build::TestBuild,
+        _stop: &dyn Fn() -> bool,
+    ) -> CheckResult {
+        CheckResult {
+            ok: false,
+            exit_code: None,
+            timed_out: false,
+            duration_ms: 0,
+            output: "Test builds do not run here.".into(),
+        }
+    }
     /// What all agent sessions cost since a moment (seconds since 1970), for the monthly budget.
     fn usage_since(&self, since: i64) -> Result<Usage, String>;
 
@@ -652,6 +670,19 @@ impl RunEnv for CoreEnv<'_> {
 
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String> {
         crate::checks::run(&self.root(), command, timeout)
+    }
+
+    fn free_memory_mb(&self) -> Option<u64> {
+        crate::machine::free_ram_bytes().map(|b| b / (1024 * 1024))
+    }
+
+    fn test_build(
+        &self,
+        recipe: &crate::test_build::TestBuild,
+        stop: &dyn Fn() -> bool,
+    ) -> CheckResult {
+        let dirs = crate::test_build::dirs(&crate::paths::data_dir(), &self.project.id);
+        crate::test_build::run(&self.root(), recipe, &dirs, stop)
     }
 
     fn usage_since(&self, since: i64) -> Result<Usage, String> {

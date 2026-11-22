@@ -114,6 +114,10 @@ pub struct FakeEnv {
     pub undos: Mutex<Vec<String>>,
     /// Commands the run rules refuse when the runner would run them (a step's check).
     pub never: Mutex<Vec<String>>,
+    /// Y8: free memory answers in MB, one per look (the last one stays); empty: it cannot be read.
+    pub free_mb: Mutex<Vec<u64>>,
+    /// Y8: the test build recipes run, in order.
+    pub test_builds: Mutex<Vec<crate::test_build::TestBuild>>,
 }
 
 impl Default for FakeEnv {
@@ -148,6 +152,8 @@ impl FakeEnv {
             commits: Mutex::new(Vec::new()),
             undos: Mutex::new(Vec::new()),
             never: Mutex::new(Vec::new()),
+            free_mb: Mutex::new(Vec::new()),
+            test_builds: Mutex::new(Vec::new()),
         }
     }
 
@@ -738,6 +744,34 @@ impl RunEnv for FakeEnv {
             duration_ms: 1,
             output,
         })
+    }
+
+    fn free_memory_mb(&self) -> Option<u64> {
+        let mut f = self.free_mb.lock().unwrap();
+        match f.len() {
+            0 => None,
+            1 => Some(f[0]),
+            _ => Some(f.remove(0)),
+        }
+    }
+
+    /// The check script answers it as the command "test build".
+    fn test_build(
+        &self,
+        recipe: &crate::test_build::TestBuild,
+        _stop: &dyn Fn() -> bool,
+    ) -> CheckResult {
+        self.call("test_build");
+        self.test_builds.lock().unwrap().push(recipe.clone());
+        let script = self.checks.lock().unwrap().clone();
+        let (ok, output) = script(crate::test_build::NAME);
+        CheckResult {
+            ok,
+            exit_code: Some(if ok { 0 } else { 1 }),
+            timed_out: false,
+            duration_ms: 1,
+            output,
+        }
     }
 
     fn usage_since(&self, _since: i64) -> Result<Usage, String> {

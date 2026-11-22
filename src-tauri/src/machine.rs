@@ -155,7 +155,7 @@ fn gpu(ram_gb: f64) -> Option<Gpu> {
 }
 
 #[cfg(windows)]
-fn free_ram_bytes() -> Option<u64> {
+pub fn free_ram_bytes() -> Option<u64> {
     use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
     // SAFETY: as in ram_bytes.
     unsafe {
@@ -166,7 +166,7 @@ fn free_ram_bytes() -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
-fn free_ram_bytes() -> Option<u64> {
+pub fn free_ram_bytes() -> Option<u64> {
     let s = std::fs::read_to_string("/proc/meminfo").ok()?;
     let kb: u64 = s
         .lines()
@@ -179,7 +179,7 @@ fn free_ram_bytes() -> Option<u64> {
 }
 
 #[cfg(target_os = "macos")]
-fn free_ram_bytes() -> Option<u64> {
+pub fn free_ram_bytes() -> Option<u64> {
     // Free, inactive and purgeable pages can all be given to a new program.
     let text = output("vm_stat", &[])?;
     let page: u64 = text
@@ -202,7 +202,7 @@ fn free_ram_bytes() -> Option<u64> {
 }
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
-fn free_ram_bytes() -> Option<u64> {
+pub fn free_ram_bytes() -> Option<u64> {
     None
 }
 

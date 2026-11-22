@@ -44,6 +44,8 @@ pub struct RunView {
     pub stopping: bool,
     /// Qanuvi runs the project's checks now.
     pub checking: bool,
+    /// Y8: the step's test build waits for free memory: the GB it needs.
+    pub waiting_memory: Option<u64>,
     /// The step's agent session at work.
     pub session_id: Option<String>,
     /// Owner messages typed into the step's chat that its turn has not taken yet.
@@ -135,6 +137,7 @@ impl Runs {
             pausing: c.pausing(),
             stopping: c.stop_asked().is_some(),
             checking: c.checking(),
+            waiting_memory: c.waiting_memory(),
             session_id: c.session_id(),
             waiting_messages: c.waiting_messages(),
             error,
@@ -214,6 +217,11 @@ impl Runs {
                 }
             })),
         );
+        // Y8: a test build waiting for free memory changes the view, not the run.
+        let (t_wait, r_wait, p_wait) = (tell.clone(), runs.clone(), pid.clone());
+        sh.controls.on_change(Some(Arc::new(move || {
+            t_wait.view(&r_wait.view(&p_wait));
+        })));
         tell.view(&self.view(project_id));
         let spawned = std::thread::Builder::new()
             .name(format!("qanuvi-run-{pid}"))
@@ -673,6 +681,7 @@ fn pass_work(
         test_command: command.clone(),
         resume: None,
         checks: Vec::new(),
+        test_build: None,
     };
     let end = turn::attempt(env, &sh.controls, &mut watch, &turns, &ask, &mut |e| {
         sh.forward(e)

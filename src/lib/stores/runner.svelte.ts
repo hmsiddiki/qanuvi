@@ -70,6 +70,8 @@ class RunnerStore {
   currentModel = $state("");
   /** Qanuvi is running the project's tests for the current step. */
   checking = $state(false);
+  /** Y8: the step's test build waits for this much free memory (GB). */
+  waitingMemory = $state<number | null>(null);
   /** The run waits for a usage limit to reset (shown in the run panel). */
   waitingUntil = $state<Date | null>(null);
   /** Average paid cost of a finished step per kind of job, from earlier runs (to show what free models saved). */
@@ -225,6 +227,7 @@ class RunnerStore {
     this.finishing = v.finishing;
     this.currentModel = v.currentModel;
     this.checking = v.checking;
+    this.waitingMemory = v.waitingMemory ?? null;
     this.waitingUntil = v.waitingUntil ? new Date(v.waitingUntil) : null;
     this.waitingAnswers = v.waitingAnswers;
     this.pausing = v.pausing;

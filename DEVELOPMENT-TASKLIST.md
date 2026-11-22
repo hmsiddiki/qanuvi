@@ -1801,7 +1801,20 @@ runs on or off; with it off nothing is sent anywhere.
     BOTH ON 0.1.43 (2026-11-23): h3 checked on both (plain "qanuvi-master status" answers the app's master, no stray
       folder on the laptop); h4 checked: Home PC relay_status has Zorin Laptop direct: true. Owner deleted
       src-tauri/target/debug (132 GB; first test build compiles from scratch).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23): 24y PART 3 AGREED (docs/PLAN-24Y.md
+    Y8 TEST BUILDS BUILT (2026-11-23, owner "ok do"; details in docs/PLAN-24Y.md "Y8 in detail"): recipe per
+      project (Project settings, Test build: Build / Start / Check / memory GB; a plan's "## Test build" section
+      wins), run after a step with "Check: test build" once its other checks pass, same fix rounds as Y4; waits for
+      free memory (default 4 GB, every 30 s, 20 min, then set aside); never names Qanuvi's data folders or the
+      running Qanuvi's folder; {out} kept, {data} fresh and removed; Start closed after. Run panel says "test build
+      waits for N GB of free memory". Qanuvi's repo gets the recipe on add or "Look again" (core --data {data},
+      status --data {data}). Also: qanuvi-master status exits 1 when not running (was 0); checks on Windows pass
+      the command raw to cmd /S /C (quotes inside a check command were escaped and broke); Project settings Save
+      kept only its own fields and wiped the run rules (fixed: the rest is kept). Rust 636 pass, clippy clean;
+      window 574 pass, svelte-check clean. Start + check of the recipe tried by hand with the 0.1.43 master on
+      scratch data (status answers in 1 s); the full cargo build part runs first in Y9. Not driven in a window.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y8): NEXT: Y7 health watch (proxy and
+      model providers down: pause, say once, go on), then Y6 review list, then Y9 on the laptop.
+    PICKUP POINT (before, 2026-11-23): 24y PART 3 AGREED (docs/PLAN-24Y.md
       decisions 5-6): order Y8 test builds -> Y7 health watch -> Y6 review list -> Y9 benchmark. Y9 = the R1-R5
       plan re-run on a scratch copy of Qanuvi from the commit before R1, on the Linux laptop only, watched from
       This PC; paid run cost is fine. NEXT: build Y8 in a fresh conversation.

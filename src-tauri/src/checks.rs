@@ -22,10 +22,13 @@ pub struct CheckResult {
 fn shell(command: &str) -> Command {
     if cfg!(windows) {
         let mut c = Command::new("cmd");
-        c.args(["/D", "/S", "/C", command]);
+        c.args(["/D", "/S", "/C"]);
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
+            // As typed: cmd /S takes off only the outer quotes. Passed as a normal argument, the quotes inside the
+            // command were escaped as \" and cmd could not read them (`cmd /C "a && b"` failed).
+            c.raw_arg(format!("\"{command}\""));
             c.creation_flags(0x0800_0000);
         }
         c
@@ -103,6 +106,28 @@ fn keep_tail(bytes: &[u8]) -> String {
     } else {
         text
     }
+}
+
+/// Starts a command in the background (a test build's app, 24y Y8), its output going to `log`. The caller stops it
+/// with [`kill_tree`].
+pub fn start(dir: &Path, command: &str, log: &Path) -> Result<std::process::Child, String> {
+    let command = command.trim();
+    if command.is_empty() {
+        return Err("nothing to start".into());
+    }
+    if let Some(parent) = log.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let out = std::fs::File::create(log).map_err(|e| e.to_string())?;
+    let err = out.try_clone().map_err(|e| e.to_string())?;
+    shell(command)
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(out)
+        .stderr(err)
+        .env("NO_COLOR", "1")
+        .spawn()
+        .map_err(|e| e.to_string())
 }
 
 pub fn run(dir: &Path, command: &str, timeout: Duration) -> Result<CheckResult, String> {

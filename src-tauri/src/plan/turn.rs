@@ -93,15 +93,28 @@ struct Asks {
     mode: Option<String>,
     session_id: Option<String>,
     checking: bool,
+    /// Y8: the test build waits for this much free memory (GB).
+    waiting_memory: Option<u64>,
     /// The owner's messages in the step's chat, not taken by a turn yet.
     said: std::collections::VecDeque<String>,
     /// Words for the agent that go as they are, never sorted by a model (a private detail the owner gave).
     direct: std::collections::VecDeque<String>,
 }
 
+/// Called when something the window shows of the run changed without a run change (Y8: a test build waiting for
+/// free memory), so the view is sent again.
+#[derive(Clone, Default)]
+struct OnChange(Option<std::sync::Arc<dyn Fn() + Send + Sync>>);
+
+impl std::fmt::Debug for OnChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OnChange({})", self.0.is_some())
+    }
+}
+
 /// The owner's asks to the running step, set by the commands and read by the turn (and later the run loop).
 #[derive(Debug, Default)]
-pub struct Controls(Mutex<Asks>);
+pub struct Controls(Mutex<Asks>, Mutex<OnChange>);
 
 impl Controls {
     fn asks(&self) -> std::sync::MutexGuard<'_, Asks> {
@@ -198,7 +211,32 @@ impl Controls {
         self.asks().checking
     }
 
-    /// A new run: nothing asked yet.
+    /// Y8: the step's test build waits for free memory: the GB it needs.
+    pub fn waiting_memory(&self) -> Option<u64> {
+        self.asks().waiting_memory
+    }
+
+    /// Who hears that the view changed without a run change (the window, through the run's listeners).
+    pub fn on_change(&self, f: Option<std::sync::Arc<dyn Fn() + Send + Sync>>) {
+        *self.1.lock().unwrap_or_else(|e| e.into_inner()) = OnChange(f);
+    }
+
+    fn set_waiting_memory(&self, gb: Option<u64>) {
+        let changed = {
+            let mut a = self.asks();
+            let changed = a.waiting_memory != gb;
+            a.waiting_memory = gb;
+            changed
+        };
+        if changed {
+            let hook = self.1.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            if let Some(f) = hook.0 {
+                f();
+            }
+        }
+    }
+
+    /// A new run: nothing asked yet (who hears changes stays).
     pub fn reset(&self) {
         *self.asks() = Asks::default();
     }
@@ -859,6 +897,8 @@ pub struct AttemptAsk {
     pub test_command: String,
     /// The step's own checks (24y Y4), run after the test command; they must pass too.
     pub checks: Vec<String>,
+    /// Y8: the step asks for the app's test build; run after its other checks pass.
+    pub test_build: Option<crate::test_build::TestBuild>,
     /// Go on in an open session (the step before left it idle): its id and its totals before this attempt.
     pub resume: Option<(String, Totals)>,
 }
@@ -903,7 +943,9 @@ pub fn attempt(
         .filter(|c| !c.trim().is_empty())
         .collect();
     let mut failing: Vec<String> = Vec::new();
-    if !commands.is_empty() {
+    // Y8: the build waited too long for free memory (the step is set aside, not tried again).
+    let mut no_memory: Option<String> = None;
+    if !commands.is_empty() || ask.test_build.is_some() {
         let mut round = 0u32;
         // A paused step does not go on to the tests: it stops where the owner paused it.
         while t.outcome == TurnOutcome::Idle
@@ -929,10 +971,34 @@ pub fn attempt(
                     outputs.push((command.to_string(), check));
                 }
             }
+            // Y8: the test build, once the other checks pass (a build is long; failing tests are fixed first).
+            if let Some(recipe) = ask.test_build.as_ref().filter(|_| failing.is_empty()) {
+                let waited = crate::test_build::wait_for_memory(
+                    &|| env.free_memory_mb(),
+                    &|d| env.sleep(d),
+                    recipe.min_free_mb(),
+                    crate::test_build::MEMORY_WAIT,
+                    &|| controls.stop_asked().is_some(),
+                    &mut |w| controls.set_waiting_memory(w.then(|| recipe.min_free_mb() / 1024)),
+                );
+                match waited {
+                    Err(why) => {
+                        no_memory = Some(why);
+                        failing.push(crate::test_build::NAME.to_string());
+                    }
+                    Ok(_) => {
+                        let check = env.test_build(recipe, &|| controls.stop_asked().is_some());
+                        if !check.ok {
+                            failing.push(crate::test_build::NAME.to_string());
+                            outputs.push((crate::test_build::NAME.to_string(), check));
+                        }
+                    }
+                }
+            }
             controls.asks().checking = false;
             test_runs += 1;
             tests_passed = Some(failing.is_empty());
-            if failing.is_empty() || round >= MAX_FIX_ROUNDS {
+            if failing.is_empty() || round >= MAX_FIX_ROUNDS || no_memory.is_some() {
                 break;
             }
             let share = FAILURE_CHARS / outputs.len().max(1);
@@ -985,7 +1051,9 @@ pub fn attempt(
     let totals = Totals::of(t.last.as_ref());
     let base = ask.resume.as_ref().map(|(_, b)| *b).unwrap_or_default();
     let idle = t.session_id.is_some() && t.last.as_ref().is_some_and(|l| l.status == "idle");
-    let note = if !t.note.is_empty() {
+    let note = if let Some(why) = &no_memory {
+        format!("{}{why}", crate::test_build::NO_MEMORY)
+    } else if !t.note.is_empty() {
         t.note.clone()
     } else if tests_passed == Some(false) {
         let own: Vec<String> = failing

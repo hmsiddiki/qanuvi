@@ -2645,3 +2645,174 @@ fn once_the_answer_comes_the_run_no_longer_says_it_waits_for_you() {
     assert!(!message.starts_with("Waiting for you"), "{message}");
     assert_eq!(running.wait().status, RunStatus::Done);
 }
+
+fn qanuvi_recipe() -> crate::test_build::TestBuild {
+    crate::test_build::TestBuild {
+        build: "cargo build --release --target-dir {out}".into(),
+        start: "{out}/release/app --data {data}".into(),
+        check: "{out}/release/app status --data {data}".into(),
+        min_free_gb: 0,
+    }
+}
+
+#[test]
+fn y8_a_step_that_asks_for_the_test_build_waits_for_memory_gets_a_fix_round_and_is_done_when_it_passes()
+ {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let env = world(
+        "# Plan\n\n- [ ] **1. Add status**\n  - Add the status answer.\n  - Check: test build\n- [ ] **2. Docs**\n  - Write it down.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    s.test_build = qanuvi_recipe();
+    env.set_settings(s);
+    // 1 GB free at first, then enough: the build waits once.
+    *env.free_mb.lock().unwrap() = vec![1024, 8192];
+    let fixed = Arc::new(AtomicBool::new(false));
+    let built = fixed.clone();
+    env.set_checks(move |cmd| match cmd {
+        "test build" if built.load(Ordering::SeqCst) => (true, "Check passed".into()),
+        "test build" => (
+            false,
+            "Test build: the build failed\nerror[E0425]: no status".into(),
+        ),
+        other => panic!("only the test build runs here, not `{other}`"),
+    });
+    let fixer = fixed.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if c.prompt.contains("`test build` failed (fix round") {
+            assert!(c.prompt.contains("E0425"), "{}", c.prompt);
+            fixer.store(true, Ordering::SeqCst);
+            return AgentReply::default();
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" {
+            assert!(
+                c.prompt.contains("Qanuvi test-builds the app itself"),
+                "{}",
+                c.prompt
+            );
+        } else {
+            assert!(!c.prompt.contains("test-builds the app"));
+        }
+        c.env.put(&format!("src/{n}.rs"), "// done\n");
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(r.status, RunStatus::Done, "{:?}", statuses(&r));
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Done);
+    assert_eq!(one.attempts[0].test_runs, Some(2));
+    let builds = env.test_builds.lock().unwrap().clone();
+    assert_eq!(builds, vec![qanuvi_recipe(), qanuvi_recipe()]);
+    // Step 2 names no test build: none ran for it.
+    assert_eq!(step(&r, "2").status, RunStepStatus::Done);
+}
+
+#[test]
+fn y8_a_test_build_without_a_recipe_sets_the_step_aside_before_any_work_and_the_run_goes_on() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Add status**\n  - Check: the test build.\n- [ ] **2. Docs**\n  - Write it down.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    env.set_settings(s);
+    env.set_checks(|cmd| panic!("nothing is checked here, not `{cmd}`"));
+    env.set_agent(|c| {
+        if planner(c) || c.title.unwrap_or("").starts_with("Question for you") {
+            return if planner(c) {
+                ok_review(c)
+            } else {
+                AgentReply::default()
+            };
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        assert_eq!(
+            n, "2",
+            "step 1 must never start: it has no test build recipe"
+        );
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(env.clone(), FILE, options(), stop.clone());
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while running.waiting_answers() < 1 || step(&running.now(), "2").status != RunStepStatus::Done {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never got through: {:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    stop.press();
+    stop.press();
+    let r = running.wait();
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Held, "{:?}", statuses(&r));
+    assert!(one.attempts.is_empty());
+    assert!(
+        one.held
+            .as_ref()
+            .unwrap()
+            .why
+            .contains("no test build recipe"),
+        "{:?}",
+        one.held
+    );
+    assert!(env.test_builds.lock().unwrap().is_empty());
+}
+
+#[test]
+fn y8_the_plans_own_recipe_wins_and_too_little_memory_sets_the_step_aside() {
+    let env = world(
+        "# Plan\n\n## Test build\n- Build: `make app OUT={out}`\n- Check: `{out}/app --version`\n- Memory: 6 GB\n\n## Steps\n\n- [ ] **1. Add status**\n  - Check: test build\n- [ ] **2. Docs**\n  - Write it down.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    s.test_build = qanuvi_recipe();
+    env.set_settings(s);
+    *env.free_mb.lock().unwrap() = vec![5 * 1024];
+    env.set_checks(|cmd| panic!("no build may run without the memory, not `{cmd}`"));
+    env.set_agent(|c| {
+        if planner(c) || c.title.unwrap_or("").starts_with("Question for you") {
+            return if planner(c) {
+                ok_review(c)
+            } else {
+                AgentReply::default()
+            };
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(env.clone(), FILE, options(), stop.clone());
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while running.waiting_answers() < 1 || step(&running.now(), "2").status != RunStepStatus::Done {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never got through: {:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    stop.press();
+    stop.press();
+    let r = running.wait();
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Held, "{:?}", statuses(&r));
+    let why = &one.held.as_ref().unwrap().why;
+    assert!(
+        why.contains("too little free memory")
+            && why.contains("5 GB free, the test build needs 6 GB"),
+        "{why}"
+    );
+    // Tried once: another try would wait the same way.
+    assert_eq!(one.attempts.len(), 1);
+    assert!(env.test_builds.lock().unwrap().is_empty());
+}

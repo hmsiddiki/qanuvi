@@ -61,6 +61,7 @@ pub mod snapshots;
 pub mod startup;
 pub mod store;
 pub mod terminal;
+pub mod test_build;
 pub mod usage;
 
 #[cfg(feature = "desktop")]

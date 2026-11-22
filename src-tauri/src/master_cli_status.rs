@@ -112,11 +112,11 @@ fn list_of(v: Value, key: Option<&str>) -> Vec<Value> {
     v.as_array().cloned().unwrap_or_default()
 }
 
-/// `qanuvi-master status`. A master that is not running is not started to answer.
+/// `qanuvi-master status`. A master that is not running is not started to answer; it ends with exit code 1 then
+/// (Y8: a test build checks that its started master runs with it).
 pub fn status_cli(dir: &Path) -> Result<(), String> {
     if !super::is_running(dir) {
-        println!("Not running. Start it: qanuvi-master serve");
-        return Ok(());
+        return Err("Not running. Start it: qanuvi-master serve".into());
     }
     let hello = call(dir, "hello", json!({}))?;
     let account = call(dir, "account_me", json!({}));
