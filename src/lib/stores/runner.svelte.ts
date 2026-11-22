@@ -74,6 +74,8 @@ class RunnerStore {
   waitingMemory = $state<number | null>(null);
   /** The run waits for a usage limit to reset (shown in the run panel). */
   waitingUntil = $state<Date | null>(null);
+  /** Y7: what is down while the run waits for it. */
+  waitingHealth = $state<string | null>(null);
   /** Average paid cost of a finished step per kind of job, from earlier runs (to show what free models saved). */
   paidPerStep = $state<Partial<Record<string, number>>>({});
   /** Only set-aside steps are left: the run waits (spending nothing) for this many answers (24u). */
@@ -229,6 +231,7 @@ class RunnerStore {
     this.checking = v.checking;
     this.waitingMemory = v.waitingMemory ?? null;
     this.waitingUntil = v.waitingUntil ? new Date(v.waitingUntil) : null;
+    this.waitingHealth = v.waitingHealth ?? null;
     this.waitingAnswers = v.waitingAnswers;
     this.pausing = v.pausing;
     this.stopping = v.stopping;

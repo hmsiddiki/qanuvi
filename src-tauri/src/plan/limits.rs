@@ -15,7 +15,7 @@ pub fn is_limit(text: &str) -> bool {
 }
 
 /// The longest text a usage-limit notice can be: it is one sentence, never a page of work.
-const NOTICE_MAX: usize = 400;
+pub const NOTICE_MAX: usize = 400;
 
 /// The usage-limit notice in one of a session's agent lines, or None when the line cannot be one.
 ///
@@ -24,6 +24,14 @@ const NOTICE_MAX: usize = 400;
 /// The agent's ordinary replies, tool results, files it read and the owner's messages never do, whatever they say
 /// (a step about a REST rate limit once read as the paid agent's limit and the run waited an hour for nothing).
 pub fn limit_notice(line: &str) -> Option<String> {
+    let text = own_error_text(line)?;
+    let text = text.trim();
+    (text.len() <= NOTICE_MAX && is_limit(text)).then(|| text.to_string())
+}
+
+/// The text of the agent's own error end in a session line (see limit_notice), or None when the line is not one.
+/// Also read by the health watch (24y Y7).
+pub fn own_error_text(line: &str) -> Option<String> {
     let text = match serde_json::from_str::<serde_json::Value>(line) {
         Ok(m) => {
             let kind = m.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -46,8 +54,7 @@ pub fn limit_notice(line: &str) -> Option<String> {
         }
         Err(_) => line.to_string(),
     };
-    let text = text.trim();
-    (text.len() <= NOTICE_MAX && is_limit(text)).then(|| text.to_string())
+    Some(text)
 }
 
 /// The minutes from now until a wall-clock time in a time zone (the next time it comes round). An unknown zone, or

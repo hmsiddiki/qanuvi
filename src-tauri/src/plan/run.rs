@@ -15,6 +15,7 @@ use super::decider::{
 use super::env::{MemoryUse, PlannerAsk, RunEnv, ask_planner, assistant_text};
 use super::finishing::is_plan_file;
 use super::guidance::{self as g, Carry, Recent};
+use super::health::{self, Down};
 use super::holdask::{
     self, HoldReply, InboxAnswer, hold_form, hold_key, hold_reply, sentence_start,
 };
@@ -97,6 +98,8 @@ struct Live {
     run: Option<PlanRun>,
     waiting_answers: usize,
     waiting_until: Option<i64>,
+    /// Y7: what is down while the run waits for it ("the proxy at 127.0.0.1:8787 is not answering").
+    waiting_health: Option<String>,
     current_model: String,
     answers: Vec<(String, HoldReply)>,
     finish_without: bool,
@@ -155,6 +158,11 @@ impl Shared {
     /// The run waits for a usage limit to reset at this moment (milliseconds).
     pub fn waiting_until(&self) -> Option<i64> {
         self.live().waiting_until
+    }
+
+    /// Y7: what is down while the run waits for it.
+    pub fn waiting_health(&self) -> Option<String> {
+        self.live().waiting_health.clone()
     }
 
     /// The model of the attempt at work.
@@ -238,6 +246,7 @@ impl Shared {
         let mut live = self.live();
         live.waiting_answers = 0;
         live.waiting_until = None;
+        live.waiting_health = None;
         live.answers.clear();
         live.finish_without = false;
         live.notices.clear();
@@ -389,6 +398,10 @@ struct Loop<'a> {
     branch: Option<String>,
     keep_for_resume: bool,
     free_until: Option<i64>,
+    /// Y7: the step meeting outages now, how many in a row, and since when (milliseconds).
+    outage: Option<(String, u32, i64)>,
+    /// Y7: the run said what is down in this outage already (it says so once).
+    outage_said: bool,
     asked_changes_from: bool,
     answered: bool,
     watch: StepWatch,
@@ -543,6 +556,8 @@ impl<'a> Loop<'a> {
             branch: None,
             keep_for_resume: false,
             free_until: None,
+            outage: None,
+            outage_said: false,
             asked_changes_from: false,
             answered: false,
             watch: StepWatch::default(),
@@ -2223,6 +2238,17 @@ impl<'a> Loop<'a> {
             };
             self.watch.over_limit = None;
             self.watch.switched = None;
+            // Y7: the paid agent goes through a proxy that does not answer: wait for it before the try (a try now
+            // could only fail).
+            if !is_free(&model)
+                && let Some(url) = self.proxy_url()
+                && !self.env.reachable(&url)
+                && !self.wait_healthy(&Down::Proxy(url), &key(&st), 0)
+            {
+                self.end_health_wait();
+                self.run.steps[i].status = RunStepStatus::Waiting;
+                break;
+            }
             let ask = AttemptAsk {
                 prompt,
                 model: model.clone(),
@@ -2394,6 +2420,43 @@ impl<'a> Loop<'a> {
                     break;
                 }
                 continue;
+            }
+            // Y7: the proxy or the model provider was down: no failure. The run waits (says so once), then tries
+            // the step again; a step that met outages for hours is set aside instead.
+            if matches!(attempt.outcome, Outcome::Error | Outcome::Open)
+                && let Some(down) = self.outage_of(&attempt)
+            {
+                let k = key(&st);
+                let now = self.env.now_ms();
+                let (n, since) = match &self.outage {
+                    Some((sk, n, since)) if *sk == k => (n + 1, *since),
+                    _ => (1, now),
+                };
+                self.outage = Some((k.clone(), n, since));
+                self.drop_carry();
+                if now - since >= health::GIVE_UP_AFTER.as_millis() as i64 {
+                    let words = match &down {
+                        Down::Provider(notice) => notice.clone(),
+                        Down::Proxy(_) => down.says(),
+                    };
+                    attempt.outcome = Outcome::Blocked;
+                    attempt.note = format!(
+                        "the model provider kept failing for {} hours ({words})",
+                        health::GIVE_UP_AFTER.as_secs() / 3600
+                    );
+                    self.outage = None;
+                } else {
+                    if !self.wait_healthy(&down, &k, n) {
+                        self.end_health_wait();
+                        self.run.steps[i].status = RunStepStatus::Waiting;
+                        break;
+                    }
+                    continue;
+                }
+            } else if self.outage.is_some() {
+                // Back: the next outage is a new one, said again.
+                self.outage = None;
+                self.outage_said = false;
             }
             if attempt.outcome == Outcome::Open
                 && let Some(after) = self.plan()
@@ -2887,6 +2950,118 @@ impl<'a> Loop<'a> {
             }
         }
         None
+    }
+
+    /// Y7: the proxy the paid agent's turns go through: the run's own address, else the one Claude Code's settings
+    /// on this machine name (for Claude Code only).
+    fn proxy_url(&self) -> Option<String> {
+        let own = self
+            .s
+            .turns
+            .base_url
+            .clone()
+            .filter(|u| !u.trim().is_empty());
+        own.or_else(|| {
+            (self.s.turns.provider == "claude-code" && self.s.turns.agent_override.is_none())
+                .then(|| self.env.agent_proxy())
+                .flatten()
+                .filter(|u| !u.trim().is_empty())
+        })
+    }
+
+    /// Y7: what was down when this attempt ended, from its agent's own error end (never what its work says), or
+    /// None. A proxy that does not answer then is named; otherwise it was the provider.
+    fn outage_of(&self, a: &Attempt) -> Option<Down> {
+        if a.session_id.is_empty() {
+            return None;
+        }
+        let lines = self.env.session_lines(&a.session_id);
+        let notice = lines
+            .iter()
+            .rev()
+            .take(8)
+            .find_map(|l| health::outage_notice(l))?;
+        Some(match self.proxy_url() {
+            Some(url) if !self.env.reachable(&url) => Down::Proxy(url),
+            _ => Down::Provider(notice),
+        })
+    }
+
+    /// Y7: waits while it is down (Stop or Pause ends it): a proxy until its port answers again, the provider for a
+    /// while that grows with the outages in a row (then the step is tried again). Said once per outage, in the
+    /// run's notices; the wait goes into the decisions. Answers false when the owner stopped or paused the run.
+    fn wait_healthy(&mut self, down: &Down, step: &str, in_a_row: u32) -> bool {
+        let says = down.says();
+        self.sh.live().waiting_health = Some(says.clone());
+        if !self.outage_said {
+            self.outage_said = true;
+            let mut first = says.clone();
+            if let Some(c) = first.get(..1) {
+                first = c.to_uppercase() + &first[1..];
+            }
+            self.sh.notice(format!(
+                "{first}: the run waits and goes on by itself when it is back."
+            ));
+        } else {
+            self.sh.touch();
+        }
+        let started = self.env.now_ms();
+        let wait_ms = health::provider_wait(in_a_row).as_millis() as i64;
+        let poll_ms = health::PROXY_POLL.as_millis() as i64;
+        let proxy = match down {
+            Down::Proxy(url) => Some(url.clone()),
+            Down::Provider(_) => self.proxy_url(),
+        };
+        let mut looked = started;
+        let back = loop {
+            if self.stop_asked() || self.pausing() {
+                break false;
+            }
+            let now = self.env.now_ms();
+            let waited_enough = matches!(down, Down::Proxy(_)) || now - started >= wait_ms;
+            if waited_enough && now - looked >= poll_ms.min(wait_ms) {
+                looked = now;
+                if proxy.as_deref().is_none_or(|u| self.env.reachable(u)) {
+                    break true;
+                }
+            }
+            self.env.sleep(Duration::from_secs(5));
+        };
+        let minutes = ((self.env.now_ms() - started) as f64 / 60_000.0).round();
+        let detail = match down {
+            Down::Provider(notice) => format!("{says} ({notice})"),
+            Down::Proxy(_) => says.clone(),
+        };
+        self.decide(
+            "health",
+            "Qanuvi",
+            &format!("Step {step}"),
+            if back {
+                "waited, then went on"
+            } else {
+                "waited, then stopped"
+            },
+            &format!("{detail}; waited {minutes} min"),
+        );
+        self.sh.live().waiting_health = None;
+        self.sh.touch();
+        back && !self.stop_asked()
+    }
+
+    /// Y7: the owner paused or stopped the run while it waited for the proxy or provider.
+    fn end_health_wait(&mut self) {
+        if self.pausing() {
+            self.sh.controls.clear_pause();
+            self.finish(
+                RunStatus::Paused,
+                "Paused while waiting for the proxy or the model provider. Resume when you want to go on.",
+            );
+        } else {
+            self.finish(
+                RunStatus::Stopped,
+                "Stopped by you while waiting for the proxy or the model provider to come back.",
+            );
+        }
     }
 
     /// Waits until the moment (Stop or Pause ends it); answers false when the owner stopped or paused the run.

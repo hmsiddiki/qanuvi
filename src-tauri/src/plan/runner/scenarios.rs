@@ -2816,3 +2816,168 @@ fn y8_the_plans_own_recipe_wins_and_too_little_memory_sets_the_step_aside() {
     assert_eq!(one.attempts.len(), 1);
     assert!(env.test_builds.lock().unwrap().is_empty());
 }
+
+fn overloaded() -> AgentReply {
+    AgentReply {
+        result: Some(
+            r#"API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#.into(),
+        ),
+        is_error: true,
+        ..Default::default()
+    }
+}
+
+fn health_waits(r: &PlanRun) -> Vec<String> {
+    r.decisions
+        .iter()
+        .flatten()
+        .filter(|d| d.kind == "health")
+        .map(|d| format!("{}: {}", d.decision, d.why))
+        .collect()
+}
+
+#[test]
+fn y7_a_provider_outage_is_no_failure_the_run_waits_says_so_once_and_goes_on() {
+    let env = world("# Plan\n\n- [ ] **1. One**\n- [ ] **2. Two**\n");
+    let started = env.now_ms();
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        // Step 1's first two tries meet the provider down.
+        if n == "1" && c.env.prompts().len() <= 2 {
+            return overloaded();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let r = Run::start(env.clone(), FILE, options(), stop.clone()).wait();
+    assert_eq!(
+        r.status,
+        RunStatus::Done,
+        "{:?} {}",
+        statuses(&r),
+        r.message
+    );
+    // The outages are not tries: step 1 was done by its first counted try, on the same model.
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Done);
+    assert_eq!(one.attempts.len(), 1, "{:?}", one.attempts);
+    let said: Vec<String> = stop
+        .0
+        .notices()
+        .into_iter()
+        .filter(|n| n.contains("not answering"))
+        .collect();
+    assert_eq!(
+        said,
+        [
+            "The model provider is not answering: the run waits and goes on by itself when it is back."
+        ]
+    );
+    let waits = health_waits(&r);
+    assert_eq!(waits.len(), 2, "{waits:?}");
+    assert!(
+        waits[0].starts_with(
+            "waited, then went on: the model provider is not answering (API Error: 529"
+        )
+    );
+    // 1 minute, then 2 (it waits longer the more outages in a row).
+    assert!(env.now_ms() - started >= 3 * 60_000);
+    assert_eq!(stop.0.waiting_health(), None);
+}
+
+#[test]
+fn y7_a_proxy_that_does_not_answer_holds_the_try_until_it_is_back() {
+    let env = world("# Plan\n\n- [ ] **1. One**\n");
+    *env.proxy.lock().unwrap() = Some("http://127.0.0.1:8787".into());
+    // Down at the first two looks, then back.
+    *env.up.lock().unwrap() = vec![false, false, true];
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        assert!(
+            c.env
+                .calls()
+                .iter()
+                .filter(|c| *c == "health_probe")
+                .count()
+                >= 3,
+            "no try before the proxy answers"
+        );
+        c.env.mark(FILE, "1", 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let r = Run::start(env.clone(), FILE, options(), stop.clone()).wait();
+    assert_eq!(
+        r.status,
+        RunStatus::Done,
+        "{:?} {}",
+        statuses(&r),
+        r.message
+    );
+    assert_eq!(step(&r, "1").attempts.len(), 1);
+    assert!(
+        stop.0
+            .notices()
+            .iter()
+            .any(|n| n == "The proxy at 127.0.0.1:8787 is not answering: the run waits and goes on by itself when it is back."),
+        "{:?}",
+        stop.0.notices()
+    );
+    assert_eq!(health_waits(&r).len(), 1);
+}
+
+#[test]
+fn y7_a_provider_that_keeps_failing_for_hours_sets_the_step_aside_and_the_run_goes_on() {
+    let env = world("# Plan\n\n- [ ] **1. One**\n- [ ] **2. Two**\n");
+    env.set_agent(|c| {
+        if planner(c) || c.title.unwrap_or("").starts_with("Question for you") {
+            return if planner(c) {
+                ok_review(c)
+            } else {
+                AgentReply::default()
+            };
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" {
+            return overloaded();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let stop = stop_button();
+    let running = Run::start(env.clone(), FILE, options(), stop.clone());
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while running.waiting_answers() < 1 || step(&running.now(), "2").status != RunStepStatus::Done {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never got through: {:?}",
+            statuses(&running.now())
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    stop.press();
+    stop.press();
+    let r = running.wait();
+    let one = step(&r, "1");
+    assert_eq!(one.status, RunStepStatus::Held, "{:?}", statuses(&r));
+    let why = &one.held.as_ref().unwrap().why;
+    assert!(
+        why.contains("the model provider kept failing for 3 hours (API Error: 529"),
+        "{why}"
+    );
+    // Said once for the whole outage.
+    assert_eq!(
+        stop.0
+            .notices()
+            .iter()
+            .filter(|n| n.contains("not answering"))
+            .count(),
+        1
+    );
+}

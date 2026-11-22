@@ -38,6 +38,8 @@ pub struct RunView {
     pub waiting_answers: usize,
     /// Milliseconds: the run waits for a usage limit to reset.
     pub waiting_until: Option<i64>,
+    /// Y7: what is down while the run waits for it ("the proxy at 127.0.0.1:8787 is not answering").
+    pub waiting_health: Option<String>,
     pub current_model: String,
     pub notices: Vec<String>,
     pub pausing: bool,
@@ -132,6 +134,7 @@ impl Runs {
             finishing: busy == Some(Busy::Finish),
             waiting_answers: sh.waiting_answers(),
             waiting_until: sh.waiting_until(),
+            waiting_health: sh.waiting_health(),
             current_model: sh.current_model(),
             notices: sh.notices(),
             pausing: c.pausing(),

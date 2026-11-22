@@ -1,6 +1,6 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9); Y8 built 2026-11-23. Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9); Y8 + Y7 built 2026-11-23. Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
 part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line
@@ -101,6 +101,22 @@ right.
    qanuvi-master --target-dir {out}`, start `{out}/release/qanuvi-master core --data {data}`, check
    `{out}/release/qanuvi-master status --data {data}` (status ends with exit code 1 when the master is not running).
    Unattended runs build the headless master only; the window build stays with live drives.
+
+## Y7 in detail (owner "ok do Y7", 2026-11-23; built)
+
+1. **What counts as down:** only the agent's own error end (as for usage limits): a server error (500, 502, 503,
+   504, 529), "overloaded", or the connection failing (refused, reset, timed out, fetch failed). A request the
+   provider refused (400, 401) is not an outage, and nothing the step's work says or reads counts.
+2. **The proxy** the paid agent goes through (the run's own address, else the one Claude Code's settings name, as
+   the headroom wrap sets) is looked at before every paid try: its port must answer. While it does not, the try
+   waits (looked at every 15 s).
+3. **After an outage** the try is not counted (the step keeps its tries and models). The run waits 1, 2, 5, then 10
+   minutes (the proxy, if any, must answer too) and tries the step again.
+4. **Said once:** one notice per outage ("The model provider is not answering: the run waits and goes on by itself
+   when it is back."); the Run panel's status line says what is down while it waits; each wait goes into the
+   run's decisions with how long it took. Pause and Stop work during the wait.
+5. **Never stuck:** a step that met outages for 3 hours is set aside ("the model provider kept failing for 3
+   hours"), and the run goes on with the other steps.
 
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.

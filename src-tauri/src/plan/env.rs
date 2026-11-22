@@ -215,6 +215,14 @@ pub trait RunEnv: Send + Sync {
 
     /// Runs a command in the project's folder (the test command, a step's check).
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String>;
+    /// Y7: whether something answers on the address's port (the run's proxy).
+    fn reachable(&self, url: &str) -> bool {
+        super::health::reachable(url)
+    }
+    /// Y7: the proxy Claude Code's own settings on this machine send it to, if any (headroom wrap sets one).
+    fn agent_proxy(&self) -> Option<String> {
+        crate::claude_update::settings_base_url()
+    }
     /// Y8: free memory here in MB (a test build waits while it is low); None when it cannot be read.
     fn free_memory_mb(&self) -> Option<u64> {
         None

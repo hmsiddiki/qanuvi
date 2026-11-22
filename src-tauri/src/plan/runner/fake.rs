@@ -114,6 +114,10 @@ pub struct FakeEnv {
     pub undos: Mutex<Vec<String>>,
     /// Commands the run rules refuse when the runner would run them (a step's check).
     pub never: Mutex<Vec<String>>,
+    /// Y7: whether the proxy answers, one per look (the last one stays); empty: it always does.
+    pub up: Mutex<Vec<bool>>,
+    /// Y7: the proxy Claude Code's settings name here (none by default).
+    pub proxy: Mutex<Option<String>>,
     /// Y8: free memory answers in MB, one per look (the last one stays); empty: it cannot be read.
     pub free_mb: Mutex<Vec<u64>>,
     /// Y8: the test build recipes run, in order.
@@ -152,6 +156,8 @@ impl FakeEnv {
             commits: Mutex::new(Vec::new()),
             undos: Mutex::new(Vec::new()),
             never: Mutex::new(Vec::new()),
+            up: Mutex::new(Vec::new()),
+            proxy: Mutex::new(None),
             free_mb: Mutex::new(Vec::new()),
             test_builds: Mutex::new(Vec::new()),
         }
@@ -744,6 +750,20 @@ impl RunEnv for FakeEnv {
             duration_ms: 1,
             output,
         })
+    }
+
+    fn reachable(&self, _url: &str) -> bool {
+        self.call("health_probe");
+        let mut u = self.up.lock().unwrap();
+        match u.len() {
+            0 => true,
+            1 => u[0],
+            _ => u.remove(0),
+        }
+    }
+
+    fn agent_proxy(&self) -> Option<String> {
+        self.proxy.lock().unwrap().clone()
     }
 
     fn free_memory_mb(&self) -> Option<u64> {

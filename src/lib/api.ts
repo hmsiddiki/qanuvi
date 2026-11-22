@@ -306,6 +306,8 @@ export interface RunView {
   waitingAnswers: number;
   /** Milliseconds: the run waits for a usage limit to reset. */
   waitingUntil: number | null;
+  /** Y7: what is down while the run waits for it ("the proxy at 127.0.0.1:8787 is not answering"). */
+  waitingHealth?: string | null;
   currentModel: string;
   notices: string[];
   pausing: boolean;

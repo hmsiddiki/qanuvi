@@ -1337,6 +1337,9 @@
           {#if current}
             Step {current.number ?? ""} · {current.title} · {label(runner.currentModel)}
             {#if currentAttempt > 1}<span class="dim"> (try {currentAttempt})</span>{/if}
+            {#if runner.waitingHealth}<span class="dim">
+                · waiting: {runner.waitingHealth}; goes on by itself when it is back</span
+              >{/if}
             {#if runner.waitingMemory}<span class="dim">
                 · test build waits for {runner.waitingMemory} GB of free memory</span
               >{:else if runner.checking}<span class="dim"> · running the tests</span>{/if}

@@ -1812,7 +1812,16 @@ runs on or off; with it off nothing is sent anywhere.
       kept only its own fields and wiped the run rules (fixed: the rest is kept). Rust 636 pass, clippy clean;
       window 574 pass, svelte-check clean. Start + check of the recipe tried by hand with the 0.1.43 master on
       scratch data (status answers in 1 s); the full cargo build part runs first in Y9. Not driven in a window.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y8): NEXT: Y7 health watch (proxy and
+    Y7 HEALTH WATCH BUILT (2026-11-23, owner "ok do Y7"; details in docs/PLAN-24Y.md "Y7 in detail"): an outage
+      (5xx/529, overloaded, connection errors) read from the agent's own error end only is no failed try: the run
+      waits (1, 2, 5, then 10 min, the proxy looked at every 15 s), says so once in its notices, logs each wait in
+      the decisions, then tries the step again; 3 hours of outages on one step set it aside. Before every paid try
+      the proxy (run's base_url, else Claude Code's settings ANTHROPIC_BASE_URL, here 127.0.0.1:8787) must answer.
+      Run panel: "waiting: <what is down>; goes on by itself when it is back". Rust 643 pass, clippy clean; window
+      574 pass. Not driven in a window (a real outage was not made).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y7): NEXT: Y6 review list (checks that
+      need eyes go to one Inbox list instead of holding the run), then Y9 on the laptop.
+    PICKUP POINT (before, 2026-11-23 after Y8): NEXT: Y7 health watch (proxy and
       model providers down: pause, say once, go on), then Y6 review list, then Y9 on the laptop.
     PICKUP POINT (before, 2026-11-23): 24y PART 3 AGREED (docs/PLAN-24Y.md
       decisions 5-6): order Y8 test builds -> Y7 health watch -> Y6 review list -> Y9 benchmark. Y9 = the R1-R5
