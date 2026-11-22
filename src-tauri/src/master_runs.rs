@@ -220,8 +220,21 @@ impl Master {
                 self.watch(&pid, args, stream);
                 let me = self.me()?;
                 let p = pid.clone();
+                // y9-1: a start without a window (a terminal) asks for the check before the run; the window makes
+                // its own in the Run panel and sends what it settled.
+                let check_first = args["start"]["checkFirst"].as_bool() == Some(true);
                 to(self.runs.start_run(&pid, self.watchers.clone(), move |sh| {
-                    run_plan(&me.run_env(&p)?, sh, setup)
+                    let env = me.run_env(&p)?;
+                    let mut setup = setup;
+                    if check_first {
+                        let c = crate::plan::headless_check::check_before_run(&env, &setup).map_err(|e| {
+                            format!("The check before the run did not answer ({e}). Start it again, or with --no-check.")
+                        })?;
+                        let o = &mut setup.options;
+                        o.wait_before.get_or_insert_with(Vec::new).extend(c.wait_before);
+                        o.extra_checks.get_or_insert_with(Vec::new).extend(c.extra_checks);
+                    }
+                    run_plan(&env, sh, setup)
                 }))
             }
             "plan_run_finish" => {

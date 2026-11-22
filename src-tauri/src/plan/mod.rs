@@ -8,6 +8,7 @@ pub mod decider;
 pub mod env;
 pub mod finishing;
 pub mod guidance;
+pub mod headless_check;
 pub mod health;
 pub mod holdask;
 pub mod housekeeping;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RULES, parsePatterns, rulesFacts, rulesLine, rulesOf } from "./runRules";
+import { DEFAULT_RULES, parsePatterns, rulesFacts, rulesLine, rulesOf, testBuildFact } from "./runRules";
 
 describe("run rules", () => {
   it("fills in what an older project record lacks", () => {
@@ -34,5 +34,15 @@ describe("run rules", () => {
     expect(rulesLine(DEFAULT_RULES, false, true)).toBe(
       "Auto: the agent judges the rest · never publishes or touches main",
     );
+  });
+});
+
+describe("testBuildFact (y9-3)", () => {
+  it("says what a test build is, so the check never asks", () => {
+    expect(testBuildFact(undefined, true)).toContain('the plan\'s own "Test build" section');
+    expect(testBuildFact({ build: "make", start: "", check: "make check" }, false)).toContain(
+      "build: make; start: none; check: make check",
+    );
+    expect(testBuildFact({ build: "", start: "", check: "" }, false)).toContain("has none yet");
   });
 });

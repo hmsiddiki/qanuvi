@@ -14,7 +14,15 @@
   import { api, errorText } from "$lib/api";
   import { untrack } from "svelte";
   import { projects } from "$lib/stores/projects.svelte";
-  import { DEFAULT_RULES, parsePatterns, rulesFacts, rulesLine, rulesOf, type RunRules } from "$lib/plan/runRules";
+  import {
+    DEFAULT_RULES,
+    parsePatterns,
+    rulesFacts,
+    rulesLine,
+    rulesOf,
+    testBuildFact,
+    type RunRules,
+  } from "$lib/plan/runRules";
   import { callThisPc, shownMachine } from "$lib/remote";
   import { offerStartWithComputer, startSettingLabel } from "$lib/startWithComputer";
   import { formatCost, formatTokens } from "$lib/agent/events";
@@ -408,6 +416,9 @@
       .catch(() => {});
   });
 
+  /** The plan file has a section of this title (its own "Run rules" or "Test build", which win for this plan). */
+  const planHas = (title: string) => plan.sections.some((s) => s.title.trim().toLowerCase() === title);
+
   function currentRules(): RunRules {
     return { ...rules, set: true, allow: parsePatterns(allowText), never: parsePatterns(neverText) };
   }
@@ -559,7 +570,14 @@
         testCommand: project.settings.test_command,
         previewUrl: project.settings.preview_url,
         // 24y: the run rules are standing answers, so the check decides what they cover instead of asking.
-        notes: [...loadPlanNotes(project.id, file), rulesFacts(currentRules(), mode === "auto")],
+        notes: [
+          ...loadPlanNotes(project.id, file),
+          rulesFacts(currentRules(), mode === "auto"),
+          ...(planHas("run rules")
+            ? ["This plan file has its own Run rules section: it wins over the project's rules for this plan."]
+            : []),
+          testBuildFact(project.settings.test_build, planHas("test build")),
+        ],
         // PM c: what the project memory knows is used, not asked again.
         memory: await api.memory.lines(project.id).catch(() => [] as string[]),
       };
@@ -1163,7 +1181,9 @@
         {/if}
       {:else}
         <p class="hint">
-          Run rules: {rulesLine(rules, isGit, mode === "auto")} ·
+          Run rules: {rulesLine(rules, isGit, mode === "auto")}{planHas("run rules")
+            ? " · this plan's own Run rules win"
+            : ""} ·
           <button type="button" class="link" onclick={() => (rulesOpen = true)}>Change</button>
         </p>
       {/if}

@@ -67,6 +67,23 @@ export function rulesFacts(r: RunRules, auto = false): string {
   return lines.join("\n");
 }
 
+/**
+ * y9-3: what "Check: test build" means, for the check before the run (it once asked which command a test build is).
+ * `planOwn`: the plan has its own "Test build" section, which wins for that plan.
+ */
+export function testBuildFact(
+  recipe: { build: string; start: string; check: string } | undefined,
+  planOwn: boolean,
+): string {
+  const what =
+    'A step line "Check: test build" means Qanuvi itself test-builds the app after the step, into its own folder and on fresh data, never over the installed app';
+  if (planOwn) return `${what}, with the plan's own "Test build" section. Nothing needs to be asked about it.`;
+  const set = (s: string) => s.trim() || "none";
+  if (recipe && (recipe.build.trim() || recipe.check.trim()))
+    return `${what}, with the project's recipe (build: ${set(recipe.build)}; start: ${set(recipe.start)}; check: ${set(recipe.check)}). Nothing needs to be asked about it.`;
+  return `${what}, with the project's test build recipe (Project settings, Test build). This project has none yet: a step that asks for one is set aside until it is set.`;
+}
+
 /** The one line shown once the card was answered. */
 export function rulesLine(r: RunRules, git: boolean, auto = false): string {
   const parts = [

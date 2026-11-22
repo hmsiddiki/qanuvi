@@ -14,7 +14,7 @@ use super::{Value, ensure_service, json};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
-const USAGE: &str = "Usage: qanuvi-master plan run <plan file> [--steps <for example 2-6, 9>] [--budget <dollars>] [--no-follow]
+const USAGE: &str = "Usage: qanuvi-master plan run <plan file> [--steps <for example 2-6, 9>] [--budget <dollars>] [--no-check] [--no-follow]
        qanuvi-master plan follow [<project>]
        qanuvi-master plan list
        qanuvi-master plan stop [<project>] [--now]";
@@ -559,8 +559,18 @@ pub fn plan_cli(dir: &Path, args: &[String]) -> Result<(), String> {
                 flag(args, "--steps"),
                 budget,
             );
+            // y9-1: the check before the run, as the window's Run panel makes it (--no-check leaves it out).
+            let mut start = start;
+            let check = !args.iter().any(|a| a == "--no-check");
+            start["checkFirst"] = json!(check);
             let args_out = json!({"projectId": id, "start": start});
             println!("Plan run of {rel} in {name}. {}", setup_line(&start));
+            if check {
+                println!(
+                    "First a short read-only check of what the run needs (about a minute); Qanuvi takes its \
+                     recommended answers, and a step that truly needs you waits for your answer in the Inbox."
+                );
+            }
             if args.iter().any(|a| a == "--no-follow") {
                 call(dir, "plan_run_start", args_out)?;
                 println!("Started. Follow it: qanuvi-master plan follow \"{name}\"");

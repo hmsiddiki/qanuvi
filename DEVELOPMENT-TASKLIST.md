@@ -1850,6 +1850,22 @@ runs on or off; with it off nothing is sent anywhere.
       (Auto, Claude Code, Opus 5.5 default, team settings, no budget, extra checks cleared) into the laptop's
       run-starts/<project id>.json. Work on branch qanuvi/plan-24z-a. Watch: qanuvi-master plan follow "qanuvi" on
       the laptop, or the window with the laptop shown.
+    Y9 RESTARTED FROM THE LAPTOP'S OWN WINDOW (2026-11-23 ~05:55, owner: drive the window, work on the laptop
+      itself): the terminal start skipped the check before the run (owner noticed), so it was stopped at step 1
+      (0 done), the scratch copy reset to bc562c8 and the branch dropped. Driven on the laptop over SSH with
+      ~/qc-scratch/y9/drive.py (X11: ffmpeg x11grab screenshots, AT-SPI names and actions, XTest clicks and keys;
+      nothing on This PC's screen): Resume -> setup card -> Check and start -> Before the run (3 questions all
+      "Qanuvi decides", setup notes: tray library present on the laptop; it asked what "test build" means) -> Start
+      the run. Running on qanuvi/plan-24z-a, step models Sonnet 5.5, 8 decisions (extra checks e.g. step 5).
+    y9-1 FIXED: a run started without a window (qanuvi-master plan run) skipped the check before the run. The master
+      now runs it (plan/headless_check.rs: same prompt, recommended answers taken as "Check and start" does, risky
+      steps with extra checks, "you" questions and missing logins hold their steps; notes, decisions, holds and
+      checked-step fingerprints kept as the window keeps them; order decisions become Needs lines via the new
+      tasklist add_order_needs/add_step_needs). plan run prints a line about it; --no-check leaves it out.
+    y9-2 FIXED: the card's run-rules line said "Qanuvi's own copies" while the plan's own Run rules said Branch: yes;
+      it now adds "this plan's own Run rules win", and the check is told the plan has its own section.
+    y9-3 FIXED: the check did not know what "Check: test build" means and asked; window and core now tell it the
+      recipe (project's, or the plan's own Test build section). Rust 652, window 575, clippy clean. Unpublished.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
       from This PC).

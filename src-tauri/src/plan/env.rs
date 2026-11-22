@@ -215,6 +215,10 @@ pub trait RunEnv: Send + Sync {
 
     /// Runs a command in the project's folder (the test command, a step's check).
     fn run_check(&self, command: &str, timeout: Duration) -> Result<CheckResult, String>;
+    /// y9-1: the names of the project's secrets (never their values), for the check before a run.
+    fn secret_names(&self) -> Vec<String> {
+        Vec::new()
+    }
     /// Y7: whether something answers on the address's port (the run's proxy).
     fn reachable(&self, url: &str) -> bool {
         super::health::reachable(url)
@@ -682,6 +686,10 @@ impl RunEnv for CoreEnv<'_> {
 
     fn free_memory_mb(&self) -> Option<u64> {
         crate::machine::free_ram_bytes().map(|b| b / (1024 * 1024))
+    }
+
+    fn secret_names(&self) -> Vec<String> {
+        crate::secrets::names(&self.project.id)
     }
 
     fn test_build(

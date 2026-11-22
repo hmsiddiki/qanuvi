@@ -551,6 +551,122 @@ pub fn clear_stale_skips(text: &str, also_done: &[String]) -> String {
     out
 }
 
+/// Adds step labels to the step's "- Needs:" line (an order decision of the check before a run), writing the line
+/// when the step has none; labels it already needs are not repeated. The window's `addStepNeeds`.
+pub fn add_step_needs(text: &str, line: usize, labels: &[String]) -> Result<String, String> {
+    let (plan, step, mut lines) = step_at(text, line, None)?;
+    let existing =
+        (line + 1..step.end.min(lines.len())).find(|&i| NEEDS_RE.is_match(js::trim(&lines[i])));
+    let had: Vec<String> = existing
+        .and_then(|i| {
+            NEEDS_RE
+                .captures(js::trim(&lines[i]))
+                .map(|c| c[1].to_string())
+        })
+        .map(|h| {
+            h.split(',')
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut all = had.clone();
+    for l in labels.iter().map(|l| l.trim()).filter(|l| !l.is_empty()) {
+        if !all.iter().any(|a| a == l) {
+            all.push(l.to_string());
+        }
+    }
+    if all.len() == had.len() {
+        return Ok(text.to_string());
+    }
+    match existing {
+        Some(i) => {
+            let indent: String = lines[i].chars().take(indent_of(&lines[i])).collect();
+            lines[i] = format!("{indent}- Needs: {}", all.join(", "));
+        }
+        None => {
+            let mut at = line + 1;
+            while at < lines.len()
+                && !blank(&lines[at])
+                && indent_of(&lines[at]) >= 2
+                && !SKIPPED_RE.is_match(&lines[at])
+            {
+                at += 1;
+            }
+            lines.insert(at, format!("  - Needs: {}", all.join(", ")));
+        }
+    }
+    Ok(lines.join(&plan.eol))
+}
+
+/// Writes order decisions ("run `step` after `after`") as Needs lines: only steps in this plan, and never one that
+/// would make steps wait for each other in a circle. Answers the new text and what was written (the window's
+/// `addOrderNeeds`).
+pub fn add_order_needs(
+    text: &str,
+    order: &[(String, Vec<String>)],
+) -> (String, Vec<(String, Vec<String>)>) {
+    let plan = parse_plan(text);
+    let lines_of: std::collections::HashMap<String, usize> = plan
+        .steps
+        .iter()
+        .filter_map(|s| s.number.clone().map(|n| (n, s.line)))
+        .collect();
+    let mut needs: std::collections::HashMap<String, HashSet<String>> = plan
+        .steps
+        .iter()
+        .filter_map(|s| {
+            s.number
+                .clone()
+                .map(|n| (n, s.needs.iter().cloned().collect()))
+        })
+        .collect();
+    fn waits(
+        from: &str,
+        to: &str,
+        needs: &std::collections::HashMap<String, HashSet<String>>,
+        seen: &mut HashSet<String>,
+    ) -> bool {
+        if from == to {
+            return true;
+        }
+        if !seen.insert(from.to_string()) {
+            return false;
+        }
+        needs
+            .get(from)
+            .is_some_and(|n| n.iter().any(|x| waits(x, to, needs, seen)))
+    }
+    let mut added: Vec<(String, Vec<String>)> = Vec::new();
+    for (step, after) in order {
+        if !lines_of.contains_key(step) {
+            continue;
+        }
+        let mut take = Vec::new();
+        for a in after {
+            let known = lines_of.contains_key(a);
+            let had = needs.get(step).is_some_and(|n| n.contains(a));
+            if known && !had && !waits(a, step, &needs, &mut HashSet::new()) {
+                needs.entry(step.clone()).or_default().insert(a.clone());
+                take.push(a.clone());
+            }
+        }
+        if !take.is_empty() {
+            added.push((step.clone(), take));
+        }
+    }
+    // From the bottom up: a Needs line added to a step moves the lines below it.
+    let mut sorted = added.clone();
+    sorted.sort_by_key(|(s, _)| std::cmp::Reverse(lines_of[s]));
+    let mut out = text.to_string();
+    for (s, after) in &sorted {
+        if let Ok(next) = add_step_needs(&out, lines_of[s], after) {
+            out = next;
+        }
+    }
+    (out, added)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,6 +858,39 @@ Plain step without bold\n- [ ] **15b. Git like VS Code** (added by the owner)\n 
     }
 
     const NEEDS: &str = "## Steps\n- [ ] **1. First**\n- [ ] **2. Second**\n  - do it\n  - Needs: 1, docs/OTHER.md#4\n- [ ] **3. Third**\n";
+
+    #[test]
+    fn order_decisions_become_needs_lines_never_in_a_circle() {
+        let text =
+            "# P\n\n- [ ] **1. One**\n  - a\n- [ ] **2. Two**\n  - Needs: 1\n- [ ] **3. Three**\n";
+        let (out, added) = add_order_needs(
+            text,
+            &[
+                ("1".into(), vec!["3".into()]),
+                ("3".into(), vec!["2".into(), "9".into()]),
+                ("2".into(), vec!["1".into()]),
+            ],
+        );
+        // 1 after 3 is written; 3 after 2 would close a circle (2 needs 1, which now needs 3); 9 is no step here;
+        // 2 already needs 1.
+        assert_eq!(added, vec![("1".to_string(), vec!["3".to_string()])]);
+        assert!(
+            out.contains("- [ ] **1. One**\n  - a\n  - Needs: 3\n"),
+            "{out}"
+        );
+        let (out2, added2) = add_order_needs(&out, &[("3".into(), vec!["2".into()])]);
+        assert!(
+            added2.is_empty() && out2 == out,
+            "3 after 2 would close the circle 1 -> 3 -> 2 -> 1"
+        );
+        let more = add_step_needs(
+            "# P\n\n- [ ] **5. Five**\n  - Needs: 1\n",
+            2,
+            &["2".into(), "1".into()],
+        )
+        .unwrap();
+        assert!(more.contains("  - Needs: 1, 2"), "{more}");
+    }
 
     #[test]
     fn reads_needs_and_writes_skipped_lines() {

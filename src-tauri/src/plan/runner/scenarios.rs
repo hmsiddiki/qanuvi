@@ -3109,3 +3109,80 @@ fn y6_an_unanswered_list_keeps_what_an_earlier_run_put_there() {
     assert!(list.title.contains("2 things to look at"), "{}", list.title);
     assert!(list.text.contains("the logo is sharp") && list.text.contains("the menu reads well"));
 }
+
+#[test]
+fn y9_1_a_run_started_without_a_window_gets_the_check_first_and_keeps_what_it_settled() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Deploy docs**\n  - Push the docs to the site.\n- [ ] **2. Pick a theme**\n- [ ] **3. Load the test data**\n- [ ] **4. Slugs**\n  - Check: test build\n- [x] **5. Done before**\n",
+    );
+    let answer = json!({
+        "secrets": [{"name": "DB_PASSWORD", "why": "the test database", "steps": ["3"]}],
+        "questions": [
+            {"step": "2", "question": "Which theme?", "sort": "you", "recommended": "", "because": "only the owner knows"},
+            {"step": "4", "question": "Slug separator?", "sort": "decide", "recommended": "dash", "because": "URLs"}
+        ],
+        "risky": [{"step": "1", "why": "publishes to the site", "sort": "checks", "because": "it reaches the live site"}],
+        "setup": [],
+        "order": [{"step": "1", "after": ["4"], "why": "docs last"}]
+    })
+    .to_string();
+    let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let n = asked.clone();
+    env.set_agent(move |c| {
+        assert!(planner(c), "only the check's planner turn runs here");
+        n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            c.prompt.contains("Run rules for this project"),
+            "{}",
+            c.prompt
+        );
+        assert!(
+            c.prompt.contains("\"Check: test build\" means Qanuvi"),
+            "{}",
+            c.prompt
+        );
+        assert!(
+            !c.prompt.contains("Done before"),
+            "done steps are not checked"
+        );
+        AgentReply {
+            result: Some(answer.clone()),
+            ..Default::default()
+        }
+    });
+    let setup = crate::plan::run::test_setup(FILE, options());
+    let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert_eq!(got.read, 4);
+    let extra: Vec<&str> = got.extra_checks.iter().map(|x| x.step.as_str()).collect();
+    assert_eq!(extra, ["1"]);
+    let mut held: Vec<&str> = got.wait_before.iter().map(|x| x.step.as_str()).collect();
+    held.sort();
+    assert_eq!(held, ["2", "3"], "{:?}", got.wait_before);
+    assert!(
+        got.wait_before
+            .iter()
+            .any(|w| w.why.contains("DB_PASSWORD"))
+    );
+    // Kept with the plan as the window keeps it: the decided choice as a note, the steps checked, the order.
+    let notes = env
+        .plan_data_get(FILE, crate::plan_data::Kind::Notes)
+        .unwrap();
+    assert!(
+        notes
+            .to_string()
+            .contains("Decided for you for step 4: Slug separator? → dash"),
+        "{notes}"
+    );
+    let state = env
+        .plan_data_get(FILE, crate::plan_data::Kind::State)
+        .unwrap();
+    assert_eq!(state["checked"].as_array().map(Vec::len), Some(4));
+    assert!(
+        env.text(FILE)
+            .contains("**1. Deploy docs**\n  - Push the docs to the site.\n  - Needs: 4\n")
+    );
+    // Started again with nothing changed: nothing is asked again.
+    let again = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert_eq!(again.read, 0);
+    assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
