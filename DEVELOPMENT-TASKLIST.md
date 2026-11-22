@@ -1644,6 +1644,13 @@ runs on or off; with it off nothing is sent anywhere.
       The laptop KEEPS the relay installed (owner's; remove: sudo ~/src/rk/qanuvi-relay-kit/setup.sh --remove --purge).
       Not driven: the kit link in a window (needs a test window on This PC: ask); --cert/--key road and --remove
       (read only). Unpublished: kit + fb1/fb2 + K1-K6 + k1/k2. Next (ask): publish the kit + 0.1.39; then sl1.
+    0.1.39 + RELAY KIT PUBLISHED (owner "publish the kit and 0.1.39 anyway", 2026-11-22; release rule skipped with
+      QANUVI_RELEASE_ANYWAY=1): 8ddb4db tag v0.1.39 (relay kit K1-K6 + k1/k2 + fb1/fb2 on top of 0.1.38). All 4
+      platforms via E:/qc-scratch/release-0.1.39/chan; kit rebuilt on the laptop at 8ddb4db (VERSION 0.1.39, 1.3 MB),
+      signed by scripts/publish-relay-kit.mjs, .sig verified with the update public key (a changed byte refused).
+      Old latest.json (0.1.38) in E:/Backups/qanuvi/channel-before-0.1.39. Online: all 12 files 200, sizes match,
+      latest.json says 0.1.39; RELAY_KIT_URL now answers. Next: owner updates both machines (kit link in the window
+      can be checked then); then sl1.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
