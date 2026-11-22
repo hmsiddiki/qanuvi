@@ -665,8 +665,54 @@ const PART: usize = 1 << 20;
 /// rl4: a line put back together from parts may be at most this long (the other side cannot fill memory).
 const MAX_LINE: usize = 512 << 20;
 
-/// Seals one line for the relay: one Data message, or several (all but the last with `more`) for a long line.
-fn seal_line(crypto: &mut Session, session: u64, line: &[u8]) -> Result<Vec<Msg>, String> {
+/// sl1 S4: lines at least this long go packed (deflate) when the other side said it can unpack them.
+const PACK_OVER: usize = 16 << 10;
+/// The first byte of a packed line (a JSON line never starts with it).
+const PACKED: u8 = 1;
+/// Sent by an app once a session opens: "I can unpack lines". A master that knows it answers the same and from
+/// then on both pack; an older master's core reads it as a line that is not JSON and leaves it.
+const PACK_PROBE: &str = "\u{2}pack";
+
+/// The line packed, when packing makes it clearly smaller.
+fn pack(line: &[u8]) -> Option<Vec<u8>> {
+    use flate2::{Compression, write::DeflateEncoder};
+    if line.len() < PACK_OVER {
+        return None;
+    }
+    let mut out = vec![PACKED];
+    let mut z = DeflateEncoder::new(&mut out, Compression::fast());
+    z.write_all(line).ok()?;
+    z.finish().ok()?;
+    (out.len() < line.len() / 10 * 9).then_some(out)
+}
+
+/// A line as it was sent: unpacked when it came packed (never past MAX_LINE).
+fn unpack(line: Vec<u8>) -> Result<Vec<u8>, String> {
+    use flate2::read::DeflateDecoder;
+    if line.first() != Some(&PACKED) {
+        return Ok(line);
+    }
+    let mut out = Vec::new();
+    DeflateDecoder::new(&line[1..])
+        .take(MAX_LINE as u64 + 1)
+        .read_to_end(&mut out)
+        .map_err(|_| "A packed line did not unpack.".to_string())?;
+    if out.len() > MAX_LINE {
+        return Err("A line was too long.".into());
+    }
+    Ok(out)
+}
+
+/// Seals one line for the relay: one Data message, or several (all but the last with `more`) for a long line. With
+/// `packing`, a long line goes packed (S4).
+fn seal_line(
+    crypto: &mut Session,
+    session: u64,
+    line: &[u8],
+    packing: bool,
+) -> Result<Vec<Msg>, String> {
+    let packed = if packing { pack(line) } else { None };
+    let line = packed.as_deref().unwrap_or(line);
     let parts: Vec<&[u8]> = if line.is_empty() {
         vec![line]
     } else {
@@ -717,6 +763,8 @@ pub struct Conversation {
     session: u64,
     crypto: Arc<Mutex<Session>>,
     joiner: Joiner,
+    /// S4: the master said it unpacks long lines (it answered the probe).
+    packing: Arc<AtomicBool>,
 }
 
 /// Sends a conversation's lines from another thread, at once (sl1): the reader's wait never holds them.
@@ -725,13 +773,15 @@ pub struct ConversationSender {
     link: LinkSender,
     session: u64,
     crypto: Arc<Mutex<Session>>,
+    packing: Arc<AtomicBool>,
 }
 
 impl ConversationSender {
     pub fn send_line(&self, line: &str) -> Result<(), String> {
         // Held while the parts go out, so their order matches the order they were sealed in.
         let mut crypto = self.crypto.lock().unwrap_or_else(|e| e.into_inner());
-        for m in seal_line(&mut crypto, self.session, line.as_bytes())? {
+        let packing = self.packing.load(Ordering::SeqCst);
+        for m in seal_line(&mut crypto, self.session, line.as_bytes(), packing)? {
             self.link.send(&m)?;
         }
         Ok(())
@@ -768,6 +818,12 @@ pub fn open_session(p: &Paired) -> Result<Conversation, String> {
                 session,
                 crypto: Arc::new(Mutex::new(crypto)),
                 joiner: Joiner::default(),
+                packing: Arc::default(),
+            })
+            .and_then(|mut c| {
+                // S4: asks whether the master unpacks long lines (an older one leaves the line).
+                c.send_line(PACK_PROBE)?;
+                Ok(c)
             })
         }
         Msg::Reject { reason, .. } => Err(reason),
@@ -785,6 +841,7 @@ impl Conversation {
             link: self.link.sender(),
             session: self.session,
             crypto: self.crypto.clone(),
+            packing: self.packing.clone(),
         }
     }
 
@@ -802,10 +859,15 @@ impl Conversation {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .open(&unb64(&body)?)?;
-                Ok(self
-                    .joiner
-                    .add(plain, more)?
-                    .map(|line| String::from_utf8_lossy(&line).to_string()))
+                let Some(line) = self.joiner.add(plain, more)? else {
+                    return Ok(None);
+                };
+                // S4: the master's answer to the probe: it unpacks, so long lines go packed from now on.
+                if line == PACK_PROBE.as_bytes() {
+                    self.packing.store(true, Ordering::SeqCst);
+                    return Ok(None);
+                }
+                Ok(Some(String::from_utf8_lossy(&unpack(line)?).to_string()))
             }
             Some(Msg::Close { session }) if session == self.session => {
                 Err("The other computer ended the connection.".into())
@@ -900,6 +962,10 @@ struct LiveSession {
     input: Sender<Vec<u8>>,
     crypto: Arc<Mutex<Session>>,
     joiner: Joiner,
+    /// S4: the app said it unpacks long lines; answers go packed.
+    packing: Arc<AtomicBool>,
+    /// What the session's answers are written to (sealed in order); the probe's answer goes here too.
+    out: Arc<Mutex<Box<dyn Write + Send>>>,
 }
 
 #[derive(Default)]
@@ -954,6 +1020,7 @@ struct SealingWriter {
     crypto: Arc<Mutex<Session>>,
     outbox: Sender<Msg>,
     pending: Vec<u8>,
+    packing: Arc<AtomicBool>,
 }
 
 impl Write for SealingWriter {
@@ -970,6 +1037,7 @@ impl Write for SealingWriter {
                 &mut self.crypto.lock().unwrap_or_else(|e| e.into_inner()),
                 self.session,
                 &line[..line.len() - 1],
+                self.packing.load(Ordering::SeqCst),
             )
             .map_err(std::io::Error::other)?;
             for m in sealed {
@@ -1360,6 +1428,15 @@ impl RelayMaster {
                     true,
                 )?));
                 let (input, rx) = channel::<Vec<u8>>();
+                let packing = Arc::new(AtomicBool::new(false));
+                let out: Arc<Mutex<Box<dyn Write + Send>>> =
+                    Arc::new(Mutex::new(Box::new(SealingWriter {
+                        session,
+                        crypto: crypto.clone(),
+                        outbox: tx.clone(),
+                        pending: Vec::new(),
+                        packing: packing.clone(),
+                    })));
                 self.inner
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
@@ -1370,8 +1447,10 @@ impl RelayMaster {
                             device: device.name.clone(),
                             since: now_secs(),
                             input,
-                            crypto: crypto.clone(),
+                            crypto,
                             joiner: Joiner::default(),
+                            packing,
+                            out: out.clone(),
                         },
                     );
                 self.log(&device.name, "connected");
@@ -1380,13 +1459,6 @@ impl RelayMaster {
                     nonce: b64(&mine),
                     direct: None,
                 });
-                let out: Arc<Mutex<Box<dyn Write + Send>>> =
-                    Arc::new(Mutex::new(Box::new(SealingWriter {
-                        session,
-                        crypto,
-                        outbox: tx.clone(),
-                        pending: Vec::new(),
-                    })));
                 let master = master.clone();
                 std::thread::spawn(move || {
                     let reader = std::io::BufReader::new(ChannelReader {
@@ -1411,8 +1483,25 @@ impl RelayMaster {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .open(&unb64(&body)?)
-                    .and_then(|p| live.joiner.add(p, more));
+                    .and_then(|p| live.joiner.add(p, more))
+                    .and_then(|line| match line {
+                        Some(l) if l != PACK_PROBE.as_bytes() => unpack(l).map(Some),
+                        other => Ok(other),
+                    });
                 match plain {
+                    // S4: the app unpacks long lines; it is told this master does too, and answers go packed.
+                    Ok(Some(line)) if line == PACK_PROBE.as_bytes() => {
+                        live.packing.store(true, Ordering::SeqCst);
+                        let out = live.out.clone();
+                        drop(i);
+                        let _ = out.lock().unwrap_or_else(|e| e.into_inner()).write_all(
+                            format!(
+                                "{PACK_PROBE}
+"
+                            )
+                            .as_bytes(),
+                        );
+                    }
                     // A part of a long line: the rest is still coming.
                     Ok(None) => {}
                     Ok(Some(mut line)) => {
@@ -1953,6 +2042,8 @@ mod tests {
             serde_json::json!({"projectId": pid, "path": "big.txt"}),
         );
         assert_eq!(read["ok"]["text"].as_str().unwrap(), big);
+        // S4: the master answered the probe, so both sides packed this long text.
+        assert!(c.packing.load(Ordering::SeqCst));
         // The same session still answers: nothing was cut.
         let again = ask(&mut c, 4, "projects_list", serde_json::json!({}));
         assert!(again.get("ok").is_some());
@@ -2022,6 +2113,59 @@ mod tests {
         rm.configure(&relay, "Home PC", false, master).unwrap();
     }
 
+    /// S4: long lines go packed and come back as they were; short ones, and ones packing would not shrink, go as
+    /// they are; a broken packed line is refused, never read as text.
+    #[test]
+    fn long_lines_go_packed_and_come_back_whole() {
+        let text: Vec<u8> = (0..4000)
+            .flat_map(|i| {
+                format!(
+                    "{{\"line\":{i},\"text\":\"some chat text\"}}
+"
+                )
+                .into_bytes()
+            })
+            .collect();
+        let packed = pack(&text).expect("long text packs");
+        assert_eq!(packed[0], PACKED);
+        assert!(
+            packed.len() * 3 < text.len(),
+            "{} of {}",
+            packed.len(),
+            text.len()
+        );
+        assert_eq!(unpack(packed).unwrap(), text);
+        assert!(pack(br#"{"id":1,"ok":true}"#).is_none());
+        let mut x = 0x9e37_79b9_7f4a_7c15u64;
+        let noise: Vec<u8> = (0..40_000)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                (x >> 24) as u8
+            })
+            .collect();
+        assert!(pack(&noise).is_none(), "random bytes do not shrink");
+        assert_eq!(unpack(b"{}".to_vec()).unwrap(), b"{}");
+        assert!(unpack(vec![PACKED, 0xff, 0x00, 0x13]).is_err());
+        // Sealed packed in parts, opened and put back together, then unpacked.
+        let key = [7u8; 32];
+        let (a, b) = ([1u8; 16], [2u8; 16]);
+        let mut send = Session::new(&key, &a, &b, false).unwrap();
+        let mut recv = Session::new(&key, &a, &b, true).unwrap();
+        let mut j = Joiner::default();
+        let mut whole = None;
+        for m in seal_line(&mut send, 9, &text, true).unwrap() {
+            let Msg::Data { body, more, .. } = m else {
+                panic!("not data")
+            };
+            whole = j
+                .add(recv.open(&unb64(&body).unwrap()).unwrap(), more)
+                .unwrap();
+        }
+        assert_eq!(unpack(whole.unwrap()).unwrap(), text);
+    }
+
     #[test]
     fn a_long_line_is_sealed_in_parts_and_put_back_together() {
         let key = [7u8; 32];
@@ -2029,7 +2173,7 @@ mod tests {
         let mut send = Session::new(&key, &a, &b, false).unwrap();
         let mut recv = Session::new(&key, &a, &b, true).unwrap();
         let line = vec![b'x'; PART * 2 + 10];
-        let msgs = seal_line(&mut send, 9, &line).unwrap();
+        let msgs = seal_line(&mut send, 9, &line, false).unwrap();
         assert_eq!(msgs.len(), 3);
         let mut j = Joiner::default();
         let mut out = None;
@@ -2045,7 +2189,7 @@ mod tests {
         }
         assert_eq!(out.unwrap(), line);
         // A short line stays one message, as before.
-        assert_eq!(seal_line(&mut send, 9, b"{}").unwrap().len(), 1);
-        assert_eq!(seal_line(&mut send, 9, b"").unwrap().len(), 1);
+        assert_eq!(seal_line(&mut send, 9, b"{}", true).unwrap().len(), 1);
+        assert_eq!(seal_line(&mut send, 9, b"", true).unwrap().len(), 1);
     }
 }

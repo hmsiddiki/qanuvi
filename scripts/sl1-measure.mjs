@@ -5,18 +5,27 @@ import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 const [bin, root, relay = ""] = process.argv.slice(2);
+// Master A may run another build (SL1_BIN_A), to check an older master against a newer caller and back.
+const binA = process.env.SL1_BIN_A || bin;
 const A = `${root}/a`,
   B = `${root}/b`,
   P = `${root}/proj`;
 fs.rmSync(root, { recursive: true, force: true });
 for (const d of [A, B, P]) fs.mkdirSync(d, { recursive: true });
 for (let i = 0; i < 40; i++) fs.writeFileSync(`${P}/f${i}.txt`, `file ${i}\n`);
-fs.writeFileSync(`${P}/big.txt`, "x".repeat(200_000));
+// About 200 KB of text that packs as real code and chat lines do (not one letter over and over).
+fs.writeFileSync(
+  `${P}/big.txt`,
+  Array.from(
+    { length: 4000 },
+    (_, i) => `line ${i}: const value${i % 97} = compute(${i}, "${(i * 7919).toString(36)}");`,
+  ).join("\n"),
+);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => Number(process.hrtime.bigint()) / 1e6;
 
-function bridge(data) {
-  const io = spawn(bin, ["--stdio", "--data", data]);
+function bridge(data, exe = bin) {
+  const io = spawn(exe, ["--stdio", "--data", data]);
   let buf = "",
     waiting = new Map(),
     id = 0;
@@ -64,10 +73,10 @@ async function tcpRtt(host, port) {
   return stats(xs);
 }
 
-const sa = spawn(bin, ["serve", "--data", A], { stdio: "ignore" });
+const sa = spawn(binA, ["serve", "--data", A], { stdio: "ignore" });
 const sb = spawn(bin, ["serve", "--data", B], { stdio: "ignore" });
 await sleep(3000);
-const a = bridge(A),
+const a = bridge(A, binA),
   b = bridge(B);
 let serverId = "",
   pairing = "";
@@ -156,7 +165,7 @@ try {
   b.io.kill();
   for (const d of [A, B]) {
     try {
-      execFileSync(bin, ["stop", "--data", d], { encoding: "utf8" });
+      execFileSync(d === A ? binA : bin, ["stop", "--data", d], { encoding: "utf8" });
     } catch {}
   }
   sa.kill();

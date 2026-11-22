@@ -211,8 +211,11 @@ pub fn command_for(
 
 impl Connection {
     fn send(&self, msg: &Value) -> Result<(), String> {
+        // sl1: made first and written once (JSON written straight in goes out piece by piece, see master send_line).
+        let mut line = msg.to_string();
+        line.push('\n');
         let mut w = self.stdin.lock().unwrap_or_else(|e| e.into_inner());
-        writeln!(w, "{msg}")
+        w.write_all(line.as_bytes())
             .and_then(|_| w.flush())
             .map_err(|_| "The connection to the master has ended.".to_string())
     }

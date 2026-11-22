@@ -72,6 +72,8 @@ getrandom = "0.4.3"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"], optional = true }
 ureq = { version = "3", features = ["platform-verifier"] }
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+# sl1 S4: long lines over the relay go packed (the same deflate the zip crate already brings).
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
 sha2 = "0.11.1"
 minisign-verify = "0.3"
 spake2 = "0.4.0"

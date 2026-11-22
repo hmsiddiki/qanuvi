@@ -102,8 +102,12 @@ pub struct Master {
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
 
 fn send_line(out: &Out, v: &Value) -> bool {
+    // sl1: the line is made first and written once. Written straight into the connection, JSON goes out piece by
+    // piece (each escaped newline or quote its own write): a 4,000-line file took ~190 ms on every road.
+    let mut line = v.to_string();
+    line.push('\n');
     let mut w = out.lock().unwrap_or_else(|e| e.into_inner());
-    writeln!(w, "{v}").and_then(|_| w.flush()).is_ok()
+    w.write_all(line.as_bytes()).and_then(|_| w.flush()).is_ok()
 }
 
 fn s(args: &Value, k: &str) -> String {
