@@ -1735,7 +1735,16 @@ runs on or off; with it off nothing is sent anywhere.
         and the usual reconnect runs (master after 1 s, window retry after 2 s). IPv6 on the same /64 is the same
         network (temporary addresses). Test a_link_notices_that_this_computer_changed_network; Rust 624 pass, clippy
         clean. Not covered: a direct link that dies while the address stays (45 s quiet wait, calls in it lost).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after d2): all pushed, unpublished: d1 + d2.
+    0.1.41 PUBLISHED (owner "publish anyway", 2026-11-23 01:05; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+      tag v0.1.41, d1 + d2 on top of 0.1.40. All 4 platforms via E:/qc-scratch/release-0.1.41/chan (run.sh +
+      notes.txt), CARGO_BUILD_JOBS=2. Old latest.json (0.1.40) in E:/Backups/qanuvi/channel-before-0.1.41.
+      Online: latest.json + all 8 files 200, sizes match, latest.json says 0.1.41.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.41): all pushed, nothing
+      unpublished. NEXT: owner updates This PC + laptop to 0.1.41, then the hotspot drive again on the installed
+      apps (expected: a few seconds of "reconnecting" each way, the label "connected" on the hotspot and
+      "connected · direct" back home). Then the roadmap (big-plan basics + stable Windows/Linux, planned with the
+      owner first).
+    PICKUP POINT (before, 2026-11-23 after d2): all pushed, unpublished: d1 + d2.
       NEXT: 0.1.41 (ask), then the hotspot drive again on the installed apps (expected: a few seconds of
       "reconnecting" each way, the label "connected" on the hotspot and "connected · direct" back home). Then the roadmap (big-plan basics + stable
       Windows/Linux, planned with the owner first).
