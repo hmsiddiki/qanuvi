@@ -124,8 +124,8 @@ install -d -o "$NAME" -g "$NAME" -m 0750 "$DATA"
 install -m 0755 "$HERE/$NAME" "$BIN"
 say "program: $BIN$( [ -f "$BIN.prev" ] && echo " (the one before kept as $NAME.prev)")"
 
-# Both IPv4 and IPv6 when the server has IPv6 ([::] takes both), else IPv4 only.
-if [ -s /proc/net/if_inet6 ]; then LISTEN="[::]:$PORT"; else LISTEN="0.0.0.0:$PORT"; fi
+# Both IPv4 and IPv6 when the server has IPv6 ([::] takes both), else IPv4 only. (/proc files show size 0, so read it.)
+if grep -q . /proc/net/if_inet6 2>/dev/null; then LISTEN="[::]:$PORT"; else LISTEN="0.0.0.0:$PORT"; fi
 FLAGS="--tls-listen $LISTEN --data $DATA"
 [ -n "$CAP" ] && FLAGS="$FLAGS --cap-per-day $CAP"
 AFTER=network-online.target

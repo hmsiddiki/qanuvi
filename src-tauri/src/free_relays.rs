@@ -130,7 +130,7 @@ pub fn load(data: &Path) -> (Vec<FreeRelay>, String) {
 fn probe(url: &str) -> Result<u64, String> {
     let started = Instant::now();
     let link = crate::relay_client::Link::connect(url)?;
-    drop(link);
+    link.end();
     Ok(started.elapsed().as_millis() as u64)
 }
 

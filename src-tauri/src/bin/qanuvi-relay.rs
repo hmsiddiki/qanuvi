@@ -108,7 +108,7 @@ fn check(addr: Option<String>) {
     let started = std::time::Instant::now();
     match qanuvi_lib::relay_client::Link::connect(&addr) {
         Ok(link) => {
-            drop(link);
+            link.end();
             println!(
                 "OK: the relay answered in {} ms.",
                 started.elapsed().as_millis()

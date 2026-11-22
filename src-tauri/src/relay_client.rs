@@ -427,6 +427,22 @@ impl Link {
         self
     }
 
+    /// Ends the link the polite way (WebSocket close, answered by the relay), so a quick test leaves no "closed
+    /// without close_notify" line in the relay's log.
+    pub fn end(mut self) {
+        let _ = self.ws.close(None);
+        let until = Instant::now() + Duration::from_secs(1);
+        while Instant::now() < until {
+            match self.ws.read() {
+                Ok(_) => {}
+                Err(tungstenite::Error::Io(e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(_) => break,
+            }
+        }
+    }
+
     pub fn send(&mut self, m: &Msg) -> Result<(), String> {
         self.ws
             .send(Message::text(serde_json::to_string(m).unwrap_or_default()))
