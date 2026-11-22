@@ -1,6 +1,6 @@
 # 24rl: a relay for 50-100k devices at once (proposal, 2026-11-21)
 
-Status: PART 1 DONE (R1-R5, deployed on basevm376, in 0.1.35/0.1.36). PART 2a DONE (in 0.1.37, driven on both machines). PART 3 BUILT (F1-F5, unpublished, cap not deployed). Earlier: 2a AGREED and BUILT
+Status: PART 1 DONE (R1-R5, deployed on basevm376, in 0.1.35/0.1.36). PART 2a DONE (in 0.1.37, driven on both machines). PART 3 DONE (0.1.38, cap deployed). RELAY KIT BUILT (K1-K6, unpublished; setup.sh as root not driven). Earlier: 2a AGREED and BUILT
 (not driven live yet). Parts 2, 3 and the relay kit are outlines; each gets its own detailed write-up before it is built.
 Order: 2a, then 3 (free relays + fair use), then the kit (alongside or after 3); part 2 (direct links) goes with sl1.
 

@@ -263,6 +263,7 @@
   .addr {
     font-family: var(--qx-font-mono, monospace);
     user-select: text;
+    overflow-wrap: anywhere;
   }
 
   .live {

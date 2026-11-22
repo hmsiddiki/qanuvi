@@ -1599,6 +1599,27 @@ runs on or off; with it off nothing is sent anywhere.
     RELAY KIT WRITTEN UP (2026-11-22): docs/PLAN-24RL.md "Relay kit in detail" (K1 setup.sh, K2 certificate,
       K3 qanuvi-relay check, K4 signed download on the channel, K5 link under "Your own relay"); 4 questions with
       defaults wait for the owner. fb1 + fb2 still unpublished. Next: owner's answers, then build K1-K5.
+    RELAY KIT REVISED + BUILT (owner 2026-11-22: a domain and port 80 are unrealistic; a VPS may have only an IP, a
+      hosting server owns 80/443): no domain, no port 80, no certbot, nginx untouched. Pairing is SPAKE2 and messages
+      are sealed end to end, so the relay's TLS only hides metadata; a relay now makes its own certificate and apps
+      check it by the pin in the address. 54c15e2 + 99a1bf9:
+      K1 qanuvi-relay --tls-self (rcgen cert in <data>/tls-self, key 0600, kept) + `qanuvi-relay address`.
+      K2 relay_client: wss://IP:port#pin=<sha256 base64url, 43>; PinVerifier (pin only, TLS signatures still
+        checked); pin never sent; host_of/port parse stop at #; a pinned relay ignores a told direct address.
+      K3 deploy/relay/kit/setup.sh (sudo ./setup.sh; host from own routes, NAT/CGNAT note; --host --port --cert/--key
+        --cap-per-day --remove [--purge]; ufw/firewalld; rerun = update, same address). K4 `qanuvi-relay check`.
+      K5 scripts/build-relay-kit.sh (Linux) + scripts/publish-relay-kit.mjs (sign, copy to channel; asks).
+      K6 hint + "download the relay kit" under Your own relay (RELAY_KIT_URL in remoteAccess store); long address
+        wraps on the code card. Owner question answered: no dedicated IP needed (shared IP fine, own port);
+        dynamic IP = forward + dynamic DNS; CGNAT = no relay there (Qanuvi's or a free relay).
+      Tests: relay 31/31 (new: self-made kept, right pin connects, wrong + missing refused; pinned addresses checked),
+        clippy clean (server build), TS stores 187, svelte-check 0. Kit built on the laptop (1.3 MB, sha256 OK);
+        relay from the unpacked kit on the laptop's LAN IP: check OK by pin, same address after restart, no pin =
+        UnknownIssuer; scratch folder removed.
+      NOT DRIVEN: setup.sh as root (laptop sudo needs the owner's password; it would also open a port in the laptop's
+        active ufw); pairing a master + device through a pinned relay (Link is shared, unit-tested); the kit link in a
+        window. Kit not published (RELAY_KIT_URL 404 until then). MOVE TO qanuvi.com: RELAY_KIT_URL is a 4th address.
+      Next (ask): owner runs sudo ./setup.sh on the laptop or a VPS (or allows it), publish the kit + 0.1.39; then sl1.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
