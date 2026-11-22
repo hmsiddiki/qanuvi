@@ -86,29 +86,33 @@ fn fail(why: impl std::fmt::Display) -> ! {
 /// Relay kit K1: the address of a relay with its own certificate (made now if it is not there yet).
 fn address(host: Option<String>, port: Option<String>, data: Option<String>) {
     let host = host.unwrap_or_else(|| fail(format!("address needs --host <IP or name>.\n{USAGE}")));
-    let data = data
-        .unwrap_or_else(|| fail("address needs --data <folder> (where the relay keeps its certificate)."));
+    let data = data.unwrap_or_else(|| {
+        fail("address needs --data <folder> (where the relay keeps its certificate).")
+    });
     let port = port.unwrap_or_else(|| "47443".into());
     let host = if host.contains(':') && !host.starts_with('[') {
         format!("[{host}]")
     } else {
         host
     };
-    let files =
-        qanuvi_lib::relay_server::self_made(std::path::Path::new(&data)).unwrap_or_else(|e| fail(e));
+    let files = qanuvi_lib::relay_server::self_made(std::path::Path::new(&data))
+        .unwrap_or_else(|e| fail(e));
     let pin = qanuvi_lib::relay_server::pin_of_file(&files.cert).unwrap_or_else(|e| fail(e));
     println!("wss://{host}:{port}#pin={pin}");
 }
 
 /// Relay kit K4: connects to a relay as an app would (TLS, checked by the pin when the address has one).
 fn check(addr: Option<String>) {
-    let addr =
-        addr.unwrap_or_else(|| fail("check needs an address, like wss://203.0.113.5:47443#pin=..."));
+    let addr = addr
+        .unwrap_or_else(|| fail("check needs an address, like wss://203.0.113.5:47443#pin=..."));
     let started = std::time::Instant::now();
     match qanuvi_lib::relay_client::Link::connect(&addr) {
         Ok(link) => {
             drop(link);
-            println!("OK: the relay answered in {} ms.", started.elapsed().as_millis());
+            println!(
+                "OK: the relay answered in {} ms.",
+                started.elapsed().as_millis()
+            );
         }
         Err(e) => fail(format!("Not reached: {e}")),
     }

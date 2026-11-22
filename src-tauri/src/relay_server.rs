@@ -235,8 +235,8 @@ impl Relay {
         let wait = match self.cap {
             Some(cap) if u.bytes > cap => {
                 let start = u.next_free.max(now);
-                u.next_free = start
-                    + Duration::from_secs_f64(body.len() as f64 / self.slow_to.max(1) as f64);
+                u.next_free =
+                    start + Duration::from_secs_f64(body.len() as f64 / self.slow_to.max(1) as f64);
                 (start > now).then_some(start)
             }
             _ => None,
@@ -869,9 +869,15 @@ pub fn self_made(data: &Path) -> Result<TlsFiles, String> {
     if files.cert.is_file() && files.key.is_file() {
         return Ok(files);
     }
-    let fail = |e: &dyn std::fmt::Display| format!("The relay could not make its certificate in {}: {e}", dir.display());
+    let fail = |e: &dyn std::fmt::Display| {
+        format!(
+            "The relay could not make its certificate in {}: {e}",
+            dir.display()
+        )
+    };
     std::fs::create_dir_all(&dir).map_err(|e| fail(&e))?;
-    let made = rcgen::generate_simple_self_signed(vec!["qanuvi-relay".to_string()]).map_err(|e| fail(&e))?;
+    let made = rcgen::generate_simple_self_signed(vec!["qanuvi-relay".to_string()])
+        .map_err(|e| fail(&e))?;
     let key_tmp = dir.join("key.pem.new");
     {
         let mut o = std::fs::OpenOptions::new();
@@ -882,7 +888,8 @@ pub fn self_made(data: &Path) -> Result<TlsFiles, String> {
             o.mode(0o600);
         }
         let mut file = o.open(&key_tmp).map_err(|e| fail(&e))?;
-        std::io::Write::write_all(&mut file, made.signing_key.serialize_pem().as_bytes()).map_err(|e| fail(&e))?;
+        std::io::Write::write_all(&mut file, made.signing_key.serialize_pem().as_bytes())
+            .map_err(|e| fail(&e))?;
     }
     std::fs::write(dir.join("cert.pem.new"), made.cert.pem()).map_err(|e| fail(&e))?;
     std::fs::rename(&key_tmp, &files.key).map_err(|e| fail(&e))?;
@@ -1009,8 +1016,14 @@ pub fn run_with(options: &Options) -> Result<(), String> {
             let files = match (&options.tls, options.tls_self, &options.data) {
                 (Some(files), _, _) => files.clone(),
                 (None, true, Some(data)) => self_made(data)?,
-                (None, true, None) => return Err("--tls-self needs --data <folder> (the certificate is kept there).".into()),
-                (None, false, _) => return Err("--tls-listen needs --cert and --key, or --tls-self.".into()),
+                (None, true, None) => {
+                    return Err(
+                        "--tls-self needs --data <folder> (the certificate is kept there).".into(),
+                    );
+                }
+                (None, false, _) => {
+                    return Err("--tls-listen needs --cert and --key, or --tls-self.".into());
+                }
             };
             Some((bind(addr)?, Certs::load(files)?))
         }
@@ -1060,6 +1073,10 @@ fn bind(addr: &str) -> Result<std::net::TcpListener, String> {
     .map_err(err)?;
     #[cfg(unix)]
     socket.set_reuse_address(true).map_err(err)?;
+    // Relay kit: [::] takes IPv4 links too (one listener for both; a server with only a public IPv6 address).
+    if at.is_ipv6() && at.ip().is_unspecified() {
+        socket.set_only_v6(false).map_err(err)?;
+    }
     socket.bind(&at.into()).map_err(err)?;
     socket.listen(4096).map_err(err)?;
     Ok(socket.into())
@@ -1462,18 +1479,32 @@ mod tests {
         // No cap: 40 KB passes at once, and nothing is said about use.
         let open = start_local().unwrap();
         let (took, usage) = send_40kb(&open);
-        assert!(took < Duration::from_millis(800), "no cap, yet slow: {took:?}");
+        assert!(
+            took < Duration::from_millis(800),
+            "no cap, yet slow: {took:?}"
+        );
         assert!(usage.is_empty(), "{usage:?}");
 
         // A 10 KB cap, 20 KB/s after it: the 30 KB over the cap take about 1.5 s, and all of it arrives.
         let (capped, _) = start_local_capped(10 << 10, 20 << 10).unwrap();
         let (took, usage) = send_40kb(&capped);
-        assert!(took >= Duration::from_millis(1200), "over the cap, yet fast: {took:?}");
+        assert!(
+            took >= Duration::from_millis(1200),
+            "over the cap, yet fast: {took:?}"
+        );
         assert!(took < Duration::from_secs(6), "slowed too far: {took:?}");
         // Told when near (80%) and when over, with the cap and the end of the slow time (next UTC midnight).
-        assert!(usage.iter().any(|(used, cap, slowed)| *cap == 10 << 10 && *used * 5 >= *cap * 4 && *slowed == 0), "{usage:?}");
+        assert!(
+            usage.iter().any(|(used, cap, slowed)| *cap == 10 << 10
+                && *used * 5 >= *cap * 4
+                && *slowed == 0),
+            "{usage:?}"
+        );
         let midnight = (today() + 1) * 86_400;
-        assert!(usage.iter().any(|(_, _, slowed)| *slowed == midnight), "{usage:?}");
+        assert!(
+            usage.iter().any(|(_, _, slowed)| *slowed == midnight),
+            "{usage:?}"
+        );
     }
 
     #[test]
@@ -1760,17 +1791,55 @@ mod tests {
         let files = self_made(dir.path()).unwrap();
         let pin = pin_of_file(&files.cert).unwrap();
         let again = self_made(dir.path()).unwrap();
-        assert_eq!(pin_of_file(&again.cert).unwrap(), pin, "made once, then kept");
+        assert_eq!(
+            pin_of_file(&again.cert).unwrap(),
+            pin,
+            "made once, then kept"
+        );
         let (_plain, port, _relay) = start_both(files);
         let right = format!("wss://127.0.0.1:{port}#pin={pin}");
         assert!(crate::relay_client::check_relay_url(&right).is_ok());
-        assert!(crate::relay_client::Link::connect(&right).is_ok(), "the right pin connects");
+        assert!(
+            crate::relay_client::Link::connect(&right).is_ok(),
+            "the right pin connects"
+        );
         let wrong = format!("wss://127.0.0.1:{port}#pin={}", "A".repeat(43));
-        let e = crate::relay_client::Link::connect(&wrong).err().expect("a wrong pin is refused");
+        let e = crate::relay_client::Link::connect(&wrong)
+            .err()
+            .expect("a wrong pin is refused");
         assert!(e.contains("not the relay you set up"), "{e}");
         assert!(
             crate::relay_client::Link::connect(&format!("wss://127.0.0.1:{port}")).is_err(),
             "without the pin a self-made certificate is not trusted"
         );
+    }
+
+    /// Relay kit: one listener on [::] takes IPv4 and IPv6 links, and a pinned IPv6 address (brackets) connects.
+    #[test]
+    fn a_dual_stack_listener_takes_both_and_a_pinned_ipv6_address_connects() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = self_made(dir.path()).unwrap();
+        let pin = pin_of_file(&files.cert).unwrap();
+        let Ok(listener) = bind("[::]:0") else {
+            return; // no IPv6 on this machine
+        };
+        let port = listener.local_addr().unwrap().port();
+        let certs = Certs::load(files).unwrap();
+        let relay = Relay::new(None);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        std::thread::spawn(move || {
+            rt.block_on(async move {
+                let _ = relay.tls_accept_loop(listener, certs).await;
+            })
+        });
+        for host in ["[::1]", "127.0.0.1"] {
+            let addr = format!("wss://{host}:{port}#pin={pin}");
+            let link = crate::relay_client::Link::connect(&addr);
+            assert!(link.is_ok(), "{addr}: {:?}", link.err());
+        }
     }
 }

@@ -124,7 +124,9 @@ install -d -o "$NAME" -g "$NAME" -m 0750 "$DATA"
 install -m 0755 "$HERE/$NAME" "$BIN"
 say "program: $BIN$( [ -f "$BIN.prev" ] && echo " (the one before kept as $NAME.prev)")"
 
-FLAGS="--tls-listen 0.0.0.0:$PORT --data $DATA"
+# Both IPv4 and IPv6 when the server has IPv6 ([::] takes both), else IPv4 only.
+if [ -s /proc/net/if_inet6 ]; then LISTEN="[::]:$PORT"; else LISTEN="0.0.0.0:$PORT"; fi
+FLAGS="--tls-listen $LISTEN --data $DATA"
 [ -n "$CAP" ] && FLAGS="$FLAGS --cap-per-day $CAP"
 AFTER=network-online.target
 if [ -n "$CERT" ]; then
@@ -212,6 +214,11 @@ echo
 echo "In Qanuvi: Settings, Reach this computer from anywhere, Relay · Change, Your own relay, paste it."
 echo "Qanuvi tests it when it is pasted; if it is not reached from there, open TCP port $PORT in your hosting"
 echo "panel's or cloud provider's firewall too (they sit in front of this server)."
+case "$HOST" in *:*)
+  echo
+  echo "Note: this is an IPv6 address (this server has no public IPv4 one). Devices on networks without IPv6 cannot"
+  echo "reach it; for those, use a server with a public IPv4 address, Qanuvi's relay or a free relay." ;;
+esac
 if [ "$BEHIND_NAT" = 1 ]; then
   echo
   echo "Note: this server has only a private address ($HOST), so it is behind NAT. Forward TCP port $PORT on the"

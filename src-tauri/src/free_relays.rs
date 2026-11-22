@@ -55,8 +55,8 @@ const CACHE: &str = "free-relays.json";
 pub fn read_list(bytes: &[u8], signature: &str, key: &str) -> Result<Vec<FreeRelay>, String> {
     crate::master_update::verify(bytes, signature, key)
         .map_err(|_| "The free relay list's signature is wrong, so it was refused.".to_string())?;
-    let list: List =
-        serde_json::from_slice(bytes).map_err(|e| format!("The free relay list does not read: {e}"))?;
+    let list: List = serde_json::from_slice(bytes)
+        .map_err(|e| format!("The free relay list does not read: {e}"))?;
     let mut seen = Vec::new();
     Ok(list
         .relays
@@ -118,12 +118,7 @@ pub fn load(data: &Path) -> (Vec<FreeRelay>, String) {
                 .ok()
                 .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
                 .and_then(|v| {
-                    read_list(
-                        v["list"].as_str()?.as_bytes(),
-                        v["sig"].as_str()?,
-                        &key,
-                    )
-                    .ok()
+                    read_list(v["list"].as_str()?.as_bytes(), v["sig"].as_str()?, &key).ok()
                 })
                 .unwrap_or_default();
             (old, e)

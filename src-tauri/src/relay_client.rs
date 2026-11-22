@@ -40,7 +40,10 @@ pub fn check_relay_url(url: &str) -> Result<String, String> {
     }
     let (base, pin) = split_pin(u);
     if pin.is_some_and(|p| !pin_ok(p)) || (u.contains('#') && pin.is_none()) {
-        return Err("The relay address has a broken #pin= part (copy the whole address the relay printed).".into());
+        return Err(
+            "The relay address has a broken #pin= part (copy the whole address the relay printed)."
+                .into(),
+        );
     }
     if pin.is_some() && !base.to_ascii_lowercase().starts_with("wss://") {
         return Err("A relay address with #pin= must start with wss://.".into());
@@ -143,18 +146,34 @@ impl rustls::client::danger::ServerCertVerifier for PinVerifier {
     }
 }
 
-fn pinned_connector(pin: &str) -> Option<tungstenite::Connector> {
+fn pinned_config(pin: &str) -> Result<Arc<rustls::ClientConfig>, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = rustls::ClientConfig::builder_with_provider(provider.clone())
         .with_safe_default_protocol_versions()
-        .ok()?
+        .map_err(|e| e.to_string())?
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(PinVerifier {
             pin: pin.to_string(),
             provider,
         }))
         .with_no_client_auth();
-    Some(tungstenite::Connector::Rustls(Arc::new(config)))
+    Ok(Arc::new(config))
+}
+
+/// A pinned relay's TLS, set up here so an IP address (IPv6 too) is the server name; tungstenite would take
+/// "[2001:db8::5]" with its brackets as a DNS name and refuse it.
+fn pinned_tls(
+    host: &str,
+    pin: &str,
+    stream: TcpStream,
+) -> Result<MaybeTlsStream<TcpStream>, String> {
+    let name = rustls::pki_types::ServerName::try_from(host.to_string())
+        .map_err(|e| format!("{host}: {e}"))?;
+    let conn =
+        rustls::ClientConnection::new(pinned_config(pin)?, name).map_err(|e| e.to_string())?;
+    Ok(MaybeTlsStream::Rustls(rustls::StreamOwned::new(
+        conn, stream,
+    )))
 }
 
 /// 24rl R3: how this computer reaches each relay: the relay's own TLS address (learned from the relay), until when
@@ -344,13 +363,18 @@ fn open_ws(url: &str, limit: Duration) -> Result<WebSocket<MaybeTlsStream<TcpStr
         .max(Duration::from_millis(100));
     let _ = stream.set_read_timeout(Some(left));
     let _ = stream.set_write_timeout(Some(left));
-    let (ws, _) = tungstenite::client_tls_with_config(
-        url,
-        stream,
-        None,
-        pin.and_then(pinned_connector).or_else(|| connector(url)),
-    )
-        .map_err(|e| e.to_string())?;
+    let (ws, _) = match pin {
+        Some(pin) if tls => {
+            tungstenite::client(url, pinned_tls(&host, pin, stream)?).map_err(|e| match e {
+                tungstenite::HandshakeError::Failure(e) => e.to_string(),
+                tungstenite::HandshakeError::Interrupted(_) => {
+                    "the relay did not answer in time".to_string()
+                }
+            })?
+        }
+        _ => tungstenite::client_tls_with_config(url, stream, None, connector(url))
+            .map_err(|e| e.to_string())?,
+    };
     let tcp = match ws.get_ref() {
         MaybeTlsStream::Plain(s) => s,
         MaybeTlsStream::Rustls(s) => s.get_ref(),
@@ -920,7 +944,9 @@ impl RelayMaster {
             error: i.error.clone(),
             road: road_of(&i.config.relay).last,
             // A count from another UTC day is gone (the relay starts each day at nothing).
-            usage: i.usage.filter(|u| u.slowed_until == 0 || u.slowed_until > now_secs()),
+            usage: i
+                .usage
+                .filter(|u| u.slowed_until == 0 || u.slowed_until > now_secs()),
         }
     }
 
@@ -1371,7 +1397,10 @@ mod tests {
         assert!(check_relay_url("wss://203.0.113.5:47443#pin=short").is_err());
         assert!(check_relay_url("wss://203.0.113.5:47443#other").is_err());
         assert!(check_relay_url(&format!("ws://127.0.0.1:47443#pin={pin}")).is_err());
-        assert_eq!(host_of(&format!("wss://203.0.113.5:47443#pin={pin}")), "203.0.113.5");
+        assert_eq!(
+            host_of(&format!("wss://203.0.113.5:47443#pin={pin}")),
+            "203.0.113.5"
+        );
         assert!(check_relay_url("https://relay.example.com").is_err());
     }
 
@@ -1469,18 +1498,26 @@ mod tests {
         let wait_connected = |rm: &Arc<RelayMaster>| {
             let deadline = Instant::now() + Duration::from_secs(10);
             while !rm.status().connected {
-                assert!(Instant::now() < deadline, "not connected: {:?}", rm.status());
+                assert!(
+                    Instant::now() < deadline,
+                    "not connected: {:?}",
+                    rm.status()
+                );
                 std::thread::sleep(Duration::from_millis(50));
             }
         };
-        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
         wait_connected(&rm);
-        rm.configure(&relay, "Home PC", false, master.clone()).unwrap();
+        rm.configure(&relay, "Home PC", false, master.clone())
+            .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert!(!rm.status().connected, "turned off reads connected");
-        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
         wait_connected(&rm);
-        rm.configure(&relay2, "Home PC", true, master.clone()).unwrap();
+        rm.configure(&relay2, "Home PC", true, master.clone())
+            .unwrap();
         assert!(
             !rm.status().connected,
             "a changed relay read connected before its welcome"
@@ -1496,10 +1533,15 @@ mod tests {
         let data = tempfile::tempdir().unwrap();
         let master = crate::master::Master::open(data.path()).unwrap().shared();
         let rm = RelayMaster::open(data.path());
-        rm.configure(&relay, "Home PC", true, master.clone()).unwrap();
+        rm.configure(&relay, "Home PC", true, master.clone())
+            .unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
         while !rm.status().connected {
-            assert!(Instant::now() < deadline, "not connected: {:?}", rm.status());
+            assert!(
+                Instant::now() < deadline,
+                "not connected: {:?}",
+                rm.status()
+            );
             std::thread::sleep(Duration::from_millis(50));
         }
         assert_eq!(rm.status().usage, None);
