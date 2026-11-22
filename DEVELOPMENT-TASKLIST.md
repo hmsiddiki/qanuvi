@@ -1831,7 +1831,14 @@ runs on or off; with it off nothing is sent anywhere.
       0.1.43. All 4 platforms via E:/qc-scratch/release-0.1.44/chan (Linux app built on the laptop). Old
       latest.json (0.1.43) in E:/Backups/qanuvi/channel-before-0.1.44. Online: latest.json + all 8 files 200, sizes
       match, latest.json says 0.1.44.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.44): owner updates both machines,
+    Y9 SET UP (2026-11-23, both machines on 0.1.44): scratch copy on the laptop at ~/qc-scratch/y9/qanuvi =
+      05d76c1 (the commit before R1, from a git bundle, no remote) + the benchmark plan docs/PLAN-24Z-A.md (22 steps
+      over R1-R5 as the hand-built work went; its own Run rules: branch yes, allow cargo/npm/npx/node, never
+      ssh/scp/git push; its own Test build for the old master: serve + status | grep Running). npm ci done;
+      baseline green there: Rust 171, window 375. Added to the laptop master as project "qanuvi". The right result
+      to compare with: the hand-built commits 768da32..22dcfb8 (R1, R2a-R2e). NEXT: start the run from the window on
+      This PC (laptop shown), Auto, Claude Code, no budget; watch; then compare and write the result.
+    PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
       from This PC).
     PICKUP POINT (before, 2026-11-23 after Y6): 24y part 3 built apart from Y9
