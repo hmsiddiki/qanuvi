@@ -1765,7 +1765,7 @@ runs on or off; with it off nothing is sent anywhere.
       every program run from ~/.local/lib/qanuvi to end, and a stray master was running there with --data
       ~/.local/share/qanuvi (started at 01:20 by a qanuvi-master command over SSH without --data during the hotspot
       watch). Stopped it; the swap went on at once, app up on 0.1.42, Home PC on + direct: true. The empty stray
-      folder ~/.local/share/qanuvi is still on the laptop (made 01:20, nothing in it; remove when the owner says).
+      folder ~/.local/share/qanuvi was left on the laptop (made 01:20); DELETED on the owner's yes (02:25).
       h3 FOUND (not built, owner to say): on a Linux desktop install, qanuvi-master's default data folder
         (~/.local/share/qanuvi, the server default) is not the app's (~/.local/share/dev.qanuvi.desktop), so a user
         typing "qanuvi-master status" talks to (and starts) a second, empty master, which then holds the next
