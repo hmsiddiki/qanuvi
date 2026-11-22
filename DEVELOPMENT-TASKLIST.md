@@ -1653,7 +1653,7 @@ runs on or off; with it off nothing is sent anywhere.
       can be checked then); then sl1.
     BOTH MACHINES ON 0.1.39 (owner, 2026-11-22; checked: qanuvi-master version 0.1.39 on This PC and the laptop).
       24rl relay kit DONE (kit link in a window still unchecked: ask before opening a window on This PC).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22): all pushed, nothing unpublished, nothing
+    PICKUP POINT (before, 2026-11-22 before sl1): all pushed, nothing unpublished, nothing
       undeployed. basevm376 relay = 75729ed build with the 2 GB cap. The laptop runs the owner's own kit relay
       (wss://[laptop IPv6]:47443#pin=..., service qanuvi-relay; remove: sudo ~/src/rk/qanuvi-relay-kit/setup.sh
       --remove --purge). NEXT: sl1 (slow switch over the relay). The relay server has no read waits since R1 (tokio),
@@ -1671,6 +1671,19 @@ runs on or off; with it off nothing is sent anywhere.
       nodelay, no relay deploy), S2 fewer calls in a row on a switch, S3 = 24rl part 2 direct links (own write-up after),
       S4 compressed big answers (owner's choice). Experiment build reverted (nothing changed in code).
       NEXT: owner's yes on S1-S4, then build S1 and S2.
+    sl1 S1 + S2 + S4 BUILT (owner "s1 to s4 all should be built", "do them in order you think best", 2026-11-22;
+      not driven in a window, unpublished): S1 5ccb5a3 relay links send at once (LinkSender + writer threads, the
+      reader waits on a socket peek, TCP_NODELAY); S2 83b5726 saved tabs + drafts read together (editor openMany),
+      one git_status per switch, plan_run_watch answer saves plan_run_state; S4 2bdddbd long lines packed (deflate,
+      agreed by a sealed probe line, older sides stay plain) + core/window write each JSON line once (found while
+      measuring: a 4,000-line file read took 190 ms even direct). Release masters, scripts/sl1-measure.mjs through
+      relay.qanuvi.com: one call 220 -> 120 ms, 10 at once 410 -> 130-200 ms, 4,000-line file 643 -> 191 ms; old/new
+      mixes work both ways. Rust 620 + window 571 tests, clippy + svelte-check + prettier clean.
+      Owner rule (2026-11-22): own relay / links must never be complicated for users (S3 is zero setup).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after sl1 S1/S2/S4): all pushed, unpublished:
+      sl1 S1/S2/S4. NEXT: owner answers S3's two questions (docs/PLAN-24RL.md "S3 in detail": installer firewall rule
+      on private networks, port 47444), then build S3 (direct links at home), drive This PC <-> laptop with the
+      script, then drive S2 in a test window (ask before driving at the PC), then 0.1.40 (ask).
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in

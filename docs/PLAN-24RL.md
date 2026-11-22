@@ -141,6 +141,44 @@ Direct calls on the same master take 1-27 ms, so almost all of a relayed call is
 **Order:** S1, S2, measure again with the same script (and from the laptop through its kit relay), then S3 in
 detail. S4 only if the owner wants it. Publishing still asks.
 
+**Built 2026-11-22:** S1 5ccb5a3, S2 83b5726, S4 2bdddbd (plus one-write JSON lines in the core and the window:
+a 4,000-line file read went 190 -> 3 ms direct). Release build, same script, through relay.qanuvi.com: one call
+~220 -> ~120 ms (the network floor here), 10 at once ~410 -> ~130-200 ms, the 4,000-line file 643 -> 191 ms. An old
+master with a new caller (and the reverse) works and gets about half of S1; S4 only packs when both sides are new.
+
+### S3 in detail: direct links on the same network (zero setup, owner 2026-11-22)
+
+Owner rule: setting up links or an own relay must never be complicated for users. So S3 has nothing to set up:
+it is found and used by itself, and the relay stays as the fallback.
+
+- D1. **Asked inside the sealed session.** Once a relay session opens, the app sends a control line (like S4's
+  probe) asking for a direct road. A master that knows it answers, sealed with the pairing key, with its
+  private-network addresses (192.168/16, 10/8, 172.16/12, IPv6 ULA and link-local) and its direct port. Nothing is
+  shown to the relay, and public addresses are never offered.
+- D2. **The master listens** on a fixed port (47444; the next free one if taken) for paired apps only. The first
+  frame names the pairing and a fresh nonce. The master looks up the key, and both sides prove they know it (sealed
+  challenge both ways), so an unpaired caller gets nothing and the port is closed again. A few failed tries from
+  one address are held off for a minute.
+- D3. **The app tries each address** with a 300 ms limit, in parallel. The first that proves itself carries the
+  session's lines from then on, with the same sealing and parts as the relay, length-prefixed on TCP with
+  TCP_NODELAY. The relay session stays open, quiet, as the fallback.
+- D4. **Falling back.** If the direct link drops or stops answering, lines go over the relay session at once.
+  Calls in flight are sent again only when their answer has not come (call ids already match answers). A direct
+  road is tried again after a minute, and when the network changes.
+- D5. **What the user sees:** only the status line, "Laptop · direct" or "Laptop · via relay". No setting, no
+  address, no port to type. A Settings switch "Use direct links at home" exists, on by default.
+- D6. **Firewall (owner's choice).** Windows asks about the first listening port with its own dialog. Rather than
+  leave that to users: the installer adds an inbound rule for qanuvi-master.exe on private networks only (removed
+  on uninstall). Without it, Windows shows its dialog once, or direct links stay off and the relay is used. Linux
+  desktops usually have no firewall up; if one is up, the relay is used. Nothing is ever changed on a server
+  (VPS masters keep SSH or the relay).
+- Tests: two masters on loopback (direct found, used, proven, an unpaired caller refused, fallback when the
+  direct link is cut mid-call, an old master ignores the ask). Then on This PC + the laptop (same home network)
+  with the measuring script, and the laptop through its kit relay.
+
+**Questions for the owner before S3 is built:** (1) the installer adds the private-network firewall rule (yes/no);
+(2) port 47444 as the default.
+
 ## Relay kit in detail (2026-11-22; revised after the owner: no domain, no port 80)
 
 Why: "Your own relay" is only a box today. The kit makes it one download and one command on the servers people
