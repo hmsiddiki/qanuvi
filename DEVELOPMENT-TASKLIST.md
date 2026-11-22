@@ -1793,7 +1793,16 @@ runs on or off; with it off nothing is sent anywhere.
         now: Zorin Laptop · direct on the home network (since ...)", status bar hover "Being reached from Zorin
         Laptop · direct on the home network" (usersText; through the relay otherwise). Window polls every 4 s.
         Rust 626 pass, clippy clean; window 574 pass, svelte-check clean. Not driven in a window.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after h3 + h4): all pushed, unpublished:
+    0.1.43 PUBLISHED (owner "publish anyway", 2026-11-23; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+      tag v0.1.43, h3 + h4 on top of 0.1.42. All 4 platforms via E:/qc-scratch/release-0.1.43/chan (run.sh written
+      again: the owner cleared E:/qc-scratch; same exports as before, QANUVI_LINUX_APP_KEY = the laptop key).
+      Old latest.json (0.1.42) in E:/Backups/qanuvi/channel-before-0.1.43. Online: all 8 files + latest.json 200,
+      sizes match, latest.json says 0.1.43. Owner: the qanuvi folder takes ~164 GB (src-tauri/target), clean-up asked.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.43): all pushed, nothing
+      unpublished. NEXT: owner updates both machines, checks "In use now" on Home PC from the laptop says "· direct
+      on the home network"; target folder clean-up (owner); then the roadmap (big-plan basics + stable
+      Windows/Linux, planned with the owner first) in a fresh conversation.
+    PICKUP POINT (before, 2026-11-23 after h3 + h4): all pushed, unpublished:
       h3 + h4. NEXT: 0.1.43 (ask), owner checks "In use now" on Home PC from the laptop says "· direct on the home
       network"; then the roadmap (big-plan basics + stable Windows/Linux, planned with the owner first) in a fresh
       conversation.
