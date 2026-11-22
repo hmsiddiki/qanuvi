@@ -24,7 +24,8 @@ export interface RelayStatus {
   connected: boolean;
   name: string;
   devices: [string, string, number][];
-  sessions: { session: number; device: string; since: number }[];
+  /** h4: direct = its answers go over a direct link on the home network now (missing from older masters). */
+  sessions: { session: number; device: string; since: number; direct?: boolean }[];
   code: [string, number] | null;
   error: string;
   /** 24rl R3: the road the link took: "own port" (the relay's own TLS port) or "443"; missing from older masters. */
@@ -253,3 +254,12 @@ class RemoteAccessStore {
 }
 
 export const remoteAccess = new RemoteAccessStore();
+
+/** h4: who uses this machine now and how each reaches it ("Zorin Laptop · direct on the home network"). */
+export function usersText(sessions: { device: string; direct?: boolean }[]): string {
+  const road = new Map<string, boolean>();
+  for (const s of sessions) road.set(s.device, (road.get(s.device) ?? false) || !!s.direct);
+  return [...road]
+    .map(([d, direct]) => `${d} · ${direct ? "direct on the home network" : "through the relay"}`)
+    .join(", ");
+}

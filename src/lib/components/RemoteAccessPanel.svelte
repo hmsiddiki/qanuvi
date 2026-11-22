@@ -118,7 +118,9 @@
       {#if st.sessions.length}
         <div class="live">
           <strong>In use now:</strong>
-          {#each st.sessions as s (s.session)}<span>{s.device} (since {ago(s.since)})</span>{/each}
+          {#each st.sessions as s (s.session)}<span
+              >{s.device} · {s.direct ? "direct on the home network" : "through the relay"} (since {ago(s.since)})</span
+            >{/each}
           <button type="button" class="btn stop" onclick={() => remoteAccess.stop()}>Stop all</button>
         </div>
       {/if}

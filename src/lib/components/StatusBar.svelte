@@ -30,7 +30,7 @@
   import { layout } from "$lib/layout/layout.svelte";
   import { formatCost } from "$lib/agent/events";
   import { monthStart } from "$lib/plan/routing";
-  import { remoteAccess } from "$lib/stores/remoteAccess.svelte";
+  import { remoteAccess, usersText } from "$lib/stores/remoteAccess.svelte";
   import { shownPlace } from "$lib/remote";
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
 
@@ -194,7 +194,7 @@
 
   {#if remoteAccess.status?.sessions.length}
     {@const who = [...new Set(remoteAccess.status.sessions.map((s) => s.device))].join(", ")}
-    <span class="item static controlled" title="Being reached from {who} through the relay">
+    <span class="item static controlled" title="Being reached from {usersText(remoteAccess.status.sessions)}">
       <MonitorSmartphone size={12} />
       <span>Used from {who}</span>
     </span>

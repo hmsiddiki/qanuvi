@@ -983,6 +983,8 @@ pub struct Live {
     pub session: u64,
     pub device: String,
     pub since: i64,
+    /// h4: its answers go over a direct link on the home network now (else through the relay).
+    pub direct: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -1227,6 +1229,7 @@ impl RelayMaster {
                     session: *s,
                     device: l.device.clone(),
                     since: l.since,
+                    direct: crate::direct::is_up(&l.direct),
                 })
                 .collect(),
             code: i

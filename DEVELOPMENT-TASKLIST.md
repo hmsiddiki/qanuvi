@@ -1780,7 +1780,24 @@ runs on or off; with it off nothing is sent anywhere.
         link per session), "In use now: Zorin Laptop · direct on the home network", the hover the same. Owner also
         read Home PC's own "Connected to the relay (its own port)" as the laptop's road: that line could say
         "(kept for when the direct link drops and for reaching it from outside)" or similar; ask.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.42 on both): all pushed, nothing
+      Owner checked: laptop (This PC picked) Settings -> Servers says "Home PC directly on the home network" (h2 OK).
+      Laptop file share made (owner ran sudo ~/make-share.sh): ~/Shared as \\192.168.0.230\Shared, user neel, Samba
+      from 192.168.0.0/24 only (ufw), old smb.conf kept as smb.conf.before-shared. Owner: working.
+      h3 BUILT (owner "go on", unpublished): qanuvi-master without --data/QANUVI_MASTER_DATA uses the app's data
+        folder (data-location pointer followed, Defaults::real so a source build pairs with .source) when it holds
+        qanuvi-app.mark and the master default has no qanuvi.db yet; else the master default as before
+        (master::default_data_dir). Checked on This PC: status without --data now says "Running ... 0.1.42, Data:
+        ...\dev.qanuvi.desktop" (before "Not running"). Updater wait left as is (no stray master any more). Test
+        a_master_started_without_a_folder_uses_the_apps_data_when_the_app_is_here.
+      h4 BUILT (unpublished): remote_status sessions carry direct (direct::is_up on the session's slot); "In use
+        now: Zorin Laptop · direct on the home network (since ...)", status bar hover "Being reached from Zorin
+        Laptop · direct on the home network" (usersText; through the relay otherwise). Window polls every 4 s.
+        Rust 626 pass, clippy clean; window 574 pass, svelte-check clean. Not driven in a window.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after h3 + h4): all pushed, unpublished:
+      h3 + h4. NEXT: 0.1.43 (ask), owner checks "In use now" on Home PC from the laptop says "· direct on the home
+      network"; then the roadmap (big-plan basics + stable Windows/Linux, planned with the owner first) in a fresh
+      conversation.
+    PICKUP POINT (before, 2026-11-23 after 0.1.42 on both): all pushed, nothing
       unpublished. NEXT: owner checks the laptop's Settings -> Servers (This PC picked) says "Home PC directly on
       the home network"; owner says on h3 (and the stray folder) and h4. Then the roadmap (big-plan basics + stable Windows/Linux, planned
       with the owner first) in a fresh conversation.

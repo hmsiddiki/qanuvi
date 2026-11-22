@@ -17,7 +17,8 @@
 //! qanuvi-master update      put a newer version in (the running service does it and restarts from it)
 //! qanuvi-master version     this program's version
 //! qanuvi-master plan        plan runs: run <plan file> (follows it; Ctrl+C leaves, the run goes on), follow, list, stop
-//! Options: --data <folder>  where its database and settings are (default ~/.local/share/qanuvi)
+//! Options: --data <folder>  where its database and settings are (default: the desktop app's data when the app is on
+//!                           this computer, else ~/.local/share/qanuvi)
 
 use std::path::PathBuf;
 
@@ -62,7 +63,7 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("QANUVI_MASTER_DATA").map(PathBuf::from))
-        .unwrap_or_else(qanuvi_lib::paths::default_master_dir);
+        .unwrap_or_else(qanuvi_lib::master::default_data_dir);
     let command = args
         .iter()
         .enumerate()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectedText, freeRelayAsk, sizeText, usageText } from "./remoteAccess.svelte";
+import { connectedText, freeRelayAsk, sizeText, usageText, usersText } from "./remoteAccess.svelte";
 
 describe("relay road (24rl R3)", () => {
   it("says which road the link took, and nothing extra for older masters", () => {
@@ -50,5 +50,19 @@ describe("free relays (24rl F2)", () => {
     expect(ask).toMatch(/cannot read anything/);
     expect(ask).toMatch(/pair again here\. Use it\?$/);
     expect(freeRelayAsk({ name: "Example", runBy: "" })).toMatch(/^Example will carry/);
+  });
+});
+
+describe("who uses this machine and how (h4)", () => {
+  it("says direct on the home network or through the relay for each device, once per device", () => {
+    expect(usersText([{ device: "Zorin Laptop", direct: true }])).toBe("Zorin Laptop · direct on the home network");
+    expect(usersText([{ device: "Phone" }])).toBe("Phone · through the relay");
+    expect(
+      usersText([
+        { device: "Zorin Laptop", direct: false },
+        { device: "Zorin Laptop", direct: true },
+        { device: "Phone", direct: false },
+      ]),
+    ).toBe("Zorin Laptop · direct on the home network, Phone · through the relay");
   });
 });

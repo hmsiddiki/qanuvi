@@ -1968,6 +1968,26 @@ fn on_app_data(dir: &Path) -> bool {
     dir.join(APP_MARK).is_file()
 }
 
+/// h3: the data folder of a `qanuvi-master` started without --data. On a computer with the desktop app it is the app's
+/// own folder (where the user moved it, if so), so "qanuvi-master status" there answers about This PC instead of
+/// starting a second, empty master (which also held the next update back). A server without the app, or a computer
+/// whose own master folder is in use already, keeps the master default.
+pub fn default_data_dir() -> PathBuf {
+    let d = crate::data_location::Defaults::real();
+    pick_default_dir(&d.base, &crate::paths::default_master_dir())
+}
+
+fn pick_default_dir(app_base: &Path, master_default: &Path) -> PathBuf {
+    let app = crate::data_location::read(app_base)
+        .dir
+        .unwrap_or_else(|| app_base.to_path_buf());
+    if on_app_data(&app) && !master_default.join("qanuvi.db").is_file() {
+        app
+    } else {
+        master_default.to_path_buf()
+    }
+}
+
 /// What shows This PC's master's tray icon and answers it until the master ends (migration M4c). Only the desktop
 /// build's `qanuvi-master` program has one (it links the tray; the library and its tests do not). M5b: the tray
 /// belongs to the watcher, so it stays while a crashed core starts again.
@@ -2481,6 +2501,33 @@ pub fn stop_service_because(dir: &Path, why: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// h3: a plain "qanuvi-master status" on a computer with the app talks to the app's master, not a new empty one.
+    #[test]
+    fn a_master_started_without_a_folder_uses_the_apps_data_when_the_app_is_here() {
+        let t = tempfile::tempdir().unwrap();
+        let (app, own) = (t.path().join("dev.qanuvi.desktop"), t.path().join("qanuvi"));
+        // A server without the app: its own default.
+        assert_eq!(pick_default_dir(&app, &own), own);
+        // The app has run here: its folder.
+        std::fs::create_dir_all(&app).unwrap();
+        mark_app_data(&app);
+        assert_eq!(pick_default_dir(&app, &own), app);
+        // The app's data moved elsewhere: there.
+        let moved = t.path().join("D-drive/qanuvi");
+        std::fs::create_dir_all(&moved).unwrap();
+        mark_app_data(&moved);
+        let loc = crate::data_location::Location {
+            dir: Some(moved.clone()),
+            ..Default::default()
+        };
+        crate::data_location::write(&app, &loc).unwrap();
+        assert_eq!(pick_default_dir(&app, &own), moved);
+        // A master of its own was set up on this computer before: it stays that one.
+        std::fs::create_dir_all(&own).unwrap();
+        std::fs::write(own.join("qanuvi.db"), "").unwrap();
+        assert_eq!(pick_default_dir(&app, &own), own);
+    }
 
     fn call(m: &Master, cmd: &str, args: Value) -> Result<Value, String> {
         let streams = |_: &str| Sink::new(|_: Value| true);
