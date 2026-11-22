@@ -1634,6 +1634,16 @@ runs on or off; with it off nothing is sent anywhere.
       now. Also: check and the free relay probe end their link with a WebSocket close (the relay log said "closed
       without close_notify" per check; now "closed by the other side"). Relay 32/32, clippy clean. Kit rebuilt and
       staged on the laptop again. Next: owner reruns sudo ./setup.sh (third time), then IPv6 + pairing from This PC.
+    RELAY KIT DRIVEN (third run by the owner, 2026-11-22): unit listens on [::]:47443, setup's own check "answers at
+      its address" (the laptop's public IPv6), address unchanged across all three runs (pin kept). From This PC:
+      check over IPv6 OK 20 ms and over LAN IPv4 OK 19 ms, both by pin. PAIRING THROUGH IT (headless, scratch masters
+      A/B in the scratchpad, debug server build of 4f11590): A relay_configure with the pinned IPv6 address ->
+      connected; relay_pair_start code; B `pair --code --relay <pinned>` -> "Relay kit test A is connected"; relay
+      log shows the master and handler links over IPv6 and the check links over IPv4. Scratch masters stopped (B's
+      own service too), data removed; owner's installed masters (D:/qanuvi) untouched.
+      The laptop KEEPS the relay installed (owner's; remove: sudo ~/src/rk/qanuvi-relay-kit/setup.sh --remove --purge).
+      Not driven: the kit link in a window (needs a test window on This PC: ask); --cert/--key road and --remove
+      (read only). Unpublished: kit + fb1/fb2 + K1-K6 + k1/k2. Next (ask): publish the kit + 0.1.39; then sl1.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
