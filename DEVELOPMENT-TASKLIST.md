@@ -1708,7 +1708,16 @@ runs on or off; with it off nothing is sent anywhere.
       notes.txt), CARGO_BUILD_JOBS=2. Firewall hook compiled for the first time: hooks.nsh included, $UpdateMode is
       the template's own variable, makensis clean. Old latest.json (0.1.39) in E:/Backups/qanuvi/channel-before-0.1.40.
       Online: latest.json + all 8 files 200, sizes match, latest.json says 0.1.40.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after 0.1.40): all pushed, nothing unpublished.
+    BOTH MACHINES ON 0.1.40, DIRECT LINK LIVE (owner updated, checked 2026-11-22 23:56): This PC's update added the
+      "Qanuvi home links" rule (Private, TCP 47444-47454, in); both network profiles Private; installed This PC master
+      ("Home PC", relay on, own port) listens on 47444 (IPv4 + IPv6). The Zorin laptop's installed 0.1.40 master
+      opened 192.168.0.230 -> 192.168.0.167:47444 one second after its new relay session; its remote_states says
+      Home PC "direct": true, state on, version 0.1.40. S3 DONE on the real installs. Open watch: the first real
+      fallback (laptop leaves home Wi-Fi, link should move to the relay and come back direct at home).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.40 direct check): all pushed, nothing
+      unpublished. NEXT: roadmap after sl1: big-plan basics + stable Windows/Linux, then cosmetics, later voice; plan
+      the next part with the owner first. Watch: first real direct-to-relay fallback.
+    PICKUP POINT (before, 2026-11-22 after 0.1.40): all pushed, nothing unpublished.
       NEXT: owner updates This PC + laptop to 0.1.40. On This PC the update's installer asks once to allow the
       "Qanuvi home links" firewall rule (yes = direct links; no = relay as before); check with netsh that the rule is
       there and that the laptop shows "connected · direct". Watch the first real fallback (laptop leaves home Wi-Fi).
