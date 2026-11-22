@@ -1739,7 +1739,21 @@ runs on or off; with it off nothing is sent anywhere.
       tag v0.1.41, d1 + d2 on top of 0.1.40. All 4 platforms via E:/qc-scratch/release-0.1.41/chan (run.sh +
       notes.txt), CARGO_BUILD_JOBS=2. Old latest.json (0.1.40) in E:/Backups/qanuvi/channel-before-0.1.41.
       Online: latest.json + all 8 files 200, sizes match, latest.json says 0.1.41.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.41): all pushed, nothing
+    HOTSPOT DRIVE 2 (owner, 2026-11-23 01:24-01:27, installed 0.1.41 both sides; watched from This PC netstat,
+      laptop ss + journal, relay journal on basevm376): to the hotspot at 01:24:57, new relay session 01:25:01
+      (d2: 4 s). Owner saw "reconnecting" twice there: at 01:25:51 the phone's hotspot itself moved to another IPv6
+      network (2400:c600:3571:1133::/64 withdrawn, 2400:c600:3577:e1e4::/64 new); the session on the old IPv6
+      address was really dead, d2 saw it, new session 01:25:53 (2 s). Not a bug (the phone changed network).
+      Back home: Wi-Fi up 01:26:49, new session 01:26:52 + direct link 01:26:53 (d2: 3-4 s). d1 + d2 WORK.
+      h1 FOUND + FIXED (unpublished): an ended link's socket stayed open for minutes (hotspot sockets ESTAB until
+      ~01:30 and ~01:35, one retransmitting): go_direct's retry waits up to 5 min holding a send handle, which held
+      the WebSocket. Link now shuts its socket down when dropped (held senders just get "ended"). Test
+      an_ended_link_closes_its_connection_while_a_sender_is_held (fails without the fix); Rust 625 pass, clippy clean.
+      Window labels on the laptop not read by me (owner's eyes only).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after hotspot drive 2): all pushed,
+      unpublished: h1 (ended link closes its socket). NEXT: roadmap (big-plan basics + stable Windows/Linux,
+      planned with the owner first); h1 goes out with the next release.
+    PICKUP POINT (before, 2026-11-23 after 0.1.41): all pushed, nothing
       unpublished. NEXT: owner updates This PC + laptop to 0.1.41, then the hotspot drive again on the installed
       apps (expected: a few seconds of "reconnecting" each way, the label "connected" on the hotspot and
       "connected · direct" back home). Then the roadmap (big-plan basics + stable Windows/Linux, planned with the

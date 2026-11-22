@@ -452,6 +452,17 @@ impl LinkSender {
     }
 }
 
+/// Hotspot drive (2026-11-23): an ended link closes its socket at once. Send handles still held by other threads
+/// (a direct-road retry waits up to five minutes with one) kept a dead link's socket open for minutes after every
+/// network change; now they only get "ended".
+impl Drop for Link {
+    fn drop(&mut self) {
+        if let Some(s) = &self.sock {
+            let _ = s.shutdown(std::net::Shutdown::Both);
+        }
+    }
+}
+
 impl Link {
     /// 24rl R3: the relay's own TLS port first when it told one before (3 s, then left alone for 6 hours if it did
     /// not answer), else and then the saved address.
@@ -2081,6 +2092,43 @@ mod tests {
                 "the relay dropped a client that only reads"
             );
         }
+    }
+
+    /// Hotspot drive: a link that ended closes its connection even while a send handle to it is still held.
+    #[test]
+    fn an_ended_link_closes_its_connection_while_a_sender_is_held() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let other = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut ws = tungstenite::accept(stream).unwrap();
+            let start = Instant::now();
+            loop {
+                match ws.read() {
+                    Ok(_) => {}
+                    Err(tungstenite::Error::Io(e))
+                        if e.kind() == std::io::ErrorKind::WouldBlock
+                            || e.kind() == std::io::ErrorKind::TimedOut =>
+                    {
+                        return None;
+                    }
+                    Err(_) => return Some(start.elapsed()),
+                }
+            }
+        });
+        let link = Link::connect(&format!("ws://127.0.0.1:{port}")).unwrap();
+        let held = link.sender();
+        std::thread::sleep(Duration::from_millis(200));
+        drop(link);
+        let ended = other.join().unwrap();
+        assert!(
+            ended.is_some_and(|t| t < Duration::from_secs(2)),
+            "the connection stayed open with a sender held"
+        );
+        assert!(held.send(&Msg::Close { session: 1 }).is_err());
     }
 
     /// rl1: a relay that says nothing at all (not even a pong) counts as gone on the client's side too.
