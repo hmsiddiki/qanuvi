@@ -1798,7 +1798,13 @@ runs on or off; with it off nothing is sent anywhere.
       again: the owner cleared E:/qc-scratch; same exports as before, QANUVI_LINUX_APP_KEY = the laptop key).
       Old latest.json (0.1.42) in E:/Backups/qanuvi/channel-before-0.1.43. Online: all 8 files + latest.json 200,
       sizes match, latest.json says 0.1.43. Owner: the qanuvi folder takes ~164 GB (src-tauri/target), clean-up asked.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.43): all pushed, nothing
+    BOTH ON 0.1.43 (2026-11-23): h3 checked on both (plain "qanuvi-master status" answers the app's master, no stray
+      folder on the laptop); h4 checked: Home PC relay_status has Zorin Laptop direct: true. Owner deleted
+      src-tauri/target/debug (132 GB; first test build compiles from scratch).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.43 on both): all pushed, nothing
+      unpublished. NEXT: the roadmap (big-plan basics + stable Windows/Linux, planned with the owner first) in a
+      fresh conversation.
+    PICKUP POINT (before, 2026-11-23 after 0.1.43): all pushed, nothing
       unpublished. NEXT: owner updates both machines, checks "In use now" on Home PC from the laptop says "· direct
       on the home network"; target folder clean-up (owner); then the roadmap (big-plan basics + stable
       Windows/Linux, planned with the owner first) in a fresh conversation.
