@@ -1596,6 +1596,9 @@ runs on or off; with it off nothing is sent anywhere.
       fb1 FIXED: disabled "Use" (relay not answering) looked like a link; now grey. fb2 FIXED: an address with its
         own port (wss://host:47443, ws://...) read "through port 443"; connectedText looks at the address. Unpublished.
       Next: relay kit (outline in PLAN-24RL.md), then sl1.
+    RELAY KIT WRITTEN UP (2026-11-22): docs/PLAN-24RL.md "Relay kit in detail" (K1 setup.sh, K2 certificate,
+      K3 qanuvi-relay check, K4 signed download on the channel, K5 link under "Your own relay"); 4 questions with
+      defaults wait for the owner. fb1 + fb2 still unpublished. Next: owner's answers, then build K1-K5.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
