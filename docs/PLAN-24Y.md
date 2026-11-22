@@ -79,10 +79,10 @@ right.
    started and watched from the window on This PC (the laptop as the shown machine), while work goes on here;
    the results are checked after. It shares the Claude usage window with work on This PC, so start it before a
    break or keep work here light.
+6. **Part 3 order and benchmark** (owner, 2026-11-23): Y8 -> Y7 -> Y6 -> Y9. The benchmark re-runs the R1 to R5
+   plan on a scratch copy of Qanuvi taken from the commit before R1, so the right result is known. The paid run's
+   cost is fine.
 
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
 24y keeps this as it is.
-6. **Part 3 order and benchmark** (owner, 2026-11-23): Y8 -> Y7 -> Y6 -> Y9. The benchmark re-runs the R1 to R5
-   plan on a scratch copy of Qanuvi taken from the commit before R1, so the right result is known. The paid run's
-   cost is fine.

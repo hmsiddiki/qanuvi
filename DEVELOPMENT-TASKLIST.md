@@ -1801,7 +1801,11 @@ runs on or off; with it off nothing is sent anywhere.
     BOTH ON 0.1.43 (2026-11-23): h3 checked on both (plain "qanuvi-master status" answers the app's master, no stray
       folder on the laptop); h4 checked: Home PC relay_status has Zorin Laptop direct: true. Owner deleted
       src-tauri/target/debug (132 GB; first test build compiles from scratch).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.43 on both): all pushed, nothing
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23): 24y PART 3 AGREED (docs/PLAN-24Y.md
+      decisions 5-6): order Y8 test builds -> Y7 health watch -> Y6 review list -> Y9 benchmark. Y9 = the R1-R5
+      plan re-run on a scratch copy of Qanuvi from the commit before R1, on the Linux laptop only, watched from
+      This PC; paid run cost is fine. NEXT: build Y8 in a fresh conversation.
+    PICKUP POINT (before, 2026-11-23 after 0.1.43 on both): all pushed, nothing
       unpublished. NEXT: the roadmap (big-plan basics + stable Windows/Linux, planned with the owner first) in a
       fresh conversation.
     PICKUP POINT (before, 2026-11-23 after 0.1.43): all pushed, nothing
