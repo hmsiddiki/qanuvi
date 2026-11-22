@@ -91,6 +91,56 @@ Decisions taken (owner said go forward): cap 2 GB/day per computer, slowed to 25
 list on the update channel, edited by the owner by hand; built and tested with local relays and shipped with an
 empty list; relay kit after. Deploying the cap on basevm376 and publishing still ask first.
 
+## sl1 in detail: slow switch over the relay (measured 2026-11-22, waits for the owner's yes)
+
+**Measured** (scripts/sl1-measure.mjs, 0.1.39 masters A and B both on This PC, B calls A through
+relay.qanuvi.com road 443; one network round trip PC to relay is 55-70 ms, and a relayed call crosses it twice, so
+the network alone is about 110-140 ms per call):
+
+| build | one call (median) | 10 calls at once | 10 calls one after another |
+|---|---|---|---|
+| 0.1.39 as it is | ~220 ms | ~410 ms | 2.6-3.0 s |
+| + TCP_NODELAY on the links | ~220 ms | ~230-350 ms | 2.4 s |
+| + NODELAY + 5 ms read wait (test only) | ~155 ms | ~170 ms | 1.8 s |
+
+Direct calls on the same master take 1-27 ms, so almost all of a relayed call is the road. A 200 KB file read takes
+450-600 ms (the home upload).
+
+**Two causes, and what each costs:**
+1. The links wait before sending. The app's session thread (remote.rs start_relay) and the master's relay loop
+   (relay_client connected_loop) each read with a 50 ms timeout, then send what is queued, so a call can sit up to
+   50 ms at each end: about 65 ms per call measured, roughly 30%. The links also lack TCP_NODELAY (the relay server
+   has it). The relay server itself has had no waits since R1.
+2. Calls made one after another on a switch. Traced in the window code:
+   - Project switch, first visit in a run: each saved editor tab is read only after the one before it
+     (+page.svelte restore), then drafts_list, then drafts_drop, then the chat's events. With 5 tabs that is 6-7 trips
+     in a row, so ~1.5 s today. Each restored tab also starts another git_status (the Explorer effect follows tab
+     hashes), so 5 tabs cause 5+ git_status calls.
+   - Project switch, later visits: 2 in a row (agent_sessions, then events + times).
+   - Plan view on a project: about 3 in a row (5 the first time in a window).
+   - Opening a chat: 1 (wide, not deep).
+
+**Parts:**
+- S1. **Links send at once.** Each relay link gets a small reader/writer task (tokio + tokio-tungstenite, already
+  in Cargo.toml for the relay server, tokio-rustls for the pinned certificates), with TCP_NODELAY. The session loop
+  and the master loop wait on one channel that both an arriving message and a line to send wake at once. Pings run on
+  a timer. The 20 idle wake-ups a second per link go away too, which is better for laptop batteries. Both the app and
+  the masters need the new build; with one side only, half the wait goes. The relay server is not touched (no
+  deploy). Expected on this setup: ~220 to ~150 ms per call, 10 at once ~410 to ~170 ms. Tests: a local relay
+  round trip with no added wait, long lines in parts, pings, a link that ends.
+- S2. **Fewer calls in a row on a switch.** Restored tabs are read together (order kept, a gone file still closed),
+  and drafts_list starts beside them. git_status runs once per switch (short debounce), not once per restored tab.
+  The Plan view's three chains start together as now, with plan_run_watch + plan_run_state in one call. First visit
+  with 5 tabs: ~7 trips in a row to 2-3. Unit tests in the window (call order, a project left in the middle).
+- S3. **24rl part 2: direct links on the same network** (the outline above): at home the laptop and This PC reach
+  each other in a few ms instead of ~150. This gets its own detailed write-up after S1 + S2 are measured.
+- S4 (owner's choice). **Big answers compressed** before sealing (lines over 16 KB, deflate; both sides say in hello
+  that they can, so older masters still work). Text files and chat events shrink about 3-5x. This is the 200 KB =
+  0.5 s case.
+
+**Order:** S1, S2, measure again with the same script (and from the laptop through its kit relay), then S3 in
+detail. S4 only if the owner wants it. Publishing still asks.
+
 ## Relay kit in detail (2026-11-22; revised after the owner: no domain, no port 80)
 
 Why: "Your own relay" is only a box today. The kit makes it one download and one command on the servers people

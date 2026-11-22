@@ -1661,6 +1661,16 @@ runs on or off; with it off nothing is sent anywhere.
       (relay_client open_ws sets 50 ms). Step 1: measure a project/plan/chat switch over the relay (calls made, time
       each, on Qanuvi's relay and on the laptop relay), headless with scratch masters. Step 2: write sl1 + 24rl part 2
       (direct links on the same network) in detail for the owner's yes, then build.
+    sl1 STEP 1 MEASURED + STEP 2 WRITTEN (2026-11-22, waits for the owner's yes): scripts/sl1-measure.mjs (two
+      scratch masters on This PC, B -> relay.qanuvi.com -> A; scratch data, pairing and server record removed after).
+      One relayed call ~220 ms median against a ~110-140 ms network floor; a throwaway build with TCP_NODELAY + 5 ms
+      read wait gave ~155 ms (10 at once 410 -> 170 ms), so the 50 ms link waits cost ~65 ms per call; nodelay alone
+      helps only calls sent together. Window trace: a project's first visit reads its saved tabs one after another
+      (5 tabs ~ 7 trips in a row, ~1.5 s) and fires git_status once per restored tab; later visits 2 in a row, Plan view
+      ~3, a chat 1. Plan in docs/PLAN-24RL.md "sl1 in detail": S1 links send at once (tokio reader/writer per link,
+      nodelay, no relay deploy), S2 fewer calls in a row on a switch, S3 = 24rl part 2 direct links (own write-up after),
+      S4 compressed big answers (owner's choice). Experiment build reverted (nothing changed in code).
+      NEXT: owner's yes on S1-S4, then build S1 and S2.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
