@@ -154,6 +154,12 @@
     cursor: pointer;
   }
 
+  /* fb1: "Use" for a relay that did not answer looked clickable. */
+  .link:disabled {
+    color: var(--qx-text-secondary);
+    cursor: default;
+  }
+
   .choices {
     display: flex;
     flex-wrap: wrap;

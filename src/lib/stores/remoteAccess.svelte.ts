@@ -69,10 +69,20 @@ export function usageText(u: RelayUsage | null | undefined, now = Date.now() / 1
   return { text: `Today through the relay: ${sizeText(u.used)} of ${sizeText(u.cap)}`, over: false };
 }
 
-/** What the panel says about a working link (the road only when the master tells it). */
-export function connectedText(st: Pick<RelayStatus, "road">): string {
+/** True when the relay's address names its own port (wss://host:47443, ws://127.0.0.1:47391), or is plain ws://. */
+function ownPortAddress(relay: string | undefined): boolean {
+  const r = (relay ?? "").trim().toLowerCase();
+  if (r.startsWith("ws://")) return true;
+  const host = r.replace(/^wss:\/\//, "").split("/")[0];
+  const port = host.match(/:(\d+)$/)?.[1];
+  return !!port && port !== "443";
+}
+
+/** What the panel says about a working link (the road only when the master tells it). fb2: the saved road is
+ * "443" only when the saved address is on 443; a relay whose address names another port says no port. */
+export function connectedText(st: Pick<RelayStatus, "road"> & { relay?: string }): string {
   if (st.road === "own port") return "Connected to the relay (its own port)";
-  if (st.road === "443") return "Connected to the relay (through port 443)";
+  if (st.road === "443" && !ownPortAddress(st.relay)) return "Connected to the relay (through port 443)";
   return "Connected to the relay";
 }
 

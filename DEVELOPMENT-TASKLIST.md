@@ -1580,6 +1580,22 @@ runs on or off; with it off nothing is sent anywhere.
       Not driven: RelayChoice "A free relay" and the usage lines in a window (needs a window on This PC: ask).
       Next (each asks): deploy the cap on basevm376 (--cap-per-day 2048), 0.1.38, an empty signed relays.json on
       the channel (optional: 404 already means none); then the relay kit, then sl1.
+    CAP DEPLOYED + 0.1.38 PUBLISHED (owner "publish anyway and yes to all", 2026-11-22):
+      basevm376 relay = 75729ed build (laptop, 2.1 MB, sha256 b78db52f...), .prev = cb0f819 build, old unit in
+      /root/qanuvi-relay.service.before-cap; unit = deploy/relay/qanuvi-relay.service with --cap-per-day 2048
+      (81a454f). Dry run as the relay user on 127.0.0.1:47444 first (TLSv1.3, verify 0). After the restart: both
+      listeners (queue 4096), This PC back through 443, the laptop on 47443 within seconds.
+      0.1.38 28c1aaa tag v0.1.38: all 4 platforms via E:/qc-scratch/release-0.1.38/chan, old latest.json (0.1.37) in
+      E:/Backups/qanuvi/channel-before-0.1.38; online all 9 files 200, sizes match; relays.json 404 (= no free relays).
+      WINDOW DRIVEN on This PC (test build, local test channel with a signed test list + throwaway key, local relay
+      with a 1 MB share): A free relay listed both (302 ms; the missing host with its reason), Use -> the yes text ->
+      Yes -> "Relay: Test own port (free)", in use, connected; own relay ws://127.0.0.1:47391 + a headless scratch
+      device paired: code card "it is on your own relay", "Today through the relay: 76 B of 1 MB", In use now. Put
+      back: device removed, Qanuvi relay, connected (its own port); scratch pairing key forgotten; test processes
+      stopped. Over-the-share line not driven (relay + TS tests cover it).
+      fb1 FIXED: disabled "Use" (relay not answering) looked like a link; now grey. fb2 FIXED: an address with its
+        own port (wss://host:47443, ws://...) read "through port 443"; connectedText looks at the address. Unpublished.
+      Next: relay kit (outline in PLAN-24RL.md), then sl1.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status

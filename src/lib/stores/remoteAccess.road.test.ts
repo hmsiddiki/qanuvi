@@ -6,6 +6,11 @@ describe("relay road (24rl R3)", () => {
     expect(connectedText({ road: "own port" })).toBe("Connected to the relay (its own port)");
     expect(connectedText({ road: "443" })).toBe("Connected to the relay (through port 443)");
     expect(connectedText({})).toBe("Connected to the relay");
+    // fb2: an address with its own port, or plain ws://, was said to go "through port 443".
+    expect(connectedText({ road: "443", relay: "wss://relay.qanuvi.com" })).toBe("Connected to the relay (through port 443)");
+    expect(connectedText({ road: "443", relay: "wss://relay.qanuvi.com:47443" })).toBe("Connected to the relay");
+    expect(connectedText({ road: "443", relay: "ws://127.0.0.1:47391" })).toBe("Connected to the relay");
+    expect(connectedText({ road: "443", relay: "wss://relay.example.com:443/" })).toBe("Connected to the relay (through port 443)");
   });
 });
 
