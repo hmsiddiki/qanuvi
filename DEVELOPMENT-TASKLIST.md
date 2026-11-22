@@ -1596,6 +1596,12 @@ runs on or off; with it off nothing is sent anywhere.
       fb1 FIXED: disabled "Use" (relay not answering) looked like a link; now grey. fb2 FIXED: an address with its
         own port (wss://host:47443, ws://...) read "through port 443"; connectedText looks at the address. Unpublished.
       Next: relay kit (outline in PLAN-24RL.md), then sl1.
+    MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
+      web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
+      (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
+      addresses (tauri.conf.json updater endpoint, knowledge.rs DEFAULT_URL, publish-update.mjs baseUrl + the copy
+      folder); publish one release from qlopy.top that points at qanuvi.com; both machines take it; from then on
+      publish to qanuvi.com only. The account site (QANUVI_ACCOUNT_SITE, test site today) moves at the same time.
     CHECKPOINT (before, 2026-11-21 after 0.1.36 + 24rl part 1 DONE): all pushed,
       nothing unpublished, nothing undeployed. Both machines on 0.1.36; basevm376 relay = cb0f819 build (both roads,
       47443 in ISPConfig's firewall). Watch: the apps' first own-port link at their next reconnect (relay_status
