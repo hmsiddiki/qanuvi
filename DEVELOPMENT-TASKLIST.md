@@ -1629,6 +1629,11 @@ runs on or off; with it off nothing is sent anywhere.
       This PC: the laptop's installed relay over LAN IPv4 by pin OK (107 ms), IPv6 refused (old build). Kit rebuilt
       on the laptop (~/src/rk/qanuvi-relay-kit, sha256 OK). Next: owner reruns sudo ./setup.sh there (= update to
       the fix, same address), then IPv6 check + pairing through it from This PC.
+    SECOND RUN (owner): same address kept (update worked, .prev kept), but the unit still had 0.0.0.0: k2 FOUND +
+      FIXED 4f11590: setup tested IPv6 with [ -s /proc/net/if_inet6 ] and /proc files show size 0; it reads the file
+      now. Also: check and the free relay probe end their link with a WebSocket close (the relay log said "closed
+      without close_notify" per check; now "closed by the other side"). Relay 32/32, clippy clean. Kit rebuilt and
+      staged on the laptop again. Next: owner reruns sudo ./setup.sh (third time), then IPv6 + pairing from This PC.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
