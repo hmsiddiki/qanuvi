@@ -1761,7 +1761,23 @@ runs on or off; with it off nothing is sent anywhere.
       tag v0.1.42, h1 + h2 on top of 0.1.41. All 4 platforms via E:/qc-scratch/release-0.1.42/chan, CARGO_BUILD_JOBS=2.
       Old latest.json (0.1.41) in E:/Backups/qanuvi/channel-before-0.1.42. Online: latest.json + all 8 files 200,
       sizes match, latest.json says 0.1.42.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.42): all pushed, nothing
+    0.1.42 ON BOTH MACHINES (2026-11-23 02:16). Laptop app did not show after the update: the updater waits for
+      every program run from ~/.local/lib/qanuvi to end, and a stray master was running there with --data
+      ~/.local/share/qanuvi (started at 01:20 by a qanuvi-master command over SSH without --data during the hotspot
+      watch). Stopped it; the swap went on at once, app up on 0.1.42, Home PC on + direct: true. The empty stray
+      folder ~/.local/share/qanuvi is still on the laptop (made 01:20, nothing in it; remove when the owner says).
+      h3 FOUND (not built, owner to say): on a Linux desktop install, qanuvi-master's default data folder
+        (~/.local/share/qanuvi, the server default) is not the app's (~/.local/share/dev.qanuvi.desktop), so a user
+        typing "qanuvi-master status" talks to (and starts) a second, empty master, which then holds the next
+        update for up to a minute (the app does not show). Proposal: with no --data, a qanuvi-master that sits in
+        the app's own install (~/.local/lib/qanuvi, /usr/lib/qanuvi, next to the app binary) uses the app's data
+        folder; servers without the app keep ~/.local/share/qanuvi. Also: the updater's wait only counts a master
+        on the app's data folder. Check Windows the same way (its status without --data said "Not running").
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.42 on both): all pushed, nothing
+      unpublished. NEXT: owner checks the laptop's Settings -> Servers says "Home PC directly on the home network";
+      owner says on h3 (and the stray folder). Then the roadmap (big-plan basics + stable Windows/Linux, planned
+      with the owner first) in a fresh conversation.
+    PICKUP POINT (before, 2026-11-23 after 0.1.42): all pushed, nothing
       unpublished. NEXT: owner updates both machines; on the laptop Settings -> Servers should say "Home PC
       directly on the home network". Then the roadmap (big-plan basics + stable Windows/Linux, planned with the
       owner first) in a fresh conversation.
