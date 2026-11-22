@@ -1729,9 +1729,15 @@ runs on or off; with it off nothing is sent anywhere.
         said "tried again when the network changes", not built. Proposal: the master looks at its own addresses
         every few seconds; when they change, its relay and direct links bound to a gone address are ended and opened
         again at once (expected: a few seconds of "reconnecting"). Owner to say.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after the hotspot drive): all pushed,
-      unpublished: d1 (window road read). NEXT: owner says on d2 (network change found at once); build d2 if yes,
-      drive d1 + d2 with the hotspot again, then 0.1.41 (ask). Then the roadmap (big-plan basics + stable
+      d2 BUILT (owner "ok", 2026-11-23; unpublished, not driven): every relay link (a master's own link and each app
+        session) asks the system every 3 s which address it would use to reach the relay now (UDP connect, nothing
+        sent); not its own address any more (or no way there) = the computer changed network: the link ends at once
+        and the usual reconnect runs (master after 1 s, window retry after 2 s). IPv6 on the same /64 is the same
+        network (temporary addresses). Test a_link_notices_that_this_computer_changed_network; Rust 624 pass, clippy
+        clean. Not covered: a direct link that dies while the address stays (45 s quiet wait, calls in it lost).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after d2): all pushed, unpublished: d1 + d2.
+      NEXT: 0.1.41 (ask), then the hotspot drive again on the installed apps (expected: a few seconds of
+      "reconnecting" each way, the label "connected" on the hotspot and "connected · direct" back home). Then the roadmap (big-plan basics + stable
       Windows/Linux, planned with the owner first).
     PICKUP POINT (before, 2026-11-23 after 0.1.40 direct check): all pushed, nothing
       unpublished. NEXT: roadmap after sl1: big-plan basics + stable Windows/Linux, then cosmetics, later voice; plan

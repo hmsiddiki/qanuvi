@@ -34,6 +34,36 @@ pub struct Link {
     pinged: Instant,
     ping_every: Duration,
     silent: Duration,
+    /// d2: this end's address and the relay's, to notice that this computer moved to another network (the link is
+    /// then dead, and waiting for the relay's silence cost about a minute of "reconnecting").
+    ends: Option<(std::net::IpAddr, std::net::SocketAddr)>,
+    looked: Instant,
+}
+
+/// d2: how often a link looks whether this computer's network changed (asked of the system; nothing is sent).
+const NET_LOOK: Duration = Duration::from_secs(3);
+
+/// d2: the address this computer would use to reach `peer` now (None: no way there at the moment).
+fn route_to(peer: std::net::SocketAddr) -> Option<std::net::IpAddr> {
+    let bind = if peer.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
+    let s = std::net::UdpSocket::bind(bind).ok()?;
+    s.connect(peer).ok()?;
+    s.local_addr().ok().map(|a| a.ip().to_canonical())
+}
+
+/// d2: whether a link on `local` is left behind: no way to the relay now, or another address would be used. An IPv6
+/// address on the same /64 is the same network (temporary addresses change by themselves).
+fn moved(local: std::net::IpAddr, now: Option<std::net::IpAddr>) -> bool {
+    use std::net::IpAddr::V6;
+    match (local, now) {
+        (_, None) => true,
+        (V6(a), Some(V6(b))) => a.segments()[..4] != b.segments()[..4],
+        (a, Some(b)) => a != b,
+    }
 }
 
 /// 24rl A1: Qanuvi's relay, used whenever no relay is given (nobody types an address for the default).
@@ -446,7 +476,13 @@ impl Link {
 
     fn with(ws: Ws, relay: String) -> Self {
         let sock = tcp_of(&ws).and_then(|t| t.try_clone().ok());
+        let ends = tcp_of(&ws).and_then(|t| {
+            let local = t.local_addr().ok()?.ip().to_canonical();
+            Some((local, t.peer_addr().ok()?))
+        });
         Self {
+            ends,
+            looked: Instant::now(),
             ws: Arc::new(Mutex::new(ws)),
             sock,
             relay,
@@ -520,6 +556,16 @@ impl Link {
     pub fn poll(&mut self) -> Result<Option<Msg>, String> {
         use crate::relay_server::{Frame, Gone};
         const ENDED: &str = "The connection to the relay ended.";
+        // d2: this computer moved to another network (Wi-Fi changed): the link is dead, so it ends now and the caller
+        // connects again at once instead of waiting for the relay's silence.
+        if let Some((local, peer)) = self.ends
+            && self.looked.elapsed() >= NET_LOOK
+        {
+            self.looked = Instant::now();
+            if moved(local, route_to(peer)) {
+                return Err("This computer's network changed.".into());
+            }
+        }
         if self.pinged.elapsed() >= self.ping_every {
             self.pinged = Instant::now();
             self.ws
@@ -1678,6 +1724,24 @@ const QUIET: [&str; 6] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_link_notices_that_this_computer_changed_network() {
+        use std::net::IpAddr;
+        let ip = |s: &str| s.parse::<IpAddr>().unwrap();
+        // The way to a relay on this computer is this computer.
+        assert_eq!(
+            route_to("127.0.0.1:9".parse().unwrap()),
+            Some(ip("127.0.0.1"))
+        );
+        assert!(!moved(ip("192.168.0.230"), Some(ip("192.168.0.230"))));
+        // Home Wi-Fi to a phone's hotspot, and no network at all.
+        assert!(moved(ip("192.168.0.230"), Some(ip("10.12.4.7"))));
+        assert!(moved(ip("192.168.0.230"), None));
+        // A new temporary IPv6 address on the same network is not a move; another network is.
+        assert!(!moved(ip("2001:db8:1:2::a"), Some(ip("2001:db8:1:2::b"))));
+        assert!(moved(ip("2001:db8:1:2::a"), Some(ip("2001:db8:9:9::a"))));
+    }
 
     #[test]
     fn names_are_kept_clean_and_short() {
