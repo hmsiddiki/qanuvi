@@ -2645,6 +2645,7 @@ impl<'a> Loop<'a> {
             .filter(|c| {
                 let program = c.command.split_whitespace().next().unwrap_or("");
                 !c.quoted
+                    && c.at_start
                     && !crate::test_build::names_test_build(&c.command)
                     && !self.env.has_program(program)
             })

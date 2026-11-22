@@ -36,7 +36,7 @@ export interface AnswerForm {
 }
 
 /** What a question belongs to; "hold" is a plan step a run set aside for the owner. */
-export type InboxSource = HoldSource | ChangesFromSource;
+export type InboxSource = HoldSource | ChangesFromSource | ReviewSource;
 
 export interface HoldSource {
   kind: "hold";
@@ -52,6 +52,15 @@ export interface HoldSource {
 export interface ChangesFromSource {
   kind: "changes-from";
   projectId: string;
+}
+
+/** Y6: a plan's review list (things that need a person's eyes); nothing waits on it. */
+export interface ReviewSource {
+  kind: "review";
+  projectId: string;
+  file: string;
+  runId: string;
+  entries: { number?: string; title: string; what: string }[];
 }
 
 export interface InboxItem {
@@ -91,7 +100,11 @@ type Change = {
 const newest = (a: InboxItem, b: InboxItem) => b.at - a.at;
 
 /** A question still waiting for the owner. */
-export const isOpenQuestion = (i: InboxItem) => i.type === "answer" && i.status === "open";
+/** Y6: the plan's review list (things to look at); answered like a question, but nothing waits on it (y9-5). */
+export const isReviewList = (i: InboxItem) => i.source?.kind === "review";
+export const isOpenQuestion = (i: InboxItem) => i.type === "answer" && i.status === "open" && !isReviewList(i);
+/** An open review list: shown under "To look at", never under "Needs your answer". */
+export const isOpenReview = (i: InboxItem) => i.type === "answer" && i.status === "open" && isReviewList(i);
 
 class InboxStore {
   /** This computer's items and every connected master's, newest first. */

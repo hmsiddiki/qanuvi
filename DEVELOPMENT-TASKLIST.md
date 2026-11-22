@@ -1866,6 +1866,15 @@ runs on or off; with it off nothing is sent anywhere.
       it now adds "this plan's own Run rules win", and the check is told the plan has its own section.
     y9-3 FIXED: the check did not know what "Check: test build" means and asked; window and core now tell it the
       recipe (project's, or the plan's own Test build section). Rust 652, window 575, clippy clean. Unpublished.
+    y9-4 FIXED (owner saw the run "needs me" after step 1): the review list got a junk entry, "the same inputs
+      through the TypeScript and the Rust functions must give the same", because step 1's detail "Add a comparison
+      check: ..." matched the check-line reader mid-sentence (and was cut at the wrap). Checks in words now count only
+      when the line starts with Check:/Checks:/Check with (StepCheck.at_start).
+    y9-5 FIXED: the review list notified "Needs your answer" and sat under that heading, so it looked like the run
+      waited. Now: notification "To look at (nothing waits): ...", Inbox heading "To look at (the run went on;
+      nothing waits)", CLI tag "to look at"; still answered the same way. Rust 653, window 575, clippy clean.
+      Flaky once under full-suite load: once_the_answer_comes_the_run_no_longer_says_it_waits_for_you (passed 3x
+      alone and in the next full run); watch it.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
       from This PC).

@@ -2985,7 +2985,7 @@ fn y7_a_provider_that_keeps_failing_for_hours_sets_the_step_aside_and_the_run_go
 #[test]
 fn y6_checks_that_need_eyes_go_on_one_review_list_and_the_run_never_waits_for_them() {
     let env = world(
-        "# Plan\n\n- [ ] **1. Cart page**\n  - Add the cart page.\n  - Check: the page looks right on a phone\n- [ ] **2. Welcome text**\n  - Write it.\n- [ ] **3. Docs**\n  - Write it down.\n",
+        "# Plan\n\n- [ ] **1. Cart page**\n  - Add the cart page.\n  - Check: the page looks right on a phone\n- [ ] **2. Welcome text**\n  - Write it.\n- [ ] **3. Docs**\n  - Write it down.\n  - Add a comparison check: the same inputs give the same results.\n",
     );
     let mut s = settings("");
     s.test_command = String::new();

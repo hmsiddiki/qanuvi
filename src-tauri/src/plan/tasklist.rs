@@ -459,6 +459,9 @@ pub struct StepCheck {
     /// Written in backticks: surely a command. Without them ("Check: npm test") it counts only when its first word is
     /// a program, so "Check: the page looks right" is never run.
     pub quoted: bool,
+    /// The line starts with "Check:", "Checks:" or "Check with" (y9-4: "Add a comparison check: ..." in the middle of
+    /// a sentence is no check line, so it never becomes a thing to look at).
+    pub at_start: bool,
 }
 
 /// At most this many checks per step.
@@ -489,6 +492,7 @@ pub fn step_checks(step: &Step) -> Vec<StepCheck> {
                 .map(|command| StepCheck {
                     command,
                     quoted: true,
+                    at_start: m.start() == 0,
                 })
                 .collect()
         } else if m.as_str().ends_with(':') {
@@ -499,6 +503,7 @@ pub fn step_checks(step: &Step) -> Vec<StepCheck> {
             vec![StepCheck {
                 command: plain.to_string(),
                 quoted: false,
+                at_start: m.start() == 0,
             }]
         } else {
             continue;

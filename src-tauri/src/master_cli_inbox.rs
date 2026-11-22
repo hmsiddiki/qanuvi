@@ -37,7 +37,10 @@ pub fn ago(at_ms: i64, now_ms: i64) -> String {
 
 /// The few words in front of an item: what it wants from the owner.
 fn tag(item: &Value) -> &'static str {
+    let review = item["source"]["kind"].as_str() == Some("review");
     match (item["type"].as_str(), item["status"].as_str()) {
+        // Y6 (y9-5): the plan's review list; nothing waits on it.
+        (Some("answer"), Some("open")) if review => "to look at",
         (Some("answer"), Some("open")) => "needs your answer",
         (Some("answer"), Some("answered")) => "answered",
         (Some("answer"), _) => "no longer asked",
@@ -82,7 +85,7 @@ pub fn list_lines(items: &[Value], all: bool, now: i64) -> Vec<String> {
     }
     let asks = items
         .iter()
-        .filter(|i| tag(i) == "needs your answer")
+        .filter(|i| matches!(tag(i), "needs your answer" | "to look at"))
         .count();
     if asks > 0 {
         out.push(

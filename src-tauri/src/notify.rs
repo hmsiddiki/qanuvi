@@ -143,8 +143,18 @@ fn from(item: &InboxItem) -> String {
         .unwrap_or_default()
 }
 
+/// Y6 (y9-5): a plan's review list: answered like a question, but nothing waits on it.
+fn is_review(item: &InboxItem) -> bool {
+    item.source
+        .as_ref()
+        .and_then(|s| s.get("kind"))
+        .and_then(|k| k.as_str())
+        == Some("review")
+}
+
 fn one(item: &InboxItem) -> Shown {
     let what = match item.kind_of.as_str() {
+        "answer" if is_review(item) => format!("To look at (nothing waits): {}", item.title),
         "answer" => format!("Needs your answer: {}", item.title),
         "problem" => format!("Problem: {}", item.title),
         _ => item.title.clone(),
@@ -162,7 +172,10 @@ pub fn compose(items: &[InboxItem], bundle: bool) -> Vec<Shown> {
     if items.len() <= 1 || !bundle {
         return items.iter().map(one).collect();
     }
-    let questions = items.iter().filter(|i| i.kind_of == "answer").count();
+    let questions = items
+        .iter()
+        .filter(|i| i.kind_of == "answer" && !is_review(i))
+        .count();
     let title = if questions > 0 {
         format!(
             "{} new in the Inbox ({questions} need{} your answer)",
@@ -211,6 +224,20 @@ pub fn local_minute() -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// y9-5: the plan's review list never says it needs an answer (nothing waits on it).
+    #[test]
+    fn a_review_list_says_to_look_at_not_needs_your_answer() {
+        let mut list = item("answer", "2 things to look at from PLAN.md");
+        list.source = Some(serde_json::json!({"kind": "review"}));
+        let shown = compose(std::slice::from_ref(&list), false);
+        assert_eq!(
+            shown[0].title,
+            "To look at (nothing waits): 2 things to look at from PLAN.md"
+        );
+        let both = compose(&[list, item("answer", "1a waits")], true);
+        assert_eq!(both[0].title, "2 new in the Inbox (1 needs your answer)");
+    }
 
     fn item(kind_of: &str, title: &str) -> InboxItem {
         InboxItem {

@@ -7,7 +7,7 @@
    */
   import { onMount } from "svelte";
   import { agent } from "$lib/stores/agent.svelte";
-  import { inbox, isOpenQuestion, type InboxItem } from "$lib/stores/inbox.svelte";
+  import { inbox, isOpenQuestion, isOpenReview, type InboxItem } from "$lib/stores/inbox.svelte";
   import InboxQuestion from "./InboxQuestion.svelte";
   import { projects } from "$lib/stores/projects.svelte";
   import { ui } from "$lib/stores/ui.svelte";
@@ -38,7 +38,9 @@
     filter === "all" || filter === (switcher.shown ?? "") ? agent.sessions.filter((s) => s.status === "waiting") : [],
   );
   let questions = $derived(inbox.items.filter((i) => isOpenQuestion(i) && mine(i)));
-  let happened = $derived(inbox.items.filter((i) => !isOpenQuestion(i) && mine(i)));
+  // Y6 (y9-5): a plan's review list waits for nobody: its own heading, answered the same way.
+  let toLook = $derived(inbox.items.filter((i) => isOpenReview(i) && mine(i)));
+  let happened = $derived(inbox.items.filter((i) => !isOpenQuestion(i) && !isOpenReview(i) && mine(i)));
 
   /** How an answered or closed question ended, in a few words. */
   function outcome(item: InboxItem): string {
@@ -145,6 +147,25 @@
     {/each}
   {/if}
 
+  {#if toLook.length}
+    <h3>To look at <span class="muted small">(the run went on; nothing waits)</span></h3>
+    {#each toLook as item (item.id)}
+      <div class="item" class:unread={!item.read} class:offline={item.offline} data-id={item.id}>
+        <div class="line">
+          <span class="kind">{KIND[item.kind]}</span>
+          <strong class="title">{item.title}</strong>
+          <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
+        </div>
+        {#if item.offline}
+          {#if item.text}<p class="text">{item.text}</p>{/if}
+          <p class="text gone">{machineOf(item).name} is not connected.</p>
+        {:else}
+          <InboxQuestion {item} onopen={open} />
+        {/if}
+      </div>
+    {/each}
+  {/if}
+
   {#if waiting.length}
     <h3>Waiting for you</h3>
     {#each waiting as s (s.id)}
@@ -187,7 +208,7 @@
         {/if}
       </div>
     {/each}
-  {:else if !waiting.length && !questions.length}
+  {:else if !waiting.length && !questions.length && !toLook.length}
     <p class="muted">
       Nothing here. Questions a plan run waits on, run reports, sign-ins that need renewing and newer knowledge show up
       here.
