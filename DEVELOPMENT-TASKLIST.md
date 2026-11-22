@@ -1845,6 +1845,11 @@ runs on or off; with it off nothing is sent anywhere.
       baseline green there: Rust 171, window 375. Added to the laptop master as project "qanuvi". The right result
       to compare with: the hand-built commits 768da32..22dcfb8 (R1, R2a-R2e). NEXT: start the run from the window on
       This PC (laptop shown), Auto, Claude Code, no budget; watch; then compare and write the result.
+    Y9 RUN STARTED (2026-11-23 ~05:40): no desktop-control tools in the session, so started from the laptop's
+      terminal (qanuvi-master plan run docs/PLAN-24Z-A.md --no-follow) after putting This PC's last run start
+      (Auto, Claude Code, Opus 5.5 default, team settings, no budget, extra checks cleared) into the laptop's
+      run-starts/<project id>.json. Work on branch qanuvi/plan-24z-a. Watch: qanuvi-master plan follow "qanuvi" on
+      the laptop, or the window with the laptop shown.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
       from This PC).
