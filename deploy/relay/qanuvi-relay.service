@@ -6,7 +6,7 @@ Wants=network-online.target qanuvi-relay-cert.service
 [Service]
 User=qanuvi-relay
 Group=qanuvi-relay
-ExecStart=/usr/local/bin/qanuvi-relay --listen 127.0.0.1:47300 --tls-listen 0.0.0.0:47443 --cert /var/lib/qanuvi-relay/tls/fullchain.pem --key /var/lib/qanuvi-relay/tls/key.pem --public-direct wss://relay.qanuvi.com:47443 --data /var/lib/qanuvi-relay
+ExecStart=/usr/local/bin/qanuvi-relay --listen 127.0.0.1:47300 --tls-listen 0.0.0.0:47443 --cert /var/lib/qanuvi-relay/tls/fullchain.pem --key /var/lib/qanuvi-relay/tls/key.pem --public-direct wss://relay.qanuvi.com:47443 --data /var/lib/qanuvi-relay --cap-per-day 2048
 Restart=always
 RestartSec=3
 # 24rl: one open file per link; 100,000 links need about that many.
