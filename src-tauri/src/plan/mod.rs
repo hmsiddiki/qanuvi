@@ -23,6 +23,7 @@ pub mod planstate;
 pub mod preflight;
 pub mod projectfacts;
 pub mod prompts;
+pub mod review;
 pub mod routing;
 pub mod run;
 pub mod runner;

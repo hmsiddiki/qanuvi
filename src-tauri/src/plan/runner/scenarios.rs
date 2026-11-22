@@ -2981,3 +2981,131 @@ fn y7_a_provider_that_keeps_failing_for_hours_sets_the_step_aside_and_the_run_go
         1
     );
 }
+
+#[test]
+fn y6_checks_that_need_eyes_go_on_one_review_list_and_the_run_never_waits_for_them() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Cart page**\n  - Add the cart page.\n  - Check: the page looks right on a phone\n- [ ] **2. Welcome text**\n  - Write it.\n- [ ] **3. Docs**\n  - Write it down.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    s.preview_url = "http://localhost/shop/".into();
+    env.set_settings(s);
+    env.set_checks(|cmd| panic!("a check in words is never run, not `{cmd}`"));
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        if n == "1" {
+            assert!(
+                c.prompt.contains("These checks need a person's eyes (the page looks right on a phone)"),
+                "{}",
+                c.prompt
+            );
+        }
+        assert!(c.prompt.contains("- To look at: <what, and where>"));
+        if n == "2" {
+            // The agent leaves the wording for the owner instead of stopping.
+            let t = c.env.text(FILE).replace(
+                "**2. Welcome text**\n  - Write it.",
+                "**2. Welcome text**\n  - Write it.\n  - To look at: the wording of the welcome text",
+            );
+            c.env.put(FILE, &t);
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(
+        r.status,
+        RunStatus::Done,
+        "{:?} {}",
+        statuses(&r),
+        r.message
+    );
+    assert!(r.steps.iter().all(|s| s.status == RunStepStatus::Done));
+    let rep = r.report.as_ref().unwrap();
+    let look: Vec<String> = rep
+        .look
+        .iter()
+        .map(|l| format!("{}: {}", l.step, l.why))
+        .collect();
+    assert_eq!(
+        look,
+        [
+            "Step 1: Cart page: the page looks right on a phone",
+            "Step 2: Welcome text: the wording of the welcome text"
+        ]
+    );
+    // One list in the Inbox for the plan, with both and the Preview.
+    let key = crate::plan::review::key("p1", FILE);
+    let lists: Vec<_> = env
+        .inbox()
+        .into_iter()
+        .filter(|i| i.key.as_deref() == Some(&key))
+        .collect();
+    assert_eq!(lists.len(), 1);
+    let list = &lists[0];
+    assert_eq!(list.kind_of, "answer");
+    assert!(
+        list.title.ends_with("2 things to look at from PLAN.md"),
+        "{}",
+        list.title
+    );
+    assert!(
+        list.text
+            .contains("• Step 1: Cart page: the page looks right on a phone")
+    );
+    assert!(list.text.contains("Preview: http://localhost/shop/"));
+
+    // The owner says what needs changing: it becomes a step after the last one looked at.
+    let mut answered = list.clone();
+    answered.status = "answered".into();
+    answered.answer = Some(json!({"choice": "ok", "text": "Make the welcome text shorter"}));
+    crate::plan::run::on_answer(&*env, &answered);
+    let plan = env.text(FILE);
+    let two = plan.find("**2. Welcome text**").unwrap();
+    let fix = plan
+        .find("Changes after your look")
+        .expect("the change is a step now");
+    let three = plan.find("**3. Docs**").unwrap();
+    assert!(two < fix && fix < three, "{plan}");
+    assert!(plan.contains("\"Make the welcome text shorter\""), "{plan}");
+    // "All fine" with nothing typed adds nothing.
+    let before = env.text(FILE);
+    answered.answer = Some(json!({"choice": "ok", "text": ""}));
+    crate::plan::run::on_answer(&*env, &answered);
+    assert_eq!(env.text(FILE), before);
+}
+
+#[test]
+fn y6_an_unanswered_list_keeps_what_an_earlier_run_put_there() {
+    let env = world("# Plan\n\n- [ ] **1. One**\n  - Check: the logo is sharp\n");
+    let mut s = settings("");
+    s.test_command = String::new();
+    env.set_settings(s);
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    // The first run has step 1 only; step 2 is written after it.
+    let one = run(&env, options());
+    assert_eq!(one.review.as_ref().map(Vec::len), Some(1));
+    let more = env.text(FILE) + "- [ ] **2. Two**\n  - Check: the menu reads well\n";
+    env.put(FILE, &more);
+    let second = run(&env, options());
+    assert_eq!(second.review.as_ref().map(Vec::len), Some(1));
+    let key = crate::plan::review::key("p1", FILE);
+    let list = env
+        .inbox()
+        .into_iter()
+        .find(|i| i.key.as_deref() == Some(&key))
+        .unwrap();
+    assert!(list.title.contains("2 things to look at"), "{}", list.title);
+    assert!(list.text.contains("the logo is sharp") && list.text.contains("the menu reads well"));
+}

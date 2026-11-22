@@ -518,6 +518,7 @@ impl<'a> Loop<'a> {
             branch: None,
             commits: None,
             report: None,
+            review: None,
             test_hint: None,
         };
         let known = parse_plan(&text)
@@ -2147,6 +2148,19 @@ impl<'a> Loop<'a> {
                     list.join(", ")
                 ));
             }
+            // Y6: checks that need a person's eyes go to the review list after the step; the step never waits for them.
+            let eyes = self.eyes_checks(&fresh);
+            if !eyes.is_empty() {
+                prompt.push_str(&format!(
+                    "\n\nThese checks need a person's eyes ({}): Qanuvi puts them on the owner's review list once this \
+                     step is done. Do not wait for them and do not mark the step blocked for them.",
+                    eyes.join("; ")
+                ));
+            }
+            prompt.push_str(
+                "\n\nIf something is left that only a person can judge (how a page looks, a wording choice), do not \
+                 stop for it: finish the step and add a line `- To look at: <what, and where>` under it in the plan.",
+            );
             if test_build.is_some() {
                 prompt.push_str(
                     "\n\nAfter this step Qanuvi test-builds the app itself (builds it into its own folder, starts it on \
@@ -2541,6 +2555,7 @@ impl<'a> Loop<'a> {
                 Outcome::Done => {
                     self.run.steps[i].status = RunStepStatus::Done;
                     self.mark_done(i);
+                    self.add_review(i);
                     // An earlier run's "Skipped:" line no longer applies.
                     self.note_skipped(i, None);
                     let pause = self.s.options.pause.unwrap_or(PauseMode::Decisions);
@@ -2620,6 +2635,85 @@ impl<'a> Loop<'a> {
             }
         }
         (checks, refused)
+    }
+
+    /// Y6: the checks a step names in words that are no command here ("Check: the page looks right"): a person
+    /// looks at them, after the step.
+    fn eyes_checks(&self, step: &Step) -> Vec<String> {
+        super::tasklist::step_checks(step)
+            .into_iter()
+            .filter(|c| {
+                let program = c.command.split_whitespace().next().unwrap_or("");
+                !c.quoted
+                    && !crate::test_build::names_test_build(&c.command)
+                    && !self.env.has_program(program)
+            })
+            .map(|c| c.command)
+            .collect()
+    }
+
+    /// Y6: a done step's checks that need eyes and its "To look at:" lines go on the plan's review list in the
+    /// Inbox (one item per plan, kept up to date); the run does not wait for them.
+    fn add_review(&mut self, i: usize) {
+        let st = self.run.steps[i].clone();
+        let Some(now) = self.plan() else { return };
+        let Some(step) = find(&now.text, st.number.as_deref(), &st.title) else {
+            return;
+        };
+        let lines: Vec<&str> = std::iter::once(step.note.as_str())
+            .chain(step.details.iter().map(String::as_str))
+            .collect();
+        let mut whats = self.eyes_checks(&step);
+        for w in super::review::looks_in(&lines) {
+            if !whats.contains(&w) {
+                whats.push(w);
+            }
+        }
+        if whats.is_empty() {
+            return;
+        }
+        let list = self.run.review.get_or_insert_with(Vec::new);
+        for what in &whats {
+            let item = LookItem {
+                number: st.number.clone(),
+                title: st.title.clone(),
+                what: what.clone(),
+            };
+            if !list.contains(&item) {
+                list.push(item);
+            }
+        }
+        let pid = self.env.project_id().to_string();
+        let list_key = super::review::key(&pid, &self.s.file);
+        // What an earlier run put there and nobody answered yet stays on the list.
+        let mut entries =
+            super::review::open_entries(self.env.inbox_by_key(&list_key).ok().flatten().as_ref());
+        for e in self.run.review.iter().flatten() {
+            if !entries.contains(e) {
+                entries.push(e.clone());
+            }
+        }
+        let preview = self
+            .env
+            .project_settings()
+            .map(|p| p.preview_url)
+            .unwrap_or_default();
+        let item = super::review::inbox_item(
+            &pid,
+            &self.s.project_name,
+            &self.s.file,
+            &self.run.id,
+            &preview,
+            &entries,
+        );
+        let _ = self.env.inbox_add(&item);
+        self.decide(
+            "review",
+            "Qanuvi",
+            &format!("Step {}", key(&st)),
+            "on the review list",
+            &format!("needs a person's eyes: {}", whats.join("; ")),
+        );
     }
 
     /// Y8: the test build the step asks for ("Check: test build"): the plan's own recipe, else the project's. Err
@@ -4362,6 +4456,10 @@ pub fn on_answer(env: &dyn RunEnv, item: &crate::inbox::InboxItem) {
     }
     if kind == Some("hold") {
         reopen_answered_hold(env, item);
+    }
+    // Y6: words typed on the review list become a step in the plan.
+    if kind == Some("review") {
+        let _ = super::review::on_answer(env, item);
     }
 }
 

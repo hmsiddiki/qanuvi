@@ -1819,7 +1819,18 @@ runs on or off; with it off nothing is sent anywhere.
       the proxy (run's base_url, else Claude Code's settings ANTHROPIC_BASE_URL, here 127.0.0.1:8787) must answer.
       Run panel: "waiting: <what is down>; goes on by itself when it is back". Rust 643 pass, clippy clean; window
       574 pass. Not driven in a window (a real outage was not made).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y7): NEXT: Y6 review list (checks that
+    Y6 REVIEW LIST BUILT (2026-11-23, owner "ok do Y6"; details in docs/PLAN-24Y.md "Y6 in detail"): a step's
+      check in words that is no command here ("Check: the page looks right") and the agent's "- To look at:" lines
+      go, once the step is done, on one Inbox list per plan (key review:<project>:<plan file>, kept up to date,
+      earlier unanswered entries stay); the step is never held for them. "All fine" closes it; words typed become a
+      step "Changes after your look" after the last step looked at (next run does it). End report and Run panel:
+      "To look at". Every step prompt says how to leave a To look at line instead of stopping. Rust 647 pass, clippy
+      clean; window 574 pass. Not driven in a window.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after Y6): 24y part 3 built apart from Y9
+      (Y8 3cc7e96, Y7 1b34aec, Y6), all unpublished. NEXT: Y9 benchmark on the Linux laptop (R1-R5 plan on a
+      scratch copy of Qanuvi from the commit before R1, watched from This PC; needs a build with Y6-Y8 on the
+      laptop first, so 0.1.44 (ask) or a laptop test build).
+    PICKUP POINT (before, 2026-11-23 after Y7): NEXT: Y6 review list (checks that
       need eyes go to one Inbox list instead of holding the run), then Y9 on the laptop.
     PICKUP POINT (before, 2026-11-23 after Y8): NEXT: Y7 health watch (proxy and
       model providers down: pause, say once, go on), then Y6 review list, then Y9 on the laptop.

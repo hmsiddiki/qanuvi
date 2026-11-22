@@ -340,6 +340,9 @@ pub struct PlanRun {
     /// The end report (24y Y5), once the run ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report: Option<RunReport>,
+    /// Y6: what this run put on the plan's review list (checks that need a person's eyes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<Vec<LookItem>>,
     /// FC: the command the run's steps ran the tests with, when the project has no test command (the finishing card
     /// offers it as "Set the test command").
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -352,6 +355,16 @@ pub struct PlanRun {
 pub struct StepCommit {
     pub step: String,
     pub id: String,
+}
+
+/// Y6: one thing on the review list: the step it is from and what to look at.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookItem {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub number: Option<String>,
+    pub title: String,
+    pub what: String,
 }
 
 /// One step in the end report: which, why, and the one thing the user does about it.
@@ -374,6 +387,9 @@ pub struct RunReport {
     /// Where the work is, when it went on the plan's branch ("on qanuvi/plan-x, 3 commits; merging is yours").
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub branch: String,
+    /// Y6: what needs a look (on the review list in the Inbox); the run did not wait for it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub look: Vec<ReportLine>,
 }
 
 /// A step as the report names it: "Step 3: Add sub", or its title.
@@ -448,6 +464,13 @@ pub fn run_report(run: &PlanRun) -> RunReport {
             }
             _ => {}
         }
+    }
+    for l in run.review.iter().flatten() {
+        r.look.push(ReportLine {
+            step: super::review::step_name(l),
+            why: l.what.clone(),
+            action: String::new(),
+        });
     }
     if let Some(b) = &run.branch {
         let n = run.commits.as_ref().map_or(0, Vec::len);

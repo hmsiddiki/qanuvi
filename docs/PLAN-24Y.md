@@ -1,6 +1,6 @@
 # 24y: a big plan runs by itself (proposal, 2026-11-20)
 
-Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9); Y8 + Y7 built 2026-11-23. Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
+Status: AGREED by the owner (2026-11-20, "ok do whats best"); part 1 done, part 2 done; part 3 agreed 2026-11-23 (Y8, Y7, Y6, Y9); Y8, Y7 and Y6 built 2026-11-23. Build order: part 1 = Y1 + Y2, part 2 = Y3 + Y4 + Y5,
 part 3 = Y6 to Y9; each part driven live on a scratch project.
 
 ## The goal in one line
@@ -101,6 +101,18 @@ right.
    qanuvi-master --target-dir {out}`, start `{out}/release/qanuvi-master core --data {data}`, check
    `{out}/release/qanuvi-master status --data {data}` (status ends with exit code 1 when the master is not running).
    Unattended runs build the headless master only; the window build stays with live drives.
+
+## Y6 in detail (owner "ok do Y6", 2026-11-23; built)
+
+1. **What goes on the list:** a step's check written in words that is no command here ("Check: the page looks
+   right on a phone"), and the lines "- To look at: <what, and where>" its agent writes under the step. Every step
+   prompt tells the agent to leave such a line instead of stopping when only a person can judge something.
+2. **When:** once the step is done; the step is never held or set aside for them, and nothing waits on them.
+3. **One list per plan** in the Inbox, kept up to date while the run goes: each thing with its step, and the
+   project's Preview address. What an earlier run put there and nobody answered yet stays on it.
+4. **Answering:** "All fine" closes it. Words typed instead ("make the welcome text shorter") become a step
+   "Changes after your look" in the plan, right after the last step looked at; the next run makes the change.
+5. **The end report** and the Run panel's report have a "To look at" part.
 
 ## Y7 in detail (owner "ok do Y7", 2026-11-23; built)
 

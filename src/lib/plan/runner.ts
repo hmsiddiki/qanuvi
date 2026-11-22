@@ -175,6 +175,8 @@ export interface PlanRun {
   commits?: { step: string; id: string }[];
   /** The end report (24y Y5), once the run ended. */
   report?: RunReport;
+  /** Y6: what this run put on the plan's review list (checks that need a person's eyes). */
+  review?: { number?: string; title: string; what: string }[];
   /** FC: the command the run's steps ran the tests with, when the project has no test command. */
   testHint?: string;
 }
@@ -192,6 +194,8 @@ export interface RunReport {
   setAside: ReportLine[];
   waiting: ReportLine[];
   branch?: string;
+  /** Y6: what needs a look (on the review list in the Inbox); the run did not wait for it. */
+  look?: ReportLine[];
 }
 
 export type RunTeam = "settings" | "paid" | "free" | "free-only";

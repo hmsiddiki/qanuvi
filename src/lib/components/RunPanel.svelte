@@ -1407,10 +1407,11 @@
     {#if run.report && run.status !== "running"}
       {@const rep = run.report}
       <!-- 24y Y5: the end report, in plain words: done; set aside and why; waiting for you, with what to do. -->
-      <details class="report" open={rep.waiting.length > 0 || rep.setAside.length > 0}>
+      {@const look = rep.look ?? []}
+      <details class="report" open={rep.waiting.length > 0 || rep.setAside.length > 0 || look.length > 0}>
         <summary
           >Report: {rep.done.length} done{#if rep.setAside.length}, {rep.setAside.length} set aside{/if}{#if rep.waiting.length},
-            {rep.waiting.length} waiting for you{/if}</summary
+            {rep.waiting.length} waiting for you{/if}{#if look.length}, {look.length} to look at{/if}</summary
         >
         {#if rep.done.length}<div><strong>Done:</strong> {rep.done.join("; ")}</div>{/if}
         {#if rep.waiting.length}
@@ -1427,6 +1428,15 @@
           <div><strong>Set aside</strong></div>
           <ul>
             {#each rep.setAside as l, n (n)}
+              <li>{l.step}: {l.why}</li>
+            {/each}
+          </ul>
+        {/if}
+        {#if look.length}
+          <!-- Y6: checks that need eyes; the run went on, the list waits in the Inbox. -->
+          <div><strong>To look at</strong> <span class="dim">(the review list in the Inbox)</span></div>
+          <ul>
+            {#each look as l, n (n)}
               <li>{l.step}: {l.why}</li>
             {/each}
           </ul>
