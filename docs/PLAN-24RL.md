@@ -176,7 +176,7 @@ it is found and used by itself, and the relay stays as the fallback.
   direct link is cut mid-call, an old master ignores the ask). Then on This PC + the laptop (same home network)
   with the measuring script, and the laptop through its kit relay.
 
-**Questions for the owner before S3 is built:** (1) the installer adds the private-network firewall rule (yes/no);
+**Owner answers (2026-11-22): yes to both** (installer rule, port 47444). S3 built fe00b6e; no settings switch.
 (2) port 47444 as the default.
 
 ## Relay kit in detail (2026-11-22; revised after the owner: no domain, no port 80)

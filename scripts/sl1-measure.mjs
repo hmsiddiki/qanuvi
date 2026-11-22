@@ -7,25 +7,38 @@ import net from "node:net";
 const [bin, root, relay = ""] = process.argv.slice(2);
 // Master A may run another build (SL1_BIN_A), to check an older master against a newer caller and back.
 const binA = process.env.SL1_BIN_A || bin;
-const A = `${root}/a`,
+// Master A on another computer (the laptop at home): SL1_A_SSH=user@host, SL1_A_KEY, SL1_BIN_A (its program),
+// SL1_A_ROOT (its scratch folder, deleted at the start and the end).
+const sshA = process.env.SL1_A_SSH || "";
+const ssh = (...cmd) => ["-i", process.env.SL1_A_KEY || "", "-o", "BatchMode=yes", sshA, ...cmd];
+const rootA = sshA ? process.env.SL1_A_ROOT || "sl1-scratch" : root;
+const A = `${rootA}/a`,
   B = `${root}/b`,
-  P = `${root}/proj`;
+  P = `${rootA}/proj`;
 fs.rmSync(root, { recursive: true, force: true });
-for (const d of [A, B, P]) fs.mkdirSync(d, { recursive: true });
-for (let i = 0; i < 40; i++) fs.writeFileSync(`${P}/f${i}.txt`, `file ${i}\n`);
+for (const d of sshA ? [B] : [A, B, P]) fs.mkdirSync(d, { recursive: true });
+if (sshA)
+  execFileSync(
+    "ssh",
+    ssh(
+      `rm -rf ${rootA} && mkdir -p ${A} ${P} && for i in $(seq 0 39); do echo "file $i" > ${P}/f$i.txt; done && for i in $(seq 0 3999); do echo "line $i: const value$((i % 97)) = compute($i, \"v$((i * 7919))\");"; done > ${P}/big.txt`,
+    ),
+  );
+if (!sshA) for (let i = 0; i < 40; i++) fs.writeFileSync(`${P}/f${i}.txt`, `file ${i}\n`);
 // About 200 KB of text that packs as real code and chat lines do (not one letter over and over).
-fs.writeFileSync(
-  `${P}/big.txt`,
-  Array.from(
-    { length: 4000 },
-    (_, i) => `line ${i}: const value${i % 97} = compute(${i}, "${(i * 7919).toString(36)}");`,
-  ).join("\n"),
-);
+if (!sshA)
+  fs.writeFileSync(
+    `${P}/big.txt`,
+    Array.from(
+      { length: 4000 },
+      (_, i) => `line ${i}: const value${i % 97} = compute(${i}, "${(i * 7919).toString(36)}");`,
+    ).join("\n"),
+  );
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => Number(process.hrtime.bigint()) / 1e6;
 
-function bridge(data, exe = bin) {
-  const io = spawn(exe, ["--stdio", "--data", data]);
+function bridge(data, exe = bin, remote = false) {
+  const io = remote ? spawn("ssh", ssh(exe, "--stdio", "--data", data)) : spawn(exe, ["--stdio", "--data", data]);
   let buf = "",
     waiting = new Map(),
     id = 0;
@@ -73,10 +86,12 @@ async function tcpRtt(host, port) {
   return stats(xs);
 }
 
-const sa = spawn(binA, ["serve", "--data", A], { stdio: "ignore" });
+const sa = sshA
+  ? spawn("ssh", ssh(`nohup ${binA} serve --data ${A} >/dev/null 2>&1 &`), { stdio: "ignore" })
+  : spawn(binA, ["serve", "--data", A], { stdio: "ignore" });
 const sb = spawn(bin, ["serve", "--data", B], { stdio: "ignore" });
 await sleep(3000);
-const a = bridge(A, binA),
+const a = bridge(A, binA, !!sshA),
   b = bridge(B);
 let serverId = "",
   pairing = "";
@@ -106,6 +121,9 @@ try {
     await sleep(500);
   }
 
+  await sleep(1500);
+  const states = (await b.call("remote_states")).ok ?? {};
+  console.log("B's connection to A goes direct:", !!states[serverId]?.direct);
   const host = (st?.relay || relay || "wss://relay.qanuvi.com").replace(/^wss?:\/\//, "").split(/[/:#]/)[0];
   console.log(`TCP connect to ${host}:443 (one network round trip):`, await tcpRtt(host, 443));
 
@@ -165,7 +183,8 @@ try {
   b.io.kill();
   for (const d of [A, B]) {
     try {
-      execFileSync(d === A ? binA : bin, ["stop", "--data", d], { encoding: "utf8" });
+      if (d === A && sshA) execFileSync("ssh", ssh(`${binA} stop --data ${A}; rm -rf ${rootA}`));
+      else execFileSync(d === A ? binA : bin, ["stop", "--data", d], { encoding: "utf8" });
     } catch {}
   }
   sa.kill();

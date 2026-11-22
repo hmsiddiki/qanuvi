@@ -1680,10 +1680,23 @@ runs on or off; with it off nothing is sent anywhere.
       relay.qanuvi.com: one call 220 -> 120 ms, 10 at once 410 -> 130-200 ms, 4,000-line file 643 -> 191 ms; old/new
       mixes work both ways. Rust 620 + window 571 tests, clippy + svelte-check + prettier clean.
       Owner rule (2026-11-22): own relay / links must never be complicated for users (S3 is zero setup).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after sl1 S1/S2/S4): all pushed, unpublished:
+    PICKUP POINT (before, 2026-11-22 after sl1 S1/S2/S4): all pushed, unpublished:
       sl1 S1/S2/S4. NEXT: owner answers S3's two questions (docs/PLAN-24RL.md "S3 in detail": installer firewall rule
       on private networks, port 47444), then build S3 (direct links at home), drive This PC <-> laptop with the
       script, then drive S2 in a test window (ask before driving at the PC), then 0.1.40 (ask).
+    sl1 S3 BUILT + DRIVEN HEADLESS (owner "yes to both": installer firewall rule + port 47444, 2026-11-22; fe00b6e,
+      unpublished): src-tauri/src/direct.rs. The app asks inside the sealed relay session, the master offers its
+      private-network addresses + port, both prove the pairing key, lines (packed when long) go direct, the relay
+      session stays as the fallback (asked again 60 s after a drop, 5 min after a failed try). Window: "connected ·
+      direct" in the machine switcher (road events on remote_watch). Installer hooks.nsh: rule "Qanuvi home links"
+      (private profile, 47444-47454) added once when missing (one elevation question; updates never ask), removed on
+      a real uninstall; NOT compiled yet (first release build checks it). Measured (scripts/sl1-measure.mjs, A on the
+      laptop over SSH, B on This PC): one call ~120 -> ~5 ms, 10 in a row 1.3 s -> 44 ms; laptop UFW let 47444 in.
+      Tests: Rust 623 + window 572, clippy + svelte-check + prettier clean. No settings switch (owner rule: nothing to
+      set up); QANUVI_DIRECT_LOOPBACK is only for one-computer checks.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22 after sl1 S3): all pushed, unpublished: sl1
+      S1-S4. NEXT: drive S2 + S3 in a test window (ask before driving at the PC), then 0.1.40 (ask; its installer build
+      is the first compile of the firewall hook). After 0.1.40 both machines link directly at home.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
