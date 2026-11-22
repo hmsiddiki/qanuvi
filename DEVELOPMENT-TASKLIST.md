@@ -1757,7 +1757,15 @@ runs on or off; with it off nothing is sent anywhere.
         its watch (before: ignored). Test in machineServers.test.ts; window 573 pass, svelte-check clean. Note for
         the owner: "Connected to the relay (its own port)" in Remote access is the machine's own relay link, which
         stays on as the fallback and for reaching it from outside.
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after hotspot drive 2 + h2): all pushed,
+    0.1.42 PUBLISHED (owner "yes publish anyway", 2026-11-23; release rule skipped with QANUVI_RELEASE_ANYWAY=1):
+      tag v0.1.42, h1 + h2 on top of 0.1.41. All 4 platforms via E:/qc-scratch/release-0.1.42/chan, CARGO_BUILD_JOBS=2.
+      Old latest.json (0.1.41) in E:/Backups/qanuvi/channel-before-0.1.42. Online: latest.json + all 8 files 200,
+      sizes match, latest.json says 0.1.42.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after 0.1.42): all pushed, nothing
+      unpublished. NEXT: owner updates both machines; on the laptop Settings -> Servers should say "Home PC
+      directly on the home network". Then the roadmap (big-plan basics + stable Windows/Linux, planned with the
+      owner first) in a fresh conversation.
+    PICKUP POINT (before, 2026-11-23 after hotspot drive 2 + h2): all pushed,
       unpublished: h1 (ended link closes its socket) + h2 (Servers row shows a direct link). NEXT: 0.1.42 (ask),
       owner checks the Servers row on the laptop says "directly on the home network"; then the roadmap (big-plan
       basics + stable Windows/Linux, planned with the owner first).
