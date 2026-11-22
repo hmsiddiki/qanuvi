@@ -74,6 +74,11 @@ right.
 3. **The branch question:** pre-chosen answer is "No, Qanuvi keeps its own copies" (git is the user's; undo still
    works through snapshots). Yes is kept per project once chosen. A project without git never sees the line.
 4. The other defaults on the card stand as written above.
+5. **The benchmark (Y9) runs on one machine, the Linux laptop** (owner, 2026-11-23): the runner is the same core
+   on both systems, and Windows is used and driven live every day here. It runs on a scratch copy on the laptop,
+   started and watched from the window on This PC (the laptop as the shown machine), while work goes on here;
+   the results are checked after. It shares the Claude usage window with work on This PC, so start it before a
+   break or keep work here light.
 
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
