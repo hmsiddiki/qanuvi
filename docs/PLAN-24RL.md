@@ -177,7 +177,6 @@ it is found and used by itself, and the relay stays as the fallback.
   with the measuring script, and the laptop through its kit relay.
 
 **Owner answers (2026-11-22): yes to both** (installer rule, port 47444). S3 built fe00b6e; no settings switch.
-(2) port 47444 as the default.
 
 ## Relay kit in detail (2026-11-22; revised after the owner: no domain, no port 80)
 
