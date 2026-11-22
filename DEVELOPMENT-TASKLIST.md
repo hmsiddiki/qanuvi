@@ -1620,6 +1620,15 @@ runs on or off; with it off nothing is sent anywhere.
         active ufw); pairing a master + device through a pinned relay (Link is shared, unit-tested); the kit link in a
         window. Kit not published (RELAY_KIT_URL 404 until then). MOVE TO qanuvi.com: RELAY_KIT_URL is a 4th address.
       Next (ask): owner runs sudo ./setup.sh on the laptop or a VPS (or allows it), publish the kit + 0.1.39; then sl1.
+    SETUP.SH RUN BY THE OWNER ON THE LAPTOP (2026-11-22): installed, own certificate, service up; ufw there is
+      inactive (service active, firewall off). Host found = the laptop's public IPv6 (its IPv4 is private), but
+      the relay listened on 0.0.0.0 only -> k1 FOUND + FIXED 051c35e: [::] listener with only_v6(false) takes both,
+      setup listens on [::] when the server has IPv6, an IPv6-only address gets a note; and the pinned TLS is now set
+      up in relay_client (tungstenite took "[::1]" with brackets as a DNS name: "Invalid DNS name"). New test
+      a_dual_stack_listener_takes_both_and_a_pinned_ipv6_address_connects; relay 32/32, clippy clean. Checked from
+      This PC: the laptop's installed relay over LAN IPv4 by pin OK (107 ms), IPv6 refused (old build). Kit rebuilt
+      on the laptop (~/src/rk/qanuvi-relay-kit, sha256 OK). Next: owner reruns sudo ./setup.sh there (= update to
+      the fix, same address), then IPv6 check + pairing through it from This PC.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
