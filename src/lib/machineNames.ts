@@ -66,3 +66,8 @@ export const COLORS = ["#3b82f6", "#a855f7", "#14b8a6", "#f97316", "#ec4899", "#
 export function pickColor(used: (string | undefined)[]): string {
   return COLORS.find((c) => !used.includes(c)) ?? COLORS[used.length % COLORS.length];
 }
+
+/** Beside a paired machine's name: how its link goes now (a direct link at home, else the relay). */
+export function relayRoad(direct: boolean | undefined): string {
+  return direct ? "directly on the home network" : "through the relay";
+}

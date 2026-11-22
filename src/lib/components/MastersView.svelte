@@ -14,7 +14,7 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import { ask } from "$lib/stores/confirm.svelte";
   import { displayName, masters } from "$lib/stores/masters.svelte";
-  import { COLORS, NAME_MAX, nameProblem } from "$lib/machineNames";
+  import { COLORS, NAME_MAX, nameProblem, relayRoad } from "$lib/machineNames";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
   import IconButton from "./IconButton.svelte";
   import RelayChoice from "./RelayChoice.svelte";
@@ -95,7 +95,13 @@
 
   /** Beside the name: how it is reached, unless the name is that address already (no name yet). */
   const reachedBy = (m: MasterSettings) =>
-    m.relay ? "through the relay" : m.target === "local" ? "this PC" : displayName(m) === m.target ? "" : m.target;
+    m.relay
+      ? relayRoad(masters.statusOf(m.id).direct)
+      : m.target === "local"
+        ? "this PC"
+        : displayName(m) === m.target
+          ? ""
+          : m.target;
 
   /** A name kept from before the name rules (the same as another machine's, or "This PC"). */
   const nameIssue = (m: MasterSettings) => (m.name ? nameProblem(m.name, masters.namesBesides(m.id)) : "");

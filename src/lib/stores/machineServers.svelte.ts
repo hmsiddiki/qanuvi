@@ -19,6 +19,9 @@ interface WatchEvent {
   closed?: string;
   error?: string;
   removed?: boolean;
+  /** S3: this server's connection moved to a direct link (direct) or back to the relay. */
+  road?: string;
+  direct?: boolean;
 }
 
 class MachineServersStore {
@@ -45,6 +48,12 @@ class MachineServersStore {
 
   #on(event: WatchEvent, machine: string): void {
     if (this.machine !== machine) return;
+    // Hotspot drive 2: the road a connected server's link takes (its row says "directly on the home network").
+    if (event.road) {
+      const now = this.statusOf(event.road);
+      if (now.state === "on") this.#set(event.road, { ...now, direct: !!event.direct });
+      return;
+    }
     if (event.connected && event.info) this.#set(event.connected, { state: "on", info: event.info });
     else if (event.closed) {
       if (event.removed) this.list = this.list.filter((x) => x.id !== event.closed);

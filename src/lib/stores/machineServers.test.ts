@@ -109,6 +109,17 @@ describe("a shown master's own server list", () => {
     expect(ms.list).toEqual([]);
   });
 
+  it("follows a connected server's road: direct at home, the relay again when that drops", async () => {
+    await ms.load("vps-a", {});
+    watch!.onmessage!({ road: "s1", direct: true });
+    expect(ms.statusOf("s1").direct).toBeUndefined();
+    watch!.onmessage!({ connected: "s1", info: hello });
+    watch!.onmessage!({ road: "s1", direct: true });
+    expect(ms.statusOf("s1")).toEqual({ state: "on", info: hello, direct: true });
+    watch!.onmessage!({ road: "s1", direct: false });
+    expect(ms.statusOf("s1").direct).toBe(false);
+  });
+
   it("removes a paired server with its pairing on that master", async () => {
     db.push({ ...server("p1", "relay"), relay: { url: "wss://r", masterId: "m", pairing: "ab12" } } as never);
     await ms.load("vps-a", {});

@@ -13,7 +13,7 @@
   import { displayName, masters } from "$lib/stores/masters.svelte";
   import { machineServers as ms } from "$lib/stores/machineServers.svelte";
   import { machineName } from "$lib/remote";
-  import { COLORS, NAME_MAX, nameProblem } from "$lib/machineNames";
+  import { COLORS, NAME_MAX, nameProblem, relayRoad } from "$lib/machineNames";
   import { settings, type MasterSettings } from "$lib/stores/settings.svelte";
   import IconButton from "./IconButton.svelte";
   import RelayChoice from "./RelayChoice.svelte";
@@ -93,7 +93,7 @@
   }
 
   const reachedBy = (m: MasterSettings) =>
-    m.relay ? "through the relay" : displayName(m) === m.target ? "" : m.target;
+    m.relay ? relayRoad(ms.statusOf(m.id).direct) : displayName(m) === m.target ? "" : m.target;
   const nameIssue = (m: MasterSettings) => (m.name ? nameProblem(m.name, ms.namesBesides(m.id)) : "");
 </script>
 

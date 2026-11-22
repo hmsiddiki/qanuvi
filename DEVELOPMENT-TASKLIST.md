@@ -1750,7 +1750,18 @@ runs on or off; with it off nothing is sent anywhere.
       the WebSocket. Link now shuts its socket down when dropped (held senders just get "ended"). Test
       an_ended_link_closes_its_connection_while_a_sender_is_held (fails without the fix); Rust 625 pass, clippy clean.
       Window labels on the laptop not read by me (owner's eyes only).
-    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after hotspot drive 2): all pushed,
+      h2 OWNER FOUND + FIXED (unpublished, not driven): on the laptop, Settings -> Servers said "Home PC through
+        the relay" while its link was direct (laptop master remote_states: direct: true; only the machine list's
+        row knew). The row in MastersView and MachineServersView now says "directly on the home network" when the
+        link is direct (relayRoad in machineNames.ts); a shown machine's server list also follows road events from
+        its watch (before: ignored). Test in machineServers.test.ts; window 573 pass, svelte-check clean. Note for
+        the owner: "Connected to the relay (its own port)" in Remote access is the machine's own relay link, which
+        stays on as the fallback and for reaching it from outside.
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-23 after hotspot drive 2 + h2): all pushed,
+      unpublished: h1 (ended link closes its socket) + h2 (Servers row shows a direct link). NEXT: 0.1.42 (ask),
+      owner checks the Servers row on the laptop says "directly on the home network"; then the roadmap (big-plan
+      basics + stable Windows/Linux, planned with the owner first).
+    PICKUP POINT (before, 2026-11-23 after hotspot drive 2): all pushed,
       unpublished: h1 (ended link closes its socket). NEXT: roadmap (big-plan basics + stable Windows/Linux,
       planned with the owner first); h1 goes out with the next release.
     PICKUP POINT (before, 2026-11-23 after 0.1.41): all pushed, nothing
