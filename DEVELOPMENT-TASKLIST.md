@@ -1651,6 +1651,16 @@ runs on or off; with it off nothing is sent anywhere.
       Old latest.json (0.1.38) in E:/Backups/qanuvi/channel-before-0.1.39. Online: all 12 files 200, sizes match,
       latest.json says 0.1.39; RELAY_KIT_URL now answers. Next: owner updates both machines (kit link in the window
       can be checked then); then sl1.
+    BOTH MACHINES ON 0.1.39 (owner, 2026-11-22; checked: qanuvi-master version 0.1.39 on This PC and the laptop).
+      24rl relay kit DONE (kit link in a window still unchecked: ask before opening a window on This PC).
+    PICKUP POINT (newest, fresh conversation starts here, 2026-11-22): all pushed, nothing unpublished, nothing
+      undeployed. basevm376 relay = 75729ed build with the 2 GB cap. The laptop runs the owner's own kit relay
+      (wss://[laptop IPv6]:47443#pin=..., service qanuvi-relay; remove: sudo ~/src/rk/qanuvi-relay-kit/setup.sh
+      --remove --purge). NEXT: sl1 (slow switch over the relay). The relay server has no read waits since R1 (tokio),
+      but the app and master link threads still read with a 50 ms timeout before sending what is queued
+      (relay_client open_ws sets 50 ms). Step 1: measure a project/plan/chat switch over the relay (calls made, time
+      each, on Qanuvi's relay and on the laptop relay), headless with scratch masters. Step 2: write sl1 + 24rl part 2
+      (direct links on the same network) in detail for the owner's yes, then build.
     MOVE TO qanuvi.com (LATER, when the owner says the site is ready; owner 2026-11-22): qlopy.top is only This PC's
       web folder and the owner is the only user, so no period of serving both. Steps: put the channel folder
       (latest.json, builds, relays.json + .sig) and knowledge.json (+ .sig) on qanuvi.com; change the three built-in
