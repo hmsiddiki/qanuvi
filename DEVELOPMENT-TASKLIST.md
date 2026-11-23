@@ -1899,7 +1899,11 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24, after the Y11 long run): LONG RUN Y11 PASSED. Plan docs/PLAN-24Z-A.md (22 steps)
+    PICKUP POINT (newest, 2026-11-24 after 0.1.48): 0.1.48 PUBLISHED tag v0.1.48 (owner "publish anyway"; sp1, sk1/ho1/pn1,
+      lr1, lr2; backup channel-before-0.1.48; all 9 files online, 200, sizes match). Owner updates This PC and the
+      laptop. Next: plan big-plan basics + stable Win/Linux with the owner; later list: inbox show with an id starting
+      with digits is read as a number; the Y11 list to look at (18 things, scratch only).
+    PICKUP POINT (before, 2026-11-24, after the Y11 long run): LONG RUN Y11 PASSED. Plan docs/PLAN-24Z-A.md (22 steps)
       on the laptop scratch copy ~/qc-scratch/y11/qanuvi, headless qanuvi-master plan run, budget $40, data
       dev.qanuvi.desktop.source, master at 732d9d6. Steps 2-22 ran by themselves with no question to the owner;
       $12.24 total (step 1 $1.03 in an earlier start). Honest end: "needs you", 21 done, with the work left for later
