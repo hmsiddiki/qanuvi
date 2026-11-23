@@ -314,6 +314,8 @@ export interface RunView {
   stopping: boolean;
   /** Qanuvi runs the project's checks now. */
   checking: boolean;
+  /** Y8 (y9-7): the step's test build runs now. */
+  testBuilding?: boolean;
   /** Y8: the step's test build waits for free memory: the GB it needs. */
   waitingMemory?: number | null;
   /** The step's agent session at work. */

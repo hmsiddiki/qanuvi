@@ -93,6 +93,8 @@ struct Asks {
     mode: Option<String>,
     session_id: Option<String>,
     checking: bool,
+    /// Y8 (y9-7): the step's test build runs now (a release build can take many minutes).
+    test_building: bool,
     /// Y8: the test build waits for this much free memory (GB).
     waiting_memory: Option<u64>,
     /// The owner's messages in the step's chat, not taken by a turn yet.
@@ -211,6 +213,33 @@ impl Controls {
         self.asks().checking
     }
 
+    /// Y8 (y9-7): the step's test build runs now.
+    pub fn test_building(&self) -> bool {
+        self.asks().test_building
+    }
+
+    /// y9-7: the tests (and the test build) start or end; the window hears it at once, or it shows a finished agent
+    /// chat with "running" and no word of what still runs.
+    fn set_checking(&self, checking: bool, test_building: bool) {
+        let changed = {
+            let mut a = self.asks();
+            let changed = a.checking != checking || a.test_building != test_building;
+            a.checking = checking;
+            a.test_building = test_building;
+            changed
+        };
+        if changed {
+            self.notify();
+        }
+    }
+
+    fn notify(&self) {
+        let hook = self.1.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if let Some(f) = hook.0 {
+            f();
+        }
+    }
+
     /// Y8: the step's test build waits for free memory: the GB it needs.
     pub fn waiting_memory(&self) -> Option<u64> {
         self.asks().waiting_memory
@@ -229,10 +258,7 @@ impl Controls {
             changed
         };
         if changed {
-            let hook = self.1.lock().unwrap_or_else(|e| e.into_inner()).clone();
-            if let Some(f) = hook.0 {
-                f();
-            }
+            self.notify();
         }
     }
 
@@ -953,7 +979,7 @@ pub fn attempt(
             && watch.handover == 0
             && !watch.pause_now
         {
-            controls.asks().checking = true;
+            controls.set_checking(true, false);
             failing.clear();
             let mut outputs: Vec<(String, CheckResult)> = Vec::new();
             for command in &commands {
@@ -987,6 +1013,7 @@ pub fn attempt(
                         failing.push(crate::test_build::NAME.to_string());
                     }
                     Ok(_) => {
+                        controls.set_checking(true, true);
                         let check = env.test_build(recipe, &|| controls.stop_asked().is_some());
                         if !check.ok {
                             failing.push(crate::test_build::NAME.to_string());
@@ -995,7 +1022,7 @@ pub fn attempt(
                     }
                 }
             }
-            controls.asks().checking = false;
+            controls.set_checking(false, false);
             test_runs += 1;
             tests_passed = Some(failing.is_empty());
             if failing.is_empty() || round >= MAX_FIX_ROUNDS || no_memory.is_some() {

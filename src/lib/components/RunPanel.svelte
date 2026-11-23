@@ -1362,7 +1362,9 @@
               >{/if}
             {#if runner.waitingMemory}<span class="dim">
                 · test build waits for {runner.waitingMemory} GB of free memory</span
-              >{:else if runner.checking}<span class="dim"> · running the tests</span>{/if}
+              >{:else if runner.testBuilding}<span class="dim">
+                · the agent is done; Qanuvi test-builds the app now (its own folder, can take minutes)</span
+              >{:else if runner.checking}<span class="dim"> · the agent is done; Qanuvi runs the tests now</span>{/if}
             {#if runner.waitingUntil}<span class="dim">
                 · usage limit reached: goes on by itself at {runner.waitingUntil.toLocaleTimeString([], {
                   hour: "2-digit",

@@ -702,3 +702,25 @@ fn a_ticked_step_is_not_held_for_a_background_command_left_behind() {
     run(&env, &c, &mut w, &ask(""));
     assert!(env.now_ms() - started >= BACKGROUND_WAIT_MS);
 }
+
+#[test]
+fn the_window_hears_when_the_tests_and_the_test_build_start_and_end() {
+    let c = Controls::default();
+    let heard = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let h = heard.clone();
+    c.on_change(Some(std::sync::Arc::new(move || {
+        h.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    })));
+    let n = || heard.load(std::sync::atomic::Ordering::SeqCst);
+    c.set_checking(true, false);
+    assert!(c.checking() && !c.test_building());
+    assert_eq!(n(), 1);
+    c.set_checking(true, false);
+    assert_eq!(n(), 1, "no change, nothing sent");
+    c.set_checking(true, true);
+    assert!(c.test_building());
+    assert_eq!(n(), 2);
+    c.set_checking(false, false);
+    assert!(!c.checking() && !c.test_building());
+    assert_eq!(n(), 3);
+}

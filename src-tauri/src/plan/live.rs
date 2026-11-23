@@ -46,6 +46,8 @@ pub struct RunView {
     pub stopping: bool,
     /// Qanuvi runs the project's checks now.
     pub checking: bool,
+    /// Y8 (y9-7): the step's test build runs now.
+    pub test_building: bool,
     /// Y8: the step's test build waits for free memory: the GB it needs.
     pub waiting_memory: Option<u64>,
     /// The step's agent session at work.
@@ -140,6 +142,7 @@ impl Runs {
             pausing: c.pausing(),
             stopping: c.stop_asked().is_some(),
             checking: c.checking(),
+            test_building: c.test_building(),
             waiting_memory: c.waiting_memory(),
             session_id: c.session_id(),
             waiting_messages: c.waiting_messages(),
