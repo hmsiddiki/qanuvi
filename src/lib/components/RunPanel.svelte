@@ -449,6 +449,9 @@
   let checkAnswer = "";
   /** Y10 d5: what the steps need that is not on this machine: those steps wait. */
   let probeHolds = $state<{ step: string; why: string; by: "you" | "default" }[]>([]);
+  /** e2e1: the real end-to-end check the run rules refuse is the owner's call, shown apart from what is missing. */
+  const endToEndHolds = $derived(probeHolds.filter((h) => h.why.startsWith(END_TO_END)));
+  const missingHolds = $derived(probeHolds.filter((h) => !h.why.startsWith(END_TO_END)));
   let secretValues = $state<Record<string, string>>({});
   let answers = $state<Record<number, string>>({});
   /** Answers the owner typed or changed (an untouched recommended answer is Qanuvi's decision). */
@@ -1327,10 +1330,19 @@
             </div>
           {/each}
         {/if}
-        {#if probeHolds.length}
+        {#if endToEndHolds.length}
+          <p class="hint">Real end-to-end check (only this step waits for your answer; the rest runs):</p>
+          <ul>
+            {#each endToEndHolds as h, i (i)}<li>
+                <strong>Step {h.step}</strong>
+                <span class="dim">{h.why.slice(END_TO_END.length).replace(/^:\s*/, "")}</span>
+              </li>{/each}
+          </ul>
+        {/if}
+        {#if missingHolds.length}
           <p class="hint">Not on this machine (only these steps wait until it is there; the rest runs):</p>
           <ul>
-            {#each probeHolds as h, i (i)}<li>
+            {#each missingHolds as h, i (i)}<li>
                 <strong>Step {h.step}</strong> <span class="dim">{h.why}</span>
               </li>{/each}
           </ul>
