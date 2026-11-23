@@ -1900,7 +1900,7 @@ runs on or off; with it off nothing is sent anywhere.
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
     PICKUP POINT (newest, 2026-11-23 after Y9): Y9 done with the result above. y9-1..y9-7 fixed, pushed,
-      unpublished. Next: talk lessons (a)-(c) through with the owner, drive y9-7 in a window, then 0.1.45 (ask).
+      unpublished. OWNER AGREED lessons (a)-(c) (2026-11-23). Next, in a fresh session: write (a)-(c) in detail in docs/PLAN-24Y.md and build them, drive y9-7 in a window, then 0.1.45 (ask).
       The laptop's scratch copy and its plan-24z-a branch stay as they are for reference.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
