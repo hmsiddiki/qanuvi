@@ -637,7 +637,12 @@
         const extra = await api.planRun
           .checkSettle(project.id, file, r.text, {}, mode, firstStepKey(), true)
           .catch(() => null);
-        if (extra?.notes.length) savePlanNotes(project.id, file, [...loadPlanNotes(project.id, file), ...extra.notes]);
+        if (extra && (extra.notes.length || extra.said.length))
+          savePlanNotes(project.id, file, [
+            ...loadPlanNotes(project.id, file),
+            ...extra.notes,
+            ...extra.said.map((s) => `Settled before the run: ${s}.`),
+          ]);
         if (extra) onchanged?.();
         await go(extra?.holds.map((h) => ({ step: h.step, why: holdWording(h) })) ?? [], []);
       }
@@ -729,6 +734,7 @@
     const notes = [
       ...loadPlanNotes(project.id, file),
       ...(extra?.notes ?? []),
+      ...(extra?.said ?? []).map((s) => `Settled before the run: ${s}.`),
       ...settled.notes,
       ...settled.decided.map(decidedNote),
     ];
@@ -1163,10 +1169,10 @@
     </label>
     {#if checking}
       <p class="hint">
-        Checking what the run needs from you: one short read-only pass on {modelLabel(
+        Checking what the run needs from you: one read-only pass on {modelLabel(
           provider,
-          oneModel || settings.agent(provider.id).model,
-        )}, about a minute. The run starts after you answer.
+          provider.models[0]?.id || oneModel || settings.agent(provider.id).model,
+        )}, a few minutes (it reads the files the steps change). The run starts after you answer.
       </p>
     {/if}
     <div class="rules-card">

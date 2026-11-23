@@ -312,6 +312,13 @@ pub fn check_before_run(env: &dyn RunEnv, setup: &RunSetup) -> Result<Checked, S
     // Y10 d1-d4: grants, eyes, the end check and promises.
     let applied = super::check_more::apply(env, &file, &found, &risk, &o.mode, plan_rules.as_ref());
     notes.extend(applied.notes.iter().cloned());
+    // What it settled, said once in the plan's notes (the run's facts), so the owner and the steps see it.
+    notes.extend(
+        applied
+            .said
+            .iter()
+            .map(|s| format!("Settled before the run: {s}.")),
+    );
     // Kept as the window keeps it.
     notes.extend(settled.notes.iter().cloned());
     notes.extend(settled.decided.iter().map(decided_note));

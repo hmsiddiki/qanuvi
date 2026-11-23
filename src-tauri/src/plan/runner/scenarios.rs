@@ -3343,3 +3343,40 @@ fn y10_the_check_settles_grants_eyes_the_end_check_promises_and_tries_what_steps
         "{notes}"
     );
 }
+
+#[test]
+fn y10_an_end_check_the_rules_refuse_is_not_dropped_unseen() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Build it**\n  - Build.\n- [ ] **2. The whole check**\n  - Verify.\n",
+    );
+    let refused = "rm -rf /tmp/x && make run-demo";
+    env.never.lock().unwrap().push(refused.to_string());
+    let answer = json!({
+        "secrets": [], "questions": [], "risky": [], "setup": [], "order": [],
+        "endCheck": {"step": "2", "check": refused, "why": "a real run of the demo"}
+    })
+    .to_string();
+    env.set_agent(move |c| {
+        assert!(
+            c.prompt.contains("never only that it starts"),
+            "{}",
+            c.prompt
+        );
+        AgentReply {
+            result: Some(answer.clone()),
+            ..Default::default()
+        }
+    });
+    let setup = crate::plan::run::test_setup(FILE, options());
+    crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert!(!env.text(FILE).contains("- Check:"));
+    let notes = env.plan_data_get(FILE, Kind::Notes).unwrap().to_string();
+    assert!(
+        notes.contains("Step 2 must prove the plan's work runs for real, end to end, with no stand-ins (a real run of the demo)"),
+        "{notes}"
+    );
+    assert!(
+        notes.contains("Settled before the run: The real end check"),
+        "{notes}"
+    );
+}

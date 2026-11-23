@@ -314,9 +314,22 @@ pub fn apply(
                     text = next;
                 }
             }
-            (false, _) => out.said.push(format!(
-                "The real end check `{command}` was not added: the run rules do not let a run use it"
-            )),
+            (false, target) => {
+                // Not dropped unseen: the closing step still proves the plan works for real.
+                let step = target
+                    .map(|s| super::planstate::step_key(s.number.as_deref(), &s.title))
+                    .unwrap_or_else(|| ec.step.clone());
+                out.notes.push(format!(
+                    "Step {step} must prove the plan's work runs for real, end to end, with no stand-ins ({}). The \
+                     check before the run proposed `{command}`, which the run rules do not allow; use a way they \
+                     allow, or say under the step what is still unproven.",
+                    ec.why
+                ));
+                out.said.push(format!(
+                    "The real end check `{command}` was not added (the run rules do not let a run use it); step \
+                     {step} is told to prove it another way"
+                ));
+            }
             _ => {}
         }
     }

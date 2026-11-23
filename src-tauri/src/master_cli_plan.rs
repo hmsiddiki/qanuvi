@@ -567,7 +567,7 @@ pub fn plan_cli(dir: &Path, args: &[String]) -> Result<(), String> {
             println!("Plan run of {rel} in {name}. {}", setup_line(&start));
             if check {
                 println!(
-                    "First a short read-only check of what the run needs (about a minute); Qanuvi takes its \
+                    "First a read-only check of what the run needs (a few minutes: it reads the files the steps change); Qanuvi takes its \
                      recommended answers, and a step that truly needs you waits for your answer in the Inbox."
                 );
             }
