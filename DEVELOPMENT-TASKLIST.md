@@ -1899,6 +1899,18 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
+    THE THREE PROPOSALS, owner "yes to the recommended" (2026-11-24), BUILT, unpublished, not driven in a window:
+      - sk1: skipping the real end-to-end check (Skip this step on its hold) puts "You skipped the real end-to-end
+        check, so the plan's work is not proven for real: <what it was>" on the plan's list to look at, and the run
+        ends "needs you" ("Not finished: the work was not proven for real"). run.rs review_list_add (split out of
+        add_review), scenario a_skipped_end_to_end_check_goes_on_the_list_to_look_at_and_the_run_needs_you.
+      - ho1 375598a: a ticked step that the plan's open list to look at still names (eyes checks, "To look at:"
+        lines, work left for later that no step does, a skipped end check) shows half orange in the step list, its
+        tooltip names what is open; section and hidden-steps counts add "N with things open". "All fine" or a typed
+        answer closes the list and the steps show green again (plan/openThings.ts).
+      - pn1 527f496: projects with the same name show the shortest folder that tells them apart ("qanuvi · y9" in
+        the sidebar, "qanuvi (y9)" in the memory view and in run notices/Inbox titles) (projectNames.ts).
+      Window 584, Rust 669, clippy, svelte-check, prettier, fmt clean.
     sp1 FIXED (2026-11-24, both machines checked on 0.1.47 first): the stale tool-row spinner. A step's row left the
       running state only on its tool result, the turn's end or an interrupt; the check before the run is stopped once
       it answers, so a row it left open spun with a growing timer for good. The agent pane now shows rows still running

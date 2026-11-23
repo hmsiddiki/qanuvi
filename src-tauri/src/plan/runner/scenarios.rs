@@ -3455,6 +3455,62 @@ fn an_end_to_end_check_the_rules_refuse_waits_for_the_owner_and_is_never_decided
     );
 }
 
+/// Owner-agreed: skipping the real end-to-end check puts it on the plan's list to look at, and the run ends "needs
+/// you", not "finished".
+#[test]
+fn a_skipped_end_to_end_check_goes_on_the_list_to_look_at_and_the_run_needs_you() {
+    let env = world("# Plan\n\n- [ ] **1. Build it**\n- [ ] **2. The whole check**\n");
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            wait_before: Some(vec![StepWhy {
+                step: "2".into(),
+                why: format!(
+                    "{}: the plan's work is only proven when it is used for real, `make run-demo`",
+                    preflight::END_TO_END
+                ),
+            }]),
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("step 2's question never came", &|| {
+        open_question(&env).is_some()
+    });
+    let q = open_question(&env).unwrap();
+    env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
+    let r = running.wait();
+    assert_eq!(r.status, RunStatus::NeedsYou, "{}", r.message);
+    assert!(
+        r.message.contains("the work was not proven for real"),
+        "{}",
+        r.message
+    );
+    let key = crate::plan::review::key("p1", FILE);
+    let list = env
+        .inbox()
+        .into_iter()
+        .find(|i| i.key.as_deref() == Some(&key))
+        .expect("the plan's list to look at");
+    assert!(
+        list.text
+            .contains("Step 2: The whole check: You skipped the real end-to-end check")
+            && list.text.contains("make run-demo"),
+        "{}",
+        list.text
+    );
+}
+
 /// Y10 (y10-3): an unattended run with only held steps left: a question the check left open is decided the safer way
 /// after the wait, said in the Inbox; a risky step the owner chose to see first keeps waiting for them.
 #[test]

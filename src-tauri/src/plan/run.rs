@@ -292,6 +292,25 @@ pub const PAUSE_RESUME: &str = "You paused this step at the owner's request and 
 
 const STOPPED: &str = "Stopped by you.";
 
+/// The start of the list-to-look-at entry for a skipped real end-to-end check.
+const SKIPPED_END_CHECK: &str =
+    "You skipped the real end-to-end check, so the plan's work is not proven for real";
+
+/// "You skipped the real end-to-end check, ...: <what it was to do>" from the hold's reason.
+fn skipped_end_check_words(why: &str) -> String {
+    let rest = why
+        .strip_prefix(super::preflight::END_TO_END)
+        .unwrap_or(why)
+        .trim_start_matches([':', ' '])
+        .trim();
+    let rest: String = rest.chars().take(240).collect();
+    if rest.is_empty() {
+        SKIPPED_END_CHECK.to_string()
+    } else {
+        format!("{SKIPPED_END_CHECK}: {rest}")
+    }
+}
+
 fn key(s: &StepRun) -> String {
     s.number.clone().unwrap_or_else(|| s.title.clone())
 }
@@ -2763,14 +2782,19 @@ impl<'a> Loop<'a> {
         if text != now.text {
             let _ = self.env.write(&self.s.file, &text, Some(&now.hash));
         }
+        self.review_list_add(st.number.clone(), &st.title, &whats);
+    }
+
+    /// Y6: things a step leaves for a person go on the plan's one review list in the Inbox (kept up to date).
+    fn review_list_add(&mut self, number: Option<String>, title: &str, whats: &[String]) {
         if whats.is_empty() {
             return;
         }
         let list = self.run.review.get_or_insert_with(Vec::new);
-        for what in &whats {
+        for what in whats {
             let item = LookItem {
-                number: st.number.clone(),
-                title: st.title.clone(),
+                number: number.clone(),
+                title: title.to_string(),
                 what: what.clone(),
             };
             if !list.contains(&item) {
@@ -2804,7 +2828,7 @@ impl<'a> Loop<'a> {
         self.decide(
             "review",
             "Qanuvi",
-            &format!("Step {}", key(&st)),
+            &format!("Step {}", number.as_deref().unwrap_or(title)),
             "on the review list",
             &format!("needs a person's eyes: {}", whats.join("; ")),
         );
@@ -3803,10 +3827,32 @@ impl<'a> Loop<'a> {
                 x.waits_for = None;
             }
         }
+        // The real end-to-end check skipped: the plan's work was not proven for real. It goes on the list to look at,
+        // and the run ends "needs you", not "finished".
+        let skipped_end_check = skip
+            && self.run.steps[i]
+                .held
+                .as_ref()
+                .is_some_and(|h| h.why.starts_with(super::preflight::END_TO_END));
+        if skipped_end_check {
+            let w = skipped_end_check_words(&self.run.steps[i].held.as_ref().unwrap().why);
+            if !self.left_open.contains(&w) {
+                self.left_open.push(w.clone());
+            }
+            let (number, title) = (
+                self.run.steps[i].number.clone(),
+                self.run.steps[i].title.clone(),
+            );
+            self.review_list_add(number, &title, &[w]);
+        }
         let st = &mut self.run.steps[i];
         if skip {
             st.status = RunStepStatus::Skipped;
-            st.reason = Some("you chose to skip it".into());
+            st.reason = Some(if skipped_end_check {
+                "you chose to skip the real end-to-end check (on the list to look at)".into()
+            } else {
+                "you chose to skip it".into()
+            });
         } else {
             st.status = RunStepStatus::Waiting;
             st.answer = Some(reply.text.clone());
@@ -4510,10 +4556,19 @@ impl<'a> Loop<'a> {
             // Steps still held or set aside (the owner ended the run without answering): the run is not done, it
             // needs them.
             if end_status(&self.run.steps) != RunStatus::NeedsYou && !self.left_open.is_empty() {
-                // Y10 (a): promised work no step did: not "finished".
+                // Y10 (a): promised work no step did, or the real end-to-end check skipped: not "finished".
+                let what = if self
+                    .left_open
+                    .iter()
+                    .all(|w| w.starts_with(SKIPPED_END_CHECK))
+                {
+                    "the work was not proven for real"
+                } else {
+                    "work was left for later that no step did"
+                };
                 let m = format!(
-                    "Ended here: {}. Not finished: work was left for later that no step did ({}). It is on the list to \
-                     look at in the Inbox: say there what to do, and your words become a new step.",
+                    "Ended here: {}. Not finished: {what} ({}). It is on the list to look at in the Inbox: say there \
+                     what to do, and your words become a new step.",
                     run_summary(&self.run.steps),
                     self.left_open.join("; ")
                 );
