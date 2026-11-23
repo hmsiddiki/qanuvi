@@ -93,9 +93,10 @@ const CHECK_MORE = [
   'it is not worth doing. Using the plan\'s real thing end to end is never eyes "skip": it is the endCheck.',
   "endCheck: when the plan builds something that runs (an app, a server, a runner), one command that uses the real",
   "thing end to end as a user would after the last step (for a plan runner: run a small plan with the real agent and",
-  "check that it finished), never only that it starts and never with stand-ins or fakes; else null. It must be a",
-  "command the run rules allow: no deleting, killing, ssh or downloads (use a new folder under the system's temp",
-  "folder instead of removing one).",
+  "check that it finished), never only that it starts and never with stand-ins or fakes; else null. Use a command",
+  "the run rules allow when one does it (a new folder under the system's temp folder instead of removing one). When",
+  "only a command they refuse uses it for real (ssh to another machine, a download), give that one: Qanuvi asks the",
+  "owner about it before the run. Never a weaker local check in its place.",
   'promises: a step that leaves part of its work for later or "until step N": from = that step, step = the open step',
   "that will do it (empty when no step does).",
   "needs: the programs, addresses (http or host:port) and secrets the steps cannot run without; Qanuvi tries each on",
@@ -196,7 +197,8 @@ export function parsePreflight(text: string): Preflight {
   }
   const arr = (v: unknown) =>
     Array.isArray(v) ? (v as Record<string, unknown>[]).filter((x) => x && typeof x === "object") : [];
-  const str = (v: unknown) => (typeof v === "string" ? clipReason(v.trim()) : "");
+  // A placeholder in place of the words (seen: "<<ccr:0bd3c8834676,string,348B>>") is no text: never shown to the owner.
+  const str = (v: unknown) => (typeof v === "string" && !PLACEHOLDER.test(v.trim()) ? clipReason(v.trim()) : "");
   const okName = (n: string) => /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(n);
   return {
     secrets: arr(raw.secrets)
@@ -284,6 +286,9 @@ export function decidedNote(d: DecidedForYou): string {
 
 /** How the core's hold for a real end-to-end check the run rules refuse starts (the Rust END_TO_END). */
 export const END_TO_END = "the real end-to-end check needs your answer";
+
+/** A placeholder in place of an answer's words (the Rust `is_placeholder`). */
+const PLACEHOLDER = /^<<[a-z]+:[^<>]*>>$/;
 
 /**
  * Sorts the check's items into holds, decided-for-you choices and extra checks. `answers` and `risk` are the form's

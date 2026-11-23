@@ -195,9 +195,10 @@ const CHECK_MORE: &[&str] = &[
     "it is not worth doing. Using the plan's real thing end to end is never eyes \"skip\": it is the endCheck.",
     "endCheck: when the plan builds something that runs (an app, a server, a runner), one command that uses the real",
     "thing end to end as a user would after the last step (for a plan runner: run a small plan with the real agent and",
-    "check that it finished), never only that it starts and never with stand-ins or fakes; else null. It must be a",
-    "command the run rules allow: no deleting, killing, ssh or downloads (use a new folder under the system's temp",
-    "folder instead of removing one).",
+    "check that it finished), never only that it starts and never with stand-ins or fakes; else null. Use a command",
+    "the run rules allow when one does it (a new folder under the system's temp folder instead of removing one). When",
+    "only a command they refuse uses it for real (ssh to another machine, a download), give that one: Qanuvi asks the",
+    "owner about it before the run. Never a weaker local check in its place.",
     r#"promises: a step that leaves part of its work for later or "until step N": from = that step, step = the open step"#,
     "that will do it (empty when no step does).",
     "needs: the programs, addresses (http or host:port) and secrets the steps cannot run without; Qanuvi tries each on",
@@ -305,8 +306,17 @@ fn sort_of(v: &Value, fallback: AskSort) -> AskSort {
 /// `typeof v === "string" ? clipReason(v.trim()) : ""`.
 fn text(v: &Value) -> String {
     v.as_str()
+        .filter(|s| !is_placeholder(js::trim(s)))
         .map(|s| clip_reason(js::trim(s), 300))
         .unwrap_or_default()
+}
+
+/// A placeholder in place of the words (seen in a check's answer: "<<ccr:0bd3c8834676,string,348B>>") is no text:
+/// it is never shown to the owner as a question.
+pub fn is_placeholder(s: &str) -> bool {
+    static RE: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"^<<[a-z]+:[^<>]*>>$").unwrap());
+    RE.is_match(s)
 }
 
 /// A text longer than `n` characters (UTF-16 units) ends at a word (when one ends at 200 or later) with "…"
@@ -1254,6 +1264,18 @@ mod tests {
         assert_eq!(r.risky[0].step, "84a");
         assert_eq!(r.setup[0].what, "MySQL running");
         assert_eq!(parse_preflight("no json here"), Preflight::default());
+    }
+
+    #[test]
+    fn a_placeholder_in_place_of_a_question_is_never_asked() {
+        let r = parse_preflight(
+            r#"{"questions":[{"step":"2","question":"<<ccr:0bd3c8834676,string,348B>>","sort":"you"},
+                {"step":"2","question":"What if the connection fails?","sort":"decide","recommended":"<<ccr:ab12,string,9B>>"}]}"#,
+        );
+        assert_eq!(r.questions.len(), 1);
+        assert_eq!(r.questions[0].question, "What if the connection fails?");
+        assert_eq!(r.questions[0].recommended, "");
+        assert!(!is_placeholder("<<the owner's words>>"));
     }
 
     #[test]

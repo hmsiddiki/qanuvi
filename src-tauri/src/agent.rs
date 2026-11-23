@@ -217,9 +217,22 @@ pub fn grant_group(tool: &str) -> String {
     }
 }
 
+/// Qanuvi's own read-only tools (the code index and the memory search): they change nothing, so they never wait for an
+/// answer. In plan mode (the check before a run) the agent asks for them despite `--allowedTools mcp__qanuvi`, and the
+/// check sat waiting for an Approve nobody was there to give (e2e1 drive, 2026-11-24).
+pub fn own_read_only(tool: &str) -> bool {
+    matches!(
+        tool.strip_prefix("mcp__qanuvi__"),
+        Some("project_map" | "find_symbol" | "outline" | "read_lines" | "search" | "memory_search")
+    )
+}
+
 /// Whether a permission request is covered by an earlier "allow without asking". Risky commands always ask.
 fn granted(grants: &Grants, session_id: &str, request: &Value) -> bool {
     let tool = request["tool_name"].as_str().unwrap_or("");
+    if own_read_only(tool) {
+        return true;
+    }
     let command = request["input"]["command"].as_str().unwrap_or("");
     if !command.is_empty() && crate::agent_tools::risky(command) {
         return false;
@@ -1908,6 +1921,23 @@ pub fn mark_stopped(db: &Db, id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn qanuvis_own_read_only_tools_never_wait_for_an_answer() {
+        let grants: Grants = Default::default();
+        let ask = |tool: &str| json!({"tool_name": tool, "input": {"query": "test-box ssh"}});
+        assert!(granted(&grants, "s1", &ask("mcp__qanuvi__memory_search")));
+        assert!(granted(&grants, "s1", &ask("mcp__qanuvi__find_symbol")));
+        // Suggesting a memory entry, the browser and everything else still ask.
+        assert!(!granted(&grants, "s1", &ask("mcp__qanuvi__memory_suggest")));
+        assert!(!granted(
+            &grants,
+            "s1",
+            &ask("mcp__qanuvi-browser__browser_open")
+        ));
+        assert!(!granted(&grants, "s1", &ask("mcp__other__memory_search")));
+        assert!(!granted(&grants, "s1", &ask("Bash")));
+    }
 
     #[test]
     fn claude_is_looked_for_where_its_installers_put_it() {

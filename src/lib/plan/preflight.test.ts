@@ -294,6 +294,23 @@ describe("the check before a run", () => {
     ]);
   });
 
+  it("never asks a placeholder in place of a question", () => {
+    const r = parsePreflight(
+      JSON.stringify({
+        questions: [
+          { step: "2", question: "<<ccr:0bd3c8834676,string,348B>>", sort: "you" },
+          {
+            step: "2",
+            question: "What if the connection fails?",
+            sort: "decide",
+            recommended: "<<ccr:ab12,string,9B>>",
+          },
+        ],
+      }),
+    );
+    expect(r.questions.map((q) => [q.question, q.recommended])).toEqual([["What if the connection fails?", ""]]);
+  });
+
   it("sorts asks: unsorted risky steps wait, a question with no recommended answer needs the owner", () => {
     const r = parsePreflight(
       JSON.stringify({
