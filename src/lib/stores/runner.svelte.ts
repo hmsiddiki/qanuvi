@@ -23,6 +23,7 @@ import { freeWorks, parsePicks, pickPrompt, type Assignment, type Profiles, type
 import { defaultPlannerModel, planner } from "./planner.svelte";
 import type { FinishLevel } from "$lib/plan/finishing";
 import { agent } from "./agent.svelte";
+import { projects } from "./projects.svelte";
 import { settings } from "./settings.svelte";
 import { runSessionInfo, type PlanSessionInfo } from "$lib/agent/handover";
 
@@ -323,7 +324,7 @@ class RunnerStore {
     for (const m of provider.models) labels[m.id] = modelLabel(provider, m.id);
     const hasFree = s.brain.models.length > 0;
     return {
-      projectName: project.name,
+      projectName: projects.shownName(project),
       file,
       options,
       provider: provider.id,

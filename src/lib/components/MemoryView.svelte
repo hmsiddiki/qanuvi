@@ -153,7 +153,10 @@
     }
   }
 
-  const projectName = (id: string | undefined) => projects.list.find((p) => p.id === id)?.name ?? "a project";
+  const projectName = (id: string | undefined) => {
+    const p = projects.list.find((x) => x.id === id);
+    return p ? projects.shownName(p) : "a project";
+  };
   const partLabel = (e: Partial<MemoryEntry>) =>
     e.part === "project"
       ? `This project · ${projectName(e.scope)}`
@@ -252,7 +255,7 @@
         {#if editing.part === "project"}
           <select bind:value={editing.scope} aria-label="Project">
             {#if !editing.scope}<option value="">Choose a project…</option>{/if}
-            {#each projects.list as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+            {#each projects.list as p (p.id)}<option value={p.id}>{projects.shownName(p)}</option>{/each}
           </select>
         {/if}
       </div>

@@ -3,6 +3,7 @@ import { api, errorText, type Project, type ProjectSettings } from "$lib/api";
 import { Channel } from "@tauri-apps/api/core";
 import { callMaster, callThisPc, onThisPcLinkEnd, own, shownMachine } from "$lib/remote";
 import { folderPicker } from "./folderPicker.svelte";
+import { folderHints, shownName } from "$lib/projectNames";
 
 /** The project each machine opens with: This PC keeps the old key, a master its own. */
 export const currentKey = (machine: string | null) =>
@@ -28,6 +29,19 @@ class ProjectsStore {
   startWith: string | null = null;
   /** Remember the current project for the next start (the main window only). */
   persist = true;
+
+  /** Folder hints for projects sharing a name (y9/qanuvi, y10/qanuvi). */
+  hints = $derived(folderHints(this.list));
+
+  /** The folder that tells this project apart from one with the same name, or "". */
+  hint(p: Project): string {
+    return this.hints.get(p.id) ?? "";
+  }
+
+  /** "qanuvi (y9)" when another project has the same name, else the name. */
+  shownName(p: Project): string {
+    return shownName(p, this.hints);
+  }
 
   get current(): Project | null {
     return this.list.find((p) => p.id === this.currentId) ?? null;
