@@ -163,6 +163,35 @@ pub fn probe(env: &dyn RunEnv, found: &Preflight, steps: &[Step], first: &str) -
     holds
 }
 
+/// lr2: a kept hold of the probe ("it needs the program cargo, which is not on this machine ...") is tried again when a
+/// run starts: false once the program, address or secret is there now, so a run started again after the owner
+/// installed it does not stop on the old finding. Holds of any other kind stay (true).
+pub fn still_missing(env: &dyn RunEnv, why: &str) -> bool {
+    static PROGRAM: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^it needs the program (\S+), which is not on this machine").unwrap()
+    });
+    static ADDRESS: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^it needs (.+?), which does not answer from this machine").unwrap()
+    });
+    static SECRET: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"^it needs ([A-Za-z_][A-Za-z0-9_]*); add it in the project's settings under Secrets",
+        )
+        .unwrap()
+    });
+    let why = why.trim();
+    if let Some(c) = PROGRAM.captures(why) {
+        return !env.has_program(&c[1]);
+    }
+    if let Some(c) = ADDRESS.captures(why) {
+        return !env.reachable(&probe_url(&c[1]));
+    }
+    if let Some(c) = SECRET.captures(why) {
+        return !env.secret_names().iter().any(|s| s == &c[1]);
+    }
+    true
+}
+
 /// d5: the test build's own programs, for the steps that ask for one ("Check: test build").
 pub fn probe_test_build(
     env: &dyn RunEnv,

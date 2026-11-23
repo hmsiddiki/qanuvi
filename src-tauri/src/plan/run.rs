@@ -717,7 +717,10 @@ impl<'a> Loop<'a> {
                     );
                 }
             }
-            let kept = planstate::prune_state(&state, &open, &all);
+            let mut kept = planstate::prune_state(&state, &open, &all);
+            // lr2: a kept "it needs the program X" (address, secret) hold is tried again: gone once X is there.
+            kept.holds
+                .retain(|h| super::check_more::still_missing(self.env, &h.why));
             self.save_state(&kept);
             // Questions of this plan whose hold is gone (the step got done, or it is tried again now) close.
             let still: HashSet<&str> = kept.holds.iter().map(|h| h.step.as_str()).collect();

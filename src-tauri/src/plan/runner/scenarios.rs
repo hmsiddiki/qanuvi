@@ -3583,3 +3583,45 @@ fn y10_a_question_nobody_answers_is_decided_after_the_wait_but_a_risky_step_stil
         "{st:?}"
     );
 }
+
+/// lr2: a run started again tries a kept "it needs the program X" hold again: the program there now, the step runs;
+/// still missing, it still waits.
+#[test]
+fn a_kept_missing_program_hold_is_tried_again_when_the_run_starts_again() {
+    let env = world("# Plan\n\n- [ ] **1. Build**\n- [ ] **2. Ship**\n");
+    let hold = |step: &str, program: &str| preflight::Hold {
+        step: step.into(),
+        why: format!(
+            "it needs the program {program}, which is not on this machine; install it, then Try again"
+        ),
+        by: preflight::HoldBy::Default,
+    };
+    let state = crate::plan::planstate::keep_holds(
+        &crate::plan::planstate::PlanState::default(),
+        &[hold("1", "cargo"), hold("2", "rustup")],
+        0.0,
+    );
+    env.plan_data_set(FILE, Kind::State, &serde_json::to_value(&state).unwrap())
+        .unwrap();
+    env.set_agent(|c| {
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(env.clone(), FILE, options(), stop_button());
+    // Step 1 runs (cargo is there now); step 2 still waits (rustup is not): its question comes.
+    wait_until("step 2's question never came", &|| {
+        open_question(&env).is_some()
+    });
+    let q = open_question(&env).unwrap();
+    assert!(q.title.contains("2. Ship"), "{}", q.title);
+    env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
+    let r = running.wait();
+    assert_eq!(step(&r, "1").status, RunStepStatus::Done, "{}", r.message);
+    assert_eq!(
+        step(&r, "2").status,
+        RunStepStatus::Skipped,
+        "{}",
+        r.message
+    );
+}
