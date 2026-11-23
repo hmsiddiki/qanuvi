@@ -48,6 +48,8 @@
     } else await load();
   }
   import { runner } from "$lib/stores/runner.svelte";
+  import { inbox } from "$lib/stores/inbox.svelte";
+  import { openThings, stepKey } from "$lib/plan/openThings";
   import { modelLabel, providerById } from "$lib/agents/providers";
   import { chooseModel, jobType, monthStart, type ModelStats } from "$lib/plan/routing";
   import { loadPicks, pickFor } from "$lib/plan/picks";
@@ -349,6 +351,16 @@
   function done(steps: Step[]) {
     return steps.filter((s) => s.status === "x").length;
   }
+
+  /** Ticked steps the plan's open review list still names: shown half-orange, counted apart. */
+  let openByStep = $derived(file ? openThings(inbox.items, project.id, file) : new Map<string, string[]>());
+  const openOf = (s: Step) => (s.status === "x" ? (openByStep.get(stepKey(s)) ?? []) : []);
+  const doneOpen = (steps: Step[]) => steps.filter((s) => openOf(s).length).length;
+  /** "2 done with things open" after a count, or "". */
+  const openWords = (steps: Step[]) => {
+    const n = doneOpen(steps);
+    return n ? ` · ${n} done with things open` : "";
+  };
 </script>
 
 <div class="plan">
@@ -552,7 +564,7 @@
         <!-- The start panel has the screen; the steps wait under one line (a range may need their numbers). -->
         {@const all = plan.sections.flatMap((s) => s.steps)}
         <div class="steps-hidden">
-          {all.length} steps · {all.length - done(all)} open
+          {all.length} steps · {all.length - done(all)} open{openWords(all)}
           <button type="button" class="link" onclick={() => (peekSteps = !peekSteps)}
             >{peekSteps ? "Hide steps" : "Show steps"}</button
           >
@@ -565,7 +577,15 @@
           <section>
             <h3>
               <span>{section.title || "Steps"}</span>
-              <span class="count">{finished}/{total}</span>
+              <span
+                class="count"
+                title={doneOpen(section.steps)
+                  ? `${doneOpen(section.steps)} of the done steps have things open (see the Inbox list to look at)`
+                  : undefined}
+                >{finished}/{total}{#if doneOpen(section.steps)}<span class="open-count">
+                    · {doneOpen(section.steps)} with things open</span
+                  >{/if}</span
+              >
             </h3>
             <div class="progress"><span style:width="{(finished / total) * 100}%"></span></div>
             {#each section.steps.filter(visible) as step (step.line)}
@@ -581,6 +601,7 @@
                         : step.status === 'x'
                           ? 'done'
                           : 'blocked'}"
+                    class:part={openOf(step).length > 0}
                     class:working={(runner.running &&
                       runner.run?.file === file &&
                       runner.run.steps.some(
@@ -589,7 +610,9 @@
                       // A step chat working outside a run: one of this plan's sessions for this very step, by the
                       // run record's session ids (a title like "Step 4:" also fits other plans' step 4).
                       (!thisRunning && stepChatWorking(step))}
-                    title="{STATUS_LABELS[step.status]} (click to change)"
+                    title="{openOf(step).length
+                      ? `Done, with things open: ${openOf(step).join('; ')}`
+                      : STATUS_LABELS[step.status]} (click to change)"
                     aria-label="Status: {STATUS_LABELS[step.status]}"
                     onclick={() => cycleStatus(step)}
                   ></button>
@@ -910,6 +933,16 @@
   .status.sdone {
     border-color: var(--qx-status-done);
     background: var(--qx-status-done);
+  }
+
+  /* Ticked, but with things open (left for later, checks that need eyes, things to look at): half orange. */
+  .status.sdone.part {
+    border-color: var(--qx-status-waiting);
+    background: linear-gradient(90deg, var(--qx-status-waiting) 50%, transparent 50%);
+  }
+
+  .open-count {
+    color: var(--qx-status-waiting);
   }
 
   .status.sblocked {
