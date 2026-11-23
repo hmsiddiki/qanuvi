@@ -1899,7 +1899,18 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24 02:00): sp1 + the three proposals BUILT AND DRIVEN LIVE on the laptop (release
+    PICKUP POINT (newest, 2026-11-24, after the Y11 long run): LONG RUN Y11 PASSED. Plan docs/PLAN-24Z-A.md (22 steps)
+      on the laptop scratch copy ~/qc-scratch/y11/qanuvi, headless qanuvi-master plan run, budget $40, data
+      dev.qanuvi.desktop.source, master at 732d9d6. Steps 2-22 ran by themselves with no question to the owner;
+      $12.24 total (step 1 $1.03 in an earlier start). Honest end: "needs you", 21 done, with the work left for later
+      that no step did (session carry-over, free-first routing + monthly spend, core-side preflight, the remaining TS
+      plan files the panels import, paid monitoring agent, real master over SSH, more scenarios) on the list to look
+      at (18 things). No false "finished", no stuck waits, work kept in the scratch working tree. Blockers fixed on
+      the way: lr1 bf73aa2 (a terminal-started run copied the last run's options: another plan's holds + $2 budget)
+      and lr2 732d9d6 (a kept "program missing" hold is probed again when a run starts). For later (not blockers):
+      inbox show with an id starting with digits is read as a number. Rust 672, window 584, clippy clean, pushed,
+      UNPUBLISHED. Next: 0.1.48 (ask), then plan big-plan basics + stable Win/Linux with the owner.
+    PICKUP POINT (before, 2026-11-24 02:00): sp1 + the three proposals BUILT AND DRIVEN LIVE on the laptop (release
       test window, data dev.qanuvi.desktop.source, scratch ~/qc-scratch/ho1/proj, real agent, $0.12): sidebar showed
       "proj · ho1" / "proj · e2e1" / "proj2"; step 1 (an eyes check) half orange, header "1/2 · 1 with things open";
       Skip on step 2's end-to-end hold -> run "needs you", list entry "You skipped the real end-to-end check..."; "All
