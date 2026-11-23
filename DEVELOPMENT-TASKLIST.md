@@ -1899,7 +1899,18 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-23 after 0.1.46):
+    PICKUP POINT (newest, 2026-11-23 23:30, real-agent drive): the Y10-built runner RUNS A REAL PLAN END TO END.
+      Laptop: old ~/src/qanuvi target/debug (38 GB) deleted (owner yes), y10 tree's qanuvi-master rebuilt, a
+      two-step scratch plan (~/qc-scratch/drive1: greet.sh, then test.sh, Needs: 1) run through `--stdio`
+      plan_run_start on its own data folder with the real Claude Code agent (sonnet, Auto): "2 done" in 15 s, $0.095,
+      both ticked with Done lines in PLAN.md, one run record saved, the run went on with no client connected and was
+      read back from a fresh connection; checked by hand: `sh test.sh` prints ok, exit 0. Notes: both steps resume
+      one agent session (--resume, as the old runner); testRuns 0 (the y10 runner does not run "- Check:" lines
+      itself, the agent did); the Team decision line names `provider_name`, empty when a client sends no
+      providerName (could fall back to the provider id). Test service stopped. Next: decide whether the check should
+      put "real end-to-end" to the owner as a question (never a recommended skip), then the open proposals
+      (half-orange mark, folder on same-named projects), then stable Win+Linux.
+    PICKUP POINT (before, 2026-11-23 after 0.1.46):
     0.1.46 PUBLISHED ab25799 tag v0.1.46 (y10-1..y10-4, backup channel-before-0.1.46, all 9 files online); laptop on
       0.1.46. y10-4 5bfaad9: a question the check left open is never taken for a login (the word match locked step
       22's question out of the Inbox and the terminal).
