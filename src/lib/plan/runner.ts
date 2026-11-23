@@ -43,6 +43,8 @@ export interface RunOptions {
   /** A step may cost at most this much (US dollars) and run this many minutes; 0 or missing: no limit. */
   stepCostLimit?: number;
   stepMinutes?: number;
+  /** How long a waiting run gives a question left open in the check before Qanuvi decides it; missing: 60, 0: no limit. */
+  answerWaitMinutes?: number;
   /** When the paid agent hits its usage limit: wait for the reset and go on, or let free models work until then. */
   onLimit?: "wait" | "free";
   /** Steps the run pauses before (risky ones the owner wants to see, or a question left open), with why (24i). */

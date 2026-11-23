@@ -279,6 +279,14 @@ impl Shared {
     }
 }
 
+/// How long a waiting run gives a question left open in the check before Qanuvi decides it (0: no limit).
+pub const ANSWER_WAIT_DEFAULT_MINUTES: f64 = 60.0;
+
+fn answer_wait_ms(o: &RunOptions) -> i64 {
+    let m = o.answer_wait_minutes.unwrap_or(ANSWER_WAIT_DEFAULT_MINUTES);
+    if m > 0.0 { (m * 60_000.0) as i64 } else { 0 }
+}
+
 /// What the run tells a step that resumes after a pause.
 pub const PAUSE_RESUME: &str = "You paused this step at the owner's request and the run now resumes: go on from where you stopped (your Progress note is in the step's log).";
 
@@ -1593,6 +1601,9 @@ impl<'a> Loop<'a> {
             self.sh.live().waiting_answers = asks;
             self.run.message = setaside::waiting_line(asks);
             self.save();
+            let limit_ms = answer_wait_ms(&self.s.options);
+            let since = self.env.now_ms();
+            let mut napped = 0i64;
             loop {
                 if self.take_answers() {
                     break;
@@ -1600,7 +1611,15 @@ impl<'a> Loop<'a> {
                 if self.stop_asked() || self.pausing() || self.sh.live().finish_without {
                     break;
                 }
+                // Nobody answered a question the check left open: Qanuvi decides it the safer way and goes on.
+                if limit_ms > 0
+                    && (self.env.now_ms() - since).max(napped) >= limit_ms
+                    && self.decide_unanswered(limit_ms)
+                {
+                    break;
+                }
                 self.sh.nap();
+                napped += self.sh.poll.as_millis() as i64;
             }
             self.sh.live().waiting_answers = 0;
             // bg2: the wait is over: "Waiting for you (1 answer)" no longer holds (it stayed while the run went on).
@@ -3643,6 +3662,61 @@ impl<'a> Loop<'a> {
         any
     }
 
+    /// Questions the check left open that nobody answered in `limit_ms`: each is decided as "Let Qanuvi decide"
+    /// (the safer way, said in the step's summary), and the Inbox says so. Risky steps the owner chose to see first
+    /// and blocked steps keep waiting. Says whether any was decided.
+    fn decide_unanswered(&mut self, limit_ms: i64) -> bool {
+        let open: Vec<(String, String, String)> = self
+            .run
+            .steps
+            .iter()
+            .filter(|s| s.status == RunStepStatus::Held)
+            .filter_map(|s| {
+                let h = s.held.as_ref()?;
+                (h.kind == HeldKind::Hold && h.why.starts_with(preflight::OPEN_QUESTION))
+                    .then(|| (key(s), s.title.clone(), h.why.clone()))
+            })
+            .collect();
+        let mins = (limit_ms + 59_999) / 60_000;
+        let mut any = false;
+        for (k, title, why) in open {
+            let reply = hold_reply(&InboxAnswer {
+                choice: holdask::AnswerChoice::Decide,
+                text: None,
+            });
+            if !self.answer(&k, reply) {
+                continue;
+            }
+            any = true;
+            let project = if self.s.project_name.is_empty() {
+                String::new()
+            } else {
+                format!("{}: ", self.s.project_name)
+            };
+            let _ = self.env.inbox_add(&NewItem {
+                kind_of: "info".into(),
+                kind: "run".into(),
+                title: format!(
+                    "{project}{} step {k}. {title}: decided with no answer",
+                    self.plan_name()
+                ),
+                text: format!(
+                    "No answer came in {mins} minutes, and nothing else in the run could go on. Qanuvi decided it the \
+                     safer way and went on; the step's summary says what it chose.\n\n{}",
+                    sentence_start(&why)
+                ),
+                key: None,
+                open: Some(self.open_plan()),
+                form: None,
+                source: None,
+            });
+            self.sh.notice(format!(
+                "Step {k}: no answer in {mins} minutes, so Qanuvi decided it the safer way."
+            ));
+        }
+        any
+    }
+
     /// The owner answers a held step: "go" lets it run (with the answer, if any, told to it), "skip" leaves it and the
     /// steps waiting for it.
     fn answer(&mut self, step: &str, reply: HoldReply) -> bool {
@@ -3660,7 +3734,10 @@ impl<'a> Loop<'a> {
             return false;
         }
         // n1: a typed answer is read before anything runs again (n2: a held step's too, every reply by meaning).
-        let typed = reply.choice == holdask::AnswerChoice::Go && !reply.text.is_empty();
+        // "Let Qanuvi decide" with no words of their own has nothing to read.
+        let typed = reply.choice == holdask::AnswerChoice::Go
+            && !reply.text.is_empty()
+            && reply.text != holdask::DECIDE_TEXT;
         let mut instruction = None;
         if typed {
             match self.read_answer(i, &reply.text) {

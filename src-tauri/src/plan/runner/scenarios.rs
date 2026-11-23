@@ -12,6 +12,7 @@ use super::{
 use crate::plan::env::RunEnv;
 use crate::plan::ownermsg;
 use crate::plan::run::{RunSetup, Shared, run_plan, test_setup};
+use crate::plan::{holdask, preflight};
 use crate::plan_data::Kind;
 use crate::projects::ProjectSettings;
 use serde_json::json;
@@ -3378,5 +3379,77 @@ fn y10_an_end_check_the_rules_refuse_is_not_dropped_unseen() {
     assert!(
         notes.contains("Settled before the run: The real end check"),
         "{notes}"
+    );
+}
+
+/// Y10 (y10-3): an unattended run with only held steps left: a question the check left open is decided the safer way
+/// after the wait, said in the Inbox; a risky step the owner chose to see first keeps waiting for them.
+#[test]
+fn y10_a_question_nobody_answers_is_decided_after_the_wait_but_a_risky_step_still_waits() {
+    let env = world("# Plan\n\n- [ ] **1. Setup**\n- [ ] **2. Packages**\n- [ ] **3. Clean up**\n");
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            answer_wait_minutes: Some(0.001),
+            wait_before: Some(vec![
+                StepWhy {
+                    step: "2".into(),
+                    why: format!(
+                        "{} (May the run download packages?)",
+                        preflight::OPEN_QUESTION
+                    ),
+                },
+                StepWhy {
+                    step: "3".into(),
+                    why: "it deletes the old runner".into(),
+                },
+            ]),
+            ..options()
+        },
+        stop_button(),
+    );
+    let decided = |env: &FakeEnv| {
+        env.inbox()
+            .into_iter()
+            .find(|i| i.title.ends_with("decided with no answer"))
+    };
+    wait_until("the open question was never decided", &|| {
+        decided(&env).is_some()
+    });
+    let note = decided(&env).unwrap();
+    assert!(note.title.contains("step 2. Packages"), "{}", note.title);
+    assert!(
+        note.text.contains("May the run download packages?"),
+        "{}",
+        note.text
+    );
+    wait_until("step 2 never ran", &|| {
+        env.prompts()
+            .iter()
+            .any(|(_, p)| p.contains(holdask::DECIDE_TEXT))
+    });
+    // The risky step is still the owner's: its question stays open until they answer.
+    let q = open_question(&env).expect("step 3 still waits");
+    assert!(q.title.contains("3. Clean up"), "{}", q.title);
+    env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
+    let r = running.wait();
+    let st: Vec<_> = statuses(&r);
+    assert!(
+        st.contains(&(Some("2".into()), RunStepStatus::Done)),
+        "{st:?}"
+    );
+    assert!(
+        st.contains(&(Some("3".into()), RunStepStatus::Skipped)),
+        "{st:?}"
     );
 }

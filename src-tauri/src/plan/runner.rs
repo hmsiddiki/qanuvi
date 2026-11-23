@@ -137,6 +137,11 @@ pub struct RunOptions {
     /// before the step goes on and the change becomes a new step; missing: 10 minutes (R2c part 2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message_wait_minutes: Option<f64>,
+    /// How long a run with nothing else to do waits for the answer to a question left open in the check before the
+    /// run, before Qanuvi decides it the safer way (as "Let Qanuvi decide") and says so in the Inbox; missing: 60
+    /// minutes; 0: it waits for the owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer_wait_minutes: Option<f64>,
 }
 
 /// The "model" of an attempt on Qanuvi's own agent (Qanuvi core picks among the free and local models).

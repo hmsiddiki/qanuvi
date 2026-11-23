@@ -1899,6 +1899,24 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
+    0.1.45 PUBLISHED 34eca5b tag v0.1.45 (Y10, 2026-11-23, backup channel-before-0.1.45, all files online).
+    y10-1/y10-2 BUILT db00afa (unpublished): the real end check must use the thing as a user would and pass the run
+      rules; refused, the closing step is told to prove it another way and the notes say so ("Settled before the run").
+    Y10 MEASURE on the laptop (0.1.45, ~/qc-scratch/y10, plan 24Z-A reset to bc562c8): the check foresaw step 21's
+      delete (grant), R5 eyes items (9, 15-18, 20 at the end; 12 run), 6 promises written into their steps; the end
+      check was dropped unseen (rm -rf in it: fixed by y10-1). In the run, step 5's review caught the empty agent
+      answer text (the Y9 miss) and sent it back until fixed; step 9 left work for later with no open step (runner (a)
+      puts it on the review list, the run must end "needs you"). The run waited 8 h on step 16 (a question the check
+      left open: may it download crates) because nobody was there -> y10-3.
+    y10-3 BUILT (unpublished): a run with nothing else to do decides a question the check left open after
+      answerWaitMinutes (missing: 60, 0: wait for the owner) as "Let Qanuvi decide", says so in the Inbox ("decided
+      with no answer"); risky steps the owner chose to see first and blocked steps keep waiting. A bare "Let Qanuvi
+      decide" is no longer sent to a model to read. Test y10_a_question_nobody_answers_... Rust 664.
+    PROPOSAL (owner idea, not agreed yet): a step ticked but not really finished (work left for later that no step
+      did, eyes checks still open, review items) shows a half-orange mark in the step list, not green; the plan's
+      header counts it apart ("18 done, 2 done with things open").
+    PROPOSAL: two projects with the same name (laptop: y9/qanuvi and y10/qanuvi) show their folder in the project
+      list so the owner can tell them apart.
     Y10 BUILT 0ed9a3a (2026-11-23 night, owner: "after finishing improvement publish anyway", update the laptop and
       run the planner answering everything; details in docs/PLAN-24Y.md "Y10 in detail"):
       - The check (window and headless): d6 strongest model (agent's first model) and reads the files the steps

@@ -582,6 +582,9 @@ pub fn decided_note(d: &DecidedForYou) -> String {
 /// Sorts the check's items into holds, decided-for-you choices and extra checks. `answers` and `risk` are the form's
 /// values by item index; `*_touched` marks the ones the owner changed (an untouched recommended answer is Qanuvi's
 /// decision, not theirs).
+/// How a hold for a question the check left open starts (Qanuvi decides it after a while with no answer).
+pub const OPEN_QUESTION: &str = "a question was left open";
+
 pub fn settle_check(
     check: &Preflight,
     answers: &HashMap<usize, String>,
@@ -602,7 +605,7 @@ pub fn settle_check(
             if !q.step.is_empty() {
                 out.holds.push(Hold {
                     step: q.step.clone(),
-                    why: format!("a question was left open ({})", q.question),
+                    why: format!("{OPEN_QUESTION} ({})", q.question),
                     by: HoldBy::Default,
                 });
             }
