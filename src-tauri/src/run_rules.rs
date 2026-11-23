@@ -364,9 +364,22 @@ impl Policy {
         if crate::agent_tools::risky_with(command, &hosts)
             && crate::agent_tools::risky_with(&expanded, &hosts)
         {
-            return Verdict::Never(
-                "it is on the never-list (deleting, pushing, downloading, publishing or system changes)".into(),
-            );
+            // y9-6: name the part that was refused; in a long command (a script, then "rm -f x") the cut command
+            // text alone never shows it, so the question asked "what was that script for" instead.
+            let part = parts(command).into_iter().find(|p| {
+                crate::agent_tools::risky_with(p, &hosts)
+                    && crate::agent_tools::risky_with(&expand_vars(p, &self.vars), &hosts)
+            });
+            let why = "it is on the never-list (deleting, pushing, downloading, publishing or system changes)";
+            return Verdict::Never(match part {
+                Some(p) => {
+                    let p = p.trim();
+                    let short: String = p.chars().take(100).collect();
+                    let dots = if short.len() < p.len() { "…" } else { "" };
+                    format!("{why}: the part `{short}{dots}`")
+                }
+                None => why.into(),
+            });
         }
         if let Some(target) = outside_write(command, |t| self.may_write(t)) {
             return Verdict::Never(format!("it writes {target}, outside the project"));
@@ -867,6 +880,20 @@ mod tests {
         ));
         // The values never show in the policy's debug text.
         assert!(!format!("{p:?}").contains("5199"));
+    }
+
+    #[test]
+    fn a_refused_long_command_names_the_part_that_was_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        let long = format!(
+            "cd x; python3 - <<'E'\n{}\nE\nnpx tsc --noEmit; rm -f src/lib/plan/parity.test.ts",
+            "s=s.replace('a','b')\n".repeat(20)
+        );
+        match p.command(&long) {
+            Verdict::Never(why) => assert!(why.contains("`rm -f src/lib/plan/parity.test.ts`"), "{why}"),
+            v => panic!("{v:?}"),
+        }
     }
 
     #[test]
