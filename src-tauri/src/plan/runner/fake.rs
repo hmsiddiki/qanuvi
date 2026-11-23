@@ -27,6 +27,8 @@ pub struct AgentCall<'a> {
     /// Turns sent to this session so far (1 = the first).
     pub turn: u32,
     pub env: &'a FakeEnv,
+    /// Y10 d1: the turn was given leave to delete files inside the project.
+    pub delete_inside: bool,
 }
 
 /// How the scripted turn ended (defaults: idle, $0.01, no final answer). Each turn adds 1000 input and 100 output
@@ -603,6 +605,7 @@ impl RunEnv for FakeEnv {
                 session_id: &id,
                 turn,
                 env: self,
+                delete_inside: req.plan_rules.as_ref().is_some_and(|r| r.delete_inside),
             });
             let (cost, tokens) = {
                 let mut w = self.w();

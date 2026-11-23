@@ -12,6 +12,7 @@ use super::{
 use crate::plan::env::RunEnv;
 use crate::plan::ownermsg;
 use crate::plan::run::{RunSetup, Shared, run_plan, test_setup};
+use crate::plan_data::Kind;
 use crate::projects::ProjectSettings;
 use serde_json::json;
 use std::sync::Arc;
@@ -3185,4 +3186,160 @@ fn y9_1_a_run_started_without_a_window_gets_the_check_first_and_keeps_what_it_se
     let again = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
     assert_eq!(again.read, 0);
     assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn y10_work_left_for_later_goes_to_its_step_and_with_no_step_the_run_is_not_finished() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Port it**\n  - Port the runner.\n- [ ] **2. Docs**\n  - Write it down.\n- [ ] **3. Wire it**\n  - Wire the turn.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    env.set_settings(s);
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        assert!(c.prompt.contains("- Left for later: <what> (step N)"), "{}", c.prompt);
+        if n == "1" {
+            let t = c.env.text(FILE).replace(
+                "  - Port the runner.",
+                "  - Port the runner.\n  - Left for later: wire the real agent turn (step 3)\n  - Left for later: a faster index",
+            );
+            c.env.put(FILE, &t);
+        }
+        if n == "3" {
+            assert!(
+                c.prompt.contains("Promised by step 1: wire the real agent turn"),
+                "{}",
+                c.prompt
+            );
+            assert!(c.prompt.contains("Earlier steps left work to this step"));
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert!(
+        r.steps.iter().all(|s| s.status == RunStepStatus::Done),
+        "{:?}",
+        statuses(&r)
+    );
+    assert_eq!(r.status, RunStatus::NeedsYou, "{}", r.message);
+    assert!(r.message.contains("a faster index"), "{}", r.message);
+    assert!(
+        !r.message.contains("wire the real agent turn"),
+        "{}",
+        r.message
+    );
+    let rep = r.report.as_ref().unwrap();
+    assert!(rep.look.iter().any(|l| l.why.contains("a faster index")));
+}
+
+#[test]
+fn y10_what_the_check_settled_reaches_its_steps() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Tray menu**\n  - Add it.\n  - Check: the tray menu looks right\n- [ ] **2. Remove the old runner**\n  - Remove it.\n",
+    );
+    let mut s = settings("");
+    s.test_command = String::new();
+    env.set_settings(s);
+    env.plan_data_set(
+        FILE,
+        Kind::Check,
+        &json!({
+            "grants": [{"step": "2", "kind": "delete"}],
+            "eyes": [{"step": "1", "what": "the tray menu", "do": "run", "how": "the test build and a screenshot"}]
+        }),
+    )
+    .unwrap();
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        if n == "1" {
+            assert!(!c.delete_inside);
+            assert!(
+                c.prompt.contains("yours to do in this step, decided before the run: the tray menu (how: the test build and a screenshot)"),
+                "{}",
+                c.prompt
+            );
+        } else {
+            assert!(c.delete_inside, "step 2 has leave to delete");
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let r = run(&env, options());
+    assert_eq!(
+        r.status,
+        RunStatus::Done,
+        "{:?} {}",
+        statuses(&r),
+        r.message
+    );
+    // The tray check was the run's own: nothing on the list to look at.
+    assert!(r.report.as_ref().unwrap().look.is_empty());
+}
+
+#[test]
+fn y10_the_check_settles_grants_eyes_the_end_check_promises_and_tries_what_steps_need() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Port it**\n  - Port it; wiring until step 3.\n- [ ] **2. Remove the old runner**\n  - Remove it.\n- [ ] **3. Wire it**\n  - Wire the turn.\n  - Check: the tray menu looks right\n- [ ] **4. Browser check**\n  - Open the page in chromium.\n",
+    );
+    let answer = json!({
+        "secrets": [], "questions": [], "setup": [], "order": [],
+        "risky": [{"step": "2", "why": "removes the old runner files", "sort": "checks", "because": "inside the project", "grant": "delete"}],
+        "eyes": [{"step": "3", "what": "the tray menu", "do": "run", "how": "the test build"}],
+        "endCheck": {"step": "3", "check": "cargo run --bin qanuvi-master -- plan run demo.md", "why": "the real run"},
+        "promises": [{"from": "1", "what": "wire the real agent turn", "step": "3"}],
+        "needs": [{"kind": "program", "name": "chromium", "steps": ["4"]}, {"kind": "program", "name": "cargo", "steps": ["3"]}]
+    })
+    .to_string();
+    env.set_agent(move |c| {
+        assert!(planner(c));
+        assert!(
+            c.prompt.contains("the files they will change"),
+            "{}",
+            c.prompt
+        );
+        assert!(c.prompt.contains("Never-list forecast"));
+        assert!(
+            c.prompt
+                .contains("look for the same: a step that removes files needs leave"),
+            "{}",
+            c.prompt
+        );
+        AgentReply {
+            result: Some(answer.clone()),
+            ..Default::default()
+        }
+    });
+    crate::plan::check_more::keep_lessons(
+        &*env,
+        &["a step that removes files needs leave".to_string()],
+    );
+    let setup = crate::plan::run::test_setup(FILE, options());
+    let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    // d5: chromium is not on this machine: only step 4 holds; cargo is.
+    let held: Vec<&str> = got.wait_before.iter().map(|x| x.step.as_str()).collect();
+    assert_eq!(held, ["4"], "{:?}", got.wait_before);
+    assert!(got.wait_before[0].why.contains("chromium"));
+    // d1 + d2: kept for the runner.
+    let rules = crate::plan::check_more::CheckRules::load(&*env, FILE);
+    assert_eq!(rules.grants_of("2"), ["delete"]);
+    assert_eq!(rules.eyes_of("3").len(), 1);
+    // d3 + d4: written into step 3.
+    let t = env.text(FILE);
+    assert!(
+        t.contains("**3. Wire it**\n  - Wire the turn.\n  - Check: the tray menu looks right\n  - Check: `cargo run --bin qanuvi-master -- plan run demo.md`\n  - Promised by step 1: wire the real agent turn\n"),
+        "{t}"
+    );
+    let notes = env.plan_data_get(FILE, Kind::Notes).unwrap().to_string();
+    assert!(
+        notes.contains("Step 3 does its check itself: the tray menu"),
+        "{notes}"
+    );
 }

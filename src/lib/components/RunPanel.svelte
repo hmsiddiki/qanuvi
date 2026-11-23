@@ -444,6 +444,10 @@
   /** The steps the check in hand went through (kept once the run starts), and how many it left out as checked before. */
   let checkSteps: { number: string | null; title: string; details: string[] }[] = [];
   let checkedBefore = $state(0);
+  /** Y10: the check's answer as it came (the core reads its grants, eyes, end check, promises and needs). */
+  let checkAnswer = "";
+  /** Y10 d5: what the steps need that is not on this machine: those steps wait. */
+  let probeHolds = $state<{ step: string; why: string; by: "you" | "default" }[]>([]);
   let secretValues = $state<Record<string, string>>({});
   let answers = $state<Record<number, string>>({});
   /** Answers the owner typed or changed (an untouched recommended answer is Qanuvi's decision). */
@@ -581,6 +585,12 @@
         // PM c: what the project memory knows is used, not asked again.
         memory: await api.memory.lines(project.id).catch(() => [] as string[]),
       };
+      // Y10 d7: what earlier checks here missed.
+      const lessons = await api.planRun.checkLessons(project.id).catch(() => [] as string[]);
+      if (lessons.length)
+        known.notes.push(
+          `Earlier runs here were held for things this check could have found first; look for the same: ${lessons.join("; ")}`,
+        );
       // A run started again (stopped by its budget, paused, ended): steps the check already went through, unchanged
       // since, are not asked about again; their answers, holds and extra checks are kept with the plan.
       const { checked, fresh } = alreadyChecked(loadPlanState(project.id, file), coveredSteps());
@@ -594,8 +604,8 @@
       const r = await planner.ask(
         project,
         preflightPrompt(file, steps, known),
-        // The model chosen for the run (so there is no surprise model); else the agent's default.
-        oneModel || settings.agent(provider.id).model || defaultPlannerModel(provider),
+        // Y10 d6: the agent's strongest model reads the files the steps change; else the run's model.
+        provider.models[0]?.id || oneModel || settings.agent(provider.id).model || defaultPlannerModel(provider),
         "Before the run: what it needs",
         {
           agentId: provider.id,
@@ -605,6 +615,12 @@
       );
       const found = parsePreflight(r.text);
       found.secrets = found.secrets.filter((s) => !known.secrets.includes(s.name));
+      checkAnswer = r.text;
+      // Y10 d5: what the steps need is tried on the machine now, so the card says what is missing before Start.
+      probeHolds = await api.planRun
+        .checkSettle(project.id, file, r.text, {}, mode, firstStepKey(), false)
+        .then((x) => x.holds)
+        .catch(() => []);
       check = found;
       recommendAll(found, false);
       if (
@@ -612,11 +628,18 @@
         !found.questions.length &&
         !found.risky.length &&
         !found.setup.length &&
-        !found.order.length
+        !found.order.length &&
+        !probeHolds.length
       ) {
         check = null;
         savePlanState(project.id, file, keepChecked(loadPlanState(project.id, file), checkSteps));
-        await go();
+        // Y10: its eyes, end check and promises are still kept (nothing to ask about them).
+        const extra = await api.planRun
+          .checkSettle(project.id, file, r.text, {}, mode, firstStepKey(), true)
+          .catch(() => null);
+        if (extra?.notes.length) savePlanNotes(project.id, file, [...loadPlanNotes(project.id, file), ...extra.notes]);
+        if (extra) onchanged?.();
+        await go(extra?.holds.map((h) => ({ step: h.step, why: holdWording(h) })) ?? [], []);
       }
     } catch (e) {
       error = `The check before the run did not answer (${errorText(e)}). Start without it, or try again.`;
@@ -693,11 +716,22 @@
         });
     }
     // Sorted (24u part 3): Qanuvi's own choices, steps with extra checks, and holds only where the owner is needed.
+    // Y10 d1-d5: grants, eyes, the end check and promises kept in the core; what is not on this machine waits.
+    const extra = await api.planRun
+      .checkSettle(project.id, file, checkAnswer, riskyChoice, mode, firstStep, true)
+      .catch(() => null);
+    for (const h of extra?.holds ?? [])
+      if (!read.holds.some((x) => x.step === h.step)) read.holds.push({ step: h.step, why: h.why, by: "default" });
     const settled = withReadHolds(
       settleCheck(c, read.answers, read.answersTouched, riskyChoice, riskyTouched),
       read.holds.filter((h) => h.step),
     );
-    const notes = [...loadPlanNotes(project.id, file), ...settled.notes, ...settled.decided.map(decidedNote)];
+    const notes = [
+      ...loadPlanNotes(project.id, file),
+      ...(extra?.notes ?? []),
+      ...settled.notes,
+      ...settled.decided.map(decidedNote),
+    ];
     // Holds are kept per plan (24u part 2): a later run holds the same steps, saying who set each hold.
     const holds: Omit<KeptHold, "at">[] = settled.holds;
     const cleared = new Set(settled.cleared);
@@ -1270,6 +1304,8 @@
                 ><strong>{x.step}</strong>
                 {x.why} <span class="sort {x.sort}">{SORT_LABEL[x.sort]}</span>{#if x.because}<span class="dim">
                     {x.because}</span
+                  >{/if}{#if x.grant === "delete"}<span class="dim">
+                    · Going ahead lets this step delete files inside this project (Qanuvi keeps a copy to undo it).</span
                   >{/if}</span
               >
               <select bind:value={riskyChoice[i]} onchange={() => (riskyTouched[i] = true)}>
@@ -1279,6 +1315,14 @@
               </select>
             </div>
           {/each}
+        {/if}
+        {#if probeHolds.length}
+          <p class="hint">Not on this machine (only these steps wait until it is there; the rest runs):</p>
+          <ul>
+            {#each probeHolds as h, i (i)}<li>
+                <strong>Step {h.step}</strong> <span class="dim">{h.why}</span>
+              </li>{/each}
+          </ul>
         {/if}
         {#if check.setup.length}
           <p class="hint">To have running or set:</p>

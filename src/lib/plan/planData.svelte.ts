@@ -10,7 +10,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { callMaster, callThisPc, onThisPcLinkEnd, ownerOf } from "$lib/remote";
 
-export type PlanDataKind = "picks" | "state" | "notes" | "run";
+export type PlanDataKind = "picks" | "state" | "notes" | "run" | "check";
 
 export interface Entry {
   project_id: string;
@@ -25,7 +25,12 @@ const PREFIXES: [string, PlanDataKind][] = [
   ["qanuvi.planstate.", "state"],
   ["qanuvi.plannotes.", "notes"],
   ["qanuvi.run.", "run"],
+  // Y10: what the check before the run settled for the runner (written by the core).
+  ["qanuvi.check.", "check"],
 ];
+
+/** A kind this window keeps (a newer master may send more). */
+const known = (k: unknown): k is PlanDataKind => PREFIXES.some(([, p]) => p === k);
 
 const keyOf = (e: Pick<Entry, "project_id" | "file" | "kind">): string =>
   `${PREFIXES.find(([, k]) => k === e.kind)![0]}${e.project_id}.${e.file}`;
@@ -96,7 +101,7 @@ class PlanData {
   async loadMaster(master: string): Promise<void> {
     try {
       const rows = await callMaster<Entry[]>(master, "plan_data_list", {});
-      for (const e of rows) if (!this.#pending.has(keyOf(e))) this.#take(e, false);
+      for (const e of rows) if (known(e.kind) && !this.#pending.has(keyOf(e))) this.#take(e, false);
     } catch {
       // An older master without plan data: its projects' plans show without it, as before.
     }
@@ -104,7 +109,7 @@ class PlanData {
 
   /** A change made on a master (its runner), heard on the run stream the window follows. */
   heard(e: Entry): void {
-    if (e && typeof e.project_id === "string" && typeof e.file === "string" && e.kind) this.#take(e);
+    if (e && typeof e.project_id === "string" && typeof e.file === "string" && known(e.kind)) this.#take(e);
   }
 
   /** Writes of this window whose echo has not come back yet, per key: an older echo must not undo a newer write. */
@@ -152,7 +157,7 @@ class PlanData {
     const events = new Channel<Entry>();
     events.onmessage = (e) => this.heard(e);
     const rows = await callThisPc<Entry[]>("plan_data_watch", { onEvent: events });
-    for (const e of rows) if (!this.#pending.has(keyOf(e))) this.#take(e, false);
+    for (const e of rows) if (known(e.kind) && !this.#pending.has(keyOf(e))) this.#take(e, false);
   }
 
   #take(e: Entry, echo = true): void {

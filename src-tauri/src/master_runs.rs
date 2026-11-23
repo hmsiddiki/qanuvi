@@ -316,6 +316,62 @@ impl Master {
                 sh().controls.set_mode(&s(args, "mode"));
                 Ok(Value::Null)
             }
+            // Y10 d7: what earlier checks in this project missed, for the window's check before the run.
+            "plan_run_check_lessons" => {
+                let env = self.run_env(&pid)?;
+                to(Ok(crate::plan::check_more::lessons(&env)))
+            }
+            // Y10 d1-d5: the window's "Check and start" hands the check's answer here: what the steps need is tried
+            // on this machine (holds for what is missing), and grants, eyes, the end check and promises are kept.
+            "plan_run_check_settle" => {
+                use crate::plan::env::RunEnv;
+                use crate::plan::preflight::{RiskChoice, parse_preflight};
+                let env = self.run_env(&pid)?;
+                let file = s(args, "file");
+                let found = parse_preflight(&s(args, "answer"));
+                let choices: HashMap<usize, RiskChoice> = args["risky"]
+                    .as_object()
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| {
+                                Some((k.parse().ok()?, serde_json::from_value(v.clone()).ok()?))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let text = env.read(&file)?.text;
+                let steps = crate::plan::tasklist::parse_plan(&text).steps;
+                let settings = env.project_settings().unwrap_or_default();
+                let plan_rules = crate::run_rules::plan_rules(&text);
+                let recipe = crate::test_build::plan_test_build(&text)
+                    .filter(crate::test_build::TestBuild::is_set)
+                    .unwrap_or(settings.test_build);
+                let first = s(args, "firstStep");
+                let mut holds = crate::plan::check_more::probe(&env, &found, &steps, &first);
+                for h in crate::plan::check_more::probe_test_build(&env, &recipe, &steps) {
+                    if !holds.iter().any(|x| x.step == h.step) {
+                        holds.push(h);
+                    }
+                }
+                // Shown on the card first (apply false: only tried), kept once the owner starts.
+                let applied = if args["apply"].as_bool() == Some(false) {
+                    crate::plan::check_more::Applied::default()
+                } else {
+                    crate::plan::check_more::apply(
+                        &env,
+                        &file,
+                        &found,
+                        &choices,
+                        &s(args, "mode"),
+                        plan_rules.as_ref(),
+                    )
+                };
+                Ok(json!({
+                    "holds": holds,
+                    "notes": applied.notes,
+                    "said": applied.said,
+                }))
+            }
             _ => Err(format!("This master does not know the command {cmd}.")),
         }
     }

@@ -75,6 +75,44 @@ pub struct PreflightRisk {
     pub why: String,
     pub sort: AskSort,
     pub because: String,
+    /// Y10 d1: "delete" when going ahead gives this step alone leave to delete files inside the project; else "".
+    #[serde(default)]
+    pub grant: String,
+}
+
+/// Y10 d2: a check that needs a person or a live drive, and what the run does about it: "run" (the step does it,
+/// `how` says with what), "end" (the owner's list to look at, after the run) or "skip".
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Eyes {
+    pub step: String,
+    pub what: String,
+    #[serde(rename = "do")]
+    pub act: String,
+    pub how: String,
+}
+
+/// Y10 d3: the one real end-to-end check the closing step must pass (no stand-ins).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EndCheck {
+    pub step: String,
+    pub check: String,
+    pub why: String,
+}
+
+/// Y10 d4: part of a step's work left for later, and the open step that will do it ("" when none does).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Promise {
+    pub from: String,
+    pub what: String,
+    pub step: String,
+}
+
+/// Y10 d5: a program, address or secret the steps cannot run without; Qanuvi tries it before the run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Need {
+    pub kind: String,
+    pub name: String,
+    pub steps: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +130,15 @@ pub struct Preflight {
     /// Steps that must run after steps the file lists after them (R2e g): each becomes a "- Needs:" line.
     #[serde(default)]
     pub order: Vec<Order>,
+    /// Y10: read by the core only (the window shows them as the core reads them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub eyes: Vec<Eyes>,
+    #[serde(default, rename = "endCheck", skip_serializing_if = "Option::is_none")]
+    pub end_check: Option<EndCheck>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub promises: Vec<Promise>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub needs: Vec<Need>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,6 +182,25 @@ pub struct Known {
 /// f4: an example in the owner's questions never uses their own name (it once came from the folder path).
 pub const NEUTRAL_EXAMPLES: &str = "Examples use made-up neutral names (for example \"Example Shop Ltd\"), never the owner's own name or a name taken from a folder path, user name or account.";
 
+/// Y10 (d1-d5): what the check also finds before the run, so the run does not hold for it later.
+const CHECK_MORE: &[&str] = &[
+    "Never-list forecast: for each step, think which commands its work will need. One the run rules refuse (deleting",
+    "files, pushing, publishing, ssh, installs, outside sites) is a risky item that names the part in plain words (for",
+    r#"example "removes the old test files"). Deleting files inside this project is the only thing a step can be given:"#,
+    r#"set "grant": "delete" and sort it "checks" (Qanuvi keeps a copy to undo it). Anything else the rules refuse is"#,
+    r#"sorted "you", with no grant."#,
+    "eyes: every check a person must look at or that needs a live drive (a window, a tray icon, a dialog, another",
+    r#"machine). "do": "run" when the run can do it itself with what exists here (a test build, a script, a command; say"#,
+    r#"how), "end" when only a person can judge it (it goes on the owner's list to look at after the run), "skip" when"#,
+    "it is not worth doing.",
+    "endCheck: when the plan builds something that runs (an app, a server, a runner), one command that runs the real",
+    "thing end to end after the last step, never with stand-ins or fakes, and that the run rules allow; else null.",
+    r#"promises: a step that leaves part of its work for later or "until step N": from = that step, step = the open step"#,
+    "that will do it (empty when no step does).",
+    "needs: the programs, addresses (http or host:port) and secrets the steps cannot run without; Qanuvi tries each on",
+    "this machine before the run.",
+];
+
 pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> String {
     let list = steps
         .iter()
@@ -158,8 +224,8 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         }
     };
     let mut out: Vec<String> = vec![
-        format!("Before an unattended run of {file}, read these open steps (and the code only where you must, read-only: at most"),
-        "about ten quick looks; this check should take a minute or two, not a step's work) and list".into(),
+        format!("Before an unattended run of {file}, read these open steps and the files they will change (read-only: open as"),
+        "many as you need, but take minutes, not a step's work) and list".into(),
         "what the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.".into(),
         String::new(),
         "Already known:".into(),
@@ -186,9 +252,13 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         "Answer with JSON only, in this shape (empty lists when nothing is needed):".into(),
         r#"{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],"#.into(),
         r#" "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"...","about":"plan","fromMemory":false}],"#.into(),
-        r#" "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],"#.into(),
+        r#" "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"...","grant":""}],"#.into(),
         r#" "setup":[{"what":"something that must run or be set","why":"..."}],"#.into(),
-        r#" "order":[{"step":"85b","after":["85c"],"why":"..."}]}"#.into(),
+        r#" "order":[{"step":"85b","after":["85c"],"why":"..."}],"#.into(),
+        r#" "eyes":[{"step":"86a","what":"a check that needs a person or a live drive","do":"run","how":"how the run does it itself"}],"#.into(),
+        r#" "endCheck":{"step":"87","check":"one command that runs the real thing end to end","why":"..."},"#.into(),
+        r#" "promises":[{"from":"86b","what":"what it leaves for later","step":"87"}],"#.into(),
+        r#" "needs":[{"kind":"program","name":"chromium","steps":["86a"]}]}"#.into(),
         "Rules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not".into(),
         "already known. Before asking, look at how the project's test command or test runner reads its settings (its docs".into(),
         "say what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a".into(),
@@ -216,6 +286,7 @@ pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> S
         r#"A question the project memory or a known secret already answers is not asked of the owner: give it as "decide""#.into(),
         r#"with the memory's answer as recommended and "fromMemory": true."#.into(),
     ]);
+    out.extend(CHECK_MORE.iter().map(|l| l.to_string()));
     out.join("\n")
 }
 
@@ -342,6 +413,11 @@ pub fn parse_preflight(answer: &str) -> Preflight {
                 why: text(&r["why"]),
                 sort: sort_of(&r["sort"], AskSort::You),
                 because: text(&r["because"]),
+                grant: if r["grant"].as_str() == Some("delete") {
+                    "delete".into()
+                } else {
+                    String::new()
+                },
             })
             .filter(|r| !r.step.is_empty())
             .take(8)
@@ -383,6 +459,60 @@ pub fn parse_preflight(answer: &str) -> Preflight {
             })
             .filter(|o| !o.step.is_empty() && !o.after.is_empty())
             .take(8)
+            .collect(),
+        eyes: items(field("eyes"))
+            .into_iter()
+            .map(|e| Eyes {
+                step: text(&e["step"]),
+                what: text(&e["what"]),
+                act: match e["do"].as_str() {
+                    Some("run") => "run".into(),
+                    Some("skip") => "skip".into(),
+                    _ => "end".into(),
+                },
+                how: text(&e["how"]),
+            })
+            .filter(|e| !e.step.is_empty() && !e.what.is_empty())
+            .take(12)
+            .collect(),
+        end_check: Some(field("endCheck"))
+            .filter(|v| v.is_object())
+            .map(|v| EndCheck {
+                step: text(&v["step"]),
+                check: text(&v["check"]),
+                why: text(&v["why"]),
+            })
+            .filter(|e| !e.check.is_empty()),
+        promises: items(field("promises"))
+            .into_iter()
+            .map(|p| Promise {
+                from: text(&p["from"]),
+                what: text(&p["what"]),
+                step: text(&p["step"]),
+            })
+            .filter(|p| !p.what.is_empty())
+            .take(12)
+            .collect(),
+        needs: items(field("needs"))
+            .into_iter()
+            .map(|n| Need {
+                kind: text(&n["kind"]),
+                name: text(&n["name"]),
+                steps: n["steps"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .map(text)
+                            .filter(|x| !x.is_empty())
+                            .take(20)
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            })
+            .filter(|n| {
+                !n.name.is_empty() && matches!(n.kind.as_str(), "program" | "address" | "secret")
+            })
+            .take(12)
             .collect(),
     }
 }

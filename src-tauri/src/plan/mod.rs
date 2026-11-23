@@ -2,6 +2,7 @@
 //! runner can move into the core and go on without the window. Plain functions with their tests; `compare` runs the
 //! same inputs through both and must match the TypeScript results before anything TypeScript is removed.
 
+pub mod check_more;
 pub mod compare;
 pub mod costs;
 pub mod decider;

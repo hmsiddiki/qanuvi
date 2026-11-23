@@ -378,6 +378,8 @@ struct Loop<'a> {
     extra_checks: HashMap<String, String>,
     /// Y8: the plan file's own "Test build" section (it wins over the project's recipe for this plan).
     plan_test_build: Option<crate::test_build::TestBuild>,
+    /// Y10 (a): work a done step left for later that no open step does: the run does not end "finished" with it.
+    left_open: Vec<String>,
     assignment: HashMap<String, Assignment>,
     stats: Stats,
     free_first: bool,
@@ -541,6 +543,7 @@ impl<'a> Loop<'a> {
             wait_list: vec![],
             extra_checks: HashMap::new(),
             plan_test_build: None,
+            left_open: Vec::new(),
             assignment: HashMap::new(),
             stats: Stats::new(),
             free_first: false,
@@ -2161,6 +2164,25 @@ impl<'a> Loop<'a> {
                 "\n\nIf something is left that only a person can judge (how a page looks, a wording choice), do not \
                  stop for it: finish the step and add a line `- To look at: <what, and where>` under it in the plan.",
             );
+            // Y10 (a) + (c): work left for later is carried to its step; checks decided "the run does it" are the
+            // step's own.
+            let check_rules = super::check_more::CheckRules::load(self.env, &self.s.file);
+            prompt.push_str(&super::check_more::step_prompt_part(
+                &fresh.details,
+                &check_rules.eyes_of(&key(&st)),
+            ));
+            // Y10 d1: a step given leave before the run to delete files inside the project gets it for its turns.
+            let granted_turns = check_rules
+                .grants_of(&key(&st))
+                .iter()
+                .any(|g| g == "delete")
+                .then(|| {
+                    let mut t = self.s.turns.clone();
+                    let mut r = t.plan_rules.clone().unwrap_or_default();
+                    r.delete_inside = true;
+                    t.plan_rules = Some(r);
+                    t
+                });
             if test_build.is_some() {
                 prompt.push_str(
                     "\n\nAfter this step Qanuvi test-builds the app itself (builds it into its own folder, starts it on \
@@ -2281,7 +2303,7 @@ impl<'a> Loop<'a> {
                 self.env,
                 &sh.controls,
                 &mut self.watch,
-                &self.s.turns,
+                granted_turns.as_ref().unwrap_or(&self.s.turns),
                 &ask,
                 &mut |e| sh.forward(e),
             );
@@ -2664,11 +2686,63 @@ impl<'a> Loop<'a> {
         let lines: Vec<&str> = std::iter::once(step.note.as_str())
             .chain(step.details.iter().map(String::as_str))
             .collect();
-        let mut whats = self.eyes_checks(&step);
+        // Y10 (c): checks decided before the run as the run's own (or skipped) are not the owner's to look at.
+        let decided = super::check_more::CheckRules::load(self.env, &self.s.file);
+        let eyes = decided.eyes_of(&key(&st));
+        let mut whats = if !eyes.is_empty() && eyes.iter().all(|e| e.act != "end") {
+            Vec::new()
+        } else {
+            self.eyes_checks(&step)
+        };
         for w in super::review::looks_in(&lines) {
             if !whats.contains(&w) {
                 whats.push(w);
             }
+        }
+        // Y10 (a): work left for later goes to the open step that does it; with none, the owner hears of it and the
+        // run does not end "finished".
+        let mut text = now.text.clone();
+        for (what, to) in super::check_more::left_for_later(&step.details) {
+            let target = to.as_deref().and_then(|n| {
+                parse_plan(&text).steps.into_iter().find(|s| {
+                    s.number.as_deref() == Some(n)
+                        && !matches!(s.status, StepStatus::Done | StepStatus::Blocked)
+                })
+            });
+            let k = key(&st);
+            match target {
+                Some(s) => {
+                    if let Ok(next) = super::tasklist::add_step_line(
+                        &text,
+                        s.line,
+                        &format!("- Promised by step {k}: {what}"),
+                    ) {
+                        if next != text {
+                            let to = s.number.clone().unwrap_or_else(|| s.title.clone());
+                            self.decide(
+                                "promise",
+                                "Qanuvi",
+                                &format!("Step {k}"),
+                                &format!("carried to step {to}"),
+                                &format!("left for later: {what}"),
+                            );
+                        }
+                        text = next;
+                    }
+                }
+                None => {
+                    let w = format!("Left for later by step {k}, and no open step does it: {what}");
+                    if !self.left_open.contains(&w) {
+                        self.left_open.push(w.clone());
+                    }
+                    if !whats.contains(&w) {
+                        whats.push(w);
+                    }
+                }
+            }
+        }
+        if text != now.text {
+            let _ = self.env.write(&self.s.file, &text, Some(&now.hash));
         }
         if whats.is_empty() {
             return;
@@ -4319,11 +4393,55 @@ impl<'a> Loop<'a> {
 
     // ---------- The end ----------
 
+    /// Y10 d7: the steps this run held or set aside are looked at once: could the check before the run have found
+    /// the reason? What it could have is kept as a lesson the next check is told.
+    fn learn_check_lessons(&mut self) {
+        let held: Vec<(String, String)> = self
+            .run
+            .steps
+            .iter()
+            .filter(|s| s.status == RunStepStatus::Blocked)
+            .filter_map(|s| s.reason.clone().map(|r| (key(s), r)))
+            .take(10)
+            .collect();
+        if held.is_empty() {
+            return;
+        }
+        let model = self.s.planner_model.clone();
+        if let Ok((text, _)) = self.ask(
+            &super::check_more::lessons_prompt(&held),
+            &model,
+            "After the run: what the check could have found",
+            true,
+        ) {
+            let lessons = super::check_more::parse_lessons(&text);
+            if !lessons.is_empty() {
+                super::check_more::keep_lessons(self.env, &lessons);
+                self.decide(
+                    "lessons",
+                    "Qanuvi",
+                    "The check before the run",
+                    "learned",
+                    &lessons.join("; "),
+                );
+            }
+        }
+    }
+
     fn end(&mut self) {
         if self.run.status == RunStatus::Running {
             // Steps still held or set aside (the owner ended the run without answering): the run is not done, it
             // needs them.
-            if end_status(&self.run.steps) == RunStatus::NeedsYou {
+            if end_status(&self.run.steps) != RunStatus::NeedsYou && !self.left_open.is_empty() {
+                // Y10 (a): promised work no step did: not "finished".
+                let m = format!(
+                    "Ended here: {}. Not finished: work was left for later that no step did ({}). It is on the list to \
+                     look at in the Inbox: say there what to do, and your words become a new step.",
+                    run_summary(&self.run.steps),
+                    self.left_open.join("; ")
+                );
+                self.finish(RunStatus::NeedsYou, &m);
+            } else if end_status(&self.run.steps) == RunStatus::NeedsYou {
                 let m = format!(
                     "Ended here: {}. Held steps stay open: answer them in their chat or with Run. The end-of-run review \
                      comes once they are done.",
@@ -4339,6 +4457,7 @@ impl<'a> Loop<'a> {
         // wanted it to end).
         if matches!(self.run.status, RunStatus::Done | RunStatus::NeedsYou) {
             self.learn_project_facts();
+            self.learn_check_lessons();
         }
         // A run paused in a step keeps that step's session for Resume.
         if !(self.run.status == RunStatus::Paused && self.keep_for_resume) {

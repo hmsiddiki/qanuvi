@@ -37,6 +37,8 @@ export interface PreflightRisk {
   why: string;
   sort: AskSort;
   because: string;
+  /** Y10 d1: "delete" when going ahead gives this step alone leave to delete files inside the project; else "". */
+  grant: "delete" | "";
 }
 
 /**
@@ -78,6 +80,25 @@ export const EMPTY_PREFLIGHT: Preflight = { secrets: [], questions: [], risky: [
 const NEUTRAL_EXAMPLES =
   'Examples use made-up neutral names (for example "Example Shop Ltd"), never the owner\'s own name or a name taken from a folder path, user name or account.';
 
+/** Y10 (d1-d5): what the check also finds before the run, so the run does not hold for it later. */
+const CHECK_MORE = [
+  "Never-list forecast: for each step, think which commands its work will need. One the run rules refuse (deleting",
+  "files, pushing, publishing, ssh, installs, outside sites) is a risky item that names the part in plain words (for",
+  'example "removes the old test files"). Deleting files inside this project is the only thing a step can be given:',
+  'set "grant": "delete" and sort it "checks" (Qanuvi keeps a copy to undo it). Anything else the rules refuse is',
+  'sorted "you", with no grant.',
+  "eyes: every check a person must look at or that needs a live drive (a window, a tray icon, a dialog, another",
+  'machine). "do": "run" when the run can do it itself with what exists here (a test build, a script, a command; say',
+  'how), "end" when only a person can judge it (it goes on the owner\'s list to look at after the run), "skip" when',
+  "it is not worth doing.",
+  "endCheck: when the plan builds something that runs (an app, a server, a runner), one command that runs the real",
+  "thing end to end after the last step, never with stand-ins or fakes, and that the run rules allow; else null.",
+  'promises: a step that leaves part of its work for later or "until step N": from = that step, step = the open step',
+  "that will do it (empty when no step does).",
+  "needs: the programs, addresses (http or host:port) and secrets the steps cannot run without; Qanuvi tries each on",
+  "this machine before the run.",
+];
+
 export function preflightPrompt(
   file: string,
   steps: PreflightStep[],
@@ -90,8 +111,8 @@ export function preflightPrompt(
     )
     .join("\n");
   return [
-    `Before an unattended run of ${file}, read these open steps (and the code only where you must, read-only: at most`,
-    "about ten quick looks; this check should take a minute or two, not a step's work) and list",
+    `Before an unattended run of ${file}, read these open steps and the files they will change (read-only: open as`,
+    "many as you need, but take minutes, not a step's work) and list",
     "what the run will need from the owner, so the owner answers once and the run then goes on alone. Change nothing.",
     "",
     "Already known:",
@@ -109,9 +130,13 @@ export function preflightPrompt(
     "Answer with JSON only, in this shape (empty lists when nothing is needed):",
     '{"secrets":[{"name":"ENV_NAME","what":"what it is, in plain words","example":"an example value, never a real password","ifEmpty":"what happens if it is left empty","why":"...","steps":["82e"]}],',
     ' "questions":[{"step":"83c","question":"a choice the steps leave open","sort":"decide","recommended":"the answer you advise","because":"...","about":"plan","fromMemory":false}],',
-    ' "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"..."}],',
+    ' "risky":[{"step":"84a","why":"deletes data / migrates / publishes / live payments / pushes","sort":"checks","because":"...","grant":""}],',
     ' "setup":[{"what":"something that must run or be set","why":"..."}],',
-    ' "order":[{"step":"85b","after":["85c"],"why":"..."}]}',
+    ' "order":[{"step":"85b","after":["85c"],"why":"..."}],',
+    ' "eyes":[{"step":"86a","what":"a check that needs a person or a live drive","do":"run","how":"how the run does it itself"}],',
+    ' "endCheck":{"step":"87","check":"one command that runs the real thing end to end","why":"..."},',
+    ' "promises":[{"from":"86b","what":"what it leaves for later","step":"87"}],',
+    ' "needs":[{"kind":"program","name":"chromium","steps":["86a"]}]}',
     "Rules: secrets only for logins, keys, passwords and addresses the steps cannot run without and that are not",
     "already known. Before asking, look at how the project's test command or test runner reads its settings (its docs",
     "say what to set): a variable the runner fills in by itself is not missing, ask for the one the runner reads; a",
@@ -138,6 +163,7 @@ export function preflightPrompt(
     'on, how the tests run, how to get a test login, where something is), else "plan".',
     'A question the project memory or a known secret already answers is not asked of the owner: give it as "decide"',
     'with the memory\'s answer as recommended and "fromMemory": true.',
+    ...CHECK_MORE,
   ].join("\n");
 }
 
@@ -201,7 +227,13 @@ export function parsePreflight(text: string): Preflight {
       .slice(0, 8),
     risky: arr(raw.risky)
       // Unsorted risky steps wait, as before sorting.
-      .map((r) => ({ step: str(r.step), why: str(r.why), sort: sortOf(r.sort, "you"), because: str(r.because) }))
+      .map((r) => ({
+        step: str(r.step),
+        why: str(r.why),
+        sort: sortOf(r.sort, "you"),
+        because: str(r.because),
+        grant: r.grant === "delete" ? ("delete" as const) : ("" as const),
+      }))
       .filter((r) => r.step)
       .slice(0, 8),
     setup: arr(raw.setup)

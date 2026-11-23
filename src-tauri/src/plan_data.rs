@@ -24,6 +24,9 @@ pub enum Kind {
     Notes,
     /// The Run dialog's settings for this plan.
     Run,
+    /// Y10: what the check before the run settled for the runner (per-step grants, eyes, the end check); with the
+    /// file "(project)", the project's check lessons (d7).
+    Check,
 }
 
 impl Kind {
@@ -33,6 +36,7 @@ impl Kind {
             Kind::State => "state",
             Kind::Notes => "notes",
             Kind::Run => "run",
+            Kind::Check => "check",
         }
     }
 
@@ -42,6 +46,7 @@ impl Kind {
             "state" => Kind::State,
             "notes" => Kind::Notes,
             "run" => Kind::Run,
+            "check" => Kind::Check,
             _ => return None,
         })
     }

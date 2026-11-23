@@ -556,6 +556,26 @@ pub fn clear_stale_skips(text: &str, also_done: &[String]) -> String {
     out
 }
 
+/// Y10: adds one detail line ("- Check: ...", "- Promised by step 5: ...") under the step at `line`, after its
+/// other detail lines; a line the step already has is not added again.
+pub fn add_step_line(text: &str, line: usize, detail: &str) -> Result<String, String> {
+    let (plan, step, mut lines) = step_at(text, line, None)?;
+    let detail = detail.trim();
+    if (line + 1..step.end.min(lines.len())).any(|i| js::trim(&lines[i]) == detail) {
+        return Ok(text.to_string());
+    }
+    let mut at = line + 1;
+    while at < lines.len()
+        && !blank(&lines[at])
+        && indent_of(&lines[at]) >= 2
+        && !SKIPPED_RE.is_match(&lines[at])
+    {
+        at += 1;
+    }
+    lines.insert(at, format!("  {detail}"));
+    Ok(lines.join(&plan.eol))
+}
+
 /// Adds step labels to the step's "- Needs:" line (an order decision of the check before a run), writing the line
 /// when the step has none; labels it already needs are not repeated. The window's `addStepNeeds`.
 pub fn add_step_needs(text: &str, line: usize, labels: &[String]) -> Result<String, String> {

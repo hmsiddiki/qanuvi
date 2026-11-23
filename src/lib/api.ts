@@ -738,6 +738,25 @@ export const api = {
     interrupt: (projectId: string) => invoke<void>("plan_run_interrupt", { projectId }),
     model: (projectId: string, model: string) => invoke<void>("plan_run_model", { projectId, model }),
     mode: (projectId: string, mode: string) => invoke<void>("plan_run_mode", { projectId, mode }),
+    /** Y10 d7: what earlier checks in this project missed (told to the next check). */
+    checkLessons: (projectId: string) => invoke<string[]>("plan_run_check_lessons", { projectId }),
+    /**
+     * Y10 d1-d5: the check's answer, settled in the core: what the steps need is tried on the machine (holds for what
+     * is missing), and grants, eyes, the end check and promises are kept or written into the plan.
+     */
+    checkSettle: (
+      projectId: string,
+      file: string,
+      answer: string,
+      risky: Record<number, string>,
+      mode: string,
+      firstStep: string,
+      apply: boolean,
+    ) =>
+      invoke<{ holds: { step: string; why: string; by: "you" | "default" }[]; notes: string[]; said: string[] }>(
+        "plan_run_check_settle",
+        { projectId, file, answer, risky, mode, firstStep, apply },
+      ),
   },
   agentConfig: {
     list: (provider: string, projectId: string | null) =>

@@ -204,6 +204,10 @@ pub fn check_before_run(env: &dyn RunEnv, setup: &RunSetup) -> Result<Checked, S
                 rules_facts(&rules, o.mode == "auto"),
                 test_build_fact(&recipe),
             ])
+            // Y10 d7: what earlier checks here missed.
+            .chain(super::check_more::lessons_fact(
+                &super::check_more::lessons(env),
+            ))
             .collect(),
         memory: env.project_memory(),
     };
@@ -215,10 +219,16 @@ pub fn check_before_run(env: &dyn RunEnv, setup: &RunSetup) -> Result<Checked, S
             details: s.details.clone(),
         })
         .collect();
+    // Y10 d6: the check reads the files the steps change, on the agent's strongest model.
     let model = [
+        setup
+            .models
+            .first()
+            .map(|m| m.id.clone())
+            .unwrap_or_default(),
+        setup.planner_model.clone(),
         o.model.clone().unwrap_or_default(),
         setup.default_model.clone(),
-        setup.planner_model.clone(),
     ]
     .into_iter()
     .find(|m| !m.trim().is_empty())
@@ -285,6 +295,23 @@ pub fn check_before_run(env: &dyn RunEnv, setup: &RunSetup) -> Result<Checked, S
             });
         }
     }
+    // Y10 d5: what the steps need is tried here first; what is missing holds only its steps.
+    let first = fresh
+        .first()
+        .map(|f| step_key(f.number.as_deref(), &f.title))
+        .unwrap_or_default();
+    let probed: Vec<preflight::Hold> = super::check_more::probe(env, &found, &steps, &first)
+        .into_iter()
+        .chain(super::check_more::probe_test_build(env, &recipe, &steps))
+        .collect();
+    for h in probed {
+        if !settled.holds.iter().any(|x| x.step == h.step) {
+            settled.holds.push(h);
+        }
+    }
+    // Y10 d1-d4: grants, eyes, the end check and promises.
+    let applied = super::check_more::apply(env, &file, &found, &risk, &o.mode, plan_rules.as_ref());
+    notes.extend(applied.notes.iter().cloned());
     // Kept as the window keeps it.
     notes.extend(settled.notes.iter().cloned());
     notes.extend(settled.decided.iter().map(decided_note));
