@@ -74,7 +74,9 @@ pub fn sentence_start(why: &str) -> String {
 
 /// The answer form of a held step, worded like the run panel's.
 pub fn hold_form(kind: HeldKind, why: &str) -> HoldForm {
-    let secret = asks_secret(why);
+    // A question the check left open is never a login: the check asks for those apart (its secrets), so words like
+    // "the login already on this computer" in a question do not lock it out of the Inbox and the terminal.
+    let secret = !why.starts_with(super::preflight::OPEN_QUESTION) && asks_secret(why);
     let hold = kind == HeldKind::Hold;
     let choice = |id, label: &str, hint: Option<&str>| FormChoice {
         id,
@@ -200,6 +202,19 @@ mod tests {
         assert!(asks_secret("needs an API key for the mail service"));
         assert!(asks_secret("sign in to the admin page"));
         assert!(!asks_secret("it changes the date format"));
+        let q = hold_form(
+            HeldKind::Hold,
+            "a question was left open (May the run use the Claude login already on this computer?)",
+        );
+        assert_eq!(
+            q.secret, None,
+            "a question from the check is answered anywhere"
+        );
+        assert!(q.choices.iter().any(|c| c.id == AnswerChoice::Decide));
+        assert_eq!(
+            hold_form(HeldKind::Hold, "it needs the FTP password").secret,
+            Some(true)
+        );
         // p2 holds name the secret as a variable.
         assert!(asks_secret(
             "it needs The test key (SHOP_API_KEY). Before the run you wrote \"x\""
