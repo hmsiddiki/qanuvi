@@ -1875,6 +1875,33 @@ runs on or off; with it off nothing is sent anywhere.
       nothing waits)", CLI tag "to look at"; still answered the same way. Rust 653, window 575, clippy clean.
       Flaky once under full-suite load: once_the_answer_comes_the_run_no_longer_says_it_waits_for_you (passed 3x
       alone and in the next full run); watch it.
+    y9-6 FIXED b519f07: step 21 was held for "rm -f src/lib/plan/parity.test.ts" at the end of a long python
+      heredoc command; the refused text was cut at 160 characters, so the Inbox question said "the script is cut
+      off" and never named the delete. The never-list reason now quotes the refused part.
+    y9-7 FIXED c0c4bda (owner saw "chat says finished but step 22 shows running"): after the agent's turn Qanuvi
+      ran the tests and the release test build (~8 min), but `checking` was set without telling the window, and the
+      test build had no words of its own. Now set_checking notifies; status line says "the agent is done; Qanuvi
+      runs the tests now" / "... test-builds the app now (its own folder, can take minutes)". Not driven live yet.
+    Y9 RESULT (2026-11-23 05:55-07:03, laptop, 0.1.44 + plan-24z-a branch on the scratch copy):
+      - Ran to the end alone: 22/22 steps done, $12.59, ~70 min, 22 commits; one hold (step 21, the delete above,
+        answered "accept as it is"); review list 17 entries; 8 things learned. `npm run verify` re-run by hand on
+        the branch: 367 vitest + svelte-check + prettier + cargo fmt + clippy -D warnings + 325 cargo tests, green.
+      - BUT NOT EQUAL TO THE HAND-BUILT R1-R5: the real agent turn was never wired. CoreEnv::agent_turn still
+        returns "The agent turn in Rust is not built yet (step 5)" unless a test stand-in is set. Step 5 wrote
+        "not wired until step 21", step 21 did not do it, step 22 listed it as "left for later", and the run said
+        "finished". Step 9 moved the window onto the core, so a real plan start on that branch ends "failed":
+        the branch would break running plans. Every check was a unit test with a stand-in, so all passed.
+        Rust added ~15k lines (hand-built R1-R5: ~39k insertions over 144 files). The R5 "drive it" part and the
+        tray/Quit look went to the review list instead of being done.
+      - Other: chat.rs got question/change word lists (against the no-word-lists rule); plan_parity.json 7 MB;
+        TS plan modules mostly kept.
+      - Lessons for the runner (to discuss with the owner, not built): (a) a step's own "not yet / until step N"
+        is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
+        "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
+        it" / live checks a step names belong to the step, not to the review list.
+    PICKUP POINT (newest, 2026-11-23 after Y9): Y9 done with the result above. y9-1..y9-7 fixed, pushed,
+      unpublished. Next: talk lessons (a)-(c) through with the owner, drive y9-7 in a window, then 0.1.45 (ask).
+      The laptop's scratch copy and its plan-24z-a branch stay as they are for reference.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
       from This PC).
