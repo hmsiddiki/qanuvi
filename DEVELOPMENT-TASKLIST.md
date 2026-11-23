@@ -1899,6 +1899,21 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
+    PICKUP POINT (newest, 2026-11-23 after 0.1.46):
+    0.1.46 PUBLISHED ab25799 tag v0.1.46 (y10-1..y10-4, backup channel-before-0.1.46, all 9 files online); laptop on
+      0.1.46. y10-4 5bfaad9: a question the check left open is never taken for a login (the word match locked step
+      22's question out of the Inbox and the terminal).
+    Y10 RESULT (laptop ~/qc-scratch/y10, plan 24Z-A, $14.79 in all vs Y9 $12.59): 22/22 ticked, run ended "needs you"
+      (not a false "finished" like Y9) with 4 left-for-later items and 14 things to look at. Wins: step 5's review
+      caught the empty agent answer (the Y9 miss) and sent it back; step 21's delete ran under its grant, no hold;
+      eyes items went to the list, not holds. Still open: no step drove a small plan with the real agent end to end
+      (step 22 only ran npm run verify; the second check took its own recommended answer and the step left the live
+      drive for later, saying ssh is refused). So whether the Y10-built runner runs a real plan is NOT yet proven.
+      Next: drive a two-step scratch plan through the y10 build's headless master with the real agent (laptop disk
+      11 GB free: a debug build needs ~25 GB, so free space first, ask the owner), then decide whether the check
+      should treat "real end-to-end" as a question for the owner, never a recommended skip.
+    Found, not fixed: qanuvi-master update waits silently while a run goes on (say so); the run panel / project list
+      shows two "qanuvi" projects alike (proposal above); a hold answered by nobody before 0.1.46 waited 8 h.
     0.1.45 PUBLISHED 34eca5b tag v0.1.45 (Y10, 2026-11-23, backup channel-before-0.1.45, all files online).
     y10-1/y10-2 BUILT db00afa (unpublished): the real end check must use the thing as a user would and pass the run
       rules; refused, the closing step is told to prove it another way and the notes say so ("Settled before the run").
