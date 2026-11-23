@@ -1899,7 +1899,17 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    THE THREE PROPOSALS, owner "yes to the recommended" (2026-11-24), BUILT, unpublished, not driven in a window:
+    PICKUP POINT (newest, 2026-11-24 02:00): sp1 + the three proposals BUILT AND DRIVEN LIVE on the laptop (release
+      test window, data dev.qanuvi.desktop.source, scratch ~/qc-scratch/ho1/proj, real agent, $0.12): sidebar showed
+      "proj · ho1" / "proj · e2e1" / "proj2"; step 1 (an eyes check) half orange, header "1/2 · 1 with things open";
+      Skip on step 2's end-to-end hold -> run "needs you", list entry "You skipped the real end-to-end check..."; "All
+      fine" -> step 1 green, count back to 1/2. Drive fixes 0e9de06: the CLI could not answer or show a list to look
+      at (tag "to look at" refused as a note); terminal-started runs now name same-named projects by folder too
+      (master_cli_plan shown_name); the skipped-end-check end line is short (its command is on the list); Svelte
+      trimmed the space before the folder hint and the open count. sp1 checked in tests only (the stalled approval
+      did not recur). Window 584, Rust 671, clippy clean. All pushed, UNPUBLISHED (0.1.48 waits for the owner's yes).
+      Next: 0.1.48 (ask), then plan big-plan basics + stable Win/Linux with the owner.
+    THE THREE PROPOSALS, owner "yes to the recommended" (2026-11-24), BUILT (driven live, see the pickup above):
       - sk1: skipping the real end-to-end check (Skip this step on its hold) puts "You skipped the real end-to-end
         check, so the plan's work is not proven for real: <what it was>" on the plan's list to look at, and the run
         ends "needs you" ("Not finished: the work was not proven for real"). run.rs review_list_add (split out of
