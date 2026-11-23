@@ -891,7 +891,9 @@ mod tests {
             "s=s.replace('a','b')\n".repeat(20)
         );
         match p.command(&long) {
-            Verdict::Never(why) => assert!(why.contains("`rm -f src/lib/plan/parity.test.ts`"), "{why}"),
+            Verdict::Never(why) => {
+                assert!(why.contains("`rm -f src/lib/plan/parity.test.ts`"), "{why}")
+            }
             v => panic!("{v:?}"),
         }
     }
