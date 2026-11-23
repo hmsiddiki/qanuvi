@@ -133,3 +133,44 @@ right.
 Already decided and built (24u part 1, setaside.rs), not a question: a step that needs the user mid-run is set aside
 with its question in the Inbox, the steps that depend on it are set aside too, and the run goes on with the rest.
 24y keeps this as it is.
+
+## Y10 in detail (owner yes to (a)-(c) and d1-d7, 2026-11-23; built)
+
+After Y9 (the benchmark ended alone but the real agent turn was never wired). Guiding rules: ask before the run, not
+during it; the runner runs smoothly through long plans; the check's questions say plainly what, why and what each
+answer does.
+
+**The check before the run (window and headless the same):**
+
+- **d6 deeper.** The check runs on the agent's strongest model and reads the files the steps change (read-only, as
+  many as it needs, a few minutes), not only the plan text.
+- **d1 never-list forecast.** A step that will need something the run rules refuse is found before the run. Deleting
+  files inside the project is the one thing a step can be given: the check lists it as a risky step with the grant
+  "delete"; going ahead (with extra checks, the pre-chosen answer) gives that step alone leave to delete files
+  inside the project (Qanuvi's copies or the branch can undo it). Pushing, publishing, ssh, installs and anything
+  outside the project are never given: those steps are asked about once before the run (their other work goes on).
+- **d2 eyes forecast.** Checks that need eyes or a live drive are listed with what the run does about each: "the run
+  does it" (the step has a way: a test build, a script; the way is written down), "at the end" (the review list),
+  or "skip". The run's answer is pre-chosen; a "run does it" item is the step's own job (lesson c).
+- **d3 the real end check.** When the plan is about running things, the check names one real end-to-end check (no
+  stand-ins) and Qanuvi writes it into the closing step as a Check line.
+- **d4 deferrals.** "Later" or "until step N" in a step must point to a step that does it; one that does not is
+  written into the step it belongs to as "- Promised by step M: what".
+- **d5 probes.** The programs, addresses and logins the steps need are tried read-only on this machine before the
+  run (a program on PATH, an address that answers, a secret that is set, the test build's programs); what is missing
+  holds only its steps, with the reason, and the card says so before Start.
+- **d7 lessons.** At the end of a run, every hold and set-aside step is looked at once: "could the check have found
+  it before?" Yes answers are kept as one-line lessons per project and the next check is told them.
+
+**The runner:**
+
+- **(a) promises.** Every step prompt says: something left for a later step gets a line "- Left for later: what
+  (step N)". Qanuvi copies it into step N as "- Promised by step M: what", which that step must do. A promise with
+  no open step to go to goes on the plan's review list, and the run ends "needs you", never "finished".
+- **(b) real run.** The closing step's end check (d3) is a normal Check line: it must pass; its prompt says stand-ins
+  do not count.
+- **(c) drives stay in the step.** A check the run does itself (d2 "the run does it") is not sent to the review list;
+  the step's prompt says to do it with the written way, and a "To look at" line does not count for it.
+
+Measure: the check again on the Y9 plan (laptop scratch copy at bc562c8) must foresee step 21's delete and the R5
+eyes items, with questions the owner can read.
