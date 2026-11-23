@@ -1899,7 +1899,26 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    CHECKPOINT (newest, 2026-11-23 after Y9, owner agreed): build runner lessons (a)-(c) and the stronger
+    Y10 BUILT 0ed9a3a (2026-11-23 night, owner: "after finishing improvement publish anyway", update the laptop and
+      run the planner answering everything; details in docs/PLAN-24Y.md "Y10 in detail"):
+      - The check (window and headless): d6 strongest model (agent's first model) and reads the files the steps
+        change; d1 risky items carry "grant": "delete": let go ahead, that step alone may delete files strictly inside
+        the project (Policy.delete_inside via RunRules.delete_inside, never saved; not ".", "*", "..", ~, $VAR);
+        d2 eyes {do: run|end|skip, how}; d3 endCheck written as "- Check: `cmd`" into its step when the run rules
+        allow it; d4 promises written as "- Promised by step M: what"; d5 needs (program/address/secret) tried on the
+        machine + the test build's own program, missing ones hold only their steps (window: shown on the card as
+        "Not on this machine" before Start); d7 lessons (plan data "check" under "(project)", newest 20) told to the
+        next check. The core keeps grants and eyes in plan data kind "check" (window store knows the kind and skips
+        kinds it does not know). New master commands plan_run_check_lessons, plan_run_check_settle (apply false =
+        probe only).
+      - The runner: (a) every step prompt asks for "- Left for later: <what> (step N)"; Qanuvi carries it into step N
+        as a Promised line (that step's prompt says to do it); with no open step it goes on the review list and the
+        run ends "needs you", never "finished"; (c) a step whose eyes were all decided run/skip sends no word checks
+        to the review list, and its prompt says the checks are its own; (b) via d3; d7 at the run's end one planner
+        question over the set-aside steps.
+      - Tests: Rust 662 (new: run_rules grant, check_more units, 3 Y10 scenarios), window 575, clippy + fmt + prettier
+        + svelte-check clean.
+    CHECKPOINT (before, 2026-11-23 after Y9, owner agreed): build runner lessons (a)-(c) and the stronger
       check before the run (d1-d7), in a fresh session. Owner's guiding rules for this work:
       - Ask before the run, not during it: a question found before the run is always better than a hold later.
       - What matters most: the runner runs smoothly and copes with long plans; the owner is needed only when it
