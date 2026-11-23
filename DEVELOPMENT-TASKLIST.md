@@ -1899,7 +1899,26 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-23 after e2e1): e2e1 BUILT (owner agreed, unpublished, not driven in a window):
+    PICKUP POINT (newest, 2026-11-24 after the e2e1 drive): e2e1 DRIVEN LIVE on the laptop (owner: do it there),
+      release test window (~/src/qanuvi, own data dev.qanuvi.desktop.source), scratch ~/qc-scratch/e2e1/proj + proj2
+      (a greeting proven only over `ssh test-box`). Fixed from the drive (6a792c5, 7464c3c, pushed, unpublished):
+      - dr1 BUG: the check before the run (plan mode) sat 11 min on an Approve for Qanuvi's own memory_search
+        (despite --allowedTools mcp__qanuvi): agent::own_read_only answers the index tools + memory_search yes at
+        once (memory_suggest, browser and the rest still ask). Re-drive: auto-approved, card in 43 s / 22 s.
+      - dr2: the check gave a weaker local end check because the prompt said it MUST be allowed, so the e2e1 hold
+        never fired; the prompt now says: an allowed command when one does it, else the refused one (ssh, a
+        download), never a weaker local check. Re-drive: endCheck = the real ssh command, the card held step 2.
+      - dr3 BUG: a question came back as a placeholder "<<ccr:0bd3c8834676,string,348B>>" (no proxy on the laptop;
+        from the agent/model side): parse drops placeholder text (Rust is_placeholder, TS PLACEHOLDER).
+      - dr4: the card listed the hold under "Not on this machine"; now its own line "Real end-to-end check (only this
+        step waits for your answer; the rest runs)".
+      Checked live: step 1 ran, step 2 waited; Inbox (qanuvi-master inbox show) offered only Go ahead / Skip this
+      step, no "Let Qanuvi decide"; Skip -> "finished · 1/2 steps done". Tests Rust 668, window 576, clippy,
+      svelte-check, prettier, fmt clean. Found, not fixed: the approved memory_search tool row kept its spinner
+      ("11 min") after the check finished (stale row; own tools no longer ask, so rarer). PROPOSAL: when the owner
+      skips the real end-to-end check, put it on the run's list to look at (the run then ends "needs you").
+      Next: 0.1.47 (ask), then the proposals, then stable Win+Linux.
+    PICKUP POINT (before, 2026-11-23 after e2e1): e2e1 BUILT (owner agreed, unpublished, not driven in a window):
       the real end-to-end check the run rules refuse is the OWNER'S question, never a recommended skip. The check
       (headless check_before_run and the window's plan_run_check_settle, so the card shows it before Start) holds the
       closing step with a plain question starting preflight::END_TO_END: what the check is, Go ahead (prove it another
