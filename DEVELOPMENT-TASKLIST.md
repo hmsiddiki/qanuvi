@@ -1899,10 +1899,22 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-23 after Y9): Y9 done with the result above. y9-1..y9-7 fixed, pushed,
+    CHECKPOINT (newest, 2026-11-23 after Y9, owner agreed): build runner lessons (a)-(c) and the stronger
+      check before the run (d1-d7), in a fresh session. Owner's guiding rules for this work:
+      - Ask before the run, not during it: a question found before the run is always better than a hold later.
+      - What matters most: the runner runs smoothly and copes with long plans; the owner is needed only when it
+        is truly urgent.
+      - The check before the run must be easy to understand: each question says plainly what it asks, why, and
+        what happens with each answer; no jargon, no internal names.
+      Order: 1) write (a)-(c) + d1-d7 in detail in docs/PLAN-24Y.md ("Y10 in detail"); 2) build d1-d7 (the check)
+      and (a)-(c) (the runner), with scenario tests; 3) measure: the check again on the Y9 plan (laptop scratch copy
+      ~/qc-scratch/y9/qanuvi, reset to bc562c8) must foresee the step 21 delete and the R5 eyes items, with its
+      questions readable to the owner; 4) drive y9-7 in a window; 5) 0.1.45 (ask).
+      Unpublished since 0.1.44: y9-1..y9-7 (03d0652, b9cc89e, 504f289, b519f07, 74fa832, c0c4bda).
+    PICKUP POINT (before, 2026-11-23 after Y9): Y9 done with the result above. y9-1..y9-7 fixed, pushed,
       unpublished. OWNER AGREED lessons (a)-(c) (2026-11-23). OWNER POINT (d): the check before the run must find needs far better than the
-      runner finds them while running, so a long run needs the owner only when it is truly urgent. PROPOSED (waiting
-      for the owner's yes): d1 never-list forecast (a step that deletes/pushes/installs is found and asked once
+      runner finds them while running, so a long run needs the owner only when it is truly urgent. OWNER SAID YES TO ALL
+      (2026-11-23): d1 never-list forecast (a step that deletes/pushes/installs is found and asked once
       before; the answer becomes a per-step rule; Y9 step 21 would not have held); d2 eyes forecast (live drives,
       dialogs, VPS: do at the end together, skip, or give the run a way); d3 the real end-to-end check named before
       the run (lesson b); d4 deferrals ("later", "until step N") must point to a step that covers them; d5 resources
