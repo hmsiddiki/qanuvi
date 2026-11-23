@@ -1899,7 +1899,11 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24 after the e2e1 drive): e2e1 DRIVEN LIVE on the laptop (owner: do it there),
+    PICKUP POINT (newest, 2026-11-24 after 0.1.47): 0.1.47 PUBLISHED tag v0.1.47 (owner "publish anyway"; e2e1 +
+      dr1-dr4; backup channel-before-0.1.47; all 8 files online, 200). Owner updates This PC and the laptop. Next, in a
+      fresh session: the proposals (skipped real end-to-end check on the look-at list, half-orange mark, folder on
+      same-named projects), the stale tool-row spinner, then stable Win+Linux.
+    PICKUP POINT (before, 2026-11-24 after the e2e1 drive): e2e1 DRIVEN LIVE on the laptop (owner: do it there),
       release test window (~/src/qanuvi, own data dev.qanuvi.desktop.source), scratch ~/qc-scratch/e2e1/proj + proj2
       (a greeting proven only over `ssh test-box`). Fixed from the drive (6a792c5, 7464c3c, pushed, unpublished):
       - dr1 BUG: the check before the run (plan mode) sat 11 min on an Approve for Qanuvi's own memory_search
