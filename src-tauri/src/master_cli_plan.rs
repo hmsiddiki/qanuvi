@@ -161,6 +161,12 @@ pub fn start_from(
     let o = &mut kept["options"];
     o["fromLine"] = json!(0);
     o["onlyOne"] = json!(false);
+    // lr1: what the last run's check settled belongs to that plan's steps (by number): never carried into this run
+    // (a held "step 2" of another plan held this plan's step 2). This plan's own check adds its own.
+    if let Some(m) = o.as_object_mut() {
+        m.remove("waitBefore");
+        m.remove("extraChecks");
+    }
     match steps.map(str::trim).filter(|s| !s.is_empty()) {
         Some(s) => o["ranges"] = json!(s),
         None => {
@@ -169,9 +175,8 @@ pub fn start_from(
             }
         }
     }
-    if let Some(b) = budget {
-        o["budgetUsd"] = json!(b);
-    }
+    // lr1: the budget is this run's: the one typed here, else none (not the last run's, made for another plan).
+    o["budgetUsd"] = json!(budget.unwrap_or(0.0));
     kept
 }
 
@@ -747,7 +752,9 @@ mod tests {
     fn a_kept_start_becomes_this_runs() {
         let kept = json!({
             "projectName": "Old", "file": "OLD.md", "providerName": "Test Agent",
-            "options": {"fromLine": 40, "onlyOne": true, "ranges": "3", "mode": "acceptEdits", "budgetUsd": 1.0},
+            "options": {"fromLine": 40, "onlyOne": true, "ranges": "3", "mode": "acceptEdits", "budgetUsd": 1.0,
+                        "waitBefore": [{"step": "2", "why": "another plan's end check"}],
+                        "extraChecks": [{"step": "1", "why": "x"}]},
             "resume": {"sessionId": "s"}
         });
         let s = start_from(kept.clone(), "Shop", "docs/PLAN.md", None, None);
@@ -757,8 +764,15 @@ mod tests {
         assert_eq!(s["options"]["fromLine"], 0);
         assert_eq!(s["options"]["onlyOne"], false);
         assert!(s["options"].get("ranges").is_none());
+        // lr1: the last run's holds, extra checks and budget belong to that run, not this one.
+        assert!(s["options"].get("waitBefore").is_none());
+        assert!(s["options"].get("extraChecks").is_none());
         assert_eq!(
             setup_line(&s),
+            "Agent Test Agent, Edit automatically mode, budget none."
+        );
+        assert_eq!(
+            setup_line(&start_from(kept.clone(), "Shop", "P.md", None, Some(1.0))),
             "Agent Test Agent, Edit automatically mode, budget $1.00."
         );
         let s = start_from(kept, "Shop", "P.md", Some(" 2-6 "), Some(0.0));
