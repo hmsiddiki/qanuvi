@@ -204,7 +204,7 @@ mod tests {
         assert!(!asks_secret("it changes the date format"));
         let q = hold_form(
             HeldKind::Hold,
-            "a question was left open (May the run use the Claude login already on this computer?)",
+            "a question was left open (May the run use the agent login already on this computer?)",
         );
         assert_eq!(
             q.secret, None,
