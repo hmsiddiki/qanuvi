@@ -1900,7 +1900,16 @@ runs on or off; with it off nothing is sent anywhere.
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
     PICKUP POINT (newest, 2026-11-23 after Y9): Y9 done with the result above. y9-1..y9-7 fixed, pushed,
-      unpublished. OWNER AGREED lessons (a)-(c) (2026-11-23). Next, in a fresh session: write (a)-(c) in detail in docs/PLAN-24Y.md and build them, drive y9-7 in a window, then 0.1.45 (ask).
+      unpublished. OWNER AGREED lessons (a)-(c) (2026-11-23). OWNER POINT (d): the check before the run must find needs far better than the
+      runner finds them while running, so a long run needs the owner only when it is truly urgent. PROPOSED (waiting
+      for the owner's yes): d1 never-list forecast (a step that deletes/pushes/installs is found and asked once
+      before; the answer becomes a per-step rule; Y9 step 21 would not have held); d2 eyes forecast (live drives,
+      dialogs, VPS: do at the end together, skip, or give the run a way); d3 the real end-to-end check named before
+      the run (lesson b); d4 deferrals ("later", "until step N") must point to a step that covers them; d5 resources
+      probed read-only (tools on PATH, hosts, secrets, test build, memory), not only read; d6 deeper pass with the
+      strongest model reading the files steps touch; d7 every runtime hold asks "could the check have found it",
+      kept as a fact for later checks. Measure: the check again on the Y9 plan must foresee step 21 and the R5
+      eyes items. Next, in a fresh session: write (a)-(c) in detail in docs/PLAN-24Y.md and build them, drive y9-7 in a window, then 0.1.45 (ask).
       The laptop's scratch copy and its plan-24z-a branch stay as they are for reference.
     PICKUP POINT (before, 2026-11-23 after 0.1.44): owner updates both machines,
       then Y9 benchmark on the laptop (R1-R5 plan on a scratch copy of Qanuvi from the commit before R1, watched
