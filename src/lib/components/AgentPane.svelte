@@ -49,6 +49,7 @@
     formatCost,
     formatTokens,
     looksLikeCall,
+    settleTools,
     timelineRows,
     type Item,
     type Row,
@@ -303,7 +304,11 @@
   /** The conversation as timeline rows: look-around steps grouped, long runs folded. */
   let rows = $derived(
     timelineRows(
-      waitingMsgs.length ? agent.items.filter((i) => !(i.kind === "user" && waitingMsgs.includes(i))) : agent.items,
+      waitingMsgs.length
+        ? agent.items.filter((i) => !(i.kind === "user" && waitingMsgs.includes(i)))
+        : running || !session
+          ? agent.items
+          : settleTools(agent.items),
     ),
   );
 

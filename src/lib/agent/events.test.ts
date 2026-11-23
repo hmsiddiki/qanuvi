@@ -11,6 +11,8 @@ import {
   itemsToMarkdown,
   reduceAll,
   resultImage,
+  settleTools,
+  ENDED_UNFINISHED,
   shortToolName,
   toolSummary,
 } from "./events";
@@ -557,5 +559,32 @@ describe("thinking as it is written", () => {
       JSON.stringify({ type: "assistant", message: { content: [{ type: "thinking", thinking: "First the tests." }] } }),
     ]);
     expect(items).toEqual([{ kind: "thinking", id: "th1.0", text: "First the tests." }]);
+  });
+});
+
+describe("a step left open when its session ended", () => {
+  const use = JSON.stringify({
+    type: "assistant",
+    message: { content: [{ type: "tool_use", id: "m1", name: "mcp__qanuvi__memory_search", input: { query: "x" } }] },
+  });
+  const open = reduceAll([use]);
+
+  it("is running while the session runs", () => {
+    expect(open[0]).toMatchObject({ kind: "tool", state: "running" });
+  });
+
+  it("shows as ended, not running, once the session stopped with no result", () => {
+    expect(settleTools(open)[0]).toMatchObject({ kind: "tool", state: "stopped", result: ENDED_UNFINISHED });
+  });
+
+  it("leaves finished steps alone", () => {
+    const done = reduceAll([
+      use,
+      JSON.stringify({
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "m1", content: "found" }] },
+      }),
+    ]);
+    expect(settleTools(done)).toBe(done);
   });
 });

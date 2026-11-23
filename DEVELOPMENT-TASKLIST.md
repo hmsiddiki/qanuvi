@@ -1899,7 +1899,12 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24 after 0.1.47): 0.1.47 PUBLISHED tag v0.1.47 (owner "publish anyway"; e2e1 +
+    sp1 FIXED (2026-11-24, both machines checked on 0.1.47 first): the stale tool-row spinner. A step's row left the
+      running state only on its tool result, the turn's end or an interrupt; the check before the run is stopped once
+      it answers, so a row it left open spun with a growing timer for good. The agent pane now shows rows still running
+      in a session that no longer runs (not running/waiting) as ended: "Not finished: the session ended first"
+      (events.ts settleTools). Window 579, svelte-check, prettier clean. Unpublished, not driven in a window.
+    PICKUP POINT (before, 2026-11-24 after 0.1.47): 0.1.47 PUBLISHED tag v0.1.47 (owner "publish anyway"; e2e1 +
       dr1-dr4; backup channel-before-0.1.47; all 8 files online, 200). Owner updates This PC and the laptop. Next, in a
       fresh session: the proposals (skipped real end-to-end check on the look-at list, half-orange mark, folder on
       same-named projects), the stale tool-row spinner, then stable Win+Linux.

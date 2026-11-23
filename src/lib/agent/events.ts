@@ -489,6 +489,20 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
   return out;
 }
 
+/** A step whose session ended before its result came (stopped, closed, ended with no turn end). */
+export const ENDED_UNFINISHED = "Not finished: the session ended first";
+
+/**
+ * Steps still "running" in a session that no longer runs: shown as ended, not with a spinner and a growing timer
+ * (the check before the run is stopped once it answers, so a step it left open had no result or turn end).
+ */
+export function settleTools(items: Item[]): Item[] {
+  if (!items.some((x) => x.kind === "tool" && x.state === "running")) return items;
+  return items.map((x) =>
+    x.kind === "tool" && x.state === "running" ? { ...x, state: "stopped", result: ENDED_UNFINISHED } : x,
+  );
+}
+
 export function reduceAll(lines: string[], times: number[] = []): Item[] {
   return lines.reduce<Item[]>((items, line, i) => reduce(items, line, i, times[i] ?? 0), []);
 }
