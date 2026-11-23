@@ -173,7 +173,7 @@ pub fn show_lines(n: usize, item: &Value, now: i64) -> Vec<String> {
         out.extend(text.lines().map(|l| format!("   {l}")));
     }
     match tag(item) {
-        "needs your answer" => {
+        "needs your answer" | "to look at" => {
             out.push(String::new());
             if item["form"]["secret"] == true {
                 out.push("   This asks for a login or password. Type it in the run panel of the plan in a Qanuvi".into());
@@ -237,7 +237,7 @@ pub fn show_lines(n: usize, item: &Value, now: i64) -> Vec<String> {
 /// The answer a typed choice and text make, or why it cannot be given.
 pub fn answer_of(item: &Value, choice: &str, text: &str) -> Result<Value, String> {
     match tag(item) {
-        "needs your answer" => {}
+        "needs your answer" | "to look at" => {}
         "answered" => return Err("This question is already answered.".into()),
         "no longer asked" => return Err("This question is no longer asked.".into()),
         _ => return Err("This item is a note, not a question; nothing to answer.".into()),
@@ -412,6 +412,24 @@ mod tests {
             answer_of(&note("x"), "go", "")
                 .unwrap_err()
                 .contains("note")
+        );
+    }
+
+    /// A plan's list to look at is answered from a terminal as in the window: "All fine", or words for a new step.
+    #[test]
+    fn a_list_to_look_at_is_answered_and_shows_its_choices() {
+        let list = json!({"id": "r1", "at": 0, "type": "answer", "status": "open", "read": false,
+            "title": "proj: 2 things to look at from PLAN.md",
+            "source": {"kind": "review", "entries": []},
+            "form": {"choices": [{"id": "ok", "label": "All fine", "hint": "Closes this list"}],
+                     "text": "Or say what to change"}});
+        assert_eq!(tag(&list), "to look at");
+        assert_eq!(answer_of(&list, "ok", "").unwrap()["choice"], "ok");
+        assert_eq!(answer_of(&list, "All fine", "").unwrap()["choice"], "ok");
+        let shown = show_lines(2, &list, 0).join("\n");
+        assert!(
+            shown.contains("All fine") && shown.contains("inbox answer 2 ok"),
+            "{shown}"
         );
     }
 

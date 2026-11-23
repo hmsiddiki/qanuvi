@@ -3492,7 +3492,8 @@ fn a_skipped_end_to_end_check_goes_on_the_list_to_look_at_and_the_run_needs_you(
     let r = running.wait();
     assert_eq!(r.status, RunStatus::NeedsYou, "{}", r.message);
     assert!(
-        r.message.contains("the work was not proven for real"),
+        r.message
+            .contains("you skipped the real end-to-end check, so the work is not proven for real"),
         "{}",
         r.message
     );

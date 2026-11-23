@@ -243,7 +243,7 @@
             >
               <span class="kind" style:background={style.color}>{style.label.slice(0, 1)}</span>
               <span class="project-name"
-                >{p.name}{#if projects.hint(p)}<span class="project-hint"> · {projects.hint(p)}</span>{/if}</span
+                >{p.name}{#if projects.hint(p)}<span class="project-hint">{` · ${projects.hint(p)}`}</span>{/if}</span
               >
               {#if p.master}<span class="remote" title="On a server"><Server size={11} /></span>{/if}
               {#if windows.windowOf(p.id)}<span class="elsewhere" title="Open in another window (click to go there)"

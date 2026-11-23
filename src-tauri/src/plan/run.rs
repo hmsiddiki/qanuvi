@@ -4557,20 +4557,32 @@ impl<'a> Loop<'a> {
             // needs them.
             if end_status(&self.run.steps) != RunStatus::NeedsYou && !self.left_open.is_empty() {
                 // Y10 (a): promised work no step did, or the real end-to-end check skipped: not "finished".
-                let what = if self
+                // The skipped end check is named in a few words (its command is on the list); work left over in full.
+                let later: Vec<&str> = self
                     .left_open
                     .iter()
-                    .all(|w| w.starts_with(SKIPPED_END_CHECK))
-                {
-                    "the work was not proven for real"
-                } else {
-                    "work was left for later that no step did"
-                };
+                    .filter(|w| !w.starts_with(SKIPPED_END_CHECK))
+                    .map(String::as_str)
+                    .collect();
+                let skipped = later.len() < self.left_open.len();
+                let mut why = Vec::new();
+                if skipped {
+                    why.push(
+                        "you skipped the real end-to-end check, so the work is not proven for real"
+                            .to_string(),
+                    );
+                }
+                if !later.is_empty() {
+                    why.push(format!(
+                        "work was left for later that no step did ({})",
+                        later.join("; ")
+                    ));
+                }
                 let m = format!(
-                    "Ended here: {}. Not finished: {what} ({}). It is on the list to look at in the Inbox: say there \
-                     what to do, and your words become a new step.",
+                    "Ended here: {}. Not finished: {}. It is on the list to look at in the Inbox: say there what to \
+                     do, and your words become a new step.",
                     run_summary(&self.run.steps),
-                    self.left_open.join("; ")
+                    why.join("; and ")
                 );
                 self.finish(RunStatus::NeedsYou, &m);
             } else if end_status(&self.run.steps) == RunStatus::NeedsYou {

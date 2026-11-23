@@ -582,8 +582,8 @@
                 title={doneOpen(section.steps)
                   ? `${doneOpen(section.steps)} of the done steps have things open (see the Inbox list to look at)`
                   : undefined}
-                >{finished}/{total}{#if doneOpen(section.steps)}<span class="open-count">
-                    · {doneOpen(section.steps)} with things open</span
+                >{finished}/{total}{#if doneOpen(section.steps)}<span class="open-count"
+                    >{` · ${doneOpen(section.steps)} with things open`}</span
                   >{/if}</span
               >
             </h3>

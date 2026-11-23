@@ -94,6 +94,56 @@ fn kept_start(dir: &Path, project_id: &str) -> Result<Value, String> {
     }
 }
 
+/// The project's name, with the folder that tells it apart when another project has the same name ("proj (ho1)"),
+/// as the window shows it (pn1).
+pub fn shown_name(list: &[Value], id: &str) -> String {
+    let name_of = |p: &Value| p["name"].as_str().unwrap_or("").to_string();
+    let parents = |p: &Value| -> Vec<String> {
+        let path = p["path"].as_str().unwrap_or("").replace('\\', "/");
+        let mut parts: Vec<String> = path
+            .trim_end_matches('/')
+            .split('/')
+            .filter(|x| !x.is_empty())
+            .map(String::from)
+            .collect();
+        parts.pop();
+        parts
+    };
+    let Some(me) = list.iter().find(|p| p["id"].as_str() == Some(id)) else {
+        return String::new();
+    };
+    let name = name_of(me);
+    let others: Vec<Vec<String>> = list
+        .iter()
+        .filter(|p| p["id"].as_str() != Some(id) && name_of(p).eq_ignore_ascii_case(&name))
+        .map(parents)
+        .collect();
+    if others.is_empty() {
+        return name;
+    }
+    let mine = parents(me);
+    let end = |u: &[String], n: usize| u[u.len().saturating_sub(n)..].join("/");
+    let most = others
+        .iter()
+        .map(Vec::len)
+        .chain([mine.len()])
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    let mut hint = String::new();
+    for depth in 1..=most {
+        hint = end(&mine, depth);
+        if !others.iter().any(|o| end(o, depth) == hint) {
+            break;
+        }
+    }
+    if hint.is_empty() {
+        name
+    } else {
+        format!("{name} ({hint})")
+    }
+}
+
 /// A kept start made into this run's: the new plan file, all open steps (or `steps`), no resume, `budget` if given.
 pub fn start_from(
     mut kept: Value,
@@ -544,6 +594,8 @@ pub fn plan_cli(dir: &Path, args: &[String]) -> Result<(), String> {
             let (p, rel) = owning_project(&list, &file.to_string_lossy())?;
             let name = p["name"].as_str().unwrap_or("").to_string();
             let id = p["id"].as_str().unwrap_or("").to_string();
+            // pn1: "proj (ho1)" in the run's Inbox titles when another project has the same name.
+            let shown = shown_name(&list, &id);
             if list_of(call(dir, "plan_run_active", json!({}))?)
                 .iter()
                 .any(|a| *a == id.as_str())
@@ -554,7 +606,7 @@ pub fn plan_cli(dir: &Path, args: &[String]) -> Result<(), String> {
             }
             let start = start_from(
                 kept_start(dir, &id)?,
-                &name,
+                &shown,
                 &rel,
                 flag(args, "--steps"),
                 budget,
@@ -673,6 +725,22 @@ mod tests {
             let (p, _) = owning_project(&l, "E:\\Work\\shop\\PLAN-F.md").unwrap();
             assert_eq!(p["id"], "a");
         }
+    }
+
+    /// pn1: a run started from a terminal names its project as the window does when two share a name.
+    #[test]
+    fn same_named_projects_get_their_folder_in_the_run_name() {
+        let list = [
+            json!({"id": "a", "name": "proj", "path": "/home/u/qc-scratch/ho1/proj"}),
+            json!({"id": "b", "name": "proj", "path": "/home/u/qc-scratch/e2e1/proj"}),
+            json!({"id": "c", "name": "site", "path": "C:\\work\\site"}),
+            json!({"id": "d", "name": "app", "path": "C:\\w\\one\\src\\app"}),
+            json!({"id": "e", "name": "App", "path": "C:\\w\\two\\src\\app"}),
+        ];
+        assert_eq!(shown_name(&list, "a"), "proj (ho1)");
+        assert_eq!(shown_name(&list, "b"), "proj (e2e1)");
+        assert_eq!(shown_name(&list, "c"), "site");
+        assert_eq!(shown_name(&list, "d"), "app (one/src)");
     }
 
     #[test]
