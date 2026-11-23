@@ -76,7 +76,10 @@ pub fn sentence_start(why: &str) -> String {
 pub fn hold_form(kind: HeldKind, why: &str) -> HoldForm {
     // A question the check left open is never a login: the check asks for those apart (its secrets), so words like
     // "the login already on this computer" in a question do not lock it out of the Inbox and the terminal.
-    let secret = !why.starts_with(super::preflight::OPEN_QUESTION) && asks_secret(why);
+    // The real end-to-end check is the owner's own call: never a login, never "Let Qanuvi decide".
+    let end_to_end = why.starts_with(super::preflight::END_TO_END);
+    let secret =
+        !why.starts_with(super::preflight::OPEN_QUESTION) && !end_to_end && asks_secret(why);
     let hold = kind == HeldKind::Hold;
     let choice = |id, label: &str, hint: Option<&str>| FormChoice {
         id,
@@ -88,7 +91,7 @@ pub fn hold_form(kind: HeldKind, why: &str) -> HoldForm {
         if hold { "Go ahead" } else { "Try again" },
         None,
     )];
-    if hold && !secret {
+    if hold && !secret && !end_to_end {
         choices.push(choice(
             AnswerChoice::Decide,
             "Let Qanuvi decide",

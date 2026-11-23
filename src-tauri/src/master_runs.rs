@@ -353,6 +353,16 @@ impl Master {
                         holds.push(h);
                     }
                 }
+                // The real end-to-end check the run rules refuse waits for the owner (shown on the card first).
+                if let Some(h) = crate::plan::check_more::end_check_hold(
+                    &env,
+                    &found,
+                    &steps,
+                    &s(args, "mode"),
+                    plan_rules.as_ref(),
+                ) {
+                    crate::plan::check_more::add_end_check_hold(&mut holds, h);
+                }
                 // Shown on the card first (apply false: only tried), kept once the owner starts.
                 let applied = if args["apply"].as_bool() == Some(false) {
                     crate::plan::check_more::Applied::default()

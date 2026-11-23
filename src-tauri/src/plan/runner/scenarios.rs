@@ -3369,7 +3369,7 @@ fn y10_an_end_check_the_rules_refuse_is_not_dropped_unseen() {
         }
     });
     let setup = crate::plan::run::test_setup(FILE, options());
-    crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    let checked = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
     assert!(!env.text(FILE).contains("- Check:"));
     let notes = env.plan_data_get(FILE, Kind::Notes).unwrap().to_string();
     assert!(
@@ -3377,8 +3377,81 @@ fn y10_an_end_check_the_rules_refuse_is_not_dropped_unseen() {
         "{notes}"
     );
     assert!(
-        notes.contains("Settled before the run: The real end check"),
+        notes.contains("Settled before the run: The real end check")
+            && notes.contains("waits for your answer before it runs"),
         "{notes}"
+    );
+    // Never a recommended skip: the closing step waits for the owner, the question asked before the run.
+    let hold = checked
+        .wait_before
+        .iter()
+        .find(|h| h.step == "2")
+        .expect("step 2 waits for the owner");
+    assert!(hold.why.starts_with(preflight::END_TO_END), "{}", hold.why);
+    assert!(
+        hold.why.contains(refused) && hold.why.contains("Skip this step"),
+        "{}",
+        hold.why
+    );
+    assert!(!checked.wait_before.iter().any(|h| h.step == "1"));
+}
+
+/// The real end-to-end check's hold is the owner's own call: nobody answering never decides it, and its answer form
+/// has no "Let Qanuvi decide"; the other steps run, the run waits, and the owner's Go ahead lets the step run.
+#[test]
+fn an_end_to_end_check_the_rules_refuse_waits_for_the_owner_and_is_never_decided_by_itself() {
+    let env = world("# Plan\n\n- [ ] **1. Build it**\n- [ ] **2. The whole check**\n");
+    env.set_agent(|c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        let n = step_of(c.prompt, &["1", "2"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            answer_wait_minutes: Some(0.001),
+            wait_before: Some(vec![StepWhy {
+                step: "2".into(),
+                why: format!(
+                    "{}: the plan's work is only proven when it is used for real, `make run-demo`",
+                    preflight::END_TO_END
+                ),
+            }]),
+            ..options()
+        },
+        stop_button(),
+    );
+    wait_until("step 2's question never came", &|| {
+        open_question(&env).is_some()
+    });
+    let q = open_question(&env).unwrap();
+    assert!(q.title.contains("2. The whole check"), "{}", q.title);
+    let form = q.form.clone().unwrap_or_default().to_string();
+    assert!(
+        form.contains("Go ahead") && form.contains("Skip this step"),
+        "{form}"
+    );
+    assert!(!form.contains("Let Qanuvi decide"), "{form}");
+    // Far past the (tiny) answer wait: still the owner's, nothing decided for them.
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(
+        !env.inbox()
+            .iter()
+            .any(|i| i.title.ends_with("decided with no answer"))
+    );
+    assert!(open_question(&env).is_some(), "the question is still open");
+    env.answer(q.key.as_deref().unwrap(), json!({"choice": "go"}));
+    let r = running.wait();
+    let st: Vec<_> = statuses(&r);
+    assert!(
+        st.contains(&(Some("1".into()), RunStepStatus::Done))
+            && st.contains(&(Some("2".into()), RunStepStatus::Done)),
+        "{st:?}"
     );
 }
 

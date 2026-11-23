@@ -73,6 +73,7 @@
     settleCheck,
     typedAnswers,
     withReadHolds,
+    END_TO_END,
     type AnswerReading,
     type AskSort,
     type OtherProject,
@@ -725,8 +726,12 @@
     const extra = await api.planRun
       .checkSettle(project.id, file, checkAnswer, riskyChoice, mode, firstStep, true)
       .catch(() => null);
-    for (const h of extra?.holds ?? [])
-      if (!read.holds.some((x) => x.step === h.step)) read.holds.push({ step: h.step, why: h.why, by: "default" });
+    for (const h of extra?.holds ?? []) {
+      const had = read.holds.find((x) => x.step === h.step);
+      // The real end-to-end check the run rules refuse is the owner's own call: its hold leads, the other reason after.
+      if (had && h.why.startsWith(END_TO_END)) had.why = `${h.why}; also ${had.why}`;
+      else if (!had) read.holds.push({ step: h.step, why: h.why, by: "default" });
+    }
     const settled = withReadHolds(
       settleCheck(c, read.answers, read.answersTouched, riskyChoice, riskyTouched),
       read.holds.filter((h) => h.step),

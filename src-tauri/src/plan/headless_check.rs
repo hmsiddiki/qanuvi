@@ -309,6 +309,12 @@ pub fn check_before_run(env: &dyn RunEnv, setup: &RunSetup) -> Result<Checked, S
             settled.holds.push(h);
         }
     }
+    // The real end-to-end check the run rules refuse: the owner answers it, never a recommended skip.
+    if let Some(h) =
+        super::check_more::end_check_hold(env, &found, &steps, &o.mode, plan_rules.as_ref())
+    {
+        super::check_more::add_end_check_hold(&mut settled.holds, h);
+    }
     // Y10 d1-d4: grants, eyes, the end check and promises.
     let applied = super::check_more::apply(env, &file, &found, &risk, &o.mode, plan_rules.as_ref());
     notes.extend(applied.notes.iter().cloned());

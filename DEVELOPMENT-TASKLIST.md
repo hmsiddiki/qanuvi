@@ -1899,7 +1899,19 @@ runs on or off; with it off nothing is sent anywhere.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-23 23:30, real-agent drive): the Y10-built runner RUNS A REAL PLAN END TO END.
+    PICKUP POINT (newest, 2026-11-23 after e2e1): e2e1 BUILT (owner agreed, unpublished, not driven in a window):
+      the real end-to-end check the run rules refuse is the OWNER'S question, never a recommended skip. The check
+      (headless check_before_run and the window's plan_run_check_settle, so the card shows it before Start) holds the
+      closing step with a plain question starting preflight::END_TO_END: what the check is, Go ahead (prove it another
+      way the rules allow, or write what is unproven), Skip this step (the real check stays the owner's), or add the
+      command to the run rules first. Never decided after answerWaitMinutes (y10-3 decides only OPEN_QUESTION holds),
+      no "Let Qanuvi decide" on its form, never read as a login; it leads a step held for something else (the other
+      reason kept after it, Rust add_end_check_hold, window RunPanel the same). Check prompt (TS + Rust, compare
+      snapshot updated): using the real thing end to end is never eyes "skip". Tests: Rust 666 (new
+      an_end_to_end_check_the_rules_refuse_waits_for_the_owner_..., the_end_to_end_hold_leads_..., y10 end-check
+      scenario asserts the hold), window 575, svelte-check, prettier, fmt clean. Next: drive it (a scratch plan whose
+      end check the rules refuse, see the card and the Inbox form), then 0.1.47 (ask), then the proposals.
+    PICKUP POINT (before, 2026-11-23 23:30, real-agent drive): the Y10-built runner RUNS A REAL PLAN END TO END.
       Laptop: old ~/src/qanuvi target/debug (38 GB) deleted (owner yes), y10 tree's qanuvi-master rebuilt, a
       two-step scratch plan (~/qc-scratch/drive1: greet.sh, then test.sh, Needs: 1) run through `--stdio`
       plan_run_start on its own data folder with the real Claude Code agent (sonnet, Auto): "2 done" in 15 s, $0.095,

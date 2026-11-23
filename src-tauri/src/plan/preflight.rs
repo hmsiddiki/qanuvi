@@ -192,7 +192,7 @@ const CHECK_MORE: &[&str] = &[
     "eyes: every check a person must look at or that needs a live drive (a window, a tray icon, a dialog, another",
     r#"machine). "do": "run" when the run can do it itself with what exists here (a test build, a script, a command; say"#,
     r#"how), "end" when only a person can judge it (it goes on the owner's list to look at after the run), "skip" when"#,
-    "it is not worth doing.",
+    "it is not worth doing. Using the plan's real thing end to end is never eyes \"skip\": it is the endCheck.",
     "endCheck: when the plan builds something that runs (an app, a server, a runner), one command that uses the real",
     "thing end to end as a user would after the last step (for a plan runner: run a small plan with the real agent and",
     "check that it finished), never only that it starts and never with stand-ins or fakes; else null. It must be a",
@@ -584,6 +584,9 @@ pub fn decided_note(d: &DecidedForYou) -> String {
 /// decision, not theirs).
 /// How a hold for a question the check left open starts (Qanuvi decides it after a while with no answer).
 pub const OPEN_QUESTION: &str = "a question was left open";
+/// How the hold for a real end-to-end check the run rules refuse starts: only the owner answers it (never decided
+/// after a wait, no "Let Qanuvi decide").
+pub const END_TO_END: &str = "the real end-to-end check needs your answer";
 
 pub fn settle_check(
     check: &Preflight,

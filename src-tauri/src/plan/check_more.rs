@@ -196,6 +196,59 @@ pub fn probe_test_build(
         .collect()
 }
 
+/// The real end-to-end check the run rules refuse: its step waits for the owner before the run reaches it, with a
+/// plain question. Never a recommended skip: it is not decided after a wait and has no "Let Qanuvi decide".
+pub fn end_check_hold(
+    env: &dyn RunEnv,
+    found: &Preflight,
+    steps: &[Step],
+    mode: &str,
+    plan_rules: Option<&crate::run_rules::RunRules>,
+) -> Option<Hold> {
+    let ec = found.end_check.as_ref()?;
+    let command = ec.check.trim().trim_matches('`');
+    if command.is_empty()
+        || matches!(
+            env.rules_verdict(command, plan_rules, mode),
+            crate::run_rules::Verdict::Allow
+        )
+    {
+        return None;
+    }
+    let s = find_step(steps, &ec.step)
+        .filter(|s| open(s))
+        .or_else(|| steps.iter().rfind(|s| open(s)))?;
+    let why = if ec.why.trim().is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", ec.why.trim().trim_end_matches('.'))
+    };
+    Some(Hold {
+        step: super::planstate::step_key(s.number.as_deref(), &s.title),
+        why: format!(
+            "{}: the plan's work is only proven when it is used for real, `{command}`{why}, and the run rules do not \
+             let a run use that command. Go ahead: the step proves it another way the rules allow, or writes under \
+             the step what is still unproven. Skip this step: it is left out and the real check stays yours to do. \
+             To let the run use the command itself, add it to the run rules (May also run without asking) first.",
+            super::preflight::END_TO_END
+        ),
+        by: HoldBy::Default,
+    })
+}
+
+/// Puts the end-to-end hold in: a step already held for something else keeps that reason after it, so the hold
+/// still starts as the end-to-end one (an open question alone would be decided after a wait).
+pub fn add_end_check_hold(holds: &mut Vec<Hold>, h: Hold) {
+    match holds.iter_mut().find(|x| x.step == h.step) {
+        Some(x) if x.why.starts_with(super::preflight::END_TO_END) => {}
+        Some(x) => {
+            x.why = format!("{}. Also: {}", h.why.trim_end_matches('.'), x.why);
+            x.by = h.by;
+        }
+        None => holds.push(h),
+    }
+}
+
 /// What `apply` did, for the notes and the "Decided for you" list.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Applied {
@@ -327,7 +380,7 @@ pub fn apply(
                 ));
                 out.said.push(format!(
                     "The real end check `{command}` was not added (the run rules do not let a run use it); step \
-                     {step} is told to prove it another way"
+                     {step} waits for your answer before it runs"
                 ));
             }
             _ => {}
@@ -516,6 +569,38 @@ pub fn step_prompt_part(details: &[String], eyes: &[&Eyes]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_end_to_end_hold_leads_a_step_held_for_something_else() {
+        let e2e = |s: &str| Hold {
+            step: s.into(),
+            why: format!("{}: use it for real.", super::super::preflight::END_TO_END),
+            by: HoldBy::Default,
+        };
+        let mut holds = vec![Hold {
+            step: "2".into(),
+            why: format!("{} (Which port?)", super::super::preflight::OPEN_QUESTION),
+            by: HoldBy::Default,
+        }];
+        add_end_check_hold(&mut holds, e2e("2"));
+        add_end_check_hold(&mut holds, e2e("2"));
+        add_end_check_hold(&mut holds, e2e("3"));
+        assert_eq!(holds.len(), 2);
+        assert!(
+            holds[0]
+                .why
+                .starts_with(super::super::preflight::END_TO_END)
+        );
+        assert!(
+            holds[0]
+                .why
+                .ends_with("Also: a question was left open (Which port?)"),
+            "{}",
+            holds[0].why
+        );
+        assert_eq!(holds[0].why.matches("for real").count(), 1);
+        assert_eq!(holds[1].step, "3");
+    }
 
     #[test]
     fn reads_left_for_later_lines() {
