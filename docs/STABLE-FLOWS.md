@@ -24,26 +24,26 @@ A row is green only when both systems pass.
 | 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | pass (hand-over not driven) |
 | 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | - | pass |
 | 10 | Message while the agent works | taken as a chat, not a restart | - | pass after f6 |
-| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | - | - |
-| 12 | Write a plan with the planner | plan file made, steps readable | - | - |
-| 13 | Check before the run | card lists needs plainly; answers kept | - | - |
-| 14 | Plan run, two steps, real agent | both done, honest end line, report | - | - |
-| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | - | - |
-| 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | - |
-| 17 | Stop, pause, resume a run | each says what happened; nothing lost | - | - |
-| 18 | Queue | add, reorder, next task starts after a run ends | - | - |
-| 19 | Close to tray and open again | runs go on; window comes back to the same place | - | - |
-| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | - |
+| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | - | pass |
+| 12 | Write a plan with the planner | plan file made, steps readable | - | pass after f8 |
+| 13 | Check before the run | card lists needs plainly; answers kept | - | pass (s8) |
+| 14 | Plan run, two steps, real agent | both done, honest end line, report | - | pass |
+| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | - | pass |
+| 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | pass |
+| 17 | Stop, pause, resume a run | each says what happened; nothing lost | - | pass after f9-f11 (s9) |
+| 18 | Queue | add, reorder, next task starts after a run ends | - | not built (R3 open) |
+| 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
+| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" not built (s10) |
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | - |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | - |
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | - |
 | 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | - |
 | 26 | Sleep and wake | links, runs and terminals come back | - | - |
-| 27 | Preview and live watch | preview address opens; live mirror on request | - | - |
+| 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
 | 28 | Backups and data folder | daily backup made; restore of one table on scratch data | - | - |
 | 29 | Settings | every page opens, scrolls, saves; Save always reachable | - | - |
-| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | - | - |
+| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | - | pass (s11) |
 | 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | - |
 | 32 | Go back one version | previous build installs over; data intact | - | - |
 
@@ -87,3 +87,42 @@ correctly, $0. The hand-over when a model rests could not be caused on purpose (
 driven: with the terminal maximised, Ctrl+P → util.ts brought the editor back.
 - s6: a plain question ("Read ... and tell me ...") was labelled "A change:" when the model was picked; it should
   read as a question.
+
+## Linux, flows 11-20, 27, 30 (2026-11-25, laptop, release test builds of a3c6c54, then b450604 + 600accc)
+
+Same set-up as the first pass (own data root, scratch ~/qc-scratch/st1/proj). Paid agent Claude Code: Sonnet for chat
+and the planner, Haiku for the steps, Fable for the check; about $0.90 in all. Step 4a went to the free Qanuvi agent
+(team "paid decides, free works").
+
+Fixed during the pass (driven again on the rebuilt window unless noted):
+- f8: "Ask the agent to write one" wrote DEVELOPMENT-TASKLIST.md, but the Plan panel kept saying "No task list" until
+  Refresh. With no plan found, the panel now looks again whenever a chat of the project stops working. (Built, not
+  driven: the scratch project already has its plan.)
+- f9: a pause that landed while the agent was ticking its step off said "Paused in step 4a · This run: 0 of 1 done"
+  with the step done in the file. The step now counts, and the run pauses after it. Scenario test; not caught live
+  again (it needs the pause in the last seconds of a step).
+- f10: step model boxes showed raw ids ("claude-haiku-5-5") once a step chat on the free agent was shown: they listed
+  the chat's agent's models, not the run's.
+- f11: Resume right after a live pause began a new step session (the kept session was only picked up after a restart
+  or another plan shown). Driven: step 10 paused mid-step, Resume went on in the same session.
+- f12: the tray's "Open Qanuvi" did nothing after the program files were replaced under a running master (rebuild;
+  the same happens on a package upgrade or update): Linux names the running program ".../qanuvi-master (deleted)" and
+  everything started from that path failed (the app, the Quit question, agent helpers). All callers now use the live
+  path. Driven: close the window, tray Open brings it back at the same place.
+
+Seen, not fixed (for ST2 or later):
+- s7: the left navigation keeps the last page lit (Memory, Plans) while a chat is shown.
+- s8: the check took a TypeScript compiler from another scratch project on the machine
+  (~/qc-scratch/y11/.../tsc) and the run's facts now depend on that folder; a project with no checker of its own gets
+  a borrowed one without saying it could go away.
+- s9: the free agent's step chat shows "Manual" while the run is in Auto (by design the run's rules answer its asks,
+  but the chip reads as if the user must approve). The header "Resume" opens the run settings, whose button then says
+  "Start". A headless browser a step opened (profile /tmp/qanuvi-browser-...) outlived the run and the master's Quit.
+- s10: Quit asks plainly ("stops 1 plan run ... can be resumed afterwards") and the next start shows "Stopped when
+  Qanuvi was quit. Resume goes on from here."; Resume finished the step in a new session. A "go on next time" choice
+  that resumes by itself is not built. The step chat kept "Waiting for the step's background command" after the quit.
+  Claude Code's own background command (sleep) outlived the quit until it ended.
+- s11: status bar: account opens its menu, cost opens Agents, the branch opens Changes, but the sidebar stays on Home,
+  so "Choose a file to see its changes" has no list beside it.
+- Flow 18 (queue) is R3, never built. Flows 21-26, 28, 29, 31, 32 are next; 24-26 and 31 need the owner (hotspot,
+  network off, sleep, a clean user account).
