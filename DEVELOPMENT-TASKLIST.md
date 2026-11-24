@@ -105,6 +105,16 @@ and ST1 has been driven again on the finished build.
     tray), one per PC; headless masters and servers never have one. This PC's assistant operates connected PCs,
     servers and VPSes through this PC's Qanuvi, as the window does (viewer). Sign-in needed (O1 f). Languages:
     English first, then Bangla; the user picks; 1-2 default voices plus the user's own trained voice.
+  - Owner 2026-11-24: any language the user selects, not a fixed few (listening: one multilingual speech model;
+    speaking: a voice file per language, delivered from qanuvi.com when chosen; English and Bangla are only the
+    first tested and tuned). Example flow: "Hey Qanuvi, ask the agent how many files are in this project": it
+    passes the task to the agent, tells the user in words what the agent answered, and takes follow-up questions
+    (asks the agent again or looks itself).
+- [ ] **O5. Web search for the assistant and the chat (owner, 2026-11-24)**: questions not about the project are
+  searched and researched on the web and answered with sources: a `web_search` + `web_read` tool for Qanuvi's own
+  agent, the chat and the assistant (paid agents that have their own search keep it). Search providers pluggable:
+  a free-tier search API with the user's key, a self-hosted search, or later a search through qanuvi.com for
+  signed-in users; the choice and its limits said plainly. Sign-in needed (O1 f).
 
 ## Stage 1: the app shell (first goal)
 
