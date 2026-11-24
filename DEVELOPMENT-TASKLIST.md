@@ -48,6 +48,60 @@ runs on or off; with it off nothing is sent anywhere.
 - Later: Rust relay service (axum, WebSockets), sign-in through a Qlopy site's OAuth 2.0 + PKCE, Ollama or llama.cpp for
   local models.
 
+## Before going online (owner, 2026-11-24): must be done before Qanuvi is released to the public
+
+Order agreed 2026-11-24: ST (stable Windows + Linux) runs first, in the background on the laptop; these items are
+planned in parts with the owner meanwhile, then built one at a time. Public release only when ST and O1-O4 are done
+and ST1 has been driven again on the finished build.
+
+- [ ] **ST. Stable Windows + Linux (owner agreed 2026-11-24, feature freeze while it runs)**: ST1 drive about 30
+  everyday flows on both systems into one pass/fail table (docs/STABLE-FLOWS.md); ST2 one fix round, then re-drive
+  only the failures, once; ST3 24 h unattended on both machines (long scratch plan, network change, sleep/wake;
+  memory, stuck processes, dead links, honest end); ST4 the known flaky tests made steady (kill_tree, shared data
+  folder, stray test browser); ST5 a whole update from a test channel on both, a fresh install for a new user, going
+  back one version. Windows drives in one block the owner gives off the PC; the laptop over SSH. Done: table green
+  on both, 24 h passes; then 0.1.49 (ask).
+- [ ] **O1. qanuvi.com online (owner, 2026-11-24)**: sign-in, sync and brain updates need the site live. Parts:
+  (a) the site deployed (Qlopy; owner's side: hosting, DNS, TLS) with Tokens/OAuth on, app `qanuvi-desktop`,
+  Google/Microsoft/GitHub sign-in (task 19's site list); (b) Qanuvi signs in against the real site, devices listed
+  under the account (M10 discovery + one-click pairing); (c) account memory (About me, Tools and models) synced
+  through the account, encrypted on the device, the site never reads it (task 18 "remote only"); (d) the brain's
+  updates (knowledge.json, model lists, setup guides, compression rules for O3) and the update channel move from
+  qlopy.top to qanuvi.com (the MOVE TO qanuvi.com note: three built-in addresses, one release that points there);
+  (e) relay kit and relay list served from qanuvi.com. Open question for the owner: when is the site ready, and is
+  its build the qanuvi-site folder?
+- [ ] **O2. A fresh install sets up free AI by itself, guided only where a person is needed (owner, 2026-11-24;
+  widens 24c, 24k, 24k2)**: on first start Qanuvi measures the machine and sets up, with one yes: OmniRoute (Node
+  first if missing; connections, keys, combos, health), OpenRouter (guided key: opens the page, waits, reads it
+  back, tests it), Free Claude Code (FCC, so Claude Code plan steps can run on free models), Ollama with a model
+  that fits (machine::room/fits); each one tested with a real call, the best free models ranked into the brain's
+  order; the user is only asked for what a person must do (a sign-in, a key, an admin prompt), each in plain words
+  with what it is for. Paid agents (Claude Code sign-in, c1) offered, never pushed. Same flow on Windows and Linux,
+  and on a master over the viewer. Done when a new user on a clean machine gets a working free agent with no
+  typing beyond sign-ins, on both systems.
+- [ ] **O3. Built-in compression in place of Headroom, kept current by Qanuvi's updates and memory (owner,
+  2026-11-24; this is 24v parts 1-2 + 24w, moved up)**: Rust, inside Qanuvi, no Python, tens of MB: part 1 in
+  Qanuvi's own agent (every provider), part 2 a small proxy per run or session for Claude Code and other outside
+  agents (never the global settings.json, ends with its owner). New: its rules (content types, what to keep) ship
+  with the brain's updates (O1 d), and it reads the project memory to keep what that project needs (error lines,
+  names the memory marks as important). Measured against Headroom (24w) until within about 10%; then the owner
+  decides whether Headroom goes.
+- [ ] **O4. A live voice assistant (owner, 2026-11-24; widens 23)**: a talking assistant that lives in the tray:
+  - V1 wake word: "Hey Qanuvi" heard while the tray icon is on, on this machine only (small local model, no audio
+    leaves the machine until woken); a clear sign when it listens; mute in the tray.
+  - V2 talk both ways: speech to text and text to speech in the user's language (local first, a provider when the
+    user picks one), interrupting it by speaking, long conversations kept awake by itself until the user is done or
+    goes quiet.
+  - V3 consult: it talks things through, asks before acting, answers from memory and the project.
+  - V4 drive Qanuvi: everything the window can do through the core (open projects, write and run plans, answer the
+    Inbox, start or stop runs, queue tasks, ask the agent to build something), said back in words.
+  - V5 drive the system for the user: open apps, files and settings, run commands, with the same run rules and
+    never-lists as plan runs (Auto = the user's trust; risky things asked in words).
+  - V6 its brain: simple things on its own with a small model; bigger ones through Qanuvi's free models, paid
+    models or both, as the user chooses (suggested, never forced).
+  - Same on Windows and Linux. Owner questions before V1: local-only voice or a provider allowed, and which
+    languages first.
+
 ## Stage 1: the app shell (first goal)
 
 - [-] **1. Project setup and an empty window** (started 2026-11-10)
