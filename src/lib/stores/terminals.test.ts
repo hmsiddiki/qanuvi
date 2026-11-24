@@ -65,6 +65,29 @@ describe("terminals per machine", () => {
     expect(invoke).toHaveBeenCalledWith(...onThisPc("term_kill", { id: "term-x" }));
     expect(t.tabs).toEqual([]);
   });
+
+  it("closing a shown tab stops its shell itself and is remembered for its screen", () => {
+    // ST1 (Linux): the screen's teardown saw the state from before the close, so the tab looked listed and the shell
+    // was parked (term_detach) and ran on. The close stops it, and the screen asks wasClosed, a plain record.
+    const t = new TerminalsStore();
+    invoke.mockClear();
+    switcher.shown = null;
+    t.open("pc-project");
+    t.open("pc-project");
+    const [shown, other] = t.tabs.map((x) => x.key);
+    t.started(shown, "term-s");
+    t.close(shown);
+    expect(invoke).toHaveBeenCalledWith(...onThisPc("term_kill", { id: "term-s" }));
+    expect(invoke).not.toHaveBeenCalledWith(...onThisPc("term_detach", { id: "term-s" }));
+    expect(t.wasClosed(shown)).toBe(true);
+    expect(t.wasClosed(other)).toBe(false);
+
+    // One that never started has nothing to stop yet (its screen stops it when its id comes).
+    invoke.mockClear();
+    t.close(other);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(t.wasClosed(other)).toBe(true);
+  });
 });
 
 // 24z3 step 3, f2: the shell picker lists the shown machine's shells, never This PC's while a server is shown.

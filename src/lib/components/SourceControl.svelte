@@ -86,11 +86,16 @@
     }
   }
 
+  // Another project: what was chosen in the last one is let go. Not when a copy first shows for the same project: the
+  // work area's copy mounts on the first click in the list, and clearing then lost that click's change (the diff said
+  // "Choose a file to see its changes").
   $effect(() => {
-    void project.id;
+    const id = project.id;
+    menu = "";
+    if (scmView.project === id) return;
+    scmView.project = id;
     scmView.selected = null;
     scmView.historyFor = null;
-    menu = "";
   });
 
   $effect(() => {
@@ -107,11 +112,12 @@
     try {
       const said = await action();
       if (said) notice = said;
-      gitState.touch();
     } catch (e) {
       error = errorText(e);
     } finally {
       busy = "";
+      // Also after a failure: a commit that failed may still have staged the files.
+      gitState.touch();
     }
   }
 
@@ -155,7 +161,10 @@
         cancelLabel: "Cancel",
       });
       if (!ok) return;
+      // The last action's error is not this one's (it stopped "Stage all and commit" before it began).
+      error = "";
       await api.git.stageAll(project.id).catch((e) => (error = errorText(e)));
+      gitState.touch();
       if (error) return;
     }
     await run("Committing…", async () => {
@@ -524,8 +533,10 @@
     min-height: 0;
   }
 
+  /* minmax(0, ...): the column follows the pane, never its widest row (in the narrow sidebar, Refresh, Commit and
+     error lines went past the edge). */
   .scm.single {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 1fr;
   }
 
@@ -541,7 +552,7 @@
   /* A narrow pane: the lists above, the diff below. */
   @container (max-width: 640px) {
     .scm {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       grid-template-rows: minmax(0, 45%) minmax(0, 1fr);
     }
 
@@ -562,6 +573,7 @@
   header {
     flex: none;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 2px;
     padding: 4px var(--qx-space-2);
@@ -746,6 +758,7 @@
 
   .error {
     color: var(--qx-status-failed);
+    overflow-wrap: anywhere;
   }
 
   .lists {

@@ -305,12 +305,26 @@ pub fn commit(dir: &Path, message: &str, amend: bool, all: bool) -> Result<Strin
         }
     }
     let out = if message.trim().is_empty() {
-        git(dir, &args)?
+        git(dir, &args)
     } else {
         args.extend(["-F", "-"]);
-        git_input(dir, &args, Some(message))?
-    };
+        git_input(dir, &args, Some(message))
+    }
+    .map_err(|e| identity_words(&e))?;
     Ok(out.lines().next().unwrap_or("").trim().to_string())
+}
+
+/// Git's "Author identity unknown" (a computer where git was never told a name and e-mail) in plain words; any other
+/// error as it is.
+fn identity_words(err: &str) -> String {
+    if err.contains("Author identity unknown") || err.contains("Please tell me who you are") {
+        "Git does not know your name and e-mail on this computer yet, so it cannot sign the commit. Set them once in a \
+         terminal: git config --global user.name \"Your Name\" and git config --global user.email you@example.com, \
+         then commit again. Your changes are staged and kept."
+            .into()
+    } else {
+        err.to_string()
+    }
 }
 
 /// Fetch, pull or push. Push sets the upstream the first time (to origin, under the same branch name).
@@ -635,6 +649,15 @@ pub fn blame(dir: &Path, rel: &str, line: u32) -> Result<Blame, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_git_identity_is_told_in_plain_words() {
+        let raw = "Author identity unknown\n\n*** Please tell me who you are.\n\nRun\n\n  git config --global user.email";
+        let said = identity_words(raw);
+        assert!(said.starts_with("Git does not know your name and e-mail"));
+        assert!(said.contains("git config --global user.name"));
+        assert_eq!(identity_words("nothing to commit"), "nothing to commit");
+    }
 
     #[test]
     fn reads_porcelain_status() {

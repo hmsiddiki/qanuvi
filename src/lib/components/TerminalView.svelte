@@ -228,6 +228,11 @@
         : api.term.spawn(projectId, shell, term.cols, term.rows, onEvent, dir ?? null)
       )
         .then((newId) => {
+          // Closed while it was starting: nothing will stop it later.
+          if (gone && (!tab || terminals.wasClosed(tab.key))) {
+            api.term.kill(newId).catch(() => {});
+            return;
+          }
           id = newId;
           if (tab) terminals.started(tab.key, newId);
           // Typed, pasted or answered while it was starting: sent now, in order.
@@ -258,8 +263,11 @@
     stopListening?.();
     // Only a closed tab (or the window going) stops the shell. A screen that goes while its tab stays (its machine
     // hidden, the terminal panel or work pane closed) leaves it running, its output kept for the next screen.
+    // Whether the tab was closed is asked of the store's plain record: state read here is as it was before the change
+    // that removed this screen, so the closed tab still looked listed and its shell was parked instead of stopped.
     if (id && !tab?.parked) {
-      if (tab && terminals.tabs.some((t) => t.key === tab.key)) terminals.parkOne(tab.key);
+      if (tab && !terminals.wasClosed(tab.key) && terminals.tabs.some((t) => t.key === tab.key))
+        terminals.parkOne(tab.key);
       else api.term.kill(id).catch(() => {});
     }
     term?.dispose();

@@ -1492,7 +1492,13 @@ With the agent now: a message it has cannot be taken back.`}
         </div>
       {:else}
         <div class="decision">
-          {item.state === "allowed" ? (item.auto ? "Approved (allowed earlier)" : "Approved") : "Declined"}
+          {item.state === "allowed"
+            ? item.auto
+              ? "Approved (allowed earlier)"
+              : "Approved"
+            : item.state === "stopped"
+              ? "Stopped by you, not answered"
+              : "Declined"}
         </div>
       {/if}
     </div>

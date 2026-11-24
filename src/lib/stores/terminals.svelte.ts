@@ -134,11 +134,23 @@ export class TerminalsStore {
     this.activeByProject = { ...this.activeByProject, [projectId]: key };
   }
 
+  /**
+   * Tabs closed by the user. A plain set, not state: a screen's teardown reads the state as it was before the change
+   * that removed it (Svelte 5), so the closed tab still looked listed there and its shell was parked, not stopped.
+   */
+  #closed = new Set<string>();
+
+  /** The user closed this tab (its shell is stopped by close itself). */
+  wasClosed(key: string): boolean {
+    return this.#closed.has(key);
+  }
+
   close(key: string): void {
     const tab = this.tabs.find((t) => t.key === key);
+    this.#closed.add(key);
     this.tabs = this.tabs.filter((t) => t.key !== key);
-    // A parked one has no screen to stop it: stopped here (a shown one stops when its screen goes).
-    if (tab?.parked && tab.termId) void callOn(tab.machine, "term_kill", { id: tab.termId }).catch(() => {});
+    // Its shell stops here, shown or parked; one still starting is stopped by its screen when its id comes.
+    if (tab?.termId && !tab.ended) void callOn(tab.machine, "term_kill", { id: tab.termId }).catch(() => {});
     if (tab && this.activeByProject[tab.projectId] === key) {
       const next = this.forProject(tab.projectId).at(-1);
       const map = { ...this.activeByProject };

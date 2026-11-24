@@ -6,6 +6,8 @@ class ScmView {
   selected = $state<{ path: string; side: "staged" | "changes" } | null>(null);
   /** History shown in the work area: a file's path, "" for the whole project, null when closed. */
   historyFor = $state<string | null>(null);
+  /** The project the choice above belongs to: a new one clears it. Plain field, so reading it tracks nothing. */
+  project = "";
 }
 
 export const scmView = new ScmView();

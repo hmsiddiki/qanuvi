@@ -373,6 +373,19 @@ describe("messages sent while the agent works", () => {
     }
   });
 
+  it("a question still open when its step is stopped is closed, not left with Approve and Decline", () => {
+    // ST1 (Linux): after "Stop this command, read my message now" the edit's card kept its buttons for a dead request.
+    const ask = (id: string) =>
+      JSON.stringify({
+        type: "control_request",
+        request_id: id,
+        request: { subtype: "can_use_tool", tool_name: "Edit", input: { file_path: "src/main.ts" } },
+      });
+    const items = reduceAll([tool("a"), ask("r1"), JSON.stringify({ type: "qanuvi_interrupted" }), ask("r2")]);
+    const cards = items.filter((i) => i.kind === "approval");
+    expect(cards.map((c) => (c as { state: string }).state)).toEqual(["stopped", "pending"]);
+  });
+
   it("a later turn's result is not marked stopped by an older interrupt", () => {
     const items = reduceAll([
       tool("a"),

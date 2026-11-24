@@ -65,7 +65,8 @@ export type Item = (
       tool: string;
       summary: string;
       detail: string;
-      state: "pending" | "allowed" | "refused";
+      /** stopped: its step was ended by "Stop this command, read my message now" before it was answered. */
+      state: "pending" | "allowed" | "refused" | "stopped";
       /** Allowed by an earlier "for this session" / "for 10 minutes". */
       auto?: boolean;
     }
@@ -362,6 +363,8 @@ function reduceLine(items: Item[], line: string, seq: number): Item[] {
     for (let i = 0; i < out.length; i++) {
       const x = out[i];
       if (x.kind === "tool" && x.state === "running") out[i] = { ...x, state: "stopped", result: STOPPED, output: "" };
+      // ST1: the question of a step that was stopped is gone too; its card kept Approve and Decline for a dead request.
+      else if (x.kind === "approval" && x.state === "pending") out[i] = { ...x, state: "stopped" };
     }
     out.push({
       kind: "notice",
@@ -627,7 +630,7 @@ export function itemsToMarkdown(title: string, items: Item[]): string {
       );
     else if (item.kind === "approval")
       out.push(
-        `- Approval for ${item.tool}: ${item.summary} (${item.state === "allowed" ? "approved" : item.state === "refused" ? "refused" : "not answered"})`,
+        `- Approval for ${item.tool}: ${item.summary} (${item.state === "allowed" ? "approved" : item.state === "refused" ? "refused" : item.state === "stopped" ? "stopped" : "not answered"})`,
       );
     else if (item.kind === "todos")
       out.push(...item.todos.map((t) => `- [${t.status === "completed" ? "x" : " "}] ${t.text}`), "");

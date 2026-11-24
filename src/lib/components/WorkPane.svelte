@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
@@ -67,9 +68,10 @@
     panel.show(view);
   }
 
-  // Search asked for: the sidebar shows Search.
+  // Search asked for: the sidebar shows Search. Only a new ask counts: openSidebar reads the layout, and tracking it
+  // here put Search back on every later layout change (the sidebar's tabs stopped switching after Ctrl+Shift+F).
   $effect(() => {
-    if (ui.searchWanted) openSidebar("search");
+    if (ui.searchWanted) untrack(() => openSidebar("search"));
   });
 
   // Opening a file shows the editor.
