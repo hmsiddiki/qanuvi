@@ -1967,7 +1967,14 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24 after 0.1.48): 0.1.48 PUBLISHED tag v0.1.48 (owner "publish anyway"; sp1, sk1/ho1/pn1,
+    CHECKPOINT (newest, 2026-11-24 after the plan talk): both machines on 0.1.48 (owner). Owner agreed ST (stable
+      Windows + Linux, docs/STABLE-FLOWS.md, 32 flows) and set O1-O5 as must-haves before the public release (section
+      "Before going online" at the top of this file: O1 qanuvi.com + login gates, O2 free setup by itself, O3 built-in
+      compression, O4 desktop-only voice assistant in any language, O5 web search). All pushed, nothing unpublished,
+      no test processes left on the laptop. NEXT, in a fresh session: ST1 on the laptop over SSH (drive.py, release
+      test build, scratch data only), filling the Linux column; then ask the owner for one block off This PC for the
+      Windows column; meanwhile plan O1 (f) login gates in parts with the owner.
+    PICKUP POINT (before, 2026-11-24 after 0.1.48): 0.1.48 PUBLISHED tag v0.1.48 (owner "publish anyway"; sp1, sk1/ho1/pn1,
       lr1, lr2; backup channel-before-0.1.48; all 9 files online, 200, sizes match). Owner updates This PC and the
       laptop. Next: plan big-plan basics + stable Win/Linux with the owner; later list: inbox show with an id starting
       with digits is read as a number; the Y11 list to look at (18 things, scratch only).
