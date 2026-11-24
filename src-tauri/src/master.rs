@@ -4327,7 +4327,7 @@ mod tests {
         // A resume that cannot start says so in the Inbox, naming the cut-off run's plan (a start that is not valid
         // here, so no run starts in a test).
         m.keep_start(&pid, &json!({"file": 5}));
-        m.resume_one(&pid);
+        m.resume_one_because(&pid, "shutdown");
         let inbox = crate::inbox::list(&m.db).unwrap();
         let note = inbox
             .iter()

@@ -103,12 +103,8 @@ impl Master {
         });
     }
 
-    /// Starts a cut-off run again with its kept start and says so in the Inbox (cut off by a shutdown).
-    pub(super) fn resume_one(&self, project_id: &str) {
-        self.resume_one_because(project_id, "shutdown");
-    }
-
-    /// The same, saying why it was cut off: a shutdown, or Quit's "Go on next time" (`quit-later`).
+    /// Starts a cut-off run again with its kept start and says so in the Inbox, saying why it was cut off: a
+    /// shutdown, or Quit's "Go on next time" (`quit-later`).
     pub(super) fn resume_one_because(&self, project_id: &str, why: &str) {
         let cut = if why == "quit-later" {
             "stopped when Qanuvi was quit, to go on at its next start"
