@@ -2414,6 +2414,16 @@ impl<'a> Loop<'a> {
                     continue;
                 }
             }
+            // f9: the pause came while the agent was finishing: the step got done (or set aside) all the same. It
+            // counts as a whole step, and the run pauses after it (it said "0 of 1 done" with the step ticked).
+            if self.watch.pause_now
+                && self.plan().is_some_and(|now| {
+                    step_outcome(&now.text, st.number.as_deref(), &st.title) != StepOutcome::Open
+                })
+            {
+                self.watch.pause_now = false;
+                self.settle_carry(&attempt, &section, carry_on);
+            }
             // Paused now by the owner: the attempt is no failure, the session is kept, Resume goes on in it.
             if self.watch.pause_now {
                 self.watch.pause_now = false;

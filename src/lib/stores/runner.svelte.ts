@@ -263,6 +263,9 @@ class RunnerStore {
     if (busy && !wasBusy) this.#hook(v.projectId);
     if (!busy && wasBusy) {
       this.#unhook();
+      // f11: a run that pauses in a step now (not only one found after a restart or another plan shown) goes on in
+      // that step's session at Resume; it began a new session that only read the progress note.
+      if (v.run) this.#keepPaused(v.run);
       if (v.error) agent.notice(`The plan run ended with an error: ${v.error}`);
       // The run's sessions as the core left them: none of them stays "working" in this window.
       void agent.refreshSessions();

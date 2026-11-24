@@ -1325,6 +1325,28 @@ fn pausing_in_the_middle_of_a_step_keeps_its_session_for_resume() {
     );
 }
 
+/// f9 (ST1 Linux drive): a pause that lands while the agent ticks the step off counts the step as done; the run
+/// pauses after it instead of saying "Paused in step 1" with 0 done.
+#[test]
+fn a_pause_while_the_step_gets_done_counts_the_step() {
+    let env = world("# Plan\n\n- [ ] **1. Short**\n- [ ] **2. Later**\n");
+    let stop = stop_button();
+    let sh = stop.0.clone();
+    env.set_agent(move |c| {
+        if !planner(c) && c.turn == 1 {
+            sh.pause();
+            c.env.mark(FILE, "1", 'x');
+        }
+        AgentReply::default()
+    });
+    let r = Run::start(env.clone(), FILE, options(), stop).wait();
+    assert_eq!(r.status, RunStatus::Paused);
+    assert!(r.message.starts_with("Paused after step 1."), "{}", r.message);
+    assert_eq!(step(&r, "1").status, RunStepStatus::Done);
+    assert!(r.paused_session.is_none());
+    assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);
+}
+
 /// A step whose work is about a rate limit (a tool result quoting the plan, the agent's reply) is no usage limit: the
 /// run goes on at once (once it waited an hour for nothing and looked stuck).
 #[test]

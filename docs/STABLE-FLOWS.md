@@ -1,4 +1,4 @@
-# ST1: everyday flows on Windows and Linux pass | steps pass; no free model run (s1) | pass (s2, s3) | pass after f1 | pass after f2-f4 | pass after f5 (s4) | pass | not run (s1) | pass | pass after f6 | pass | steps pass; no free model run (s1) | pass (s2, s3) | pass after f1 | pass after f2-f4 | pass after f5 (s4) | pass | not run (s1) | pass | pass after f6 |
+# ST1: everyday flows on Windows and Linux
 
 One row per flow a normal user meets. Each one is driven for real on the release build:
 - Windows: a test window on This PC, in one block of time the owner gives off the PC;

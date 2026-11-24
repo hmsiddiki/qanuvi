@@ -305,6 +305,18 @@
     return () => clearInterval(timer);
   });
 
+  // f8: with no plan found, look again when a chat of this project stops working (the agent may have written one,
+  // "Ask the agent to write one"). Listing the folder on a timer would cost too much on a big project.
+  let working = $derived(agent.sessions.filter((s) => ["running", "waiting"].includes(s.status)).length);
+  let lastWorking = 0;
+  $effect(() => {
+    const now = working;
+    untrack(() => {
+      if (now < lastWorking && !file) void discover().then(load);
+      lastWorking = now;
+    });
+  });
+
   // Only another project reopens the view. Saving this project's settings (the run rules on Start) hands in a new
   // project object with the same id; reopening then dropped the Run panel and the check's answer with it.
   let projectId = $derived(project.id);
@@ -656,7 +668,7 @@
                         ? ` · tool calls: ${info.tools.read} reading, ${info.tools.change} changing, ${info.tools.run} running`
                         : ''}"
                     >
-                      {modelLabel(agent.provider, info.model)}{info.status === "running" ? " …" : ""} · {formatCost(
+                      {modelLabel(runProvider, info.model)}{info.status === "running" ? " …" : ""} · {formatCost(
                         info.cost,
                       )}
                     </span>
@@ -684,9 +696,10 @@
                         ? "Auto"
                         : `${autoPick(step).picked ? "Picked" : "Auto"} · ${autoPick(step).label}`}</option
                     >
-                    {#each agent.provider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
-                    {#if modelOf(step) && !agent.provider.models.some((m) => m.id === modelOf(step))}
-                      <option value={modelOf(step)}>{modelOf(step)}</option>
+                    <!-- f10: the run's agent, not the chat's: a step chat on the free agent showed raw ids here. -->
+                    {#each runProvider.models as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
+                    {#if modelOf(step) && !runProvider.models.some((m) => m.id === modelOf(step))}
+                      <option value={modelOf(step)}>{modelLabel(runProvider, modelOf(step) ?? "")}</option>
                     {/if}
                   </select>
                 </div>
