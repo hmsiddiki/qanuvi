@@ -782,26 +782,33 @@ impl Master {
             // Backups and the data folder (24z3 D3): the master's own, on by default like the desktop app's (in
             // backups::master_default_dir: Documents on Windows/macOS, ~/qanuvi-backups on Linux); its pointer file is in its own data folder; the data folder itself is
             // set where it starts (--data or QANUVI_MASTER_DATA), so Settings only shows it.
+            // ba1: on the app's own data these are This PC's backups, in the app's folder with its window storage,
+            // where the daily job puts them (backup_place); the master's own folder showed other backups.
             "backups_info" => {
                 let d = &self.dir;
-                to(Ok(crate::backups::info(d, d, Some(&backups_default()))))
+                let (_, default) = backup_place(d, self.app_data);
+                to(Ok(crate::backups::info(d, d, Some(&default))))
             }
             "backups_set" => to(crate::backups::set(
                 &self.dir,
                 &s(args, "folder"),
                 args["off"].as_bool().unwrap_or(false),
             )),
-            "backups_now" => to(crate::backups::now_backup(
-                &self.dir,
-                None,
-                Some(&backups_default()),
-            )),
+            "backups_now" => {
+                let (web, default) = backup_place(&self.dir, self.app_data);
+                to(crate::backups::now_backup(
+                    &self.dir,
+                    web.as_deref(),
+                    Some(&default),
+                ))
+            }
             "backups_restore" => {
                 let d = &self.dir;
+                let (_, default) = backup_place(d, self.app_data);
                 to(crate::backups::book_restore(
                     d,
                     d,
-                    Some(&backups_default()),
+                    Some(&default),
                     Path::new(&s(args, "path")),
                 ))
             }
@@ -809,7 +816,7 @@ impl Master {
             "backups_dismiss_note" => to(crate::backups::dismiss_note(&self.dir)),
             "backups_remove" => to(crate::backups::remove_one(
                 &self.dir,
-                Some(&backups_default()),
+                Some(&backup_place(&self.dir, self.app_data).1),
                 Path::new(&s(args, "path")),
             )),
             "data_location_info" => {
@@ -3464,6 +3471,9 @@ mod tests {
             folder,
             crate::backups::default_dir(crate::data_location::from_source())
         );
+        // ba1: Settings → Backups shows and lists that same folder (it showed the master's own).
+        let i = call(&m, "backups_info", json!({})).unwrap();
+        assert_eq!(i["defaultDir"], folder.to_string_lossy().as_ref(), "{i}");
         let (web, folder) = backup_place(data.path(), false);
         assert_eq!((web, folder), (None, backups_default()));
     }

@@ -1341,7 +1341,11 @@ fn a_pause_while_the_step_gets_done_counts_the_step() {
     });
     let r = Run::start(env.clone(), FILE, options(), stop).wait();
     assert_eq!(r.status, RunStatus::Paused);
-    assert!(r.message.starts_with("Paused after step 1."), "{}", r.message);
+    assert!(
+        r.message.starts_with("Paused after step 1."),
+        "{}",
+        r.message
+    );
     assert_eq!(step(&r, "1").status, RunStepStatus::Done);
     assert!(r.paused_session.is_none());
     assert_eq!(step(&r, "2").status, RunStepStatus::Waiting);

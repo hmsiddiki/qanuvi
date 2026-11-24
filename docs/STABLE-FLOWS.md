@@ -34,18 +34,18 @@ A row is green only when both systems pass.
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
 | 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) |
-| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | - |
-| 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | - |
-| 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | - |
+| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | pass (s12) | - |
+| 22 | Pair a machine | code pairing over the relay; machine in the switcher | pass (s13) | - |
+| 23 | Switch machines | the other machine's projects, chat, terminal; back again | pass (s13) | - |
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | - |
 | 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | - |
 | 26 | Sleep and wake | links, runs and terminals come back | - | - |
 | 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
-| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | - | - |
-| 29 | Settings | every page opens, scrolls, saves; Save always reachable | - | - |
+| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | pass after ba1, ba2 (s14) | - |
+| 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | - |
 | 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | - | pass (s11) |
 | 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | - |
-| 32 | Go back one version | previous build installs over; data intact | - | - |
+| 32 | Go back one version | previous build installs over; data intact | pass (s12) | - |
 
 ST3, the 24 h run, has its own log. It covers memory and handle counts every 10 minutes, stuck processes, dead links, and the run's end line.
 
@@ -129,5 +129,47 @@ Seen, not fixed (for ST2 or later):
   was done; the system yes/no box (no Qanuvi window can open) still means plain Quit.
 - s11: status bar: account opens its menu, cost opens Agents, the branch opens Changes, but the sidebar stays on Home,
   so "Choose a file to see its changes" has no list beside it.
-- Flow 18 (queue) is R3, never built; owner 2026-11-25: it belongs to the later "Tasks" feature. Owner 2026-11-25: build the "go on next time" Quit choice (s10). Flows 21-26, 28, 29, 31, 32 are next; 24-26 and 31 need the owner (hotspot,
-  network off, sleep, a clean user account).
+- Flow 18 (queue) is R3, never built; owner 2026-11-25: it belongs to the later "Tasks" feature. Owner 2026-11-25: build
+  the "go on next time" Quit choice (s10).
+
+## Linux, flows 21-23, 28, 29, 32 (2026-11-25, laptop, release test build of 3e199be, then with ba1 + ba2)
+
+Flows 21 and 32 ran a copy laid out like a user's own install (~/qc-scratch/st21/home/.local/lib/qanuvi, not a
+target/ test build), fully apart from the installed Qanuvi on the laptop: its own HOME (data, Documents backups,
+autostart, menu entry), its own session bus (an installed-like copy takes the single-instance lock, so on the real bus
+it handed over to the installed app and quit), QANUVI_INSTALL_HOME on the test home, and a localhost update channel
+signed with a throwaway key (QANUVI_UPDATE_TEST_KEY). Flows 22, 23, 28 and 29 used two target/release test windows on
+their own data roots (st1 and st22). Paid agent: one short Sonnet chat on the paired machine, $0.05.
+
+Fixed during the pass:
+- ba1: Settings → Backups of This PC (and "Back up now", Restore, Remove) used the master's own default folder
+  (~/qanuvi-backups on Linux, Documents/"Qanuvi master backups" on Windows), while the daily backup of the app's data
+  goes to the app's folder (Documents/"Qanuvi backups"). The page listed another folder's backups, "Last backup" named
+  one that was not in the list, and "Back up now" wrote beside the master backups without the window storage. Since
+  the M5a move every installed app had it. The master's backups calls now take the same place as the daily job.
+  Rust test added (a master on the app's data shows the app's folder); driven: the page shows the Documents folder and
+  its backups, Back up now lands there.
+- ba2: a booked restore was named by its folder ("qanuvi-backup-2026-11-24-230637", the UTC date: a day off at night)
+  while the list shows local times; it now reads "The backup from 11/25/2026, 5:06:37 AM" (driven, then cancelled).
+  The note after a restore ("Restored the backup qanuvi-backup-... kept as ...-before-restore") is written by the
+  master, which knows UTC only, and still names the folders (s14).
+
+Seen, not fixed (for ST2 or later):
+- s12 (flows 21, 32): Settings → Updates shows the right version before and after; Check now found 0.1.99, Download
+  checked the signature, Restart to update put it in (0.1.48 kept as .prev, menu entry, link, icon) and the window came
+  back at its place on 0.1.99 with app and master from the new install. Going back has no button: a user unpacks the
+  previous tarball (here the published 0.1.47) over it; 0.1.47 opened 0.1.99's data with project, branch and settings
+  intact (no schema change since 0.1.26, database version 13). A Linux user going back has no written steps. The
+  Updates card says "Channel dev" while a test channel is set. With an empty HOME the Agents card read "Claude Code
+  ... not signed in yet" under a green "Connected" badge.
+- s13 (flows 22, 23): the second window turned remote access on ("Connected to the relay (through port 443)": a new
+  link's first road; the relay names its own port 47443 for the next one, which answers from the laptop) and showed a
+  code; the first window paired with it and connected "directly on the home network". The switcher showed it; its
+  data folder, project, file (Ctrl+P), terminal (its own folder and environment) and a chat ("pong") worked; This PC
+  and back kept the file, chat and terminal. The sidebar Inbox count is all machines' (by design, C2). A headless
+  master has no command to turn remote access on or make a pairing code; it is done from a window viewing it.
+- s14 (flow 28): Back up now, a project added, Restore at the next start, Restart: the project was gone, the chat
+  kept, a "before restore" copy beside the others. All data roots of one kind share one default backups folder: the
+  list shows backups of other data folders (other test data here; on a real install, the app and one master are apart
+  by design) with a Restore button each, and "the last 7 are kept" counts them all together.
+- Flows 24-26 (hotspot, network off, sleep) and 31 (a clean user account) need the owner.

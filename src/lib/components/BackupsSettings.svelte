@@ -82,6 +82,8 @@
         (info.dir.startsWith("/") && info.data.startsWith("/"))),
   );
   const restartWord = $derived(machine ? place : "Qanuvi");
+  // The booked backup, named by its time as in the list (its folder name has the UTC date, a day off at night).
+  const booked = $derived(info?.restore ? info.backups.find((b) => b.path === info?.restore) : undefined);
 
   async function save(dir: string, off: boolean) {
     error = "";
@@ -255,8 +257,8 @@
   {#if info.restore}
     <div class="card">
       <p class="warn">
-        <code>{info.restore.split(/[\\/]/).pop()}</code> is restored when {restartWord} starts again. The data as it is then
-        is backed up first.
+        {#if booked}The backup from {when(booked.created)}{:else}<code>{info.restore.split(/[\\/]/).pop()}</code>{/if} is
+        restored when {restartWord} starts again. The data as it is then is backed up first.
       </p>
       <div class="row">
         <button type="button" class="btn primary" disabled={busy} onclick={restartNow}

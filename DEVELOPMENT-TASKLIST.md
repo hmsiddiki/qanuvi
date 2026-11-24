@@ -1967,7 +1967,16 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-25 04:30): owner answers: flow 18 (queue) belongs to a later "Tasks" feature
+    PICKUP POINT (newest, 2026-11-25 05:20): ST1 Linux flows 21, 22, 23, 28, 29, 32 PASS (docs/STABLE-FLOWS.md,
+      notes s12-s14). Fixed: ba1 This PC's Settings → Backups (info, Back up now, Restore, Remove) used the master's
+      own folder instead of the app's (every installed app since M5a; Rust test added, driven), ba2 booked restore
+      named by its local time (driven). Unpublished now: f8-f12 + s10 + ba1 + ba2. Laptop drive kits:
+      ~/qc-scratch/st21 (installed-like copy: own HOME, own bus, localhost channel, throwaway key; launch.sh,
+      quit.sh), ~/qc-scratch/st22 (second test window, paired as "Scratch B"), st1/quitall.sh (tray Quit of every
+      target/release test copy), st1/wheel.py (mouse wheel). Laptop src tree has ba1 + ba2 copied in (same as the
+      commit). NEXT: owner for flows 24-26 (hotspot, network off, sleep) and 31 (a clean user account); then the
+      Windows block; 0.1.49 when the owner says.
+    PICKUP POINT (before, 2026-11-25 04:30): owner answers: flow 18 (queue) belongs to a later "Tasks" feature
       (recurring background jobs: plans in a queue, a script at a set time daily, reports, automation; written in
       docs/IDEAS-UPCOMING.md, not ST). s10 "Go on next time" BUILT (e01b506 + ff60ca8, pushed, UNPUBLISHED; quit
       tests + runs tests pass on the laptop) and DRIVEN LIVE on the laptop test window (tray Quit mid-step, Go on
