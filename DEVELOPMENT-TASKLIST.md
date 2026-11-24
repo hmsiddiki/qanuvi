@@ -68,8 +68,10 @@ and ST1 has been driven again on the finished build.
   through the account, encrypted on the device, the site never reads it (task 18 "remote only"); (d) the brain's
   updates (knowledge.json, model lists, setup guides, compression rules for O3) and the update channel move from
   qlopy.top to qanuvi.com (the MOVE TO qanuvi.com note: three built-in addresses, one release that points there);
-  (e) relay kit and relay list served from qanuvi.com. Open question for the owner: when is the site ready, and is
-  its build the qanuvi-site folder?
+  (e) relay kit and relay list served from qanuvi.com. Owner 2026-11-24: sign-in runs today against
+  aloelo.dev/qanuvi; the real site can go online at any time. (f) LOGIN GATES: a plain code editor works without
+  an account; everything beyond it needs sign-in (the live assistant, connecting servers and other machines, and the
+  rest of the beyond-editor features, list to be agreed), checked in the core, not only hidden in the window.
 - [ ] **O2. A fresh install sets up free AI by itself, guided only where a person is needed (owner, 2026-11-24;
   widens 24c, 24k, 24k2)**: on first start Qanuvi measures the machine and sets up, with one yes: OmniRoute (Node
   first if missing; connections, keys, combos, health), OpenRouter (guided key: opens the page, waits, reads it
@@ -99,8 +101,10 @@ and ST1 has been driven again on the finished build.
     never-lists as plan runs (Auto = the user's trust; risky things asked in words).
   - V6 its brain: simple things on its own with a small model; bigger ones through Qanuvi's free models, paid
     models or both, as the user chooses (suggested, never forced).
-  - Same on Windows and Linux. Owner questions before V1: local-only voice or a provider allowed, and which
-    languages first.
+  - Same on Windows and Linux. Owner decisions 2026-11-24: the assistant belongs to the desktop app only (window +
+    tray), one per PC; headless masters and servers never have one. This PC's assistant operates connected PCs,
+    servers and VPSes through this PC's Qanuvi, as the window does (viewer). Sign-in needed (O1 f). Languages:
+    English first, then Bangla; the user picks; 1-2 default voices plus the user's own trained voice.
 
 ## Stage 1: the app shell (first goal)
 
