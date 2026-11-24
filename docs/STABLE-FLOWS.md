@@ -15,13 +15,13 @@ A row is green only when both systems pass.
 | # | Flow | What passes | Windows | Linux |
 |---|------|-------------|---------|-------|
 | 1 | First start, empty data | window opens, setup wizard offered, no error lines | - | pass |
-| 2 | Setup wizard, free AI | OmniRoute / OpenRouter / Ollama steps say what they do; a free model answers | - | steps pass; no free model run (s1) |
+| 2 | Setup wizard, free AI | OmniRoute / OpenRouter / Ollama steps say what they do; a free model answers | - | pass (OpenRouter) |
 | 3 | Open a project, file tree, editor | open, edit, save, undo; big file opens fast | - | pass (s2, s3) |
 | 4 | Search and go to symbol | Ctrl+P, Ctrl+T, find in files | - | pass after f1 |
 | 5 | Git panel | changes, diff, commit on a scratch repo; no-git folder works | - | pass after f2-f4 |
 | 6 | Terminal | open, type, colours, resize, paste, close; survives switching projects | - | pass after f5 (s4) |
 | 7 | Chat with the paid agent | answer streams, tool rows settle, cost shown | - | pass |
-| 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | not run (s1) |
+| 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | pass (hand-over not driven) |
 | 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | - | pass |
 | 10 | Message while the agent works | taken as a chat, not a restart | - | pass after f6 |
 | 11 | Memory page | add, Try it, suggestion Keep/Dismiss | - | - |
@@ -79,3 +79,11 @@ Seen, not fixed (for ST2 or later):
 - s5 (later): programs on a PATH set in ~/.bashrc only (nvm, fnm) are not found by a desktop-started Qanuvi; the
   desktop session reads ~/.profile. The first "Node.js missing" seen here came from starting the window over SSH.
 - The system folder picker (GTK) ignores a typed path ending in "/"; picking the folder works. Not Qanuvi's.
+
+Flows 2 and 8 (2026-11-25, same build plus f7 at 113fa70): the owner pasted an OpenRouter key into the wizard; Qanuvi
+checked it and picked three free models (nemotron-3-ultra-550b, nemotron-3-nano-omni-30b, openrouter/free) and said
+"Done" with what it set. A new session used "Qanuvi agent · Auto": nemotron-3-ultra read src/util.ts and answered
+correctly, $0. The hand-over when a model rests could not be caused on purpose (covered by unit tests only). f7
+driven: with the terminal maximised, Ctrl+P → util.ts brought the editor back.
+- s6: a plain question ("Read ... and tell me ...") was labelled "A change:" when the model was picked; it should
+  read as a question.
