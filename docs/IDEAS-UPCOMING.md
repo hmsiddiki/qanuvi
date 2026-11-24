@@ -60,3 +60,9 @@ sharing account memory only) is batch D8 in the tasklist; the ideas below come a
   that model (short and explicit for a small local model, more for a paid one). Open: what "adapt" means (shaping
   instructions now, adapters later), which brain decides when there are several machines (each core, or the paid
   decider on top), and how to tell it worked (fewer corrections, fewer blocked steps).
+
+## Tasks (owner, 2026-11-25)
+
+A later feature, "Tasks", for recurring background jobs a machine runs on its own. Examples: several plans in a
+queue (the old R3 queue, ST1 flow 18, belongs here), a script that runs at a set time every day, making a report,
+and other automation. It is not part of the stable-flows work.

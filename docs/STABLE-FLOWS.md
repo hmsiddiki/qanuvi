@@ -31,7 +31,7 @@ A row is green only when both systems pass.
 | 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | - | pass |
 | 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | pass |
 | 17 | Stop, pause, resume a run | each says what happened; nothing lost | - | pass after f9-f11 (s9) |
-| 18 | Queue | add, reorder, next task starts after a run ends | - | not built (R3 open) |
+| 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
 | 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" not built (s10) |
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | - |
@@ -124,5 +124,5 @@ Seen, not fixed (for ST2 or later):
   Claude Code's own background command (sleep) outlived the quit until it ended.
 - s11: status bar: account opens its menu, cost opens Agents, the branch opens Changes, but the sidebar stays on Home,
   so "Choose a file to see its changes" has no list beside it.
-- Flow 18 (queue) is R3, never built. Flows 21-26, 28, 29, 31, 32 are next; 24-26 and 31 need the owner (hotspot,
+- Flow 18 (queue) is R3, never built; owner 2026-11-25: it belongs to the later "Tasks" feature. Owner 2026-11-25: build the "go on next time" Quit choice (s10). Flows 21-26, 28, 29, 31, 32 are next; 24-26 and 31 need the owner (hotspot,
   network off, sleep, a clean user account).

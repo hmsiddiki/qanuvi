@@ -1528,12 +1528,31 @@ impl Master {
         } else {
             "They"
         };
-        if let Some(what) = work_text((agents, runs))
-            && !self.ask_quit(&format!(
-                "Quitting Qanuvi stops {what} on this computer. {they} can be resumed afterwards.\n\nQuit anyway?"
-            ))
-        {
-            return;
+        // s10 (owner, 2026-11-25): with plan runs going, "Go on next time" quits too, and the runs start again by
+        // themselves at the next start (resume_cut_off).
+        let mut why = "quit";
+        if let Some(what) = work_text((agents, runs)) {
+            let text = if runs > 0 {
+                format!(
+                    "Quitting Qanuvi stops {what} on this computer.\n\nGo on next time: the plan {} by itself when \
+                     Qanuvi starts again. Quit: {} for you to choose Resume.",
+                    if runs == 1 {
+                        "run goes on"
+                    } else {
+                        "runs go on"
+                    },
+                    if runs == 1 { "it waits" } else { "they wait" },
+                )
+            } else {
+                format!(
+                    "Quitting Qanuvi stops {what} on this computer. {they} can be resumed afterwards.\n\nQuit anyway?"
+                )
+            };
+            match self.ask_quit(&text, runs > 0) {
+                quit_question::QuitChoice::Keep => return,
+                quit_question::QuitChoice::Quit => {}
+                quit_question::QuitChoice::Later => why = "quit-later",
+            }
         }
         if self.app_links.reach(&json!({"do": "quit"})) > 0 {
             let deadline = Instant::now() + Duration::from_secs(20);
@@ -1547,7 +1566,7 @@ impl Master {
                 }
             }
         }
-        self.end_because("quit")
+        self.end_because(why)
     }
 
     /// Looks at this master's OmniRoute once; its Inbox changes go to the connections that follow the Inbox.
@@ -4324,6 +4343,58 @@ mod tests {
         drop(m);
         let m = Master::open(data.path()).unwrap();
         assert_eq!(m.cut_off.lock().unwrap().0, "");
+    }
+
+    /// s10: Quit's "Go on next time" leaves the stop note "quit-later"; the next start keeps the runs for a resume
+    /// of their own (whatever "Start Qanuvi when Windows starts" says), and a resume that cannot start says why.
+    #[test]
+    fn go_on_next_time_keeps_the_runs_for_the_next_start() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        mark_app_data(data.path());
+        let pid = {
+            let m = Master::open(data.path()).unwrap();
+            let p = call(
+                &m,
+                "projects_add",
+                json!({"path": project.path().to_string_lossy()}),
+            )
+            .unwrap();
+            let pid = p["id"].as_str().unwrap().to_string();
+            runs::save(
+                &m.db,
+                &pid,
+                "r1",
+                "T.md",
+                "running",
+                r#"{"status":"running"}"#,
+            )
+            .unwrap();
+            pid
+        };
+        std::fs::write(stop_note_file(data.path()), "quit-later").unwrap();
+        let m = Master::open(data.path()).unwrap();
+        let r = runs::list(&m.db, &pid).unwrap().remove(0);
+        let d: Value = serde_json::from_str(&r.data).unwrap();
+        assert_eq!(d["stoppedBy"], "quit-later");
+        assert_eq!(d["message"], runs::stop_note("quit-later").unwrap());
+        assert_eq!(
+            *m.cut_off.lock().unwrap(),
+            ("quit-later".to_string(), vec![pid.clone()])
+        );
+        m.keep_start(&pid, &json!({"file": 5}));
+        m.resume_one_because(&pid, "quit-later");
+        let inbox = crate::inbox::list(&m.db).unwrap();
+        let note = inbox
+            .iter()
+            .find(|i| i.title.starts_with("Plan run not resumed"))
+            .unwrap();
+        assert!(
+            note.text
+                .contains("The run of T.md was stopped when Qanuvi was quit"),
+            "{}",
+            note.text
+        );
     }
 
     /// A project added from the master's own terminal (`qanuvi-master projects add`), removed or changed reaches the

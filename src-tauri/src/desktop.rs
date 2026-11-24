@@ -646,12 +646,19 @@ async fn quit_question_text() -> Res<serde_json::Value> {
 
 // t1: the answer to the tray's Quit question goes to This PC's master; the question window then ends.
 #[tauri::command]
-async fn quit_question_answer(app: tauri::AppHandle, id: u64, yes: bool) -> Res<()> {
+async fn quit_question_answer(
+    app: tauri::AppHandle,
+    id: u64,
+    yes: bool,
+    later: Option<bool>,
+) -> Res<()> {
+    // s10: "Go on next time" (the runs go on by themselves at the next start).
+    let later = later.unwrap_or(false);
     let sent = tauri::async_runtime::spawn_blocking(move || {
         crate::master::this_pc_call(
             &crate::paths::data_dir(),
             "app_quit_answer",
-            serde_json::json!({"id": id, "yes": yes}),
+            serde_json::json!({"id": id, "yes": yes, "later": later}),
         )
     })
     .await
@@ -676,7 +683,7 @@ fn run_quit_question(data: std::path::PathBuf, mut context: tauri::Context<tauri
                 tauri::WebviewUrl::App("quit-question".into()),
             )
             .title("Quit Qanuvi")
-            .inner_size(440.0, 196.0)
+            .inner_size(440.0, 230.0)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)

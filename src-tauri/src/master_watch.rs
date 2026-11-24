@@ -585,7 +585,8 @@ fn start_updated(exe: Option<PathBuf>) -> impl Fn(&Path) -> Result<(), String> +
 
 /// `qanuvi-master core` beside this program, for the watcher to start.
 fn core_command(dir: &Path, without_startup: bool) -> Command {
-    let exe = crate::data_location::current_exe().unwrap_or_else(|_| PathBuf::from("qanuvi-master"));
+    let exe =
+        crate::data_location::current_exe().unwrap_or_else(|_| PathBuf::from("qanuvi-master"));
     let mut c = Command::new(exe);
     c.arg("core").arg("--data").arg(dir).env(WATCHED, "1");
     if without_startup {

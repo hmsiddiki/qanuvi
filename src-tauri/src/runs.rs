@@ -107,6 +107,10 @@ pub fn stop_note(why: &str) -> Option<&'static str> {
             Some("Stopped by the update to a new version of Qanuvi. Resume goes on from here.")
         }
         "quit" => Some("Stopped when Qanuvi was quit. Resume goes on from here."),
+        // s10: the Quit question's "Go on next time"; the next start resumes it by itself (resume_cut_off).
+        "quit-later" => Some(
+            "Stopped when Qanuvi was quit, to go on when it starts again. Resume goes on from here.",
+        ),
         "restart" => Some("Stopped when Qanuvi restarted. Resume goes on from here."),
         "crash" => Some("Stopped when Qanuvi's background part crashed. Resume goes on from here."),
         "shutdown" => Some("Stopped when the computer shut down. Resume goes on from here."),

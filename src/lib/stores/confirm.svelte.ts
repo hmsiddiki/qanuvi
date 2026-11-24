@@ -8,18 +8,23 @@ export interface AskOptions {
   kind?: "info" | "warning" | "error";
   okLabel?: string;
   cancelLabel?: string;
+  /** s10: a third button beside OK (between Cancel and OK); its answer is "other". */
+  otherLabel?: string;
 }
 
 interface Pending extends AskOptions {
   message: string;
-  resolve: (yes: boolean) => void;
+  resolve: (answer: Answer) => void;
 }
+
+/** OK (true), Cancel (false), or the third button ("other"). */
+export type Answer = boolean | "other";
 
 class ConfirmStore {
   current = $state<Pending | null>(null);
   #queue: Pending[] = [];
 
-  ask(message: string, options: AskOptions | string = {}): Promise<boolean> {
+  ask(message: string, options: AskOptions | string = {}): Promise<Answer> {
     const o = typeof options === "string" ? { title: options } : options;
     return new Promise((resolve) => {
       const p: Pending = { ...o, message, resolve };
@@ -28,11 +33,11 @@ class ConfirmStore {
     });
   }
 
-  answer(yes: boolean): void {
+  answer(a: Answer): void {
     const c = this.current;
     if (!c) return;
     this.current = this.#queue.shift() ?? null;
-    c.resolve(yes);
+    c.resolve(a === "other" && !c.otherLabel ? false : a);
   }
 }
 
@@ -40,5 +45,11 @@ export const confirmDialog = new ConfirmStore();
 
 /** Asks the user to confirm, in Qanuvi's own dialog (the same call as the system dialog's ask). */
 export function ask(message: string, options?: AskOptions | string): Promise<boolean> {
+  const o = typeof options === "string" ? { title: options } : (options ?? {});
+  return confirmDialog.ask(message, { ...o, otherLabel: undefined }) as Promise<boolean>;
+}
+
+/** s10: asks with three buttons: OK (true), Cancel (false), or the third (`otherLabel`, "other"). */
+export function choose(message: string, options: AskOptions & { otherLabel: string }): Promise<Answer> {
   return confirmDialog.ask(message, options);
 }

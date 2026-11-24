@@ -8,14 +8,17 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
-  import { quitWords } from "$lib/stores/quitQuestion";
+  import { quitAnswer, quitButtons, type QuitQuestion } from "$lib/stores/quitQuestion";
+  import type { Answer } from "$lib/stores/confirm.svelte";
 
-  let question = $state<{ id: number; text: string } | null>(null);
+  let question = $state<QuitQuestion | null>(null);
+  // s10: with plan runs going, "Go on next time" is the main button and Quit the middle one.
+  let words = $derived(quitButtons(question ?? { id: 0, text: "" }));
   let answered = $state(false);
   let ok = $state<HTMLButtonElement>();
 
   onMount(() => {
-    invoke<{ id: number; text: string } | null>("quit_question_text")
+    invoke<QuitQuestion | null>("quit_question_text")
       .then((q) => {
         // Nothing to ask any more (answered elsewhere, or the master went): the window goes.
         if (!q) return void getCurrentWindow().close();
@@ -25,10 +28,10 @@
       .catch(() => void getCurrentWindow().close());
   });
 
-  async function answer(yes: boolean) {
+  async function answer(a: Answer) {
     if (!question || answered) return;
     answered = true;
-    await invoke("quit_question_answer", { id: question.id, yes }).catch(() => {});
+    await invoke("quit_question_answer", { id: question.id, ...quitAnswer(question, a) }).catch(() => {});
     void getCurrentWindow().close();
   }
 
@@ -45,17 +48,19 @@
 
 <svelte:window onkeydown={keydown} />
 
-<div class="dialog" role="alertdialog" aria-label={quitWords.title}>
+<div class="dialog" role="alertdialog" aria-label={words.title}>
   <div class="head" data-tauri-drag-region>
     <span class="icon"><TriangleAlert size={18} /></span>
-    <h2 data-tauri-drag-region>{quitWords.title}</h2>
+    <h2 data-tauri-drag-region>{words.title}</h2>
   </div>
   <p>{question?.text ?? ""}</p>
   <div class="actions">
-    <button type="button" disabled={!question || answered} onclick={() => answer(false)}>{quitWords.cancelLabel}</button
-    >
+    <button type="button" disabled={!question || answered} onclick={() => answer(false)}>{words.cancelLabel}</button>
+    {#if words.otherLabel}
+      <button type="button" disabled={!question || answered} onclick={() => answer("other")}>{words.otherLabel}</button>
+    {/if}
     <button type="button" class="primary" bind:this={ok} disabled={!question || answered} onclick={() => answer(true)}
-      >{quitWords.okLabel}</button
+      >{words.okLabel}</button
     >
   </div>
 </div>

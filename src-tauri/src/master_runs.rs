@@ -80,28 +80,46 @@ impl Master {
 
     /// M5b: after a shutdown, with "Start Qanuvi when Windows starts" on, This PC's runs that were cut off go on by
     /// themselves (half a minute after start, so its start-up commands answer first), each said in the Inbox. With
-    /// the setting off, the window shows the stop with Resume and offers the setting.
+    /// the setting off, the window shows the stop with Resume and offers the setting. s10: runs stopped by the Quit
+    /// question's "Go on next time" go on at this start whatever the setting (10 seconds after it).
     pub fn resume_cut_off(self: &Arc<Self>) {
         let (why, projects) =
             std::mem::take(&mut *self.cut_off.lock().unwrap_or_else(|e| e.into_inner()));
-        if why != "shutdown" || projects.is_empty() || !self.app_data {
+        if projects.is_empty() || !self.app_data {
             return;
         }
-        if !crate::sign_in_start::is_on().unwrap_or(false) {
-            return;
-        }
+        let wait = match why.as_str() {
+            "quit-later" => 10,
+            "shutdown" if crate::sign_in_start::is_on().unwrap_or(false) => 30,
+            _ => return,
+        };
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(30));
+            std::thread::sleep(std::time::Duration::from_secs(wait));
             let Some(m) = me.upgrade() else { return };
             for pid in projects {
-                m.resume_one(&pid);
+                m.resume_one_because(&pid, &why);
             }
         });
     }
 
-    /// Starts a cut-off run again with its kept start and says so in the Inbox.
+    /// Starts a cut-off run again with its kept start and says so in the Inbox (cut off by a shutdown).
     pub(super) fn resume_one(&self, project_id: &str) {
+        self.resume_one_because(project_id, "shutdown");
+    }
+
+    /// The same, saying why it was cut off: a shutdown, or Quit's "Go on next time" (`quit-later`).
+    pub(super) fn resume_one_because(&self, project_id: &str, why: &str) {
+        let cut = if why == "quit-later" {
+            "stopped when Qanuvi was quit, to go on at its next start"
+        } else {
+            "cut off when the computer shut down"
+        };
+        let started = if why == "quit-later" {
+            "Qanuvi started again and"
+        } else {
+            "Qanuvi started with the computer and"
+        };
         let name = projects::get(&self.db, project_id)
             .map(|p| p.name)
             .unwrap_or_else(|_| "a project".into());
@@ -126,16 +144,14 @@ impl Master {
             Ok(_) => (
                 format!("Plan run resumed on its own: {name}"),
                 format!(
-                    "The run of {file} was cut off when the computer shut down. Qanuvi started with the computer and \
-                     the run goes on from where it stopped."
+                    "The run of {file} was {cut}. {started} the run goes on from where it stopped."
                 ),
                 "info",
             ),
             Err(e) => (
                 format!("Plan run not resumed: {name}"),
                 format!(
-                    "The run of {file} was cut off when the computer shut down and could not go on by itself: {}. \
-                     Open the plan and choose Resume.",
+                    "The run of {file} was {cut} and could not go on by itself: {}. Open the plan and choose Resume.",
                     e.trim_end_matches('.')
                 ),
                 "problem",

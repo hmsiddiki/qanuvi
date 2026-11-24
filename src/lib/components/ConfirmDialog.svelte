@@ -44,6 +44,9 @@
       <p>{c.message}</p>
       <div class="actions">
         <button type="button" onclick={() => confirmDialog.answer(false)}>{c.cancelLabel ?? "Cancel"}</button>
+        {#if c.otherLabel}
+          <button type="button" onclick={() => confirmDialog.answer("other")}>{c.otherLabel}</button>
+        {/if}
         <button type="button" class="primary" bind:this={ok} onclick={() => confirmDialog.answer(true)}
           >{c.okLabel ?? "OK"}</button
         >
