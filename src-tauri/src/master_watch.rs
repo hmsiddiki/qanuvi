@@ -381,7 +381,7 @@ impl Watch {
             waits: [Duration::from_secs(2), Duration::from_secs(5)],
             tell: Box::new(tell_owner),
             ask_model: Box::new(ask_local_model),
-            updated: Box::new(start_updated(std::env::current_exe().ok())),
+            updated: Box::new(start_updated(crate::data_location::current_exe().ok())),
             install: Box::new(run_install_file),
         }
     }
@@ -585,7 +585,7 @@ fn start_updated(exe: Option<PathBuf>) -> impl Fn(&Path) -> Result<(), String> +
 
 /// `qanuvi-master core` beside this program, for the watcher to start.
 fn core_command(dir: &Path, without_startup: bool) -> Command {
-    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("qanuvi-master"));
+    let exe = crate::data_location::current_exe().unwrap_or_else(|_| PathBuf::from("qanuvi-master"));
     let mut c = Command::new(exe);
     c.arg("core").arg("--data").arg(dir).env(WATCHED, "1");
     if without_startup {

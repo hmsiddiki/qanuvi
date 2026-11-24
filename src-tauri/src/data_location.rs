@@ -44,6 +44,21 @@ pub struct Defaults {
     pub webview: Option<PathBuf>,
 }
 
+/// This program's own path, as `std::env::current_exe`, but the live file: f12 (ST1 Linux drive) a program replaced
+/// while it runs (an update, a package upgrade, a rebuild) reads as ".../qanuvi-master (deleted)" on Linux, and
+/// everything started from that path (the app from the tray, agent helpers, a restart) failed with "No such file".
+pub fn current_exe() -> std::io::Result<PathBuf> {
+    std::env::current_exe().map(live_path)
+}
+
+/// The path without Linux's " (deleted)" mark.
+pub fn live_path(me: PathBuf) -> PathBuf {
+    match me.to_str().and_then(|s| s.strip_suffix(" (deleted)")) {
+        Some(live) => PathBuf::from(live),
+        None => me,
+    }
+}
+
 /// Whether this Qanuvi runs from a build in the source tree (`target/debug` or `target/release`): such a test build
 /// keeps its own data, so trying a change never touches the installed copy's projects, sessions and settings.
 /// QANUVI_SHARED_DATA=1 turns this off.
@@ -51,7 +66,7 @@ pub fn from_source() -> bool {
     if std::env::var_os("QANUVI_SHARED_DATA").is_some() {
         return false;
     }
-    std::env::current_exe().is_ok_and(|exe| from_source_path(&exe))
+    current_exe().is_ok_and(|exe| from_source_path(&exe))
 }
 
 /// The rule behind `from_source`: the program sits in a `target/debug` or `target/release` folder.
@@ -515,6 +530,18 @@ pub fn remove_old(base: &Path, current: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_program_replaced_while_it_runs_is_found_at_its_live_path() {
+        assert_eq!(
+            live_path(PathBuf::from("/opt/q/qanuvi-master (deleted)")),
+            PathBuf::from("/opt/q/qanuvi-master")
+        );
+        assert_eq!(
+            live_path(PathBuf::from("/opt/q/qanuvi-master")),
+            PathBuf::from("/opt/q/qanuvi-master")
+        );
+    }
 
     #[test]
     fn a_restart_names_the_process_to_wait_for() {

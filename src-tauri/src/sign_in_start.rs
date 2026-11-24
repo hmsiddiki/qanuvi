@@ -22,9 +22,10 @@ fn entry_name() -> &'static str {
     }
 }
 
-/// The desktop app's program: this one, or the app beside the master that asks.
+/// The desktop app's program: this one, or the app beside the master that asks. f12: the live file, also when this
+/// program was replaced while it runs (the tray's "Open Qanuvi" tried the deleted path and nothing opened).
 pub fn app_exe() -> Result<PathBuf, String> {
-    let me = std::env::current_exe().map_err(|e| e.to_string())?;
+    let me = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     let stem = me
         .file_stem()
         .map(|s| s.to_string_lossy().to_lowercase())

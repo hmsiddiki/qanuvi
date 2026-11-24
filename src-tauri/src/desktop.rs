@@ -467,7 +467,7 @@ fn backups_default() -> std::path::PathBuf {
 /// Starts Qanuvi again (to finish a move): the new instance waits until this one has closed.
 #[tauri::command]
 fn app_restart(app: tauri::AppHandle) -> Res<()> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     // This PC's master has the data open: a move or a booked restore needs it closed. The new instance starts it again.
     crate::master::stop_service_because(&crate::paths::data_dir(), "restart");
     // The same project folder argument again (not the flags, not an older --after-pid).

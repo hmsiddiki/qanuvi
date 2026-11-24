@@ -41,7 +41,7 @@ fn mcp_config(
     index: bool,
     browser: bool,
 ) -> Result<std::path::PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     let dir = crate::paths::data_dir().join("mcp");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // Old configs (one per session) are removed after a week.
@@ -1267,7 +1267,7 @@ impl Agents {
             None
         };
         let program = if own {
-            std::env::current_exe().map_err(|e| e.to_string())?
+            crate::data_location::current_exe().map_err(|e| e.to_string())?
         } else {
             find_claude()
                 .ok_or("Claude Code (the `claude` command) was not found on this machine.")?

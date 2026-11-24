@@ -179,7 +179,7 @@ pub fn touches_installed(recipe: &TestBuild) -> Option<String> {
     guarded.push(installed.base.clone());
     guarded.extend(installed.webview.clone());
     guarded.push(crate::paths::data_dir());
-    if let Some(dir) = std::env::current_exe()
+    if let Some(dir) = crate::data_location::current_exe()
         .ok()
         .and_then(|e| e.parent().map(Path::to_path_buf))
     {

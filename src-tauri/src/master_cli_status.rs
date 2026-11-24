@@ -300,7 +300,7 @@ fn update_here() -> Result<(), String> {
             };
         }
     };
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     println!("Downloading {}.", found.version);
     let live = std::io::stdout().is_terminal();
     let new = mu::prepare(

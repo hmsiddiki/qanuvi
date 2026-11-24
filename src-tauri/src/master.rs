@@ -1628,7 +1628,7 @@ impl Master {
     /// M8b: puts the update the last look found in. M8d: This PC's master installs the whole app instead (the app's
     /// signed installer, kept in its data folder), and ends for it once nothing works.
     fn update_install(&self, hold: bool) -> Result<crate::master_update::UpdateState, String> {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
         let target = if self.app_data {
             crate::master_update::Target::Installer {
                 folder: self.dir.join("updates"),
@@ -1703,7 +1703,7 @@ impl Master {
                 std::thread::sleep(Duration::from_millis(300));
             }
         }
-        let master = std::env::current_exe().map_err(|e| e.to_string())?;
+        let master = crate::data_location::current_exe().map_err(|e| e.to_string())?;
         let app = crate::sign_in_start::app_exe()?;
         let script = if cfg!(windows) {
             installer_script(&[&master, &app], installer, !had_window)
@@ -2178,13 +2178,13 @@ pub fn is_running(dir: &Path) -> bool {
 /// Starts the background service, detached from this process and its terminal.
 /// `after`: a service that is ending (a restart); the new one waits for it before it opens the data.
 fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     spawn_service(&exe, dir, after)
 }
 
 /// The master program next to the running one (the desktop app ships `qanuvi-master` beside `qanuvi`).
 pub fn master_exe_beside_me() -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     let master = exe.with_file_name(if cfg!(windows) {
         "qanuvi-master.exe"
     } else {

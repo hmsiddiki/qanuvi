@@ -172,7 +172,7 @@ pub fn command_for(
     local_data: &std::path::Path,
 ) -> Result<Command, String> {
     if target == "local" || target == "self" {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
         let name = if cfg!(windows) {
             "qanuvi-master.exe"
         } else {
