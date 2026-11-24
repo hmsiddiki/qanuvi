@@ -1967,7 +1967,16 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-24 08:20, ST1 Linux flows 1-10 done): docs/STABLE-FLOWS.md has the Linux column
+    PICKUP POINT (newest, 2026-11-25 02:45, ST1 Linux flows 11-20, 27, 30 done): docs/STABLE-FLOWS.md has them with
+      fixes f8-f12 (b450604 + 600accc, pushed, UNPUBLISHED; f9/f11/f12 driven on the rebuilt laptop window, f8 built
+      and scenario-free, f10 seen right after the rebuild) and notes s7-s11. Flow 18 (queue) is R3, never built; flow
+      20's "go on next time" choice was never built either (owner to say whether either belongs in ST). Drive kit
+      additions: drive.py has the session D-Bus address and a "scroll x y n" command; launch.sh writes window.pid; the
+      test master's tray menu answers over D-Bus (busctl ... com.canonical.dbusmenu Event, item 2 Open, 4 Quit).
+      NEXT (fresh session): Linux flows 21, 22-23 (pair the test window with a second scratch master on the laptop, own
+      data folder, not the installed app), 28, 29, 32; ask the owner for 24-26 (hotspot, network off, sleep) and 31
+      (a clean user account). Then the Windows block.
+    PICKUP POINT (before, 2026-11-24 08:20, ST1 Linux flows 1-10 done): docs/STABLE-FLOWS.md has the Linux column
       for 1-10 and notes f1-f7 (fixed) and s1-s5 (seen, for ST2 or later). Fixes 969f071 (pushed, driven again on
       the rebuilt laptop window: sidebar after Ctrl+Shift+F, Git first click + narrow view, terminal close ends the
       shell, stopped approval card); f7 (maximised terminal steps back for a file, change, preview or plan) in the
