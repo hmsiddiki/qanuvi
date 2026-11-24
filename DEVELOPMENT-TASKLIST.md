@@ -1967,7 +1967,18 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    CHECKPOINT (newest, 2026-11-24 after the plan talk): both machines on 0.1.48 (owner). Owner agreed ST (stable
+    PICKUP POINT (newest, 2026-11-24 08:20, ST1 Linux flows 1-10 done): docs/STABLE-FLOWS.md has the Linux column
+      for 1-10 and notes f1-f7 (fixed) and s1-s5 (seen, for ST2 or later). Fixes 969f071 (pushed, driven again on
+      the rebuilt laptop window: sidebar after Ctrl+Shift+F, Git first click + narrow view, terminal close ends the
+      shell, stopped approval card); f7 (maximised terminal steps back for a file, change, preview or plan) in the
+      next commit, built only. All UNPUBLISHED. Laptop setup for the drive (keep it, scratch only):
+      ~/qc-scratch/st1/launch.sh starts the release test window with XDG_DATA_HOME=~/qc-scratch/st1/xdg (own empty
+      data, login-shell PATH, WebKit inspector on 127.0.0.1:9333); ~/qc-scratch/st1/drive.py targets that window by
+      pid (window.pid), insp.mjs + hook.js read the window's ipc calls through the inspector. The test master for
+      that data stops with "qanuvi-master stop --data ~/qc-scratch/st1/xdg/dev.qanuvi.desktop.source".
+      NEXT (fresh session): rebuild the laptop window for f7 and drive it, then ST1 Linux flows 11-32; flows 2 and 8
+      need a free model (ask the owner: Ollama install with sudo, or an OpenRouter key). Then the Windows block.
+    CHECKPOINT (before, 2026-11-24 after the plan talk): both machines on 0.1.48 (owner). Owner agreed ST (stable
       Windows + Linux, docs/STABLE-FLOWS.md, 32 flows) and set O1-O5 as must-haves before the public release (section
       "Before going online" at the top of this file: O1 qanuvi.com + login gates, O2 free setup by itself, O3 built-in
       compression, O4 desktop-only voice assistant in any language, O5 web search). All pushed, nothing unpublished,

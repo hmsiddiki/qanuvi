@@ -74,9 +74,15 @@
     if (ui.searchWanted) untrack(() => openSidebar("search"));
   });
 
-  // Opening a file shows the editor.
+  // Opening a file shows the editor, and a maximised terminal steps back for it (not at the first showing: a terminal
+  // left maximised stays so after a restart).
+  let atStart: string | null = untrack(() => editor.activeKey);
   $effect(() => {
-    if (editor.activeKey) ui.view = "editor";
+    const key = editor.activeKey;
+    if (!key) return;
+    ui.view = "editor";
+    if (key !== atStart) untrack(() => layout.state.terminalMaximized && layout.toggleTerminalMaximized());
+    atStart = null;
   });
 </script>
 

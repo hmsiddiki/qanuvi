@@ -1,4 +1,5 @@
 import { panel } from "./panel.svelte";
+import { layout } from "$lib/layout/layout.svelte";
 
 /** What the work pane shows and which overlays are open. */
 export type WorkView = "editor" | "preview" | "plan" | "search" | "diff" | "inbox";
@@ -63,6 +64,8 @@ class UiStore {
       this.searchWanted++;
       return;
     }
+    // A maximised terminal hides the work area: it steps back so what was asked for shows (as VS Code does).
+    if (layout.state.terminalMaximized) layout.toggleTerminalMaximized();
     this.view = view as WorkView;
   }
 
