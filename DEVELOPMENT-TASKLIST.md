@@ -1967,7 +1967,15 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-25 02:45, ST1 Linux flows 11-20, 27, 30 done): docs/STABLE-FLOWS.md has them with
+    PICKUP POINT (newest, 2026-11-25 04:30): owner answers: flow 18 (queue) belongs to a later "Tasks" feature
+      (recurring background jobs: plans in a queue, a script at a set time daily, reports, automation; written in
+      docs/IDEAS-UPCOMING.md, not ST). s10 "Go on next time" BUILT (e01b506 + ff60ca8, pushed, UNPUBLISHED; quit
+      tests + runs tests pass on the laptop) and DRIVEN LIVE on the laptop test window (tray Quit mid-step, Go on
+      next time, start again: the run went on by itself, Inbox note, step done). Unpublished now: f8-f12 + s10.
+      NEXT (fresh session): Linux flows 21, 22-23 (second scratch master on the laptop, own data, not the installed
+      app), 28, 29, 32; ask the owner for 24-26 (hotspot, network off, sleep) and 31 (a clean user account). Then
+      the Windows block.
+    PICKUP POINT (before, 2026-11-25 02:45, ST1 Linux flows 11-20, 27, 30 done): docs/STABLE-FLOWS.md has them with
       fixes f8-f12 (b450604 + 600accc, pushed, UNPUBLISHED; f9/f11/f12 driven on the rebuilt laptop window, f8 built
       and scenario-free, f10 seen right after the rebuild) and notes s7-s11. Flow 18 (queue) is R3, never built; flow
       20's "go on next time" choice was never built either (owner to say whether either belongs in ST). Drive kit

@@ -33,7 +33,7 @@ A row is green only when both systems pass.
 | 17 | Stop, pause, resume a run | each says what happened; nothing lost | - | pass after f9-f11 (s9) |
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
-| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" not built (s10) |
+| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) |
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | - |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | - |
@@ -122,6 +122,11 @@ Seen, not fixed (for ST2 or later):
   Qanuvi was quit. Resume goes on from here."; Resume finished the step in a new session. A "go on next time" choice
   that resumes by itself is not built. The step chat kept "Waiting for the step's background command" after the quit.
   Claude Code's own background command (sleep) outlived the quit until it ended.
+  Built 2026-11-25 (owner: build it): with plan runs going, Quit asks "Keep running · Quit · Go on next time" (the main
+  button); the master ends with the note "quit-later" and its next start resumes the runs by itself after 10 s,
+  whatever "Start Qanuvi when Windows starts" says, with an Inbox note "Plan run resumed on its own". Driven on the
+  laptop: tray Quit during step 12 (sleep 60), Go on next time, start again: step 12 went on in a new session and
+  was done; the system yes/no box (no Qanuvi window can open) still means plain Quit.
 - s11: status bar: account opens its menu, cost opens Agents, the branch opens Changes, but the sidebar stays on Home,
   so "Choose a file to see its changes" has no list beside it.
 - Flow 18 (queue) is R3, never built; owner 2026-11-25: it belongs to the later "Tasks" feature. Owner 2026-11-25: build the "go on next time" Quit choice (s10). Flows 21-26, 28, 29, 31, 32 are next; 24-26 and 31 need the owner (hotspot,
