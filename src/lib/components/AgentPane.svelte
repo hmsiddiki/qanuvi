@@ -81,7 +81,9 @@
     settings.set("agent", "qanuvi");
     agent.newSession();
     wizard.open = true;
-    ui.show("agents");
+    // ST1 flow 31 n31a: the wizard is on Models and providers. Agents opened with "Install Claude Code" on top and no
+    // wizard in sight, so a new user who pressed "Set up free AI" saw the paid agent's install instead.
+    ui.openSettings("models");
   }
   import ModePicker from "./ModePicker.svelte";
   import { ask } from "$lib/stores/confirm.svelte";
