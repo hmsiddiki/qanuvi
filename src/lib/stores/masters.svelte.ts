@@ -18,6 +18,7 @@ import {
   callThisPc,
   disown,
   forgetMaster,
+  linkBack,
   linkEnded,
   machineName,
   nameMachines,
@@ -344,7 +345,10 @@ class MastersStore {
   #set(id: string, s: MasterStatus) {
     if (s.state === "on" && s.direct === undefined && this.#roads.has(id)) s = { ...s, direct: this.#roads.get(id) };
     if (s.state === "off" || s.state === "error") this.#roads.delete(id);
+    const was = this.status[id]?.state;
     this.status = { ...this.status, [id]: s };
+    // c2: what waits for it to come back (a terminal whose shell went on there) is told.
+    if (s.state === "on" && was !== "on") queueMicrotask(() => linkBack(id));
   }
 
   async #listen() {

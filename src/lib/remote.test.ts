@@ -175,6 +175,22 @@ describe("a terminal whose link ended (j1)", () => {
   });
 });
 
+describe("a terminal waiting for its server (c2)", () => {
+  it("says the shell goes on there, and hears each time the machine is back until it stops listening", async () => {
+    const { linkBack, linkLostText, onLinkBack } = await import("./remote");
+    nameMachines((id) => (id === "vps" ? "VPS" : id));
+    expect(linkLostText("vps")).toMatch(/^The connection to VPS was lost. The shell goes on there for 5 minutes/);
+    let heard = 0;
+    const stop = onLinkBack("vps", () => heard++);
+    linkBack("other");
+    linkBack("vps");
+    linkBack("vps");
+    stop();
+    linkBack("vps");
+    expect(heard).toBe(2);
+  });
+});
+
 describe("link errors (ce1)", () => {
   it("knows the texts that say a link was gone, and not other errors", async () => {
     const { isLinkError } = await import("./remote");

@@ -63,6 +63,10 @@ struct Outlet {
     ended: Option<Option<u32>>,
     /// The oldest output was dropped (more than RECENT_MAX came): a window given it back is told (M5c).
     trimmed: bool,
+    /// ST1 flow 25 c2: the connection that opened it ended and nobody has taken it over yet.
+    orphaned: bool,
+    /// Counts orphanings and takeovers, so a grace that ran out ends only the orphaning it was for.
+    turn: u64,
 }
 
 /// Said before kept output that lost its beginning (grey, as the window's own notes in a terminal).
@@ -158,7 +162,13 @@ struct Term {
 #[derive(Default)]
 pub struct Terminals {
     map: Mutex<HashMap<String, Term>>,
+    /// How long a terminal outlives the connection that opened it, in ms (0: TERM_GRACE; tests set less).
+    grace_ms: std::sync::atomic::AtomicU64,
 }
+
+/// ST1 flow 25 c2: how long a shell goes on after the connection that opened it ended (a Wi-Fi drop, a move to a
+/// hotspot), so the window that comes back takes it over with what it wrote meanwhile. Nobody back by then: it ends.
+pub const TERM_GRACE: Duration = Duration::from_secs(5 * 60);
 
 /// Looks a program up on PATH (with Windows' executable extensions).
 pub fn find_on_path(program: &str) -> Option<PathBuf> {
@@ -531,7 +541,64 @@ impl Terminals {
             let _ = sink.send(TermEvent::Exit { code });
         }
         o.sink = Some(sink);
+        // Taken over (c2): a grace running for an earlier orphaning no longer ends it.
+        o.orphaned = false;
+        o.turn += 1;
         Ok(())
+    }
+
+    /// How long an orphaned terminal is kept (c2).
+    pub fn grace(&self) -> Duration {
+        match self.grace_ms.load(Ordering::SeqCst) {
+            0 => TERM_GRACE,
+            ms => Duration::from_millis(ms),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn set_grace(&self, grace: Duration) {
+        self.grace_ms
+            .store(grace.as_millis().max(1) as u64, Ordering::SeqCst);
+    }
+
+    /// The connection that opened (or last took over) a terminal ended (c2): its output is kept, nobody gets it, and
+    /// the shell goes on. Answers the turn to hand `end_orphan` once the grace is over; none when there is nothing to
+    /// keep (gone, or its shell already ended: then it is closed now).
+    pub fn orphan(&self, id: &str) -> Option<u64> {
+        let outlet = self
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .map(|t| t.outlet.clone())?;
+        let mut o = outlet.lock().unwrap_or_else(|e| e.into_inner());
+        if o.ended.is_some() {
+            drop(o);
+            self.kill(id);
+            return None;
+        }
+        o.sink = None;
+        o.orphaned = true;
+        o.turn += 1;
+        Some(o.turn)
+    }
+
+    /// The grace of one orphaning is over (c2): still nobody's, so it ends.
+    pub fn end_orphan(&self, id: &str, turn: u64) {
+        let outlet = self
+            .map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .map(|t| t.outlet.clone());
+        let Some(outlet) = outlet else { return };
+        let still = {
+            let o = outlet.lock().unwrap_or_else(|e| e.into_inner());
+            o.orphaned && o.turn == turn
+        };
+        if still {
+            self.kill(id);
+        }
     }
 
     pub fn kill(&self, id: &str) {

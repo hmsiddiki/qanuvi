@@ -660,7 +660,7 @@ impl Master {
                 let timeout = Duration::from_secs(n(args, "timeoutSecs").clamp(5, 1800));
                 to(checks::run(&self.root(args)?, &s(args, "command"), timeout))
             }
-            // Terminals: closed when the connection that opened them ends.
+            // Terminals: kept for TERM_GRACE when the connection that opened them ends (c2), then closed.
             "term_shells" => to(Ok(terminal::shells())),
             "term_spawn" => {
                 let root = self.root(args)?;
@@ -702,6 +702,11 @@ impl Master {
                         .is_ok()
                 });
                 self.terminals.attach(&s(args, "id"), term)?;
+                // c2: it is this connection's now, kept again for a while if this one ends too.
+                opened_terminals
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(s(args, "id"));
                 Ok(Value::Null)
             }
             "term_kill" => {
@@ -1303,8 +1308,19 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
             master.close_forwarded(key, id);
         } else if crate::pipes::is_pipe(id) {
             master.pipes.stop(id);
-        } else {
-            master.terminals.kill(id);
+        } else if let Some(turn) = master.terminals.orphan(id) {
+            // ST1 flow 25 c2: the shell goes on for a while; a window that comes back takes it over (term_attach).
+            let (me, id, grace) = (
+                Arc::downgrade(&master),
+                id.clone(),
+                master.terminals.grace(),
+            );
+            std::thread::spawn(move || {
+                std::thread::sleep(grace);
+                if let Some(m) = me.upgrade() {
+                    m.terminals.end_orphan(&id, turn);
+                }
+            });
         }
     }
 }
@@ -3760,6 +3776,7 @@ mod tests {
         let data = tempfile::tempdir().unwrap();
         let project = tempfile::tempdir().unwrap();
         let m = Arc::new(Master::open(data.path()).unwrap());
+        m.terminals.set_grace(Duration::from_millis(300));
         let p = projects::add(&m.db, &project.path().to_string_lossy()).unwrap();
         let shell = terminal::shells()[0].id.clone();
         let lines = [
@@ -3782,8 +3799,65 @@ mod tests {
         assert!(one["ok"].is_string(), "the terminal's id: {one}");
         let two = replies.iter().find(|r| r["id"] == 2).expect("answer 2");
         assert!(two["err"].as_str().unwrap().contains("nope"));
-        // The terminal ends with the connection.
-        assert!(m.terminals.write(one["ok"].as_str().unwrap(), "x").is_err());
+        // c2: the terminal outlives the connection for its grace, then ends.
+        let term = one["ok"].as_str().unwrap();
+        assert!(m.terminals.write(term, "x").is_ok());
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while m.terminals.write(term, "x").is_ok() {
+            assert!(
+                Instant::now() < deadline,
+                "the orphaned terminal did not end"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    #[test]
+    fn a_terminal_taken_over_by_a_new_connection_outlives_the_old_ones_grace() {
+        // ST1 flow 25 c2: a Wi-Fi drop ends the connection; the window comes back on a new one and takes the shell.
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let m = Arc::new(Master::open(data.path()).unwrap());
+        m.terminals.set_grace(Duration::from_millis(600));
+        let p = projects::add(&m.db, &project.path().to_string_lossy()).unwrap();
+        let shell = terminal::shells()[0].id.clone();
+        let spawn = json!({"id": 1, "cmd": "term_spawn", "args": {"projectId": p.id, "shell": shell, "cols": 80, "rows": 24, "onEvent": "t1"}});
+        let answer = |line: Value| {
+            let captured: Arc<Mutex<Vec<u8>>> = Arc::default();
+            let out: Out = Arc::new(Mutex::new(Box::new(Captured(captured.clone()))));
+            handle_connection(
+                m.clone(),
+                std::io::Cursor::new(line.to_string().into_bytes()),
+                out,
+            );
+            let text = String::from_utf8_lossy(&captured.lock().unwrap()).to_string();
+            text.lines()
+                .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+                .find(|r| r["id"] == 1)
+                .unwrap()
+        };
+        let first_ended = Instant::now();
+        let term = answer(spawn)["ok"].as_str().unwrap().to_string();
+        // Halfway through the first grace a second connection takes it over, then ends as well: its own grace starts.
+        std::thread::sleep(Duration::from_millis(300));
+        let taken =
+            answer(json!({"id": 1, "cmd": "term_attach", "args": {"id": term, "onEvent": "t2"}}));
+        assert!(taken.get("err").is_none(), "{taken}");
+        // The first grace is over now; that one no longer ends it.
+        std::thread::sleep(Duration::from_millis(750).saturating_sub(first_ended.elapsed()));
+        assert!(
+            m.terminals.write(&term, "x").is_ok(),
+            "the first grace ended a taken-over terminal"
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while m.terminals.write(&term, "x").is_ok() {
+            assert!(Instant::now() < deadline, "the second grace did not end it");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(
+            answer(json!({"id": 1, "cmd": "term_attach", "args": {"id": term, "onEvent": "t3"}}))["err"]
+                .is_string()
+        );
     }
 
     #[test]

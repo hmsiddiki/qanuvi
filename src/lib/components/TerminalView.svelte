@@ -7,7 +7,7 @@
   import "@xterm/xterm/css/xterm.css";
   import { api, errorText, type TermEvent } from "$lib/api";
   import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
-  import { linkEndedText, onLinkEnd, shownMachine } from "$lib/remote";
+  import { linkEndedText, linkLostText, onLinkBack, onLinkEnd, own, shownMachine } from "$lib/remote";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { EarlyInput, opensLink, osc52Copy, pasteText, urlsIn } from "$lib/terminalText";
 
@@ -70,6 +70,9 @@
   let played = false;
   let stopListening: (() => void) | null = null;
   let gone = false;
+  /** Its server's connection went; the shell goes on there and is taken over when it is back (c2). */
+  let waiting = false;
+  let stopBack: (() => void) | null = null;
 
   function resize() {
     if (!term || !fit || !host || host.offsetWidth === 0 || host.offsetHeight === 0) return;
@@ -154,7 +157,8 @@
       // Answers the screen gives to old output played back (a cursor question the shell asked long ago) are not
       // typed into the shell.
       if (replaying) return;
-      if (exited || early.hold(id, data)) return;
+      // Nothing typed goes to a shell whose connection is gone (it would be lost); it is back with the connection.
+      if (waiting || exited || early.hold(id, data)) return;
       api.term.write(id!, data).catch(() => {});
     });
     term.onTitleChange((title) => ontitle?.(title));
@@ -195,11 +199,37 @@
         } else term?.write(event.data);
       } else ended(event.code, endText ?? "The shell has ended. Close this tab or open a new terminal.");
     };
-    // j1: the link its shell runs through ended (its master restarted or the connection went): the shell ended with
-    // it, and no end comes on its stream, so the screen says so.
+    // j1: the link its shell runs through ended. This PC's own master stopped: the shell ended with it, and no end
+    // comes on its stream, so the screen says so. A server's connection went (c2: a Wi-Fi drop, a hotspot): its
+    // master keeps the shell for a while, and this screen takes it over again when the machine is back.
     const machine = tab ? tab.machine : shownMachine();
+    const takeBack = async (on: string) => {
+      if (!waiting || !id || gone || exited) return;
+      stopBack?.();
+      stopBack = null;
+      own(id, on);
+      // The whole kept output comes again: the screen starts over with it.
+      replaying = true;
+      played = false;
+      term?.reset();
+      try {
+        await api.term.attach(id, onEvent);
+        waiting = false;
+        if (!played) setTimeout(() => !played && (replaying = false), 500);
+        resize();
+      } catch {
+        replaying = false;
+        waiting = false;
+        ended(null, linkEndedText(on));
+      }
+    };
     void onLinkEnd(machine, () => {
-      if (id) ended(null, linkEndedText(machine));
+      if (!id || exited) return;
+      if (machine === null) return ended(null, linkEndedText(machine));
+      if (waiting) return;
+      waiting = true;
+      term?.write(`\r\n\x1b[90m[${linkLostText(machine)}]\x1b[0m\r\n`);
+      stopBack = onLinkBack(machine, () => void takeBack(machine));
     }).then((stop) => {
       if (gone) stop();
       else stopListening = stop;
@@ -261,6 +291,7 @@
     observer?.disconnect();
     gone = true;
     stopListening?.();
+    stopBack?.();
     // Only a closed tab (or the window going) stops the shell. A screen that goes while its tab stays (its machine
     // hidden, the terminal panel or work pane closed) leaves it running, its output kept for the next screen.
     // Whether the tab was closed is asked of the store's plain record: state read here is as it was before the change

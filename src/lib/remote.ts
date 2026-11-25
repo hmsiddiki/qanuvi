@@ -227,6 +227,36 @@ export function linkEnded(machine: string): void {
   for (const fn of [...(linkEnds.get(machine) ?? [])]) fn();
 }
 
+/** Who waits for a machine's link to come back (ST1 flow 25 c2: a terminal that kept its shell there), by key. */
+const linkBacks = new Map<string, Set<() => void>>();
+
+/** Calls `fn` each time the machine is connected again after its link ended. Answers the way to stop listening. */
+export function onLinkBack(machine: string, fn: () => void): () => void {
+  const fns = linkBacks.get(machine) ?? new Set<() => void>();
+  linkBacks.set(machine, fns);
+  fns.add(fn);
+  return () => {
+    fns.delete(fn);
+    if (!fns.size && linkBacks.get(machine) === fns) linkBacks.delete(machine);
+  };
+}
+
+/** A machine is connected again (its status came back on). */
+export function linkBack(machine: string): void {
+  for (const fn of [...(linkBacks.get(machine) ?? [])]) fn();
+}
+
+/**
+ * The line a terminal shows while its link to a server is gone (c2): the shell goes on there for a while (the master's
+ * TERM_GRACE, 5 minutes) and comes back here with the connection.
+ */
+export function linkLostText(machine: string): string {
+  return (
+    `The connection to ${machineName(machine)} was lost. The shell goes on there for 5 minutes and comes back here ` +
+    "when the connection does."
+  );
+}
+
 /** The sentence a terminal shows when its link ended (finding j1): the shell ended with it. */
 export function linkEndedText(machine: string | null): string {
   const what =
