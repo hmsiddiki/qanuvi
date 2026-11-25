@@ -41,10 +41,10 @@ pub struct Link {
 }
 
 /// d2: how often a link looks whether this computer's network changed (asked of the system; nothing is sent).
-const NET_LOOK: Duration = Duration::from_secs(3);
+pub(crate) const NET_LOOK: Duration = Duration::from_secs(3);
 
 /// d2: the address this computer would use to reach `peer` now (None: no way there at the moment).
-fn route_to(peer: std::net::SocketAddr) -> Option<std::net::IpAddr> {
+pub(crate) fn route_to(peer: std::net::SocketAddr) -> Option<std::net::IpAddr> {
     let bind = if peer.is_ipv4() {
         "0.0.0.0:0"
     } else {
@@ -57,7 +57,7 @@ fn route_to(peer: std::net::SocketAddr) -> Option<std::net::IpAddr> {
 
 /// d2: whether a link on `local` is left behind: no way to the relay now, or another address would be used. An IPv6
 /// address on the same /64 is the same network (temporary addresses change by themselves).
-fn moved(local: std::net::IpAddr, now: Option<std::net::IpAddr>) -> bool {
+pub(crate) fn moved(local: std::net::IpAddr, now: Option<std::net::IpAddr>) -> bool {
     use std::net::IpAddr::V6;
     match (local, now) {
         (_, None) => true,

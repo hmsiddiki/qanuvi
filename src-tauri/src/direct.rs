@@ -159,6 +159,7 @@ fn read_lines(
     mut on_line: impl FnMut(Vec<u8>),
 ) {
     let _ = stream.set_read_timeout(Some(QUIET));
+    let watching = watch_network(&stream);
     let mut quiet = 0;
     loop {
         match read_frame(&mut stream, FRAME_MAX) {
@@ -194,11 +195,42 @@ fn read_lines(
             Err(_) => break,
         }
     }
+    watching.store(false, std::sync::atomic::Ordering::SeqCst);
     let _ = stream.shutdown(std::net::Shutdown::Both);
     let mut s = slot.lock().unwrap_or_else(|e| e.into_inner());
     if s.as_ref().is_some_and(|o| o.id == id) {
         *s = None;
     }
+}
+
+/// ST1 flow 24 nb2: a direct link notices that this computer changed network (Wi-Fi to a hotspot) within a few
+/// seconds, as relay links do since d2. It waited for three quiet times (45 s) instead, and lines sent meanwhile went
+/// into a dead socket. A changed route shuts the socket, so the reader ends and the session goes on over the relay.
+/// The returned flag stops the watch when the reader ends by itself.
+fn watch_network(stream: &TcpStream) -> Arc<std::sync::atomic::AtomicBool> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let on = Arc::new(AtomicBool::new(true));
+    let ends = stream
+        .local_addr()
+        .ok()
+        .map(|a| a.ip().to_canonical())
+        .zip(stream.peer_addr().ok());
+    let (Some((local, peer)), Ok(sock)) = (ends, stream.try_clone()) else {
+        return on;
+    };
+    let still = on.clone();
+    std::thread::spawn(move || {
+        while still.load(Ordering::SeqCst) {
+            std::thread::sleep(crate::relay_client::NET_LOOK);
+            if still.load(Ordering::SeqCst)
+                && crate::relay_client::moved(local, crate::relay_client::route_to(peer))
+            {
+                let _ = sock.shutdown(std::net::Shutdown::Both);
+                break;
+            }
+        }
+    });
+    on
 }
 
 #[derive(Serialize, Deserialize)]
