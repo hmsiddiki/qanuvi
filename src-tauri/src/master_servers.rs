@@ -13,15 +13,18 @@ use std::sync::Arc;
 /// How long a master waits before it tries its away servers again.
 pub const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
-/// nb3: the waits before each quick try after a connection ended by itself (about 40 s in all, then every minute).
-const RETRY_SOON: [std::time::Duration; 6] = [
+/// nb3: the waits before the first quick tries after a connection ended by itself; then a try every
+/// `RETRY_THEN` until `RETRY_FOR` has passed, and after that the minute's round alone.
+const RETRY_SOON: [std::time::Duration; 4] = [
     std::time::Duration::from_secs(2),
     std::time::Duration::from_secs(3),
     std::time::Duration::from_secs(5),
     std::time::Duration::from_secs(5),
-    std::time::Duration::from_secs(10),
-    std::time::Duration::from_secs(15),
 ];
+const RETRY_THEN: std::time::Duration = std::time::Duration::from_secs(10);
+/// A Wi-Fi drop of a minute or more (the drive's was 36 s, at the edge of the first series) still comes back within
+/// seconds of the network.
+const RETRY_FOR: std::time::Duration = std::time::Duration::from_secs(5 * 60);
 
 /// Why "local" (a desktop's test master next to the app) and "self" (the desktop itself) are not servers of a master.
 fn app_only(target: &str) -> String {
@@ -154,8 +157,8 @@ impl Master {
         self.retry_soon(id);
     }
 
-    /// ST1 flow 24 nb3: a connection that ended by itself is tried again after a few seconds, then a little later,
-    /// before the minute's round takes over. It waited for that round alone, so a Wi-Fi drop, a move to a hotspot or
+    /// ST1 flow 24 nb3: a connection that ended by itself is tried again after a few seconds, then every 10 s for
+    /// five minutes, before the minute's round takes over. It waited for that round alone, so a Wi-Fi drop, a move to a hotspot or
     /// a try while the network was still coming up (no name lookup yet) left the machine away for up to a minute.
     fn retry_soon(&self, id: &str) {
         let Some(me) = self.me.get().cloned() else {
@@ -171,7 +174,12 @@ impl Master {
         }
         let id = id.to_string();
         std::thread::spawn(move || {
-            for wait in RETRY_SOON {
+            let since = std::time::Instant::now();
+            let later = std::iter::repeat(RETRY_THEN);
+            for wait in RETRY_SOON.into_iter().chain(later) {
+                if since.elapsed() >= RETRY_FOR {
+                    break;
+                }
                 std::thread::sleep(wait);
                 let Some(m) = me.upgrade() else { return };
                 if m.try_again(&id) {
