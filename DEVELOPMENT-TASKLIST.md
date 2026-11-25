@@ -134,6 +134,28 @@ and ST1 has been driven again on the finished build.
     already connected for it before writing an own script or starting another browser.
   - f. Seen and changed in Settings → Memory; driven live with a handover in the middle (the preference must hold
     after it).
+- [ ] **O7. Qanuvi takes care of the machine it runs on (owner, 2026-11-26)**: on every OS, Qanuvi must never leave
+  the user's machine worse off, and it notices and explains what is wrong with it. Found on This PC: the kernel's paged
+  pool at 8.4 GB (normal 0.3-1 GB), RAM at 77-87% with nothing visible to blame. The cause was a link logger left
+  running for 3 days by an earlier agent session, starting about 8 Git Bash programs a second. Each Git Bash program
+  start left one access token in the kernel ("Toke" tag, 1.77 M tokens, about 5 GB). The leak stopped the moment the
+  loop was ended; only a restart gives the memory back.
+  - a. Own leftovers never outlive their owner: background commands, loops, loggers, helpers (MCP, browsers) and
+    agent sessions that Qanuvi or its agents started are tracked, and are ended when their session, step or chat
+    ends, or when they go idle past a limit. Nothing runs forever unseen. A leftover from an earlier run is found at
+    start and listed with "End".
+  - b. A machine health watch, cheap and native (no per-second program starts): memory, swap/commit, CPU, disk,
+    process counts, and on Windows the kernel pools by tag (NtQuerySystemInformation class 22: "Toke" growing =
+    program starts are leaking). Linux: /proc meminfo and slab; macOS: vm_stat. Watched over time, so a slow leak shows
+    as a trend, not just a number.
+  - c. Plain explanations and safe fixes: "Windows is holding 5 GB of leaked security tokens from programs started by
+    X; ended X; a restart gives the 5 GB back", with one-click actions only for what Qanuvi owns or the user confirms.
+    Never ends the user's own apps without asking.
+  - d. Agents are told and held to it: no polling loops that start programs every second (one long-lived process
+    instead), and every background command they start is ended before their turn or step is over (bg1-bg5 started
+    this for plan runs; chats and helpers too).
+  - e. Seen in the window (status bar memory line + a Machine health page in Settings) and per connected machine
+    (viewer: each machine's own health). Driven live on Windows and Linux with a leak made on purpose.
 
 ## Stage 1: the app shell (first goal)
 
