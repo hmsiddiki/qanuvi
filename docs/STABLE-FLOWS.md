@@ -38,7 +38,7 @@ A row is green only when both systems pass.
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | pass (s13) | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | pass (s13) | - |
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | PASS (2026-11-26) | s15 |
-| 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | - |
+| 25 | Network drop and back | reconnecting line, then connected; no stale lines | PASS (2026-11-26) | s16 |
 | 26 | Sleep and wake | links, runs and terminals come back | - | - |
 | 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
 | 28 | Backups and data folder | daily backup made; restore of one table on scratch data | pass after ba1, ba2 (s14) | - |
@@ -177,4 +177,11 @@ Seen, not fixed (for ST2 or later):
   and nb3 (a link that ended by itself waited for the minute's round: away up to a minute after the network came
   back). After a9440ac: Wi-Fi off 36 s and on, direct 5 s after the network; to the hotspot, relay 5 s after; back
   home, direct 1 s after. The road book kept the own port (skip_until 0). Not checked: a drop longer than 40 s.
-- Flows 25, 26 (network off with the window watched, sleep) and 31 (a clean user account) need the owner.
+- s16 (flow 25, laptop test window viewing a server, Wi-Fi off about 60 s): found c1 (the "connection lost,
+  reconnecting" cover stayed about 14 s after the link was back: it waited for the window's own next try) and c2 (a
+  terminal on the server ended with the connection). Fixed 1bc149c + 06ae772 (owner: c2 in ST): a shell outlives
+  its connection for 5 minutes, typing waits, the window takes it over when the machine is back. Driven with a test
+  master from 06ae772 on This PC ("This PC test", its own data): link back direct 3 s after the network, cover gone
+  within 2 s, the terminal came back with every line printed meanwhile and kept counting. A master before 06ae772
+  still ends the shell (the window then says it ended).
+- Flows 26 (sleep) and 31 (a clean user account) need the owner.
