@@ -682,6 +682,7 @@ impl Master {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .insert(id.clone());
+                self.terminals.hold(&id, holder_of(opened_terminals));
                 Ok(json!(id))
             }
             "term_write" => to(self.terminals.write(&s(args, "id"), &s(args, "data"))),
@@ -707,6 +708,8 @@ impl Master {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .insert(s(args, "id"));
+                self.terminals
+                    .hold(&s(args, "id"), holder_of(opened_terminals));
                 Ok(Value::Null)
             }
             "term_kill" => {
@@ -1308,7 +1311,7 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
             master.close_forwarded(key, id);
         } else if crate::pipes::is_pipe(id) {
             master.pipes.stop(id);
-        } else if let Some(turn) = master.terminals.orphan(id) {
+        } else if let Some(turn) = master.terminals.orphan(id, holder_of(&terminals)) {
             // ST1 flow 25 c2: the shell goes on for a while; a window that comes back takes it over (term_attach).
             let (me, id, grace) = (
                 Arc::downgrade(&master),
@@ -1323,6 +1326,11 @@ pub fn handle_connection(master: Arc<Master>, input: impl BufRead, out: Out) {
             });
         }
     }
+}
+
+/// A connection's identity while it lasts (c2): the address of its own set of opened terminals.
+fn holder_of(opened: &Mutex<HashSet<String>>) -> usize {
+    opened as *const _ as usize
 }
 
 /// The writer of a connection that ended: every write fails.
@@ -3810,6 +3818,49 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(50));
         }
+    }
+
+    #[test]
+    fn an_old_connection_noticed_gone_late_leaves_a_taken_over_terminal_alone() {
+        // ST1 flow 25 c2 (driven): the master noticed the laptop's old connection gone 80 s after the Wi-Fi drop,
+        // when the window had already taken the shell over on a new one; that late end took its output away.
+        let project = tempfile::tempdir().unwrap();
+        let terms = terminal::Terminals::default();
+        let (tx, rx) = std::sync::mpsc::channel::<terminal::TermEvent>();
+        let sink = Sink::new(move |e| tx.send(e).is_ok());
+        let shell = terminal::shells()[0].id.clone();
+        let id = terms
+            .spawn("p", project.path(), &shell, 80, 24, sink)
+            .unwrap();
+        let (old, new) = (1usize, 2usize);
+        terms.hold(&id, old);
+        // The window comes back on the new connection and takes it over.
+        let (tx2, rx2) = std::sync::mpsc::channel::<terminal::TermEvent>();
+        terms
+            .attach(&id, Sink::new(move |e| tx2.send(e).is_ok()))
+            .unwrap();
+        terms.hold(&id, new);
+        // The old connection's end comes now: nothing changes.
+        assert_eq!(terms.orphan(&id, old), None);
+        while rx2.try_recv().is_ok() {}
+        terms.write(&id, "echo late-end-check\r\n").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut seen = String::new();
+        while !seen.contains("late-end-check") {
+            assert!(
+                Instant::now() < deadline,
+                "the new connection got no output: {seen}"
+            );
+            if let Ok(terminal::TermEvent::Data { data }) =
+                rx2.recv_timeout(Duration::from_millis(200))
+            {
+                seen.push_str(&data);
+            }
+        }
+        // The holder's own end still orphans it.
+        assert!(terms.orphan(&id, new).is_some());
+        drop(rx);
+        terms.kill(&id);
     }
 
     #[test]

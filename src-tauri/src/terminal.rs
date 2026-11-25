@@ -67,6 +67,9 @@ struct Outlet {
     orphaned: bool,
     /// Counts orphanings and takeovers, so a grace that ran out ends only the orphaning it was for.
     turn: u64,
+    /// The connection that has it now (0: none noted). Only that one's end orphans it: an old connection that is
+    /// noticed gone late (its pings ran out after the window had come back on a new one) leaves it alone.
+    holder: usize,
 }
 
 /// Said before kept output that lost its beginning (grey, as the window's own notes in a terminal).
@@ -564,7 +567,7 @@ impl Terminals {
     /// The connection that opened (or last took over) a terminal ended (c2): its output is kept, nobody gets it, and
     /// the shell goes on. Answers the turn to hand `end_orphan` once the grace is over; none when there is nothing to
     /// keep (gone, or its shell already ended: then it is closed now).
-    pub fn orphan(&self, id: &str) -> Option<u64> {
+    pub fn orphan(&self, id: &str, holder: usize) -> Option<u64> {
         let outlet = self
             .map
             .lock()
@@ -572,6 +575,10 @@ impl Terminals {
             .get(id)
             .map(|t| t.outlet.clone())?;
         let mut o = outlet.lock().unwrap_or_else(|e| e.into_inner());
+        if o.holder != 0 && o.holder != holder {
+            // Taken over by another connection meanwhile: that one has it.
+            return None;
+        }
         if o.ended.is_some() {
             drop(o);
             self.kill(id);
@@ -581,6 +588,13 @@ impl Terminals {
         o.orphaned = true;
         o.turn += 1;
         Some(o.turn)
+    }
+
+    /// Notes the connection that has a terminal now (c2: spawned or taken over on it).
+    pub fn hold(&self, id: &str, holder: usize) {
+        if let Some(t) = self.map.lock().unwrap_or_else(|e| e.into_inner()).get(id) {
+            t.outlet.lock().unwrap_or_else(|e| e.into_inner()).holder = holder;
+        }
     }
 
     /// The grace of one orphaning is over (c2): still nobody's, so it ends.
