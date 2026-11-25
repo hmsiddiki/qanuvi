@@ -39,7 +39,7 @@ A row is green only when both systems pass.
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | pass (s13) | - |
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | PASS (2026-11-26) | s15 |
 | 25 | Network drop and back | reconnecting line, then connected; no stale lines | PASS (2026-11-26) | s16 |
-| 26 | Sleep and wake | links, runs and terminals come back | - | - |
+| 26 | Sleep and wake | links, runs and terminals come back | PASS (2026-11-26; runs not checked) | s17 |
 | 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
 | 28 | Backups and data folder | daily backup made; restore of one table on scratch data | pass after ba1, ba2 (s14) | - |
 | 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | - |
@@ -184,4 +184,9 @@ Seen, not fixed (for ST2 or later):
   master from 06ae772 on This PC ("This PC test", its own data): link back direct 3 s after the network, cover gone
   within 2 s, the terminal came back with every line printed meanwhile and kept counting. A master before 06ae772
   still ends the shell (the window then says it ended).
-- Flows 26 (sleep) and 31 (a clean user account) need the owner.
+- s17 (flow 26, laptop asleep about 3 minutes, window showing "This PC test" with a counting terminal): link back
+  direct 2 s after the Wi-Fi rejoined; the terminal came back with the lines printed meanwhile and still counted 2
+  minutes later. Found before it (after s16): the server noticed the laptop's old link gone 80 s late, after the
+  window had taken the shell over on the new one, and took its output away; fixed fe9b54f (only the connection
+  that holds a terminal orphans it). No plan run was going during the sleep (runs not checked here).
+- Flow 31 (a clean user account) needs the owner.
