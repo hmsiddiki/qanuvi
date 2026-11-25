@@ -115,6 +115,25 @@ and ST1 has been driven again on the finished build.
   agent, the chat and the assistant (paid agents that have their own search keep it). Search providers pluggable:
   a free-tier search API with the user's key, a self-hosted search, or later a search through qanuvi.com for
   signed-in users; the choice and its limits said plainly. Sign-in needed (O1 f).
+- [ ] **O6. The user's preferences are kept and every session knows them (owner, 2026-11-26)**: basic for an
+  assistant that codes; the user never has to know about handovers or repeat themselves. Found on qpfixbase: after
+  a chat handover at 153k (the note asks only about the work, `src/lib/agent/handover.ts`), "visual checks in my open
+  Vivaldi" was lost. The new session ran its own hidden Playwright, then the 4-minute suite, and needed three
+  corrections, although the Playwright extension tools for the open Vivaldi were in its tool list.
+  - a. Kept as said: a standing instruction ("use my Vivaldi for visual checks", "don't run the full suite unless I
+    ask") goes at once to the right memory: About me (account, every project) for how the user works, or This project
+    (machine) for the project's own setup. Said outright = the user's setting, kept without asking. Only noticed or
+    guessed = a suggestion in the Inbox (nothing learned is a rule). The agent says in one line what it kept and where.
+  - b. Corrections count most: "no, I said…" or "why again" means keep it now. A repeated correction must never
+    happen.
+  - c. Every session starts with them: new chats, handed-over chats and plan steps, all memories, not only the plan
+    run's FACTS.
+  - d. A backstop in the handover note: a short "how the user wants things done" part for anything said in that chat
+    and not yet kept.
+  - e. Given tools first: when the user names a tool or app ("playwright in my Vivaldi"), use the tool Qanuvi
+    already connected for it before writing an own script or starting another browser.
+  - f. Seen and changed in Settings → Memory; driven live with a handover in the middle (the preference must hold
+    after it).
 
 ## Stage 1: the app shell (first goal)
 
