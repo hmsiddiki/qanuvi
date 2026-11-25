@@ -13,6 +13,16 @@ use std::sync::Arc;
 /// How long a master waits before it tries its away servers again.
 pub const RECONNECT_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// nb3: the waits before each quick try after a connection ended by itself (about 40 s in all, then every minute).
+const RETRY_SOON: [std::time::Duration; 6] = [
+    std::time::Duration::from_secs(2),
+    std::time::Duration::from_secs(3),
+    std::time::Duration::from_secs(5),
+    std::time::Duration::from_secs(5),
+    std::time::Duration::from_secs(10),
+    std::time::Duration::from_secs(15),
+];
+
 /// Why "local" (a desktop's test master next to the app) and "self" (the desktop itself) are not servers of a master.
 fn app_only(target: &str) -> String {
     format!(
@@ -138,9 +148,60 @@ impl Master {
     /// One of its connections ended by itself: it is let go, and the followers are told why.
     fn remote_ended(&self, id: &str) {
         self.remotes.disconnect(id);
-        let said = "The connection ended. Work there goes on; it is tried again in a minute.";
+        let said = "The connection ended. Work there goes on; it is tried again in a moment.";
         self.note_error(id, Some(said));
         self.servers_changed(json!({"closed": id, "error": said}));
+        self.retry_soon(id);
+    }
+
+    /// ST1 flow 24 nb3: a connection that ended by itself is tried again after a few seconds, then a little later,
+    /// before the minute's round takes over. It waited for that round alone, so a Wi-Fi drop, a move to a hotspot or
+    /// a try while the network was still coming up (no name lookup yet) left the machine away for up to a minute.
+    fn retry_soon(&self, id: &str) {
+        let Some(me) = self.me.get().cloned() else {
+            return;
+        };
+        if !self
+            .retrying
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id.to_string())
+        {
+            return;
+        }
+        let id = id.to_string();
+        std::thread::spawn(move || {
+            for wait in RETRY_SOON {
+                std::thread::sleep(wait);
+                let Some(m) = me.upgrade() else { return };
+                if m.try_again(&id) {
+                    break;
+                }
+            }
+            if let Some(m) = me.upgrade() {
+                m.retrying
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&id);
+            }
+        });
+    }
+
+    /// One quick try for `retry_soon`; true when there is nothing more to try (connected, held off or gone).
+    fn try_again(&self, id: &str) -> bool {
+        if self.remotes.connected().iter().any(|c| c == id) || self.is_held_off(id) {
+            return true;
+        }
+        let Ok(list) = crate::servers::list(&self.db) else {
+            return true;
+        };
+        let Some(server) = list.into_iter().find(|s| s["id"] == id) else {
+            return true;
+        };
+        if server["autoConnect"] != true || (self.app_data && app_held(&server)) {
+            return true;
+        }
+        self.connect_server(&server).is_ok()
     }
 
     /// Connects to one of its servers (or answers the connection it has) and answers that machine's hello.

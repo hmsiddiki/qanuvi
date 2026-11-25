@@ -89,6 +89,8 @@ pub struct Master {
     /// Servers disconnected on purpose (finding z2): not connected again every minute until a connect asks for them
     /// (their "connect by itself" setting stays as it is; the next start of the master tries them again).
     held_off: Mutex<std::collections::HashSet<String>>,
+    /// Servers whose connection ended by itself and are being tried again quickly (nb3), one series each.
+    retrying: Mutex<std::collections::HashSet<String>>,
     /// Remote access through a relay (Milestone 20).
     pub relay: Arc<crate::relay_client::RelayMaster>,
     /// This master itself, for the relay link (set once it is shared).
@@ -247,6 +249,7 @@ impl Master {
             quit_question: Default::default(),
             remote_errors: Mutex::default(),
             held_off: Mutex::default(),
+            retrying: Mutex::default(),
             relay: {
                 // 24rl R3: what is learned about each relay's own port is kept with this master's data.
                 crate::relay_client::keep_roads_in(dir);
