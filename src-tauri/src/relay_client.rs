@@ -470,18 +470,21 @@ impl Link {
         let relay = check_relay_url(url)?;
         let road = road_of(&relay);
         let now = now_secs();
+        let mut own_failed = false;
         if !road.direct.is_empty() && road.skip_until <= now {
             match open_ws(&road.direct, DIRECT_TRY) {
                 Ok(ws) => {
                     took(&relay, OWN_PORT, None);
                     return Ok(Self::with(ws, relay));
                 }
-                Err(_) => took(&relay, &road.last, Some(now + SKIP_BLOCKED)),
+                Err(_) => own_failed = true,
             }
         }
         let ws = open_ws(&relay, CONNECT_LIMIT)
             .map_err(|e| format!("The relay could not be reached: {e}"))?;
-        took(&relay, THROUGH_SAVED, None);
+        // ST1 flow 24 (2026-11-26): the own port counts as blocked only when the saved address then works. When both
+        // fail the network itself is down (a Wi-Fi blip), and one blip had put the link on 443 for 6 hours.
+        took(&relay, THROUGH_SAVED, own_failed.then_some(now + SKIP_BLOCKED));
         Ok(Self::with(ws, relay))
     }
 
@@ -2442,6 +2445,17 @@ mod tests {
             }
         }
         rm.configure(&relay, "Home PC", false, master).unwrap();
+    }
+
+    #[test]
+    fn a_network_that_is_down_does_not_mark_the_relays_own_port_blocked() {
+        // ST1 flow 24: a reconnect during a Wi-Fi blip fails on both roads; the own port stays in use afterwards.
+        let free = |_| std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+        let (saved, own) = (free(0), free(1));
+        let relay = check_relay_url(&format!("ws://127.0.0.1:{saved}")).unwrap();
+        learn(&relay, &format!("wss://127.0.0.1:{own}"));
+        assert!(Link::connect(&relay).is_err());
+        assert_eq!(road_of(&relay).skip_until, 0);
     }
 
     #[test]
