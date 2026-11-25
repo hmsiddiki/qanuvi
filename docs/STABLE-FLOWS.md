@@ -37,7 +37,7 @@ A row is green only when both systems pass.
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | pass (s12) | - |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | pass (s13) | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | pass (s13) | - |
-| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | - |
+| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | PASS (2026-11-26) | s15 |
 | 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | - |
 | 26 | Sleep and wake | links, runs and terminals come back | - | - |
 | 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
@@ -172,4 +172,9 @@ Seen, not fixed (for ST2 or later):
   kept, a "before restore" copy beside the others. All data roots of one kind share one default backups folder: the
   list shows backups of other data folders (other test data here; on a real install, the app and one master are apart
   by design) with a Restore button each, and "the last 7 are kept" counts them all together.
-- Flows 24-26 (hotspot, network off, sleep) and 31 (a clean user account) need the owner.
+- s15 (flow 24, laptop test copy paired with the installed Home PC 0.1.48, owner moved the Wi-Fi): fixed nb1 (a
+  Wi-Fi blip marked the relay's own port blocked for 6 h), nb2 (a direct link waited 45 s after a network change)
+  and nb3 (a link that ended by itself waited for the minute's round: away up to a minute after the network came
+  back). After a9440ac: Wi-Fi off 36 s and on, direct 5 s after the network; to the hotspot, relay 5 s after; back
+  home, direct 1 s after. The road book kept the own port (skip_until 0). Not checked: a drop longer than 40 s.
+- Flows 25, 26 (network off with the window watched, sleep) and 31 (a clean user account) need the owner.
