@@ -34,18 +34,18 @@ A row is green only when both systems pass.
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
 | 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) |
-| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | pass (s12) | - |
-| 22 | Pair a machine | code pairing over the relay; machine in the switcher | pass (s13) | - |
-| 23 | Switch machines | the other machine's projects, chat, terminal; back again | pass (s13) | - |
-| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | PASS (2026-11-26) | s15 |
-| 25 | Network drop and back | reconnecting line, then connected; no stale lines | PASS (2026-11-26) | s16 |
-| 26 | Sleep and wake | links, runs and terminals come back | PASS (2026-11-26; runs not checked) | s17 |
+| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) |
+| 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) |
+| 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | pass (s13) |
+| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | pass (s15) |
+| 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | pass after c1, c2 (s16) |
+| 26 | Sleep and wake | links, runs and terminals come back | - | pass; runs not checked (s17) |
 | 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
-| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | pass after ba1, ba2 (s14) | - |
-| 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | - |
+| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | - | pass after ba1, ba2 (s14) |
+| 29 | Settings | every page opens, scrolls, saves; Save always reachable | - | pass |
 | 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | - | pass (s11) |
 | 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | - |
-| 32 | Go back one version | previous build installs over; data intact | pass (s12) | - |
+| 32 | Go back one version | previous build installs over; data intact | - | pass (s12) |
 
 ST3, the 24 h run, has its own log. It covers memory and handle counts every 10 minutes, stuck processes, dead links, and the run's end line.
 
