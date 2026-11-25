@@ -229,7 +229,10 @@ class MastersStore {
     if (e.road) return this.#road(`${parent}/${e.road}`, !!e.direct);
     if (e.connected && e.info) {
       await this.#readNested(parent).catch(() => {});
-      await this.#nestedState(`${parent}/${e.connected}`, { state: "on", info: e.info });
+      const key = `${parent}/${e.connected}`;
+      // ST1 flow 25 c1: a held (lost) screen of it goes now, not at the window's own next try.
+      if (switcher.held?.id === key) await this.retryNow();
+      else await this.#nestedState(key, { state: "on", info: e.info });
     } else if (e.closed) {
       const key = `${parent}/${e.closed}`;
       if (e.removed) return this.#removedNested(key);
@@ -643,7 +646,9 @@ class MastersStore {
     if (!m || appHeld(m)) return;
     const now = this.statusOf(id);
     if (e.connected) {
-      if (now.state !== "on" && now.state !== "connecting") await this.connect(m);
+      // ST1 flow 25 c1: the held (lost) screen of it goes now, not at the window's own next try (up to 20 s later).
+      if (switcher.held?.id === id) await this.retryNow();
+      else if (now.state !== "on" && now.state !== "connecting") await this.connect(m);
       return;
     }
     if (e.removed) {
