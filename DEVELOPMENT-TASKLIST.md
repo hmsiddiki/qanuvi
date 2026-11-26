@@ -2051,6 +2051,31 @@ and ST1 has been driven again on the finished build.
       window quits); look at it in the install part. Owner asked about the white plate behind the Dock/notification
       icon: macOS 26+ puts every app icon that is not a full rounded square on a light plate; only a Mac-only icon that
       fills the square avoids it (owner to choose the background).
+    MAC ICON DONE (owner: darker background; tray icon stays transparent): icons/icon.icns is now the logo on a dark
+      rounded square (Apple's 1024 grid, 824 px square, gradient #2a2833 -> #141416, faint edge), made on the Mac by
+      src-tauri/macos/macicon.swift + iconutil (steps in src-tauri/macos/README.md; redo after `npx tauri icon`).
+      Seen in the Dock on the Mac mini: no white plate. Windows/Linux icons unchanged.
+    OWNER DECISION 2026-11-27: NO Apple Developer account for now. Mac builds ship unsigned (ad-hoc): the first open
+      needs System Settings -> Privacy & Security -> "Open Anyway" once; the download page must say so.
+    MAC INSTALL/UPDATE PLAN (next, build in order):
+      MU1 a .dmg for downloads (tauri --bundles app,dmg; drag-to-Applications window, the dark icon); check its size
+          and that it opens on the Mac; the download page text for "Open Anyway".
+      MU2 Mac updates: publish-update.mjs builds on the Mac over ssh (QANUVI_MAC_APP_HOST, like the Linux L2 step),
+          packs Qanuvi.app as Qanuvi_<v>_mac.tar.gz, signs it on This PC, lists it as darwin-aarch64. In the app:
+          INSTALLER_END "_mac.tar.gz" on macOS, a mac_install_script beside linux_install_script (wait for the app and
+          master to end via ps, unpack beside the bundle, swap Qanuvi.app in, keep the old one as a .prev outside
+          /Applications, `open -a` again, --background when no window was open; an unpack failure restarts the old
+          one), unit tests like the Linux ones, then a whole update driven on the Mac from a test channel.
+      MU3 Qanuvi running outside /Applications (the disk image, Downloads, macOS's read-only "App Translocation" copy
+          of an unsigned app) cannot be updated in place: offer once in the Inbox "Move Qanuvi to Applications" (like
+          s18), copy with ditto, start again from there.
+      Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
+      background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
+      (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    PICKUP POINT (newest, 2026-11-27 05:00): Mac mini set up and driven (m1 helper app, m4 notifications, Mac icon all
+      DRIVEN LIVE and pushed, unpublished). Next: MU1 -> MU2 -> MU3 above. Mac drive kit: memory note mac-mini
+      (mdrive refuses keys unless Qanuvi is front; tray via `mdrive tray`). Site: owner runs the register/social
+      sign-in plan, then we put qanuvi.com online and set the app's built-in client id to the live site's one.
     PICKUP POINT (2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
       nb1-nb3, c1, c2, n31a, w1, s18 Install for this user, bk1 backups skip build files, tb1 test-build cleanup;
       backup E:/Backups/qanuvi/channel-before-0.1.49; all 9 files online, 200, sizes match). s18 DRIVEN
