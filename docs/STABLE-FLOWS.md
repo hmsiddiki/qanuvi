@@ -198,7 +198,11 @@ Seen, not fixed (for ST2 or later):
   offer "Install for this user" on first start from elsewhere); backup folders are named in UTC (sorting, by design).
   Not driven: the .deb installer (needs sudo), a real second user account. Owner said yes to the proposal: built
   b08fdcd (s18 Install for this user: asked once in the Inbox; yes copies the unpacked folder in with the update
-  helper and starts again from there; unit-tested, the copy run for real on Linux; not driven in a window yet).
+  helper and starts again from there; unit-tested, the copy run for real on Linux). Driven 2026-11-27 with the
+  published 0.1.49 tarball unpacked into ~/Qanuvi of a new empty home: the question came in the Inbox on first
+  start, "Install for this user" copied qanuvi, qanuvi-master and the icon to ~/.local/lib/qanuvi, wrote the menu
+  entry (qanuvi:// links included) and the 128 px icon, and the app started again from there within seconds (window,
+  master and core all from ~/.local/lib/qanuvi); not asked again after the restart. PASS.
   Found while clearing the laptop's full disk (2.1 GB free): bk1, daily backups copied test-builds (4.7 GB each),
   now left out with updates and web caches; tb1, test builds' kept output never went, now removed at start when the
   project is gone or unused 14 days (both b08fdcd).
