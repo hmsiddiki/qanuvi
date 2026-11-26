@@ -311,6 +311,27 @@ enum Opening {
     None,
 }
 
+/// ST1 Windows w1: the master service starts in a new process group (CREATE_NEW_PROCESS_GROUP), which turns Ctrl+C
+/// off for it, and every program started from it inherits that: Ctrl+C in a terminal stopped nothing. Turned on again
+/// once, before the first shell starts, so shells and what runs in them get Ctrl+C; this process itself ignores it
+/// through its own handler (handlers are not inherited, the off switch is).
+fn ctrl_c_for_children() {
+    #[cfg(windows)]
+    {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
+            unsafe extern "system" fn ignore(_kind: u32) -> windows_sys::core::BOOL {
+                1
+            }
+            unsafe {
+                SetConsoleCtrlHandler(Some(ignore), 1);
+                SetConsoleCtrlHandler(None, 0);
+            }
+        });
+    }
+}
+
 /// Looks at a terminal's very first output for the pseudo-console's cursor question.
 fn opening_question(data: &str) -> Opening {
     if let Some(rest) = data.strip_prefix(CURSOR_QUESTION) {
@@ -374,6 +395,7 @@ impl Terminals {
         channel: Sink<TermEvent>,
         watch: bool,
     ) -> Result<String, String> {
+        ctrl_c_for_children();
         let pty = native_pty_system();
         let pair = pty
             .openpty(PtySize {
@@ -687,6 +709,43 @@ impl Terminals {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ST1 Windows w1, end to end: Ctrl+C typed into a terminal stops a program that runs until interrupted.
+    #[cfg(windows)]
+    #[test]
+    fn ctrl_c_stops_a_running_program_on_windows() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel::<TermEvent>();
+        let terms = Terminals::default();
+        let shell = shells()[0].id.clone();
+        let id = terms
+            .spawn(
+                "p",
+                dir.path(),
+                &shell,
+                100,
+                30,
+                Sink::new(move |e| tx.send(e).is_ok()),
+            )
+            .unwrap();
+        let mut seen = String::new();
+        let mut read_until = |text: &str, secs: u64| {
+            let deadline = Instant::now() + Duration::from_secs(secs);
+            while !seen.contains(text) && Instant::now() < deadline {
+                if let Ok(TermEvent::Data { data }) = rx.recv_timeout(Duration::from_millis(200)) {
+                    seen.push_str(&data);
+                }
+            }
+            seen.contains(text)
+        };
+        std::thread::sleep(Duration::from_secs(2));
+        terms.write(&id, "ping -t 127.0.0.1\r").unwrap();
+        assert!(read_until("Reply from", 15), "ping did not start");
+        terms.write(&id, "\x03").unwrap();
+        // ping says "Control-C" when it is interrupted.
+        assert!(read_until("Control-C", 10), "Ctrl+C did not stop ping");
+        terms.kill(&id);
+    }
 
     #[test]
     fn keeps_a_split_character_for_the_next_read() {
