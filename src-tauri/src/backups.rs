@@ -20,8 +20,13 @@ const DAY: u64 = 24 * 60 * 60;
 /// locks, the window's storage (copied apart), folders that are rebuilt or only temporary, and a master's service
 /// file, restart mark and lock (its port and token are made new at each start; the lock is held while it runs), and
 /// the machine's lasting id (a backup restored on another computer must not make it the same machine), nor a
-/// server's kept account sign-in (a secret; a restored copy must not sign another machine in).
-const SKIP: [&str; 14] = [
+/// server's kept account sign-in (a secret; a restored copy must not sign another machine in). bk1: nor test builds'
+/// output (gigabytes of build files, made again by the next build), downloaded updates, or the window's web caches.
+const SKIP: [&str; 18] = [
+    "test-builds",
+    "updates",
+    "WebKitCache",
+    "CacheStorage",
     "qanuvi.db",
     "qanuvi.db-wal",
     "qanuvi.db-shm",
@@ -664,8 +669,15 @@ mod tests {
         std::fs::create_dir_all(local_storage(&web).join("leveldb")).unwrap();
         std::fs::write(local_storage(&web).join("leveldb/000003.log"), b"settings").unwrap();
         let dest = root.path().join("backups");
+        // bk1: a test build's output is left out (it is made again), a folder of the same name deeper in is not.
+        std::fs::create_dir_all(data.join("test-builds/p1/out")).unwrap();
+        std::fs::write(data.join("test-builds/p1/out/app"), b"build").unwrap();
+        std::fs::create_dir_all(data.join("mcp/test-builds")).unwrap();
+        std::fs::write(data.join("mcp/test-builds/x"), b"kept").unwrap();
 
         let b = make(&data, Some(&web), &dest, Kind::Manual).unwrap();
+        assert!(!b.join("data/test-builds").exists());
+        assert!(b.join("data/mcp/test-builds/x").exists());
         assert_eq!(
             rows(&b.join("data/qanuvi.db")),
             ["a", "b"],

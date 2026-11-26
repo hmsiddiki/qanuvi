@@ -240,6 +240,41 @@ pub fn dirs(base: &Path, project_id: &str) -> Dirs {
     }
 }
 
+/// Written at each test build, so the cleanup knows when a project's build files were last used.
+const USED_FILE: &str = "used";
+
+/// tb1: a project's kept build files go when nothing has built there for this long.
+pub const KEEP_UNUSED: Duration = Duration::from_secs(14 * 24 * 3600);
+
+/// tb1: removes the test builds (under `base`/test-builds) of projects no longer in `projects` (their ids), and those
+/// not built for `unused_for` (the next build starts from nothing, as the first one did). Answers how many went.
+pub fn sweep(base: &Path, projects: &[String], unused_for: Duration) -> usize {
+    let known: Vec<PathBuf> = projects.iter().map(|id| dirs(base, id).root).collect();
+    let now = std::time::SystemTime::now();
+    let mut gone = 0;
+    for e in std::fs::read_dir(base.join("test-builds"))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let root = e.path();
+        if !root.is_dir() {
+            continue;
+        }
+        let last = std::fs::metadata(root.join(USED_FILE))
+            .or_else(|_| std::fs::metadata(&root))
+            .and_then(|m| m.modified())
+            .ok();
+        let stale = last
+            .and_then(|t| now.duration_since(t).ok())
+            .is_some_and(|age| age > unused_for);
+        if (!known.contains(&root) || stale) && std::fs::remove_dir_all(&root).is_ok() {
+            gone += 1;
+        }
+    }
+    gone
+}
+
 /// The command with `{out}` and `{data}` filled in. On Windows the path written after them uses backslashes, so
 /// `{out}/release/app.exe` is a program cmd can start; a path with spaces is quoted.
 pub fn expand(command: &str, d: &Dirs) -> String {
@@ -341,6 +376,7 @@ pub fn run(root: &Path, recipe: &TestBuild, d: &Dirs, stop: &dyn Fn() -> bool) -
         return result(false, started, format!("Test build not run: {why}."));
     }
     let _ = std::fs::create_dir_all(&d.out);
+    let _ = std::fs::write(d.root.join(USED_FILE), b"");
     let mut said = String::new();
     if !recipe.build.trim().is_empty() {
         let command = expand(recipe.build.trim(), d);
@@ -469,6 +505,31 @@ mod tests {
 
     fn d(base: &Path) -> Dirs {
         dirs(base, "p1")
+    }
+
+    // tb1: kept build files of a removed project, or not built for two weeks, are cleaned up; the rest stay.
+    #[test]
+    fn old_and_orphaned_test_builds_are_cleaned_up() {
+        let base = tempfile::tempdir().unwrap();
+        let b = base.path();
+        let make = |id: &str, age_days: u64| {
+            let d = dirs(b, id);
+            std::fs::create_dir_all(&d.out).unwrap();
+            std::fs::write(d.out.join("app"), b"build").unwrap();
+            let used = std::fs::File::create(d.root.join(USED_FILE)).unwrap();
+            let at = std::time::SystemTime::now() - Duration::from_secs(age_days * 24 * 3600);
+            used.set_modified(at).unwrap();
+            d.root
+        };
+        let fresh = make("fresh", 1);
+        let old = make("old", 20);
+        let removed = make("removed", 0);
+        let projects = vec!["fresh".to_string(), "old".to_string()];
+        assert_eq!(sweep(b, &projects, KEEP_UNUSED), 2);
+        assert!(fresh.join("out/app").exists());
+        assert!(!old.exists() && !removed.exists());
+        // No test builds at all: nothing to do.
+        assert_eq!(sweep(&b.join("none"), &projects, KEEP_UNUSED), 0);
     }
 
     #[test]

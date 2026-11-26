@@ -131,6 +131,9 @@ impl Master {
     /// An answered question that changes how its project works (where reviews get changes from) is applied here, as
     /// on the desktop. A held step's answer needs nothing more: the run reads it from the Inbox.
     fn answered(&self, item: &inbox::InboxItem) {
+        if self.home_install_answered(item) {
+            return;
+        }
         let Some(pid) = item
             .source
             .as_ref()

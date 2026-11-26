@@ -1433,13 +1433,23 @@ impl Master {
         // cleanup, and (This PC) the updater's folders of updates already installed.
         std::thread::spawn({
             let app_data = self.app_data;
+            // tb1: test builds' kept files of removed projects, or unused for two weeks (only with a project list
+            // that reads, so a broken database never looks like "no projects").
+            let projects = crate::projects::list(&self.db)
+                .ok()
+                .map(|l| l.into_iter().map(|p| p.id).collect::<Vec<_>>());
+            let dir = self.dir.clone();
             move || {
                 crate::browser::sweep_profiles(false);
                 if app_data {
                     crate::browser::sweep_updater_folders();
                 }
+                if let Some(ids) = projects {
+                    crate::test_build::sweep(&dir, &ids, crate::test_build::KEEP_UNUSED);
+                }
             }
         });
+        self.offer_home_install();
         let me = Arc::downgrade(self);
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(20));
@@ -1740,6 +1750,121 @@ impl Master {
     ///
     /// L2: on Linux the helper puts the app's tarball into the user's home folder instead ([`linux_install_script`]).
     fn install_whole_app(&self, installer: &Path) -> Result<(), String> {
+        self.put_whole_app_in(|master, app, background| {
+            if cfg!(windows) {
+                Ok(installer_script(&[master, app], installer, background))
+            } else {
+                let (home, own) = linux_install_home()?;
+                Ok(linux_install_script(
+                    master, app, installer, background, &home, own,
+                ))
+            }
+        })
+    }
+
+    /// s18: the answer to "Install for this user": Qanuvi started from an unpacked tarball puts itself into the home
+    /// folder, as an update would (windows closed first, then started again from there with its menu entry).
+    fn install_unpacked(&self) -> Result<(), String> {
+        let (home, own) = linux_install_home()?;
+        let app = crate::sign_in_start::app_exe()?;
+        let from = unpacked_copy(&app, &home)
+            .ok_or("This Qanuvi is not an unpacked copy, so there is nothing to install.")?;
+        self.put_whole_app_in(|master, app, background| {
+            Ok(linux_copy_script(
+                master, app, &from, background, &home, own,
+            ))
+        })
+    }
+
+    /// s18: Qanuvi started on Linux from an unpacked tarball has no menu entry and no `qanuvi://` link handler until
+    /// its first update. This PC's master asks once, in the Inbox, whether to install it for this user.
+    fn offer_home_install(&self) {
+        if !cfg!(target_os = "linux") || !self.app_data {
+            return;
+        }
+        let asked = self.dir.join(HOME_INSTALL_ASKED);
+        if asked.exists() {
+            return;
+        }
+        let Ok((home, _)) = linux_install_home() else {
+            return;
+        };
+        let Ok(app) = crate::sign_in_start::app_exe() else {
+            return;
+        };
+        let Some(from) = unpacked_copy(&app, &home) else {
+            return;
+        };
+        if std::fs::write(&asked, b"").is_err() {
+            return;
+        }
+        let item = crate::inbox::NewItem {
+            kind_of: "answer".into(),
+            kind: "update".into(),
+            title: "Install Qanuvi for this user?".into(),
+            text: format!(
+                "Qanuvi runs from the unpacked folder {}. Installed, it gets an entry in the app menu, opens Qanuvi links, \
+                 and updates in place. No password is needed. Qanuvi closes and starts again from its new place; the \
+                 unpacked folder can be deleted afterwards.",
+                from.display()
+            ),
+            key: Some(HOME_INSTALL_KEY.into()),
+            open: None,
+            form: Some(json!({"choices": [
+                {"id": "install", "label": "Install for this user"},
+                {"id": "later", "label": "Not now"}
+            ]})),
+            source: Some(json!({"kind": HOME_INSTALL_KEY})),
+        };
+        if let Ok((added, new)) = crate::inbox::add_new(&self.db, &item) {
+            (self.inbox_teller())(&json!({"change": "add", "item": added, "new": new}));
+        }
+    }
+
+    /// s18: "Install for this user" answered: the install starts a moment later, so the answer's reply goes out first.
+    pub(crate) fn home_install_answered(&self, item: &crate::inbox::InboxItem) -> bool {
+        let kind = item
+            .source
+            .as_ref()
+            .and_then(|s| s.get("kind"))
+            .and_then(Value::as_str);
+        if kind != Some(HOME_INSTALL_KEY) {
+            return false;
+        }
+        let choice = item
+            .answer
+            .as_ref()
+            .and_then(|a| a.get("choice"))
+            .and_then(Value::as_str);
+        if choice == Some("install")
+            && let Some(me) = self.me.get().and_then(|w| w.upgrade())
+        {
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(500));
+                if let Err(e) = me.install_unpacked() {
+                    let note = crate::inbox::NewItem {
+                        kind_of: "problem".into(),
+                        kind: "update".into(),
+                        title: "Qanuvi was not installed for this user".into(),
+                        text: e,
+                        key: Some(format!("{HOME_INSTALL_KEY}-failed")),
+                        open: None,
+                        form: None,
+                        source: None,
+                    };
+                    if let Ok((added, new)) = crate::inbox::add_new(&me.db, &note) {
+                        (me.inbox_teller())(&json!({"change": "add", "item": added, "new": new}));
+                    }
+                }
+            });
+        }
+        true
+    }
+
+    fn put_whole_app_in(
+        &self,
+        script_for: impl FnOnce(&Path, &Path, bool) -> Result<String, String>,
+    ) -> Result<(), String> {
         if !cfg!(any(windows, target_os = "linux")) {
             return Err(
                 "This PC's whole install updates by itself on Windows and Linux only so far."
@@ -1758,12 +1883,7 @@ impl Master {
         }
         let master = crate::data_location::current_exe().map_err(|e| e.to_string())?;
         let app = crate::sign_in_start::app_exe()?;
-        let script = if cfg!(windows) {
-            installer_script(&[&master, &app], installer, !had_window)
-        } else {
-            let (home, own) = linux_install_home()?;
-            linux_install_script(&master, &app, installer, !had_window, &home, own)
-        };
+        let script = script_for(&master, &app, !had_window)?;
         // A watched core's children end with its watcher (its job object), so the watcher starts the helper.
         if watch::watched() {
             std::fs::write(watch::install_file(&self.dir), &script).map_err(|e| e.to_string())?;
@@ -1872,6 +1992,24 @@ fn linux_install_home() -> Result<(PathBuf, bool), String> {
     }
 }
 
+/// s18: the mark that "Install for this user" was asked (once per data folder), and its Inbox key.
+const HOME_INSTALL_ASKED: &str = "home-install-asked";
+const HOME_INSTALL_KEY: &str = "home-install";
+
+/// s18: the folder of an unpacked Qanuvi tarball this `app` runs from, or None for an installed copy (the home
+/// folder's ~/.local/lib/qanuvi, a system-wide one in /usr or /opt), a build in the source tree, or a folder that
+/// does not hold both programs.
+pub fn unpacked_copy(app: &Path, home: &Path) -> Option<PathBuf> {
+    if crate::data_location::from_source_path(app) {
+        return None;
+    }
+    let dir = app.parent()?;
+    let installed =
+        dir == home.join(".local/lib/qanuvi") || dir.starts_with("/usr") || dir.starts_with("/opt");
+    let whole = dir.join("qanuvi").is_file() && dir.join("qanuvi-master").is_file();
+    (!installed && whole).then(|| dir.to_path_buf())
+}
+
 /// The Linux helper (L2), as `sh -c` runs it; the @NAMES@ are filled in by [`linux_install_script`].
 const LINUX_INSTALL: &str = r#"n=0
 while [ $n -lt 120 ]; do
@@ -1884,7 +2022,7 @@ while [ $n -lt 120 ]; do
 done
 lib=@HOME@/.local/lib/qanuvi
 rm -rf "$lib.new"
-if ! { mkdir -p "$lib.new" && tar -xzf @TARBALL@ -C "$lib.new" && [ -x "$lib.new/qanuvi" ] && [ -x "$lib.new/qanuvi-master" ]; }; then
+if ! { mkdir -p "$lib.new" && @UNPACK@ && [ -x "$lib.new/qanuvi" ] && [ -x "$lib.new/qanuvi-master" ]; }; then
   rm -rf "$lib.new"
   @OLD_APP@ @FLAG@ </dev/null >/dev/null 2>&1 &
   exit 1
@@ -1923,11 +2061,42 @@ pub fn linux_install_script(
     home: &Path,
     own: bool,
 ) -> String {
-    let q = |p: &Path| format!("'{}'", p.display().to_string().replace('\'', r"'\''"));
+    let unpack = format!("tar -xzf {} -C \"$lib.new\"", shell_quote(tarball));
+    linux_put_in_script(master, app, &unpack, background, home, own)
+}
+
+/// s18: the same helper for a Qanuvi started from an unpacked tarball: its folder `from` is copied into the home
+/// folder (the menu entry and link handler written as for an update), and Qanuvi starts again from there. The
+/// unpacked folder itself stays as it is.
+pub fn linux_copy_script(
+    master: &Path,
+    app: &Path,
+    from: &Path,
+    background: bool,
+    home: &Path,
+    own: bool,
+) -> String {
+    let unpack = format!("cp -a {}/. \"$lib.new\"", shell_quote(from));
+    linux_put_in_script(master, app, &unpack, background, home, own)
+}
+
+fn shell_quote(p: &Path) -> String {
+    format!("'{}'", p.display().to_string().replace('\'', r"'\''"))
+}
+
+fn linux_put_in_script(
+    master: &Path,
+    app: &Path,
+    unpack: &str,
+    background: bool,
+    home: &Path,
+    own: bool,
+) -> String {
+    let q = |p: &Path| shell_quote(p);
     LINUX_INSTALL
         .replace("@PROGRAMS@", &format!("{}|{}", q(master), q(app)))
         .replace("@HOME@", &q(home))
-        .replace("@TARBALL@", &q(tarball))
+        .replace("@UNPACK@", unpack)
         .replace("@OLD_APP@", &q(app))
         .replace("@FLAG@", if background { "--background" } else { "" })
         .replace("@OWN@", if own { "true" } else { "false" })
@@ -2780,6 +2949,74 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&started).unwrap(),
             "old app --background\n"
+        );
+    }
+
+    // s18: only an unpacked tarball folder (both programs, not installed, not a source build) is offered the install.
+    #[test]
+    fn an_unpacked_tarball_is_told_apart_from_installed_copies() {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("home");
+        let folder = |p: &Path| {
+            std::fs::create_dir_all(p).unwrap();
+            std::fs::write(p.join("qanuvi"), "app").unwrap();
+            std::fs::write(p.join("qanuvi-master"), "master").unwrap();
+            p.join("qanuvi")
+        };
+        let unpacked = folder(&home.join("Downloads/Qanuvi"));
+        assert_eq!(
+            unpacked_copy(&unpacked, &home),
+            Some(home.join("Downloads/Qanuvi"))
+        );
+        let installed = folder(&home.join(".local/lib/qanuvi"));
+        assert_eq!(unpacked_copy(&installed, &home), None);
+        let built = folder(&t.path().join("src/target/release"));
+        assert_eq!(unpacked_copy(&built, &home), None);
+        let lone = home.join("bin/qanuvi");
+        std::fs::create_dir_all(home.join("bin")).unwrap();
+        std::fs::write(&lone, "app").unwrap();
+        assert_eq!(unpacked_copy(&lone, &home), None, "no master beside it");
+        assert_eq!(unpacked_copy(Path::new("/usr/bin/qanuvi"), &home), None);
+    }
+
+    // s18, run for real on Linux: the unpacked folder is copied in, with the menu entry, and started from there; the
+    // unpacked folder stays.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_linux_helper_copies_an_unpacked_folder_in() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = tempfile::tempdir().unwrap();
+        let h = home.path();
+        let started = h.join("started.txt");
+        let from = h.join("Downloads/Qanuvi it's here");
+        std::fs::create_dir_all(&from).unwrap();
+        for (name, says) in [("qanuvi", "installed app"), ("qanuvi-master", "master")] {
+            let file = from.join(name);
+            let text = format!("#!/bin/sh\necho \"{says} $*\" >> '{}'\n", started.display());
+            std::fs::write(&file, text).unwrap();
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let app = from.join("qanuvi");
+        let script = linux_copy_script(&from.join("qanuvi-master"), &app, &from, false, h, false);
+        let ran = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&script)
+            .status()
+            .unwrap();
+        assert!(ran.success());
+        std::thread::sleep(Duration::from_millis(500));
+        let lib = h.join(".local/lib/qanuvi");
+        assert!(lib.join("qanuvi-master").is_file());
+        assert!(from.join("qanuvi").is_file(), "the unpacked folder stays");
+        let entry =
+            std::fs::read_to_string(h.join(".local/share/applications/Qanuvi.desktop")).unwrap();
+        assert!(
+            entry.contains(&format!("Exec=\"{}/qanuvi\" %u", lib.display())),
+            "{entry}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&started).unwrap(),
+            "installed app \n"
         );
     }
 
