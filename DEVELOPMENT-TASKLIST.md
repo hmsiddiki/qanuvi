@@ -2033,6 +2033,14 @@ and ST1 has been driven again on the finished build.
       `open -n -a <bundle> --args` on a Mac; bring_app_forward (open -a after "show") is marked not reliable. REAL
       FIX, in the install part: the master as its own helper app inside the bundle (own bundle id, LSUIElement),
       then drive m1 again. Not driven yet: notifications (Settings "Send a test notification"), sign-in, pairing.
+    m1 FIXED 8af783f (owner hit it: Dock and tray did not open Qanuvi): the master ships as its own helper app,
+      Qanuvi.app/Contents/Helpers/Qanuvi Master.app (dev.qanuvi.master, LSUIElement; src-tauri/macos/master-Info.plist
+      via bundle.macOS.files); the app finds its master there first, the master finds the app back from there. DRIVEN
+      LIVE (owner checked too): close by the red button, Dock click opens the window in front; tray click with Orion in
+      front brings the open window forward; window closed + Orion in front, tray click opens it in front. Seen: m2
+      the window comes back centred, not where it was moved; m3 a restored terminal tab is named "Terminal", not
+      "zsh". Left: the app's short --stdio link still starts Contents/MacOS/qanuvi-master (Tauri copies every
+      program there; harmless, no window-server use); move it to the helper in the install part.
     PICKUP POINT (2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
       nb1-nb3, c1, c2, n31a, w1, s18 Install for this user, bk1 backups skip build files, tb1 test-build cleanup;
       backup E:/Backups/qanuvi/channel-before-0.1.49; all 9 files online, 200, sizes match). s18 DRIVEN
