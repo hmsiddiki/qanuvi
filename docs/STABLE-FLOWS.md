@@ -196,7 +196,12 @@ Seen, not fixed (for ST2 or later):
   Code" on top and no wizard; it now opens Models and providers with the wizard. Seen: a tarball user has no menu
   entry and a copy outside ~/.local/lib/qanuvi until the first update installs one there (proposal for the owner:
   offer "Install for this user" on first start from elsewhere); backup folders are named in UTC (sorting, by design).
-  Not driven: the .deb installer (needs sudo), a real second user account.
+  Not driven: the .deb installer (needs sudo), a real second user account. Owner said yes to the proposal: built
+  b08fdcd (s18 Install for this user: asked once in the Inbox; yes copies the unpacked folder in with the update
+  helper and starts again from there; unit-tested, the copy run for real on Linux; not driven in a window yet).
+  Found while clearing the laptop's full disk (2.1 GB free): bk1, daily backups copied test-builds (4.7 GB each),
+  now left out with updates and web caches; tb1, test builds' kept output never went, now removed at start when the
+  project is gone or unused 14 days (both b08fdcd).
 - s19 (Windows block, This PC, 2026-11-26, owner away): release test build of ecab8ce on its own empty data root
   (APPDATA and LOCALAPPDATA pointed at E:qc-scratchwinst), scratch git project, Claude Code on Sonnet/Haiku,
   $1.37 spent. Pass: 1, 3-7, 9-15, 19, 27 (preview), 28 (Back up now), 29, 30; 17 pause and resume (the step wrote a
