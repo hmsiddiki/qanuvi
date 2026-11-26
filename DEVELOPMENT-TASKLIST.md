@@ -2008,7 +2008,13 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-25 05:20): ST1 Linux flows 21, 22, 23, 28, 29, 32 PASS (docs/STABLE-FLOWS.md,
+    PICKUP POINT (newest, 2026-11-26 06:35): ST1 Linux: every flow driven (24-26 s15-s17, 31 s18); Windows block
+    driven with the owner away (s19): 1, 3-7, 9-15, 19, 27-30 pass, 17 pause/resume. Fixed and pushed, unpublished:
+    nb1-nb3, c1, c2 (+fe9b54f), n31a, w1 (Ctrl+C on Windows), with f8-f12, s10, ba1, ba2 from before. Not driven on
+    Windows: 2, 8, 16, 20, 21-26, 31, 32 (need a free model, the installed app or the owner). Open for the owner:
+    tarball "Install for this user" proposal (s18), c2 is in ST. Next: owner reviews, then the rest of the Windows
+    flows with the owner, ST2/ST3, 0.1.49 (ask).
+    PICKUP POINT (before, 2026-11-25 05:20): ST1 Linux flows 21, 22, 23, 28, 29, 32 PASS (docs/STABLE-FLOWS.md,
       notes s12-s14). Fixed: ba1 This PC's Settings → Backups (info, Back up now, Restore, Remove) used the master's
       own folder instead of the app's (every installed app since M5a; Rust test added, driven), ba2 booked restore
       named by its local time (driven). Unpublished now: f8-f12 + s10 + ba1 + ba2. Laptop drive kits:
