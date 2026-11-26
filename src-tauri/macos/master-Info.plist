@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- m1: Qanuvi's master as its own helper app inside Qanuvi.app/Contents/Helpers, so macOS keeps it apart from the
+     app (Dock, open, the tray's "Open Qanuvi"). LSUIElement: no Dock icon, only the menu-bar icon. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>dev.qanuvi.master</string>
+  <key>CFBundleName</key>
+  <string>Qanuvi</string>
+  <key>CFBundleDisplayName</key>
+  <string>Qanuvi</string>
+  <key>CFBundleExecutable</key>
+  <string>qanuvi-master</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>LSMinimumSystemVersion</key>
+  <string>11.0</string>
+</dict>
+</plist>

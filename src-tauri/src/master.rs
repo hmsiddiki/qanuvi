@@ -1944,7 +1944,7 @@ impl Master {
 }
 
 /// m1 (Mac): the .app bundle a program runs from (…/Qanuvi.app/Contents/MacOS/qanuvi), if it runs from one.
-fn app_bundle(exe: &Path) -> Option<PathBuf> {
+pub(crate) fn app_bundle(exe: &Path) -> Option<PathBuf> {
     let macos = exe.parent()?;
     let contents = macos.parent()?;
     let bundle = contents.parent()?;
@@ -1954,15 +1954,36 @@ fn app_bundle(exe: &Path) -> Option<PathBuf> {
     is_bundle.then(|| bundle.to_path_buf())
 }
 
+/// m1 (Mac): the master's own helper app inside Qanuvi.app. A program run from inside an app bundle counts as that
+/// app for macOS; with the master beside the app, the Dock, `open` and the tray brought the master forward and the
+/// window never opened. Its own bundle (dev.qanuvi.master, no Dock icon) keeps the two apart.
+pub(crate) const MAC_HELPER_APP: &str = "Qanuvi Master.app";
+
+/// m1: where the master sits in an app bundle (`Qanuvi.app/Contents/Helpers/Qanuvi Master.app/...`).
+pub(crate) fn mac_helper_master(app_bundle: &Path) -> PathBuf {
+    app_bundle
+        .join("Contents/Helpers")
+        .join(MAC_HELPER_APP)
+        .join("Contents/MacOS/qanuvi-master")
+}
+
+/// m1: the app's program for a master in its helper app (the way back from `mac_helper_master`), if it is one.
+pub(crate) fn mac_app_of_helper(master: &Path) -> Option<PathBuf> {
+    let helper = app_bundle(master)?;
+    let helpers = helper.parent()?;
+    let contents = helpers.parent()?;
+    (helpers.file_name()? == "Helpers" && contents.file_name()? == "Contents")
+        .then(|| contents.join("MacOS/qanuvi"))
+}
+
 /// The command that starts the app. m1 (Mac): through `open` when it runs from a .app bundle, so it comes to the
 /// front; a program started straight by a background process opens behind the app in use. Arguments added after
-/// this go to the app (`open --args`). `-n`: while this master runs from the same bundle, macOS counts the bundle as
-/// running already and would only bring the master forward, never starting the window (seen on the Mac mini).
+/// this go to the app (`open --args`). Needs the master in its own helper app (`mac_helper_master`).
 fn app_command(exe: &Path) -> std::process::Command {
     if cfg!(target_os = "macos") {
         if let Some(bundle) = app_bundle(exe) {
             let mut c = std::process::Command::new("/usr/bin/open");
-            c.arg("-n").arg("-a").arg(bundle).arg("--args");
+            c.arg("-a").arg(bundle).arg("--args");
             return c;
         }
     }
@@ -1971,8 +1992,7 @@ fn app_command(exe: &Path) -> std::process::Command {
 
 /// m1 (Mac): brings the running app to the front. Its own window focus cannot do it since macOS 14: an app comes
 /// forward by itself only after the user acted on it, and the tray click went to this master. Launch Services can.
-/// Elsewhere the app's own focus is enough. NOT RELIABLE YET: while the master runs from inside the same bundle, macOS
-/// may bring the master forward instead of the window; the fix is the master as its own helper app (Mac install part).
+/// Elsewhere the app's own focus is enough. Needs the master in its own helper app (`mac_helper_master`).
 fn bring_app_forward() {
     if !cfg!(target_os = "macos") {
         return;
@@ -2457,6 +2477,14 @@ fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
 /// The master program next to the running one (the desktop app ships `qanuvi-master` beside `qanuvi`).
 pub fn master_exe_beside_me() -> Result<PathBuf, String> {
     let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
+    // m1 (Mac): the master is its own helper app inside Qanuvi.app.
+    if cfg!(target_os = "macos") {
+        if let Some(helper) = app_bundle(&exe).map(|b| mac_helper_master(&b)) {
+            if helper.is_file() {
+                return Ok(helper);
+            }
+        }
+    }
     let master = exe.with_file_name(if cfg!(windows) {
         "qanuvi-master.exe"
     } else {
@@ -2818,6 +2846,31 @@ mod tests {
             None
         );
         assert_eq!(app_bundle(Path::new("qanuvi")), None);
+    }
+
+    /// m1: the master's helper app inside Qanuvi.app, and the way back to the app's program.
+    #[test]
+    fn mac_helper_master_and_back() {
+        let master = mac_helper_master(Path::new("/Applications/Qanuvi.app"));
+        assert_eq!(
+            master,
+            PathBuf::from(
+                "/Applications/Qanuvi.app/Contents/Helpers/Qanuvi Master.app/Contents/MacOS/qanuvi-master"
+            )
+        );
+        assert_eq!(
+            mac_app_of_helper(&master),
+            Some(PathBuf::from(
+                "/Applications/Qanuvi.app/Contents/MacOS/qanuvi"
+            ))
+        );
+        // A master beside the app (Linux, Windows, an old Mac layout) is no helper.
+        assert_eq!(
+            mac_app_of_helper(Path::new(
+                "/Applications/Qanuvi.app/Contents/MacOS/qanuvi-master"
+            )),
+            None
+        );
     }
 
     /// h3: a plain "qanuvi-master status" on a computer with the app talks to the app's master, not a new empty one.

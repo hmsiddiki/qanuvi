@@ -47,6 +47,12 @@
         }
       }
     },
+    "macOS": {
+      "files": {
+        "Helpers/Qanuvi Master.app/Contents/Info.plist": "macos/master-Info.plist",
+        "Helpers/Qanuvi Master.app/Contents/MacOS/qanuvi-master": "target/release/qanuvi-master"
+      }
+    },
     "publisher": "Inner IT",
     "copyright": "© 2026 Inner IT",
     "shortDescription": "Qanuvi",
