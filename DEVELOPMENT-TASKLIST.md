@@ -2016,6 +2016,23 @@ and ST1 has been driven again on the finished build.
       window, master serve/core/stdio all up on dev.qanuvi.desktop.source, master.log empty. Not seen yet: the window
       itself (screencapture over SSH needs Screen Recording for the SSH side, owner grants). Next: owner grants
       Screen Recording + Accessibility, then basics (window, terminal, tray, notifications, sign-in, pairing).
+    MAC BLOCK part 2 (2026-11-27, driven live with the owner hands off): owner granted Screen Recording + Accessibility
+      ("Device control and data access" on macOS 27) to /usr/libexec/sshd-keygen-wrapper. Drive tool mdrive (Swift,
+      ~/qc-scratch/mdrive on the Mac, copy E:/qc-scratch/mac/mdrive.swift): shot, names (the window's parts by
+      Accessibility, web view included), press, click, type (real key codes: native dialogs ignore text-only
+      events), key, scroll, tray (icon found by Accessibility: its place moves), front (through Launch Services).
+      Keys and typing are refused unless Qanuvi is the front app: an earlier Cmd+W went to the owner's browser.
+      PASS: window (macOS buttons in Qanuvi's title bar, app menu, "test build" badge), add project through the native
+      folder picker, Cmd+P + editor + language-server offer, terminal (zsh, arm64, node, git colours, Ctrl+C stops
+      ping), tray menu on right click (Open, Start again greyed, Quit), Quit from the tray ends everything cleanly,
+      closing the window keeps master + core.
+      m1 FOUND: the window opened from the tray lands BEHIND the app in use (macOS 14+ lets an app come forward only
+      after the user acted on it; the click went to the master). Cause underneath: the master runs from inside
+      Qanuvi.app, so macOS counts it as the same app (dev.qanuvi.desktop); `open -a Qanuvi.app` then brings the
+      master forward and never starts or raises the window. Built (unit-tested, not driven): start_app goes through
+      `open -n -a <bundle> --args` on a Mac; bring_app_forward (open -a after "show") is marked not reliable. REAL
+      FIX, in the install part: the master as its own helper app inside the bundle (own bundle id, LSUIElement),
+      then drive m1 again. Not driven yet: notifications (Settings "Send a test notification"), sign-in, pairing.
     PICKUP POINT (2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
       nb1-nb3, c1, c2, n31a, w1, s18 Install for this user, bk1 backups skip build files, tb1 test-build cleanup;
       backup E:/Backups/qanuvi/channel-before-0.1.49; all 9 files online, 200, sizes match). s18 DRIVEN

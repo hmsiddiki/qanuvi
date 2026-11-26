@@ -1556,6 +1556,7 @@ impl Master {
     /// Opens Qanuvi; started for a notification's item (M5a), it opens its Inbox there.
     pub fn open_app_at(&self, item: Option<String>) {
         if self.app_links.reach(&json!({"do": "show"})) > 0 {
+            bring_app_forward();
             return;
         }
         start_app(item);
@@ -1942,11 +1943,60 @@ impl Master {
     }
 }
 
+/// m1 (Mac): the .app bundle a program runs from (…/Qanuvi.app/Contents/MacOS/qanuvi), if it runs from one.
+fn app_bundle(exe: &Path) -> Option<PathBuf> {
+    let macos = exe.parent()?;
+    let contents = macos.parent()?;
+    let bundle = contents.parent()?;
+    let is_bundle = macos.file_name()? == "MacOS"
+        && contents.file_name()? == "Contents"
+        && bundle.extension().is_some_and(|e| e == "app");
+    is_bundle.then(|| bundle.to_path_buf())
+}
+
+/// The command that starts the app. m1 (Mac): through `open` when it runs from a .app bundle, so it comes to the
+/// front; a program started straight by a background process opens behind the app in use. Arguments added after
+/// this go to the app (`open --args`). `-n`: while this master runs from the same bundle, macOS counts the bundle as
+/// running already and would only bring the master forward, never starting the window (seen on the Mac mini).
+fn app_command(exe: &Path) -> std::process::Command {
+    if cfg!(target_os = "macos") {
+        if let Some(bundle) = app_bundle(exe) {
+            let mut c = std::process::Command::new("/usr/bin/open");
+            c.arg("-n").arg("-a").arg(bundle).arg("--args");
+            return c;
+        }
+    }
+    std::process::Command::new(exe)
+}
+
+/// m1 (Mac): brings the running app to the front. Its own window focus cannot do it since macOS 14: an app comes
+/// forward by itself only after the user acted on it, and the tray click went to this master. Launch Services can.
+/// Elsewhere the app's own focus is enough. NOT RELIABLE YET: while the master runs from inside the same bundle, macOS
+/// may bring the master forward instead of the window; the fix is the master as its own helper app (Mac install part).
+fn bring_app_forward() {
+    if !cfg!(target_os = "macos") {
+        return;
+    }
+    let Some(bundle) = crate::sign_in_start::app_exe()
+        .ok()
+        .and_then(|exe| app_bundle(&exe))
+    else {
+        return;
+    };
+    let _ = std::process::Command::new("/usr/bin/open")
+        .arg("-a")
+        .arg(bundle)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
 /// Starts the app beside this master (for a notification's item, its Inbox opens there).
 fn start_app(item: Option<String>) {
     match crate::sign_in_start::app_exe() {
         Ok(exe) => {
-            let mut c = std::process::Command::new(exe);
+            let mut c = app_command(&exe);
             if item.is_some() {
                 c.arg(crate::notify::link(item.as_deref()));
             }
@@ -2750,6 +2800,25 @@ pub fn stop_service_because(dir: &Path, why: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// m1: only a program inside Something.app/Contents/MacOS counts as a Mac app bundle.
+    #[test]
+    fn app_bundle_found_only_inside_a_dot_app() {
+        let p = Path::new("/Applications/Qanuvi.app/Contents/MacOS/qanuvi");
+        assert_eq!(
+            app_bundle(p),
+            Some(PathBuf::from("/Applications/Qanuvi.app"))
+        );
+        assert_eq!(
+            app_bundle(Path::new("/home/u/.local/lib/qanuvi/qanuvi")),
+            None
+        );
+        assert_eq!(
+            app_bundle(Path::new("/x/Qanuvi/Contents/MacOS/qanuvi")),
+            None
+        );
+        assert_eq!(app_bundle(Path::new("qanuvi")), None);
+    }
 
     /// h3: a plain "qanuvi-master status" on a computer with the app talks to the app's master, not a new empty one.
     #[test]
