@@ -17,6 +17,13 @@ export interface TerminalTab {
   termId?: string;
   /** Its machine is hidden: no screen in the window, the shell goes on there and its output is kept. */
   parked?: boolean;
+  /** m3: opened before the machine's shells were known, so titled "Terminal"; named once they are (loadShells). */
+  unnamed?: boolean;
+}
+
+/** A tab's title: the shell's name, with the folder it started in. */
+function tabTitle(label: string, dir?: string): string {
+  return dir ? `${label} · ${dir.split("/").pop()}` : label;
 }
 
 let counter = 0;
@@ -39,7 +46,16 @@ export class TerminalsStore {
     } catch {
       found = [];
     }
-    if (switcher.shown === machine) this.shells = found;
+    if (switcher.shown !== machine) return;
+    this.shells = found;
+    // m3: tabs opened (or brought back) before the list came get their shell's name now; an empty shell is the
+    // machine's default, the first in the list.
+    if (!found.length || !this.tabs.some((t) => t.unnamed && t.machine === machine)) return;
+    this.tabs = this.tabs.map((t) => {
+      if (!t.unnamed || t.machine !== machine) return t;
+      const shell = found.find((s) => s.id === t.shell) ?? (t.shell === "" ? found[0] : undefined);
+      return shell ? { ...t, title: tabTitle(shell.label, t.dir), unnamed: false } : t;
+    });
   }
 
   /** The tabs that have a screen now: the shown machine's. */
@@ -113,7 +129,8 @@ export class TerminalsStore {
   open(projectId: string, shellId?: string, dir?: string): void {
     const onServer = this.remote(projectId);
     const shell = onServer ? "" : shellId || settings.value.defaultShell || this.shells[0]?.id || "";
-    const label = onServer ? "Server terminal" : (this.shells.find((s) => s.id === shell)?.label ?? "Terminal");
+    const known = this.shells.find((s) => s.id === shell);
+    const label = onServer ? "Server terminal" : (known?.label ?? "Terminal");
     const key = `term-${++counter}`;
     this.tabs = [
       ...this.tabs,
@@ -121,10 +138,11 @@ export class TerminalsStore {
         key,
         projectId,
         shell,
-        title: dir ? `${label} · ${dir.split("/").pop()}` : label,
+        title: tabTitle(label, dir),
         ended: false,
         dir,
         machine: switcher.shown,
+        ...(!onServer && !known ? { unnamed: true } : {}),
       },
     ];
     this.activeByProject = { ...this.activeByProject, [projectId]: key };

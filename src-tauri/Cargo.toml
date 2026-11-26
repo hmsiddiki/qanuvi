@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [features]
 # The desktop app with its window. Without it, only the master without a window is built (for a Linux server).
 default = ["desktop"]
-desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:tauri-plugin-dialog", "dep:keyring", "dep:tauri-plugin-process", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-deep-link", "dep:windows", "dep:notify-rust", "dep:tray-icon", "dep:tao", "dep:png", "dep:arboard"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:tauri-plugin-dialog", "dep:keyring", "dep:tauri-plugin-process", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-deep-link", "dep:tauri-plugin-window-state", "dep:windows", "dep:notify-rust", "dep:tray-icon", "dep:tao", "dep:png", "dep:arboard"]
 
 [[bin]]
 name = "qanuvi"
@@ -83,6 +83,7 @@ trash = "5"
 tauri-plugin-process = { version = "2", optional = true }
 tauri-plugin-single-instance = { version = "2", optional = true }
 tauri-plugin-deep-link = { version = "2", optional = true }
+tauri-plugin-window-state = { version = "2", optional = true }
 # This PC's master shows a tray icon while it runs (migration M4c); the same versions Tauri uses.
 tray-icon = { version = "0.25", optional = true }
 tao = { version = "0.37", optional = true }

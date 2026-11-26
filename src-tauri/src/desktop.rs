@@ -796,6 +796,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        // m2: the window comes back where it was (place, size, maximised); seen on the Mac, the same everywhere. Not
+        // its visibility: a background start stays without a window.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+                )
+                .build(),
+        )
         .setup(move |app| {
             let dir = data.clone();
             crate::paths::set_data_dir(dir.clone());

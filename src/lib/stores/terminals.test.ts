@@ -131,3 +131,23 @@ describe("shells of the shown machine", () => {
     invoke.mockReset();
   });
 });
+
+// m3 (Mac drive): a tab brought back before the shells were read was titled "Terminal" for good.
+describe("a tab opened before the shells are known", () => {
+  it("gets its shell's name once they are", async () => {
+    invoke.mockImplementation(async (cmd: unknown) =>
+      cmd === "term_shells" ? [{ id: "pwsh", label: "PowerShell", program: "pwsh" }] : undefined,
+    );
+    const t = new TerminalsStore();
+    switcher.shown = null;
+    t.open("pc-project", undefined, "pc-project/src");
+    expect(t.tabs[0].title).toBe("Terminal · src");
+    await t.loadShells();
+    expect(t.tabs[0].title).toBe("PowerShell · src");
+    expect(t.tabs[0].unnamed).toBe(false);
+    t.open("pc-project");
+    expect(t.tabs[1].title, "known shells name a new tab at once").toBe("PowerShell");
+    expect(t.tabs[1].unnamed).toBeUndefined();
+    invoke.mockReset();
+  });
+});
