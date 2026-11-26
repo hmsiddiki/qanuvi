@@ -2008,7 +2008,15 @@ and ST1 has been driven again on the finished build.
         is a promise: carry it as a need of step N and do not close the plan while one is open; (b) a plan's last
         "whole check" must include one real (non-stand-in) run when the plan is about running things; (c) "drive
         it" / live checks a step names belong to the step, not to the review list.
-    PICKUP POINT (newest, 2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
+    MAC BLOCK part 1 (2026-11-27): Mac mini M2 (macOS 27.2.1, 16 GB, 8 cores) reached over SSH from This PC.
+      Owner: keep the Mac's disk use low. Installed: Command Line Tools (owner), Rust minimal profile, Node 24 in
+      ~/.local/node (no Homebrew). Source in ~/src/qanuvi (shallow clone). FIRST BUILD PASSED: npx tauri build
+      --bundles app, 3 min 53 s, Qanuvi.app 22.9 MB, both programs arm64; target 1.5 GB. qanuvi-master copied into
+      Contents/MacOS by hand (the bundle does not carry it yet: part of the install/update path). Started with open:
+      window, master serve/core/stdio all up on dev.qanuvi.desktop.source, master.log empty. Not seen yet: the window
+      itself (screencapture over SSH needs Screen Recording for the SSH side, owner grants). Next: owner grants
+      Screen Recording + Accessibility, then basics (window, terminal, tray, notifications, sign-in, pairing).
+    PICKUP POINT (2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
       nb1-nb3, c1, c2, n31a, w1, s18 Install for this user, bk1 backups skip build files, tb1 test-build cleanup;
       backup E:/Backups/qanuvi/channel-before-0.1.49; all 9 files online, 200, sizes match). s18 DRIVEN
       2026-11-27 with the 0.1.49 tarball on the laptop: PASS (docs/STABLE-FLOWS.md s18). Laptop disk cleared to ~82 GB free. Owner bought a Mac mini M2: next is the Mac block (owner turns
