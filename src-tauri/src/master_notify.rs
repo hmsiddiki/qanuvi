@@ -58,12 +58,38 @@ pub fn show(
     Ok(())
 }
 
+/// m4 (Mac): the app macOS shows a notification as. Without one the notification library asks for a placeholder app
+/// ("Where is use_default?") instead of showing anything. Qanuvi's bundle when the program runs from Qanuvi.app (the
+/// app, or the master in its helper app, installed or a test build); a bare program outside a bundle shows as Terminal.
+#[cfg(any(target_os = "macos", test))]
+pub fn mac_sender(exe: &std::path::Path, app_id: &str) -> String {
+    // The master's helper app is a bundle too, so one check covers both.
+    if crate::master::app_bundle(exe).is_some() {
+        app_id.to_string()
+    } else {
+        "com.apple.Terminal".to_string()
+    }
+}
+
+/// m4: sets the sender once per process (macOS only; see `mac_sender`).
+#[cfg(target_os = "macos")]
+pub fn mac_set_sender(app_id: &str) {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        if let Ok(exe) = crate::data_location::current_exe() {
+            let _ = notify_rust::set_application(&mac_sender(&exe, app_id));
+        }
+    });
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn show(
     one: &Shown,
     _installed: bool,
     open: impl Fn(Option<String>) + Send + Sync + 'static,
 ) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    mac_set_sender(APP_ID);
     let mut n = notify_rust::Notification::new();
     n.summary(&one.title).body(&one.text).appname("Qanuvi");
     #[cfg(target_os = "linux")]
@@ -96,5 +122,21 @@ mod tests {
         let conf: serde_json::Value =
             serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         assert_eq!(conf["identifier"], super::APP_ID);
+    }
+
+    /// m4: inside Qanuvi.app (the app or the master's helper) notifications come from Qanuvi, never a placeholder.
+    #[test]
+    fn mac_sender_is_qanuvi_inside_the_app() {
+        use std::path::Path;
+        let app = Path::new("/Applications/Qanuvi.app/Contents/MacOS/qanuvi");
+        let helper = Path::new(
+            "/Applications/Qanuvi.app/Contents/Helpers/Qanuvi Master.app/Contents/MacOS/qanuvi-master",
+        );
+        assert_eq!(super::mac_sender(app, super::APP_ID), super::APP_ID);
+        assert_eq!(super::mac_sender(helper, super::APP_ID), super::APP_ID);
+        assert_eq!(
+            super::mac_sender(Path::new("/usr/local/bin/qanuvi-master"), super::APP_ID),
+            "com.apple.Terminal"
+        );
     }
 }

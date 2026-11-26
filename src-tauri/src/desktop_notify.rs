@@ -55,8 +55,8 @@ impl Notifier {
 }
 
 /// An installed Qanuvi (not a test build out of `target/`): its own app id and the qanuvi:// link work. Only Windows
-/// and macOS ask; on Linux it was unused, and clippy's warning failed every Linux CI build from 07d8e38 on.
-#[cfg(any(windows, target_os = "macos"))]
+/// asks (macOS: m4 shows every Qanuvi.app build as Qanuvi); unused elsewhere, and clippy fails CI on that.
+#[cfg(windows)]
 fn installed() -> bool {
     !crate::data_location::from_source()
 }
@@ -227,17 +227,9 @@ fn show_now(app: &AppHandle, one: &Shown) -> Result<(), String> {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn show_now(app: &AppHandle, one: &Shown) -> Result<(), String> {
+    // m4: shown as Qanuvi (its bundle id) whenever it runs from Qanuvi.app, a test build included.
     #[cfg(target_os = "macos")]
-    {
-        // Shown as Qanuvi when installed (its bundle id); a test build has no bundle, so the system's default stays.
-        static ONCE: std::sync::Once = std::sync::Once::new();
-        if installed() {
-            let id = app.config().identifier.clone();
-            ONCE.call_once(|| {
-                let _ = notify_rust::set_application(&id);
-            });
-        }
-    }
+    crate::master_notify::mac_set_sender(&app.config().identifier);
     let mut n = notify_rust::Notification::new();
     n.summary(&one.title).body(&one.text).appname("Qanuvi");
     // Linux: "default" is the click on the notification itself (no button is shown for it).

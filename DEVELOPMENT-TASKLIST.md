@@ -2041,6 +2041,16 @@ and ST1 has been driven again on the finished build.
       the window comes back centred, not where it was moved; m3 a restored terminal tab is named "Terminal", not
       "zsh". Left: the app's short --stdio link still starts Contents/MacOS/qanuvi-master (Tauri copies every
       program there; harmless, no window-server use); move it to the helper in the install part.
+    m4 FIXED + DRIVEN LIVE (2026-11-27): "Send a test notification" on the Mac opened macOS's "Where is use_default?"
+      app chooser: the notification library was only told the sender for installed copies, so a test build had none.
+      Now every program running from Qanuvi.app (the app, or the master in its helper) sends as dev.qanuvi.desktop
+      (master_notify::mac_sender / mac_set_sender); a bare program outside a bundle as Terminal. macOS then asked the
+      owner to allow Qanuvi's notifications (owner allowed); the notification arrived with Qanuvi's name and icon, and
+      clicking it brought Qanuvi forward with the Inbox open. Seen: m5 a macOS notice "Qanuvi is running in the
+      background" at the first start of the helper build (no LaunchAgent file; likely the helper staying after the
+      window quits); look at it in the install part. Owner asked about the white plate behind the Dock/notification
+      icon: macOS 26+ puts every app icon that is not a full rounded square on a light plate; only a Mac-only icon that
+      fills the square avoids it (owner to choose the background).
     PICKUP POINT (2026-11-27): 0.1.49 PUBLISHED tag v0.1.49 (owner "publish anyway"; f8-f12, s10, ba1, ba2,
       nb1-nb3, c1, c2, n31a, w1, s18 Install for this user, bk1 backups skip build files, tb1 test-build cleanup;
       backup E:/Backups/qanuvi/channel-before-0.1.49; all 9 files online, 200, sizes match). s18 DRIVEN
