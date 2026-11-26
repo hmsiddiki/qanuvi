@@ -14,25 +14,25 @@ A row is green only when both systems pass.
 
 | # | Flow | What passes | Windows | Linux |
 |---|------|-------------|---------|-------|
-| 1 | First start, empty data | window opens, setup wizard offered, no error lines | - | pass |
+| 1 | First start, empty data | window opens, setup wizard offered, no error lines | pass | pass |
 | 2 | Setup wizard, free AI | OmniRoute / OpenRouter / Ollama steps say what they do; a free model answers | - | pass (OpenRouter) |
-| 3 | Open a project, file tree, editor | open, edit, save, undo; big file opens fast | - | pass (s2, s3) |
-| 4 | Search and go to symbol | Ctrl+P, Ctrl+T, find in files | - | pass after f1 |
-| 5 | Git panel | changes, diff, commit on a scratch repo; no-git folder works | - | pass after f2-f4 |
-| 6 | Terminal | open, type, colours, resize, paste, close; survives switching projects | - | pass after f5 (s4) |
-| 7 | Chat with the paid agent | answer streams, tool rows settle, cost shown | - | pass |
+| 3 | Open a project, file tree, editor | open, edit, save, undo; big file opens fast | pass | pass (s2, s3) |
+| 4 | Search and go to symbol | Ctrl+P, Ctrl+T, find in files | pass | pass after f1 |
+| 5 | Git panel | changes, diff, commit on a scratch repo; no-git folder works | pass | pass after f2-f4 |
+| 6 | Terminal | open, type, colours, resize, paste, close; survives switching projects | pass after w1 (s19) | pass after f5 (s4) |
+| 7 | Chat with the paid agent | answer streams, tool rows settle, cost shown | pass | pass |
 | 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | pass (hand-over not driven) |
-| 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | - | pass |
-| 10 | Message while the agent works | taken as a chat, not a restart | - | pass after f6 |
-| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | - | pass |
-| 12 | Write a plan with the planner | plan file made, steps readable | - | pass after f8 |
-| 13 | Check before the run | card lists needs plainly; answers kept | - | pass (s8) |
-| 14 | Plan run, two steps, real agent | both done, honest end line, report | - | pass |
-| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | - | pass |
+| 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | pass | pass |
+| 10 | Message while the agent works | taken as a chat, not a restart | pass | pass after f6 |
+| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | pass | pass |
+| 12 | Write a plan with the planner | plan file made, steps readable | pass | pass after f8 |
+| 13 | Check before the run | card lists needs plainly; answers kept | pass | pass (s8) |
+| 14 | Plan run, two steps, real agent | both done, honest end line, report | pass | pass |
+| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | pass | pass |
 | 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | pass |
-| 17 | Stop, pause, resume a run | each says what happened; nothing lost | - | pass after f9-f11 (s9) |
+| 17 | Stop, pause, resume a run | each says what happened; nothing lost | pause + resume pass; stop not caught (s19) | pass after f9-f11 (s9) |
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
-| 19 | Close to tray and open again | runs go on; window comes back to the same place | - | pass after f12 |
+| 19 | Close to tray and open again | runs go on; window comes back to the same place | pass | pass after f12 |
 | 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) |
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) |
@@ -40,11 +40,11 @@ A row is green only when both systems pass.
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | pass (s15) |
 | 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | pass after c1, c2 (s16) |
 | 26 | Sleep and wake | links, runs and terminals come back | - | pass; runs not checked (s17) |
-| 27 | Preview and live watch | preview address opens; live mirror on request | - | preview pass; live mirror not driven |
-| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | - | pass after ba1, ba2 (s14) |
-| 29 | Settings | every page opens, scrolls, saves; Save always reachable | - | pass |
-| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | - | pass (s11) |
-| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | - |
+| 27 | Preview and live watch | preview address opens; live mirror on request | preview pass; live mirror not driven | preview pass; live mirror not driven |
+| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | backup now pass; restore not driven | pass after ba1, ba2 (s14) |
+| 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | pass |
+| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | pass | pass (s11) |
+| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | pass after n31a (s18) |
 | 32 | Go back one version | previous build installs over; data intact | - | pass (s12) |
 
 ST3, the 24 h run, has its own log. It covers memory and handle counts every 10 minutes, stuck processes, dead links, and the run's end line.
@@ -189,4 +189,22 @@ Seen, not fixed (for ST2 or later):
   minutes later. Found before it (after s16): the server noticed the laptop's old link gone 80 s late, after the
   window had taken the shell over on the new one, and took its output away; fixed fe9b54f (only the connection
   that holds a terminal orphans it). No plan run was going during the sleep (runs not checked here).
-- Flow 31 (a clean user account) needs the owner.
+- s18 (flow 31, Linux, 2026-11-26): a new user simulated without sudo: an empty HOME, its own session bus, a bare
+  system PATH (no Node, Rust or Claude Code), the release tarball unpacked into ~/Qanuvi and started from there.
+  First start fine (no errors, knowledge note in the Inbox); with a project "Get AI help for free" is offered; the
+  terminal works on the bare PATH. Fixed n31a ecab8ce (driven): "Set up free AI" opened Agents with "Install Claude
+  Code" on top and no wizard; it now opens Models and providers with the wizard. Seen: a tarball user has no menu
+  entry and a copy outside ~/.local/lib/qanuvi until the first update installs one there (proposal for the owner:
+  offer "Install for this user" on first start from elsewhere); backup folders are named in UTC (sorting, by design).
+  Not driven: the .deb installer (needs sudo), a real second user account.
+- s19 (Windows block, This PC, 2026-11-26, owner away): release test build of ecab8ce on its own empty data root
+  (APPDATA and LOCALAPPDATA pointed at E:qc-scratchwinst), scratch git project, Claude Code on Sonnet/Haiku,
+  $1.37 spent. Pass: 1, 3-7, 9-15, 19, 27 (preview), 28 (Back up now), 29, 30; 17 pause and resume (the step wrote a
+  progress note and resume went on at add5; Stop was not caught, the steps finished first). Fixed w1 c4a8a03 (driven):
+  Ctrl+C in a terminal stopped nothing (ping -t, a dev server): the master starts in a new process group, which turns
+  Ctrl+C off for every shell it starts; now turned on again for its children (the master ignores it itself). The
+  earlier test note "SendKeys Ctrl+C does not reach a Windows console shell" was this bug. Seen: the test build's
+  desktop notification is titled "Windows PowerShell" when it was started from PowerShell; a held step's question
+  quotes a long shell command (heavy for a normal user); the Git list refreshes every 15 s (s3). Not driven on
+  Windows: 2 and 8 (no free model set up), 16, 18 (later Tasks), 20, 21-26, 31, 32 (installer, update channel,
+  pairing and network flows: need the installed app or the owner).
