@@ -3405,11 +3405,13 @@ fn y10_a_question_nobody_answers_is_decided_after_the_wait_but_a_risky_step_stil
 #[test]
 fn a_kept_missing_program_hold_is_dropped_when_the_run_starts_again() {
     let env = world("# Plan\n\n- [ ] **7. Google**\n- [ ] **8. Microsoft**\n");
-    let hold = |step: &str| preflight::Hold {
+    let hold = |step: &str| {
+        preflight::Hold {
         step: step.into(),
         why: "it needs the program qanuvi-browser, which is not on this machine; install it, then Try again"
             .into(),
         by: preflight::HoldBy::Default,
+    }
     };
     let state = crate::plan::planstate::keep_holds(
         &crate::plan::planstate::PlanState::default(),
@@ -3460,8 +3462,139 @@ fn baseline_a_plan_without_secrets_runs_start_to_end_without_asking_the_owner() 
     let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
     assert!(got.wait_before.is_empty(), "{:?}", got.wait_before);
     let r = Run::start(env.clone(), FILE, options(), stop_button()).wait();
-    assert_eq!(r.status, RunStatus::Done, "{:?} {}", statuses(&r), r.message);
+    assert_eq!(
+        r.status,
+        RunStatus::Done,
+        "{:?} {}",
+        statuses(&r),
+        r.message
+    );
     assert_eq!(step(&r, "7").status, RunStepStatus::Done, "{}", r.message);
     assert_eq!(step(&r, "8").status, RunStepStatus::Done, "{}", r.message);
     assert!(open_question(&env).is_none(), "{:?}", env.inbox());
+}
+
+/// THE baseline (owner, 2026-11-28), the whole stream from the start of the project:
+/// the check before the run asks what is needed and lets Qanuvi decide what it can; with "Stop for me: Never" the run
+/// starts and keeps going to the end; nothing asks the owner while steps work; only something truly important (a step
+/// the agent marked blocked) waits, and only once everything else is done.
+#[test]
+fn baseline_the_whole_stream_check_then_a_quiet_run_to_the_end_only_the_important_thing_waits() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Model**\n- [ ] **2. Slugs**\n- [ ] **3. Google**\n  - Open the sign-in page in the browser.\n- [ ] **4. Live keys**\n- [ ] **5. Docs**\n",
+    );
+    let answer = json!({
+        "secrets": [], "risky": [], "setup": [], "order": [], "eyes": [], "promises": [],
+        "questions": [{"step": "2", "question": "Slug separator?", "sort": "decide", "recommended": "dash", "because": "URLs"}],
+        "needs": [
+            {"kind": "program", "name": "qanuvi-browser", "steps": ["3"]},
+            {"kind": "address", "name": "http://127.0.0.1:9", "steps": ["4"]}
+        ]
+    })
+    .to_string();
+    let asked_mid_work = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let seen = asked_mid_work.clone();
+    let blocked_once = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let b = blocked_once.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            if c.prompt.contains("Answer with JSON only, in this shape") {
+                return AgentReply {
+                    result: Some(answer.clone()),
+                    ..Default::default()
+                };
+            }
+            return ok_review(c);
+        }
+        // The step by its exact title (the decided note names "Step 2" in every prompt).
+        let n = [
+            "1. Model",
+            "2. Slugs",
+            "3. Google",
+            "4. Live keys",
+            "5. Docs",
+        ]
+        .iter()
+        .find(|t| c.prompt.contains(&format!("**{t}**")))
+        .map(|t| &t[..1])
+        .expect("a step prompt");
+        // The blocked step may be asked at once (the owner can answer early); nothing else is ever asked, and
+        // asking never stops the other steps.
+        for q in c
+            .env
+            .inbox()
+            .into_iter()
+            .filter(|i| i.kind_of == "answer" && i.status == "open")
+        {
+            if !q.title.contains("4. Live keys") {
+                seen.lock()
+                    .unwrap()
+                    .push(format!("step {n} ran while asking: {}", q.title));
+            }
+        }
+        if n == "4" && !b.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            c.env.mark(FILE, "4", '!');
+            let text = c.env.text(FILE).replace(
+                "**4. Live keys**",
+                "**4. Live keys**\n  - Blocked: the owner must create the live Google keys",
+            );
+            c.env.put(FILE, &text);
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    // 1. The check: Qanuvi decides the slug question, the guessed program and address hold nothing.
+    let setup = crate::plan::run::test_setup(FILE, options());
+    let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert!(got.wait_before.is_empty(), "{:?}", got.wait_before);
+    // 2. The run ("Never"): it goes on to the end; the blocked step waits only when nothing else is left.
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while running.waiting_answers() == 0 {
+        assert!(
+            std::time::Instant::now() < until,
+            "the run never reached the end"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let now = running.now();
+    for s in ["1", "2", "3", "5"] {
+        assert_eq!(
+            step(&now, s).status,
+            RunStepStatus::Done,
+            "step {s}: {}",
+            now.message
+        );
+    }
+    let questions: Vec<String> = env
+        .inbox()
+        .into_iter()
+        .filter(|i| i.kind_of == "answer" && i.status == "open")
+        .map(|i| i.title)
+        .collect();
+    assert_eq!(questions.len(), 1, "{questions:?}");
+    assert!(questions[0].contains("4. Live keys"), "{questions:?}");
+    assert!(
+        asked_mid_work.lock().unwrap().is_empty(),
+        "{:?}",
+        asked_mid_work.lock().unwrap()
+    );
+    let q = open_question(&env).unwrap();
+    env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
+    let r = running.wait();
+    assert_eq!(
+        step(&r, "4").status,
+        RunStepStatus::Skipped,
+        "{}",
+        r.message
+    );
 }
