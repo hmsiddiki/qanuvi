@@ -272,7 +272,7 @@ pub fn info(data: &Path, base: &Path, default: Option<&Path>) -> Info {
         keep: KEEP,
         restore: loc.restore.as_deref().map(s),
         note,
-        backups: dir.as_deref().map(list).unwrap_or_default(),
+        backups: dir.as_deref().map(|d| list_of(d, data)).unwrap_or_default(),
     }
 }
 
@@ -435,9 +435,32 @@ pub fn list(dest: &Path) -> Vec<Entry> {
     out
 }
 
-/// Keeps the newest `keep` daily and manual backups; before-restore copies stay until the user removes them.
-pub fn prune(dest: &Path, keep: usize) {
-    for old in list(dest)
+/// s14: the backups of one data folder. Data folders of one kind share a default backups folder (test copies, an
+/// app and a master): each shows, keeps and counts only its own.
+pub fn list_of(dest: &Path, data: &Path) -> Vec<Entry> {
+    list(dest)
+        .into_iter()
+        .filter(|e| same_folder(&e.manifest.from, data))
+        .collect()
+}
+
+/// Whether two paths name one folder (resolved when they exist; Windows ignores case).
+fn same_folder(a: &Path, b: &Path) -> bool {
+    let norm = |p: &Path| {
+        let p = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let t = p
+            .to_string_lossy()
+            .trim_end_matches(['/', '\\'])
+            .to_string();
+        if cfg!(windows) { t.to_lowercase() } else { t }
+    };
+    norm(a) == norm(b)
+}
+
+/// Keeps the newest `keep` daily and manual backups of this data folder; before-restore copies stay until the user
+/// removes them, and other data folders' backups are theirs to keep.
+pub fn prune(dest: &Path, data: &Path, keep: usize) {
+    for old in list_of(dest, data)
         .into_iter()
         .filter(|e| e.manifest.kind != Kind::BeforeRestore)
         .skip(keep)
@@ -482,7 +505,7 @@ pub fn run_due(
         Ok(_) => {
             fresh.last_at = now();
             fresh.last_error = None;
-            prune(&dest, KEEP);
+            prune(&dest, data, KEEP);
         }
         Err(e) => fresh.last_error = Some(e.clone()),
     }
@@ -693,6 +716,33 @@ mod tests {
 
         // Never inside the data folder.
         assert!(make(&data, None, &data.join("b"), Kind::Manual).is_err());
+    }
+
+    #[test]
+    fn data_folders_sharing_a_backups_folder_see_and_keep_only_their_own() {
+        // s14: two data folders (a test copy and the real one) back up into the same folder.
+        let root = tempfile::tempdir().unwrap();
+        let (one, two) = (root.path().join("one"), root.path().join("two"));
+        drop(data_with_db(&one, &["a"]));
+        drop(data_with_db(&two, &["b"]));
+        let dest = root.path().join("backups");
+        for d in [&one, &two] {
+            let c = Config {
+                dir: Some(dest.clone()),
+                ..Default::default()
+            };
+            write_config(d, &c).unwrap();
+        }
+        for _ in 0..3 {
+            now_backup(&two, None, None).unwrap();
+        }
+        for _ in 0..(KEEP + 2) {
+            now_backup(&one, None, None).unwrap();
+        }
+        assert_eq!(list_of(&dest, &one).len(), KEEP);
+        // One's pruning left two's backups alone, and two's list holds only them.
+        assert_eq!(list_of(&dest, &two).len(), 3);
+        assert_eq!(info(&two, root.path(), None).backups.len(), 3);
     }
 
     #[test]

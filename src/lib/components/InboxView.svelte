@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PlainText from "./PlainText.svelte";
   /**
    * The Inbox (24f, 15f): sessions waiting for the user, plan run reports, sign-ins to renew, newer knowledge. The one
    * screen shared by all machines (24z3 C2): every machine's items with its name, a filter by machine, answers sent to
@@ -138,7 +139,7 @@
             <span class="dot" style:background={m.color}></span>{m.name}
           </div>{/if}
         {#if item.offline}
-          {#if item.text}<p class="text">{item.text}</p>{/if}
+          {#if item.text}<p class="text"><PlainText text={item.text} /></p>{/if}
           <p class="text gone">{machineOf(item).name} is not connected. Answer it once it is back.</p>
         {:else}
           <InboxQuestion {item} onopen={open} />
@@ -157,7 +158,7 @@
           <span class="muted small when">{ago(Math.floor(item.at / 1000))}</span>
         </div>
         {#if item.offline}
-          {#if item.text}<p class="text">{item.text}</p>{/if}
+          {#if item.text}<p class="text"><PlainText text={item.text} /></p>{/if}
           <p class="text gone">{machineOf(item).name} is not connected.</p>
         {:else}
           <InboxQuestion {item} onopen={open} />
@@ -196,7 +197,7 @@
           <div class="machine">
             <span class="dot" style:background={m.color}></span>{m.name}
           </div>{/if}
-        {#if item.text}<p class="text">{item.text}</p>{/if}
+        {#if item.text}<p class="text"><PlainText text={item.text} /></p>{/if}
         {#if item.type === "answer"}<p class="text">{outcome(item)}</p>{/if}
         {#if item.offline}
           <p class="text gone">{machineOf(item).name} is not connected.</p>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PlainText from "./PlainText.svelte";
   /**
    * One Inbox question with its answer form (24u part 4). Used in the Inbox, and later by the window a desktop
    * notification opens, so a question is answered the same way everywhere. The first answer anywhere counts.
@@ -35,7 +36,7 @@
 <div class="question">
   {#if item.form?.card}
     <HoldCardView card={item.form.card} />
-  {:else if item.text}<p class="why">{item.text}</p>{/if}
+  {:else if item.text}<p class="why"><PlainText text={item.text} /></p>{/if}
   {#if item.form?.secret}
     <p class="secret">
       This asks for a login or password. Type it in the run panel of the plan, so it is kept as a private detail and

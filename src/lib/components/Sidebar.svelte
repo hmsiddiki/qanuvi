@@ -26,7 +26,6 @@
   import { workspace } from "$lib/stores/workspace.svelte";
   import { masters } from "$lib/stores/masters.svelte";
   import { switcher } from "$lib/stores/switcher.svelte";
-  import Bell from "@lucide/svelte/icons/bell";
   import Plus from "@lucide/svelte/icons/plus";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Settings2 from "@lucide/svelte/icons/settings-2";
@@ -68,7 +67,7 @@
     { id: "agents", label: "Agents", icon: Bot },
     { id: "memory", label: "Memory", icon: Brain },
     { id: "servers", label: "Servers", icon: Server },
-    { id: "reminders", label: "Reminders", icon: Bell },
+    // Reminders (step 22) comes back when it is built; an entry that does nothing is hidden meanwhile.
   ];
 
   let collapsed = $derived(layout.state.sidebarCollapsed);
@@ -92,9 +91,7 @@
           ? null
           : ui.view === "plan"
             ? "plans"
-            : ui.section === "reminders"
-              ? "reminders"
-              : "home",
+            : "home",
   );
 
   function navigate(id: string) {

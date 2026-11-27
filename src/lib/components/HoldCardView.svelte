@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PlainText from "./PlainText.svelte";
   /**
    * n1: a blocked or unfinished plan step's question, laid out so it can be answered without the chat: the headline,
    * what happened, why it needs the owner, what is needed, the exact text to copy, and what Qanuvi can do itself.
@@ -29,10 +30,10 @@
 </script>
 
 <div class="card">
-  {#if card.reply?.trim()}<p class="reply">{card.reply}</p>{/if}
-  <p class="headline">{card.headline}</p>
+  {#if card.reply?.trim()}<p class="reply"><PlainText text={card.reply} /></p>{/if}
+  <p class="headline"><PlainText text={card.headline} /></p>
   {#each parts as [label, text] (label)}
-    <p class="part"><span class="label">{label}:</span> {text}</p>
+    <p class="part"><span class="label">{label}:</span> <PlainText {text} /></p>
   {/each}
   {#if card.snippet?.text}
     <div class="snippet">
@@ -43,7 +44,7 @@
       <pre>{card.snippet.text}</pre>
     </div>
   {/if}
-  {#if card.canDo?.trim()}<p class="can-do">{card.canDo}</p>{/if}
+  {#if card.canDo?.trim()}<p class="can-do"><PlainText text={card.canDo} /></p>{/if}
 </div>
 
 <style>

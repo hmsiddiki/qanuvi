@@ -203,6 +203,9 @@ const CHECK_MORE: &[&str] = &[
     "that will do it (empty when no step does).",
     "needs: the programs, addresses (http or host:port) and secrets the steps cannot run without; Qanuvi tries each on",
     "this machine before the run.",
+    "A program a step needs that is neither in this project nor on the PATH (for example one found inside another",
+    "project's folder) is not used quietly: add a setup item that names where it was found, that the run depends on",
+    "that folder staying, and recommends adding it to this project.",
 ];
 
 pub fn preflight_prompt(file: &str, steps: &[PreflightStep], known: &Known) -> String {
