@@ -84,6 +84,9 @@ pub enum Flow {
     End,
 }
 
+/// How long a turn that sent a message mid-work waits at idle for the agent to read it and go on.
+const IDLE_GRACE: Duration = Duration::from_millis(1500);
+
 /// A session status that ends a turn.
 pub fn turn_over(status: &str) -> bool {
     matches!(status, "idle" | "failed" | "stopped" | "ended")
@@ -599,6 +602,11 @@ impl RunEnv for CoreEnv<'_> {
             session: Box::new(started),
         }));
         let mut last_said = String::new();
+        // A message sent while the agent worked (the owner's words): Qanuvi's own agent may read it only after it
+        // went idle, and work on. The turn then waits a moment at idle, so that work is followed and answered by the
+        // run rules, not left behind with nobody listening (2026-11-28: step 2 found the session busy and failed).
+        let mut sent_during = false;
+        let mut idle_since: Option<std::time::Instant> = None;
         // Events until the turn is over; a closed channel means the session's process is gone.
         loop {
             match flow {
@@ -606,6 +614,7 @@ impl RunEnv for CoreEnv<'_> {
                 Flow::Send(text) => {
                     // A message that cannot be sent (the agent just ended) changes nothing: its end comes as an event.
                     if let Some(tx) = weak.upgrade() {
+                        sent_during |= !turn_over(&end.status);
                         let _ = send(tx, Some(&end.session_id), &text, None);
                     }
                 }
@@ -624,6 +633,9 @@ impl RunEnv for CoreEnv<'_> {
             let event = match rx.recv_timeout(Duration::from_secs(1)) {
                 Ok(e) => e,
                 Err(RecvTimeoutError::Timeout) => {
+                    if idle_since.is_some_and(|t| t.elapsed() >= IDLE_GRACE) {
+                        break;
+                    }
                     flow = on_event(None);
                     continue;
                 }
@@ -653,7 +665,16 @@ impl RunEnv for CoreEnv<'_> {
                     end.duration_ms = session.duration_ms;
                     // What the runner answered to the end still counts (it may keep waiting: an interrupt).
                     if turn_over(&session.status) && flow == Flow::Go {
-                        break;
+                        if sent_during && session.status == "idle" && idle_since.is_none() {
+                            idle_since = Some(std::time::Instant::now());
+                            continue;
+                        }
+                        if idle_since.is_none() || session.status != "idle" {
+                            break;
+                        }
+                    } else if !turn_over(&session.status) {
+                        // Working again (it read the waiting message): followed to its next end.
+                        idle_since = None;
                     }
                 }
                 AgentEvent::Exit { .. } => {

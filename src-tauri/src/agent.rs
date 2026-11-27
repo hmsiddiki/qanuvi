@@ -1226,7 +1226,9 @@ impl Agents {
                     get(db, id).is_ok_and(|s| s.status == "running" || s.status == "waiting");
                 // The events keep going to whoever runs the turn (a plan run waits for its step to finish there);
                 // a message added mid-task only joins it. Between turns the new sender takes over.
-                if !during {
+                // A plan run's turn (its rules come with it) always takes the events over: the turn before it has
+                // ended, so nobody else listens (a busy session left by the step before failed the next in 0 s).
+                if !during || policy.is_some() {
                     *running.channel.lock().unwrap_or_else(|e| e.into_inner()) = channel;
                 }
                 // The user chose another model or permission mode for this session: the running agent hears it first
