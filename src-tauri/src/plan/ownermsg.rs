@@ -278,7 +278,13 @@ pub fn parse_keep(answer: &str) -> bool {
 
 pub fn note_message(text: &str) -> String {
     format!(
-        "(Qanuvi: a note from the owner for this step: \"{text}\". Take it into account and go on with the step.)"
+        "(Qanuvi: the owner wrote in this step's chat: \"{text}\". Read what they mean and decide yourself, without \
+         stopping the step: information, use it; an instruction for this step, do it as part of the step; new work \
+         beyond this step, judge its size: small and safe, finish the step first, then do it right after in this \
+         session; big, risky, or a choice the owner should confirm, do not start it: add it to the plan file as a new \
+         open step right after this one, marked \"- [!]\" with a \"  - Blocked: ...\" line under it saying exactly \
+         what the owner should confirm (Qanuvi asks them and the run goes on), then finish this step. Say in your \
+         summary what you did with it.)"
     )
 }
 
@@ -367,12 +373,12 @@ pub fn default_text(wait_ms: i64) -> String {
 
 pub fn handled_text(kind: Kind) -> &'static str {
     match kind {
-        Kind::Note => "passed to the agent as a note for this step",
+        Kind::Note => "passed to the agent, which acts on it",
         Kind::Rule => "kept as a rule for the whole plan (FACTS.md), every later step gets it",
         Kind::Question => "the agent answers it in the chat, then goes on",
         Kind::Stop => "taken as Stop: the agent finishes the edit in hand, then the run stops",
         Kind::Pause => "taken as Pause: the agent finishes the edit in hand and writes where it is",
-        Kind::Change => "asked when to do it",
+        Kind::Change => "the agent acts on it: in this step, or right after it",
     }
 }
 

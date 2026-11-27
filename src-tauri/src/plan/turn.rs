@@ -654,7 +654,9 @@ pub fn turn(
                 sorted.title.clone()
             };
             match sorted.kind {
-                Kind::Note | Kind::Rule | Kind::Question => {
+                // The working agent reads the owner's words and acts on them itself (information, an instruction for
+                // this step, or new work right after it): nothing waits for the owner, nothing asks them.
+                Kind::Note | Kind::Rule | Kind::Question | Kind::Change => {
                     // The owner asked to keep it, or it is a lasting fact: the project's memory has it from now on.
                     let kept = sorted.keep
                         && sorted.kind != Kind::Question
@@ -673,7 +675,7 @@ pub fn turn(
                         line: told(handled),
                     });
                     return Flow::Send(match sorted.kind {
-                        Kind::Note => ownermsg::note_message(&text),
+                        Kind::Note | Kind::Change => ownermsg::note_message(&text),
                         Kind::Rule => ownermsg::rule_message(&text),
                         _ => ownermsg::question_message(&text),
                     });
@@ -695,52 +697,6 @@ pub fn turn(
                     } else {
                         Flow::Hold
                     };
-                }
-                Kind::Change if asking.is_some() => {
-                    // One question at a time: a second change while one is asked becomes its own step (nothing lost).
-                    watch.messages.push(record(
-                        "another change was being asked about, so it was added as a new step after this one",
-                    ));
-                    watch.new_steps.push(ownermsg::NewStep {
-                        title: step_title,
-                        text: text.clone(),
-                    });
-                    forward(&AgentEvent::Line {
-                        line: ownermsg::chat_line(&format!(
-                            "Your change \"{text}\" becomes a new step after this one (another change is being asked about)."
-                        )),
-                    });
-                    return Flow::Go;
-                }
-                Kind::Change => {
-                    let key = format!(
-                        "msg:{}:{}:{now}",
-                        env.project_id(),
-                        id.clone().unwrap_or_else(|| title.to_string())
-                    );
-                    forward(&AgentEvent::Line {
-                        line: ownermsg::chat_line(&ownermsg::ask_text(&text, wait)),
-                    });
-                    let _ = env.inbox_add(&crate::inbox::NewItem {
-                        kind_of: "answer".into(),
-                        kind: "run".into(),
-                        title: format!("{title}: when should your change be done?"),
-                        text: text.clone(),
-                        key: Some(key.clone()),
-                        open: None,
-                        form: Some(ownermsg::form()),
-                        source: Some(serde_json::json!({"kind": "step-message",
-                            "projectId": env.project_id(), "session": id.clone(), "step": title})),
-                    });
-                    asking = Some(Asking {
-                        at: now,
-                        title: step_title,
-                        text: text.clone(),
-                        by: sorted.by.clone(),
-                        key,
-                        until: now + wait,
-                    });
-                    return Flow::Send(ownermsg::change_hold_message(&text));
                 }
             }
         }
