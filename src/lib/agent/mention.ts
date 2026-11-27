@@ -43,6 +43,20 @@ export function inProject(root: string, path: string): string | null {
   return p.toLowerCase().startsWith(`${r.toLowerCase()}/`) ? p.slice(r.length + 1) : null;
 }
 
+/**
+ * r1 (Mac drive): a file an agent's step names, relative to the project. Claude Code names full paths; Qanuvi's own
+ * agent names paths relative to the project ("hello.js"), which inProject refused, so Revert said "outside the
+ * project". A relative path counts when it does not climb out of the project.
+ */
+export function agentFileInProject(root: string, path: string): string | null {
+  const p = path.replace(/\\/g, "/");
+  const absolute = p.startsWith("/") || /^[a-z]:\//i.test(p);
+  if (absolute) return inProject(root, p);
+  const rel = p.replace(/^(\.\/)+/, "");
+  if (!rel || rel.split("/").includes("..")) return null;
+  return rel;
+}
+
 /** Image files by name (dropped images become attachments the agent sees). */
 export function isImagePath(path: string): boolean {
   return /\.(png|jpe?g|gif|webp)$/i.test(path);

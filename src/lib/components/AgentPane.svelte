@@ -18,7 +18,7 @@
   import ListChecks from "@lucide/svelte/icons/list-checks";
   import StepCard from "./StepCard.svelte";
   import MentionPicker, { type Choice } from "./MentionPicker.svelte";
-  import { inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
+  import { agentFileInProject, inProject, insertMention, isImagePath, mentionAt } from "$lib/agent/mention";
   import { revertEdits, type Edit } from "$lib/agent/diff";
   import {
     matchesIn,
@@ -583,7 +583,7 @@
   }): Promise<string | null> {
     const p = projects.current;
     if (!p || !step.file || !step.edits || step.whole) return "This change cannot be undone from the chat.";
-    const rel = inProject(p.path, step.file);
+    const rel = agentFileInProject(p.path, step.file);
     if (!rel) return "The file is outside the project.";
     const now = await api.files.read(p.id, rel).catch(() => null);
     if (!now) return "The file could not be read.";
@@ -713,9 +713,9 @@
       return "nothing";
     }
     const ready: { rel: string; text: string; hash: string; before: string }[] = [];
-    const left = plan.cannot.map((c) => `${inProject(p.path, c.file) ?? c.file}: ${c.why}`);
+    const left = plan.cannot.map((c) => `${agentFileInProject(p.path, c.file) ?? c.file}: ${c.why}`);
     for (const f of plan.files) {
-      const rel = inProject(p.path, f.file);
+      const rel = agentFileInProject(p.path, f.file);
       if (!rel) {
         left.push(`${f.file}: outside the project`);
         continue;
@@ -905,9 +905,8 @@
 
   function openFile(file: string | null) {
     if (!file || !project) return;
-    const root = project.path.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
-    const path = file.replace(/\\/g, "/");
-    if (path.toLowerCase().startsWith(root + "/")) editor.open(project.id, path.slice(root.length + 1));
+    const rel = agentFileInProject(project.path, file);
+    if (rel) editor.open(project.id, rel);
   }
 
   /** What a "without asking" approval covers, in words: all file changes together, otherwise the tool. */
@@ -1533,7 +1532,7 @@ With the agent now: a message it has cannot be taken back.`}
         <span class="dim">Changed {changed.length} file{changed.length === 1 ? "" : "s"}:</span>
         {#each changed as c (c.file)}
           <button type="button" class="link" title="Open {c.file}" onclick={() => openFile(c.file)}
-            >{(project && inProject(project.path, c.file)) ?? c.file}</button
+            >{(project && agentFileInProject(project.path, c.file)) ?? c.file}</button
           >
           {#if c.written && !c.added && !c.removed}<span class="dim">written</span>{:else}<span class="plus"
               >+{c.added}</span

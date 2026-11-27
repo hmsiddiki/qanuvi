@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fileMention, inProject, insertMention, isImagePath, mentionAt, symbolMention } from "./mention";
+import {
+  agentFileInProject,
+  fileMention,
+  inProject,
+  insertMention,
+  isImagePath,
+  mentionAt,
+  symbolMention,
+} from "./mention";
 
 describe("@ mentions in the message box", () => {
   it("finds the @query the caret is in, only at a word start", () => {
@@ -27,5 +35,19 @@ describe("@ mentions in the message box", () => {
     expect(inProject("C:/p/app", "C:/p/apple/a.ts")).toBeNull();
     expect(isImagePath("C:/x/shot.PNG")).toBe(true);
     expect(isImagePath("C:/x/notes.md")).toBe(false);
+  });
+});
+
+// r1 (Mac drive): Qanuvi's own agent names edited files relative to the project; Revert said "outside the project".
+describe("files an agent's step names", () => {
+  it("takes full paths inside the project and plain relative ones, never one that climbs out", () => {
+    expect(agentFileInProject("/Users/u/mproj", "/Users/u/mproj/hello.js")).toBe("hello.js");
+    expect(agentFileInProject("/Users/u/mproj", "hello.js")).toBe("hello.js");
+    expect(agentFileInProject("/Users/u/mproj", "./src/a.ts")).toBe("src/a.ts");
+    expect(agentFileInProject("C:\\p\\app", "src\\a.ts")).toBe("src/a.ts");
+    expect(agentFileInProject("C:\\p\\app", "C:\\p\\app\\src\\a.ts")).toBe("src/a.ts");
+    expect(agentFileInProject("/Users/u/mproj", "../other/x.js")).toBeNull();
+    expect(agentFileInProject("/Users/u/mproj", "/etc/hosts")).toBeNull();
+    expect(agentFileInProject("C:/p/app", "D:/x.ts")).toBeNull();
   });
 });
