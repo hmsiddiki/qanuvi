@@ -3558,11 +3558,19 @@ fn baseline_the_whole_stream_check_then_a_quiet_run_to_the_end_only_the_importan
         },
         stop_button(),
     );
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    while running.waiting_answers() == 0 {
+    // The blocked step's question may show while step 5 still works: wait for every other step, then look.
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let others_done = || {
+        let now = running.now();
+        ["1", "2", "3", "5"]
+            .iter()
+            .all(|s| step(&now, s).status == RunStepStatus::Done)
+    };
+    while running.waiting_answers() == 0 || !others_done() {
         assert!(
             std::time::Instant::now() < until,
-            "the run never reached the end"
+            "the run never reached the end: {:?}",
+            statuses(&running.now())
         );
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
@@ -3597,4 +3605,88 @@ fn baseline_the_whole_stream_check_then_a_quiet_run_to_the_end_only_the_importan
         "{}",
         r.message
     );
+}
+
+/// A step the check held (a missing secret) that also needs a later step is asked at once, not only set aside as
+/// "waits for step 3" (a real run hid the secret question that way, 2026-11-28).
+#[test]
+fn baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question() {
+    let env = world(
+        "# Plan\n\n- [ ] **1. Build**\n- [ ] **2. Post the note**\n  - Post to the webhook in TEAM_WEBHOOK_URL.\n  - Needs: 3\n- [ ] **3. Readme**\n",
+    );
+    let answer = json!({
+        "secrets": [{"name": "TEAM_WEBHOOK_URL", "what": "the team chat address", "why": "step 2 posts there", "steps": ["2"]}],
+        "questions": [], "risky": [], "setup": [], "order": [], "eyes": [], "promises": [], "needs": []
+    })
+    .to_string();
+    let blocked_once = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let b = blocked_once.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            if c.prompt.contains("Answer with JSON only, in this shape") {
+                return AgentReply {
+                    result: Some(answer.clone()),
+                    ..Default::default()
+                };
+            }
+            return ok_review(c);
+        }
+        let n = ["1. Build", "2. Post the note", "3. Readme"]
+            .iter()
+            .find(|t| c.prompt.contains(&format!("**{t}**")))
+            .map(|t| &t[..1])
+            .expect("a step prompt");
+        if n == "3" && !b.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            c.env.mark(FILE, "3", '!');
+            let text = c.env.text(FILE).replace(
+                "**3. Readme**",
+                "**3. Readme**\n  - Blocked: the owner must pick the licence",
+            );
+            c.env.put(FILE, &text);
+            return AgentReply::default();
+        }
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let setup = crate::plan::run::test_setup(FILE, options());
+    let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert_eq!(got.wait_before.len(), 1, "{:?}", got.wait_before);
+    let running = Run::start(
+        env.clone(),
+        FILE,
+        RunOptions {
+            replan: false,
+            ..options()
+        },
+        stop_button(),
+    );
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let titles = || -> Vec<String> {
+        env.inbox()
+            .into_iter()
+            .filter(|i| i.kind_of == "answer" && i.status == "open")
+            .map(|i| i.title)
+            .collect()
+    };
+    while titles().len() < 2 {
+        assert!(
+            std::time::Instant::now() < until,
+            "both questions never came: {:?} {:?}",
+            titles(),
+            statuses(&running.now())
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let t = titles();
+    assert!(t.iter().any(|x| x.contains("2. Post the note")), "{t:?}");
+    assert!(t.iter().any(|x| x.contains("3. Readme")), "{t:?}");
+    for q in env
+        .inbox()
+        .into_iter()
+        .filter(|i| i.kind_of == "answer" && i.status == "open")
+    {
+        env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
+    }
+    let r = running.wait();
+    assert_eq!(step(&r, "1").status, RunStepStatus::Done, "{}", r.message);
 }

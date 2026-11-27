@@ -369,7 +369,7 @@ impl Policy {
         let expanded = expand_vars(command, &self.vars);
         let hosts: Vec<&str> = self.preview_host.as_deref().into_iter().collect();
         // Y10 d1: a step given leave to delete inside the project: its deletes there are judged as the rest is.
-        let granted: Vec<String> = if self.delete_inside {
+        let mut granted: Vec<String> = if self.delete_inside {
             parts(command)
                 .into_iter()
                 .filter(|p| self.deletes_inside(p))
@@ -377,6 +377,13 @@ impl Policy {
         } else {
             Vec::new()
         };
+        // A step may stop a process the project or the run started (a demo server it opened): `kill <pid>`,
+        // `taskkill /PID`, `Stop-Process -Id` by number only. Any other kill stays on the never-list.
+        granted.extend(
+            parts(command)
+                .into_iter()
+                .filter(|p| crate::own_process::stops_own(p, &self.root)),
+        );
         let mut command_left = command.to_string();
         for g in &granted {
             command_left = command_left.replacen(g.as_str(), " true ", 1);
@@ -929,6 +936,56 @@ mod tests {
         // Never kept in the settings.
         let v = serde_json::to_value(&granted_rules).unwrap();
         assert!(v.get("delete_inside").is_none());
+    }
+
+    /// A step may stop the demo server it started in the project (found on a real run, 2026-11-28); a kill of
+    /// anything else, or with other risky parts, stays on the never-list.
+    #[test]
+    fn a_step_may_stop_a_process_it_started_in_the_project_and_no_other() {
+        let dir = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let spawn = |at: &std::path::Path| {
+            if cfg!(windows) {
+                std::process::Command::new("cmd")
+                    .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
+                    .current_dir(at)
+                    .spawn()
+                    .unwrap()
+            } else {
+                std::process::Command::new("sleep")
+                    .arg("30")
+                    .current_dir(at)
+                    .spawn()
+                    .unwrap()
+            }
+        };
+        let mut mine = spawn(dir.path());
+        let p = Policy::new(&project(dir.path(), RunRules::default()), None);
+        let id = mine.id();
+        let own = p.command(&format!("kill {id}"));
+        let own_quiet = p.command(&format!("kill -9 {id} 2>/dev/null; echo stopped"));
+        let mixed = p.command(&format!("kill {id} && git push"));
+        let _ = mine.kill();
+        let _ = mine.wait();
+        assert!(!matches!(own, Verdict::Never(_)), "{own:?}");
+        assert!(!matches!(own_quiet, Verdict::Never(_)), "{own_quiet:?}");
+        assert!(matches!(mixed, Verdict::Never(_)), "{mixed:?}");
+        // Not this process, not init, not by a pid file.
+        for bad in [
+            format!("kill {}", std::process::id()),
+            "kill 1".to_string(),
+            "kill $(cat server.pid)".to_string(),
+        ] {
+            assert!(matches!(p.command(&bad), Verdict::Never(_)), "{bad}");
+        }
+        // On Linux and macOS a process working in another folder is not the project's.
+        if cfg!(unix) {
+            let mut theirs = spawn(other.path());
+            let v = p.command(&format!("kill {}", theirs.id()));
+            let _ = theirs.kill();
+            let _ = theirs.wait();
+            assert!(matches!(v, Verdict::Never(_)), "{v:?}");
+        }
     }
 
     #[test]

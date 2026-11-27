@@ -43,6 +43,7 @@ pub mod memory_disk;
 pub mod model_keys;
 pub mod notify;
 pub mod omniroute;
+pub mod own_process;
 pub mod pairing_keys;
 pub mod paths;
 pub mod pipes;

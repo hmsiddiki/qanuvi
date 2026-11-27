@@ -314,6 +314,21 @@ fn text(v: &Value) -> String {
         .unwrap_or_default()
 }
 
+/// A command (the end check): kept whole, never cut with "…" (a cut command can never run, found on a real run
+/// 2026-11-28); one longer than 2000 characters is dropped instead.
+fn command(v: &Value) -> String {
+    let t = text_whole(v);
+    if js::len(&t) > 2000 { String::new() } else { t }
+}
+
+fn text_whole(v: &Value) -> String {
+    v.as_str()
+        .map(js::trim)
+        .filter(|s| !is_placeholder(s))
+        .map(str::to_string)
+        .unwrap_or_default()
+}
+
 /// A placeholder in place of the words (seen in a check's answer: "<<ccr:0bd3c8834676,string,348B>>") is no text:
 /// it is never shown to the owner as a question.
 pub fn is_placeholder(s: &str) -> bool {
@@ -495,7 +510,7 @@ pub fn parse_preflight(answer: &str) -> Preflight {
             .filter(|v| v.is_object())
             .map(|v| EndCheck {
                 step: text(&v["step"]),
-                check: text(&v["check"]),
+                check: command(&v["check"]),
                 why: text(&v["why"]),
             })
             .filter(|e| !e.check.is_empty()),
@@ -1221,6 +1236,22 @@ pub fn with_read_holds(settled: &SettledCheck, holds: &[Hold]) -> SettledCheck {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// A long end-check command is kept whole (a real run cut it at 300 characters with "…" and it could never run).
+    #[test]
+    fn a_long_end_check_command_is_kept_whole() {
+        let cmd = format!(
+            "npm test && node -e \"{}\" && (node server.js & pid=$!; sleep 1; curl -fsS http://127.0.0.1:4173/ | grep -q ok; rc=$?; kill $pid; exit $rc)",
+            "x".repeat(320)
+        );
+        let answer =
+            json!({"endCheck": {"step": "5", "check": cmd, "why": "the real thing"}}).to_string();
+        let got = parse_preflight(&answer).end_check.expect("an end check");
+        assert_eq!(got.check, cmd);
+        let huge =
+            json!({"endCheck": {"step": "5", "check": "y".repeat(2500), "why": "w"}}).to_string();
+        assert!(parse_preflight(&huge).end_check.is_none());
+    }
 
     fn parse(v: Value) -> Preflight {
         parse_preflight(&v.to_string())

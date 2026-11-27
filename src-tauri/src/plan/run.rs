@@ -1686,6 +1686,16 @@ impl<'a> Loop<'a> {
                 }
             }
         }
+        // A step the owner chose to see first (risky, a missing secret, or a question left open in the check before
+        // the run) is asked before its Needs line is looked at: a real run set such a step aside as only "waits for
+        // step 5", and its own question (a missing secret) never reached the owner (2026-11-28).
+        if self.run.steps[i].answer.is_none()
+            && let Some(why) = waits_before(number.as_deref(), Some(&self.wait_list))
+        {
+            let why = why.to_string();
+            self.set_aside(i, HeldKind::Hold, &why);
+            return false;
+        }
         let needs = now_step
             .as_ref()
             .map(|st| st.needs.clone())
@@ -1738,14 +1748,6 @@ impl<'a> Loop<'a> {
             self.note_skipped(i, Some(&why));
             self.log_result(i);
             self.save();
-            return false;
-        }
-        // A step the owner chose to see first (risky, or a question left open in the check before the run).
-        if self.run.steps[i].answer.is_none()
-            && let Some(why) = waits_before(number.as_deref(), Some(&self.wait_list))
-        {
-            let why = why.to_string();
-            self.set_aside(i, HeldKind::Hold, &why);
             return false;
         }
         true
