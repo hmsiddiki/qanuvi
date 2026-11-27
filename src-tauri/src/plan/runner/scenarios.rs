@@ -3690,3 +3690,61 @@ fn baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question() {
     let r = running.wait();
     assert_eq!(step(&r, "1").status, RunStepStatus::Done, "{}", r.message);
 }
+
+/// Free models out for today (OpenRouter's daily limit): one free try finds it out, the run says so once, and every
+/// later try goes to the paid model. A real run lost two free tries on every step (2026-11-28).
+#[test]
+fn baseline_free_models_out_for_today_are_tried_once_then_paid_models_do_every_step() {
+    let env = world("# Plan\n\n- [ ] **1. Slugs**\n- [ ] **2. Titles**\n- [ ] **3. Readme**\n");
+    let free_tries = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let f = free_tries.clone();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return ok_review(c);
+        }
+        if c.agent == "qanuvi" {
+            f.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let route = json!({"type": "system", "subtype": "qanuvi_route", "model": "openrouter/openrouter/free",
+                "text": format!("openrouter/x:free could not answer ({}); openrouter/openrouter/free takes over.",
+                    crate::llm::DAILY_LIMIT)})
+            .to_string();
+            return AgentReply {
+                is_error: true,
+                result: Some("No model could answer.".into()),
+                lines: vec![route],
+                ..Default::default()
+            };
+        }
+        let n = step_of(c.prompt, &["1", "2", "3"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let mut setup = test_setup(
+        FILE,
+        RunOptions {
+            team: Some(RunTeam::Free),
+            replan: false,
+            ..options()
+        },
+    );
+    setup.has_free = true;
+    let stop = stop_button();
+    let shared = stop.0.clone();
+    let running = Run::start_setup(env.clone(), setup, stop);
+    let r = running.wait();
+    for s in ["1", "2", "3"] {
+        assert_eq!(
+            step(&r, s).status,
+            RunStepStatus::Done,
+            "step {s}: {}",
+            r.message
+        );
+    }
+    assert_eq!(free_tries.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let said: Vec<String> = shared
+        .notices()
+        .into_iter()
+        .filter(|n| n.contains("Free models are out for today"))
+        .collect();
+    assert_eq!(said.len(), 1, "{:?}", shared.notices());
+}

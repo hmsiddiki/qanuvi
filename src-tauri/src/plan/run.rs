@@ -34,6 +34,9 @@ use super::routing::{
     choose_model, job_type, learn,
 };
 use super::runner::*;
+
+/// What Qanuvi core says in a session when the free models are out for today (`crate::llm::DAILY_LIMIT`).
+const LIMIT_MARK: &str = "free daily limit is used up";
 use super::setaside::{self, AsideItem, DepStep, HeldKind, HeldStep, is_closing_step};
 use super::tasklist::{
     Step, StepStatus, clear_stale_skips, parse_plan, set_step_model, set_step_skipped,
@@ -427,6 +430,9 @@ struct Loop<'a> {
     branch: Option<String>,
     keep_for_resume: bool,
     free_until: Option<i64>,
+    /// The free models are out for today (their provider's daily limit): the rest of the run goes to paid models
+    /// at once, instead of every step trying the free ones twice first (seen on a real run, 2026-11-28).
+    free_out: bool,
     /// Y7: the step meeting outages now, how many in a row, and since when (milliseconds).
     outage: Option<(String, u32, i64)>,
     /// Y7: the run said what is down in this outage already (it says so once).
@@ -587,6 +593,7 @@ impl<'a> Loop<'a> {
             branch: None,
             keep_for_resume: false,
             free_until: None,
+            free_out: false,
             outage: None,
             outage_said: false,
             asked_changes_from: false,
@@ -1985,7 +1992,8 @@ impl<'a> Loop<'a> {
             let st = self.run.steps[i].clone();
             let tries = &st.attempts[st.retry_from.unwrap_or(0).min(st.attempts.len())..];
             // The paid agent's limit is not reset yet and the owner chose free models meanwhile.
-            let free_now = self.free_until.is_some_and(|t| self.env.now_ms() < t)
+            let free_now = !self.free_out
+                && self.free_until.is_some_and(|t| self.env.now_ms() < t)
                 && self.can_free
                 && !is_free(&first);
             let chosen = self.live.as_ref().filter(|l| l.step == i);
@@ -1998,8 +2006,17 @@ impl<'a> Loop<'a> {
                     &c.model,
                     per_model,
                 )
-            } else if free {
+            } else if free && !self.free_out {
                 next_model_free_first(&models, tries, FREE_MODEL, &first, per_model)
+            } else if self.free_out {
+                // Free models out for today: the paid models go on from the step's paid tries only (a free try is
+                // not in their list, so it would end the step as "did not finish" with no paid try at all).
+                let paid: Vec<Attempt> = tries
+                    .iter()
+                    .filter(|a| !is_free(&a.model))
+                    .cloned()
+                    .collect();
+                next_model(&models, &paid, &first, per_model)
             } else {
                 next_model(&models, tries, &first, per_model)
             };
@@ -2481,6 +2498,19 @@ impl<'a> Loop<'a> {
                     ),
                 );
                 break;
+            }
+            // The free models are out for today: said once, and every later try goes to the paid models.
+            if matches!(attempt.outcome, Outcome::Error | Outcome::Open)
+                && is_free(&attempt.model)
+                && !self.free_out
+                && self.free_daily_limit(&attempt)
+            {
+                self.free_out = true;
+                self.sh.notice(format!(
+                    "Free models are out for today ({}). The rest of this run uses {}.",
+                    crate::llm::DAILY_LIMIT,
+                    self.s.provider_name
+                ));
             }
             // A usage limit is no failure: wait for the reset (or let free models work), then try the step again.
             if matches!(attempt.outcome, Outcome::Error | Outcome::Open)
@@ -3179,6 +3209,18 @@ impl<'a> Loop<'a> {
     }
 
     /// When the usage limit this attempt met resets (milliseconds), or None when it met none.
+    /// A free try that ended on the free models' daily limit (Qanuvi core says so in the session).
+    fn free_daily_limit(&self, a: &Attempt) -> bool {
+        !a.session_id.is_empty()
+            && self
+                .env
+                .session_lines(&a.session_id)
+                .iter()
+                .rev()
+                .take(12)
+                .any(|l| l.contains(LIMIT_MARK))
+    }
+
     fn limit_reset(&self, a: &Attempt) -> Option<i64> {
         if a.session_id.is_empty() {
             return None;
