@@ -1872,9 +1872,10 @@ impl Master {
         &self,
         script_for: impl FnOnce(&Path, &Path, bool) -> Result<String, String>,
     ) -> Result<(), String> {
-        if !cfg!(any(windows, target_os = "linux")) {
+        // MU2: macOS too (the bundle swapped by mac_install_script).
+        if !cfg!(any(windows, target_os = "linux", target_os = "macos")) {
             return Err(
-                "This PC's whole install updates by itself on Windows and Linux only so far."
+                "This PC's whole install updates by itself on Windows, Linux and macOS only."
                     .into(),
             );
         }
