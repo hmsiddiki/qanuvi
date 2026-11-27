@@ -2230,6 +2230,7 @@ impl<'a> Loop<'a> {
             prompt.push_str(&super::check_more::step_prompt_part(
                 &fresh.details,
                 &check_rules.eyes_of(&key(&st)),
+                &check_rules.written_of(&key(&st)),
             ));
             // Y10 d1: a step given leave before the run to delete files inside the project gets it for its turns.
             let granted_turns = check_rules

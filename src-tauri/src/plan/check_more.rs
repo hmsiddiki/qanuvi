@@ -33,6 +33,16 @@ pub struct CheckRules {
     pub grants: Vec<Grant>,
     #[serde(default)]
     pub eyes: Vec<Eyes>,
+    /// The end checks Qanuvi wrote into steps before the run (d3): Qanuvi's own guess, not the owner's yardstick, so
+    /// the step's agent may correct a command that could never pass (a real run blocked on one, 2026-11-28).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub written: Vec<Written>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Written {
+    pub step: String,
+    pub check: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +65,10 @@ impl CheckRules {
             .filter(|g| g.step == step)
             .map(|g| g.kind.clone())
             .collect()
+    }
+
+    pub fn written_of(&self, step: &str) -> Vec<&Written> {
+        self.written.iter().filter(|w| w.step == step).collect()
     }
 
     pub fn eyes_of(&self, step: &str) -> Vec<&Eyes> {
@@ -350,6 +364,15 @@ pub fn apply(
         match (allowed, target) {
             (true, Some(s)) => {
                 if let Ok(next) = add_step_line(&text, s.line, &format!("- Check: `{command}`")) {
+                    let step = super::planstate::step_key(s.number.as_deref(), &s.title);
+                    rules.written.retain(|w| w.step != step);
+                    rules.written.push(Written {
+                        step,
+                        check: command.to_string(),
+                    });
+                    if let Ok(v) = serde_json::to_value(&rules) {
+                        let _ = env.plan_data_set(file, Kind::Check, &v);
+                    }
                     if next != text {
                         out.said.push(format!(
                             "The real end check `{command}` was added to step {}",
@@ -524,7 +547,7 @@ pub fn has_promises(details: &[String]) -> bool {
 }
 
 /// (a) + (c): the step prompt's part about work left for later and checks the run does itself.
-pub fn step_prompt_part(details: &[String], eyes: &[&Eyes]) -> String {
+pub fn step_prompt_part(details: &[String], eyes: &[&Eyes], written: &[&Written]) -> String {
     let mut out = String::from(
         "\n\nIf you leave part of this step's work for a later step or for later (\"until step N\", \"not yet\"), add a \
          line `- Left for later: <what> (step N)` under the step, N being the step that will do it (leave out the \
@@ -553,6 +576,14 @@ pub fn step_prompt_part(details: &[String], eyes: &[&Eyes]) -> String {
              stand-ins); a \"To look at\" line does not finish them. If one truly cannot be done here, say why under \
              the step.",
             run.join("; ")
+        ));
+    }
+    for w in written {
+        out.push_str(&format!(
+            "
+
+The check `{}` was written by Qanuvi before the run, not by the owner: your work must pass it, but              if the command itself is wrong (it could never pass, even with correct work), correct that Check line so              it still uses the real thing end to end in the same way, never a weaker check, and say in your summary              what was wrong with it. Qanuvi runs the corrected line on the next try.",
+            w.check
         ));
     }
     out
@@ -633,7 +664,7 @@ mod tests {
             act: "run".into(),
             how: "the test build and a screenshot".into(),
         };
-        let p = step_prompt_part(&["- Promised by step 5: x".into()], &[&e]);
+        let p = step_prompt_part(&["- Promised by step 5: x".into()], &[&e], &[]);
         assert!(p.contains("Left for later"));
         assert!(p.contains("Promised"));
         assert!(p.contains("the tray menu (how: the test build and a screenshot)"));
@@ -641,6 +672,18 @@ mod tests {
             act: "end".into(),
             ..e
         };
-        assert!(!step_prompt_part(&[], &[&skip]).contains("yours to do"));
+        assert!(!step_prompt_part(&[], &[&skip], &[]).contains("yours to do"));
+        // An end check Qanuvi wrote may be corrected by the step, never weakened.
+        let w = Written {
+            step: "5".into(),
+            check: "npm test".into(),
+        };
+        let p = step_prompt_part(&[], &[], &[&w]);
+        assert!(
+            p.contains("`npm test` was written by Qanuvi before the run"),
+            "{p}"
+        );
+        assert!(p.contains("never a weaker check"), "{p}");
+        assert!(!step_prompt_part(&[], &[], &[]).contains("written by Qanuvi"));
     }
 }

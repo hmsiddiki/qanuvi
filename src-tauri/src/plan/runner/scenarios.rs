@@ -3148,6 +3148,15 @@ fn y10_the_check_settles_grants_eyes_the_end_check_promises_and_tries_what_steps
     let rules = crate::plan::check_more::CheckRules::load(&*env, FILE);
     assert_eq!(rules.grants_of("2"), ["delete"]);
     assert_eq!(rules.eyes_of("3").len(), 1);
+    // The end check Qanuvi wrote is kept as its own, so step 3 may correct a command that could never pass.
+    assert_eq!(
+        rules
+            .written_of("3")
+            .iter()
+            .map(|w| w.check.as_str())
+            .collect::<Vec<_>>(),
+        ["cargo run --bin qanuvi-master -- plan run demo.md"]
+    );
     // d3 + d4: written into step 3.
     let t = env.text(FILE);
     assert!(
