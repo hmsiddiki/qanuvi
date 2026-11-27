@@ -1,8 +1,9 @@
-# ST1: everyday flows on Windows and Linux
+# ST1: everyday flows on Windows, Linux and macOS
 
 One row per flow a normal user meets. Each one is driven for real on the release build:
 - Windows: a test window on This PC, in one block of time the owner gives off the PC;
 - Linux: a test window on the laptop over SSH (drive.py);
+- macOS: a test window on the Mac mini over SSH (mdrive, Accessibility + Screen Recording granted to sshd);
 - scratch projects and test data only.
 
 Results:
@@ -10,42 +11,42 @@ Results:
 - `FAIL <id>`, with the fix in ST2
 - `-`, not driven yet
 
-A row is green only when both systems pass.
+A row is green only when every system passes.
 
-| # | Flow | What passes | Windows | Linux |
-|---|------|-------------|---------|-------|
-| 1 | First start, empty data | window opens, setup wizard offered, no error lines | pass | pass |
-| 2 | Setup wizard, free AI | OmniRoute / OpenRouter / Ollama steps say what they do; a free model answers | - | pass (OpenRouter) |
-| 3 | Open a project, file tree, editor | open, edit, save, undo; big file opens fast | pass | pass (s2, s3) |
-| 4 | Search and go to symbol | Ctrl+P, Ctrl+T, find in files | pass | pass after f1 |
-| 5 | Git panel | changes, diff, commit on a scratch repo; no-git folder works | pass | pass after f2-f4 |
-| 6 | Terminal | open, type, colours, resize, paste, close; survives switching projects | pass after w1 (s19) | pass after f5 (s4) |
-| 7 | Chat with the paid agent | answer streams, tool rows settle, cost shown | pass | pass |
-| 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | pass (hand-over not driven) |
-| 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | pass | pass |
-| 10 | Message while the agent works | taken as a chat, not a restart | pass | pass after f6 |
-| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | pass | pass |
-| 12 | Write a plan with the planner | plan file made, steps readable | pass | pass after f8 |
-| 13 | Check before the run | card lists needs plainly; answers kept | pass | pass (s8) |
-| 14 | Plan run, two steps, real agent | both done, honest end line, report | pass | pass |
-| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | pass | pass |
-| 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | pass |
-| 17 | Stop, pause, resume a run | each says what happened; nothing lost | pause + resume pass; stop not caught (s19) | pass after f9-f11 (s9) |
-| 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) |
-| 19 | Close to tray and open again | runs go on; window comes back to the same place | pass | pass after f12 |
-| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) |
-| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) |
-| 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) |
-| 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | pass (s13) |
-| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | pass (s15) |
-| 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | pass after c1, c2 (s16) |
-| 26 | Sleep and wake | links, runs and terminals come back | - | pass; runs not checked (s17) |
-| 27 | Preview and live watch | preview address opens; live mirror on request | preview pass; live mirror not driven | preview pass; live mirror not driven |
-| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | backup now pass; restore not driven | pass after ba1, ba2 (s14) |
-| 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | pass |
-| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | pass | pass (s11) |
-| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | pass after n31a (s18) |
-| 32 | Go back one version | previous build installs over; data intact | - | pass (s12) |
+| # | Flow | What passes | Windows | Linux | Mac |
+|---|------|-------------|---------|-------|-----|
+| 1 | First start, empty data | window opens, setup wizard offered, no error lines | pass | pass | pass (s20) |
+| 2 | Setup wizard, free AI | OmniRoute / OpenRouter / Ollama steps say what they do; a free model answers | - | pass (OpenRouter) | pass (OpenRouter; Ollama and OmniRoute not installed: low disk) |
+| 3 | Open a project, file tree, editor | open, edit, save, undo; big file opens fast | pass | pass (s2, s3) | pass |
+| 4 | Search and go to symbol | Ctrl+P, Ctrl+T, find in files | pass | pass after f1 | pass (Cmd+P) |
+| 5 | Git panel | changes, diff, commit on a scratch repo; no-git folder works | pass | pass after f2-f4 | - |
+| 6 | Terminal | open, type, colours, resize, paste, close; survives switching projects | pass after w1 (s19) | pass after f5 (s4) | pass (zsh, Ctrl+C) |
+| 7 | Chat with the paid agent | answer streams, tool rows settle, cost shown | pass | pass | - |
+| 8 | Chat with a free model (Qanuvi agent) | answer, a tool call, a hand-over when a model rests | - | pass (hand-over not driven) | pass, hand-over driven (429 -> next model) |
+| 9 | Approve and revert an edit | Manual mode asks; Revert puts the file back | pass | pass | pass after r1 (Revert said outside the project) |
+| 10 | Message while the agent works | taken as a chat, not a restart | pass | pass after f6 | pass |
+| 11 | Memory page | add, Try it, suggestion Keep/Dismiss | pass | pass | - |
+| 12 | Write a plan with the planner | plan file made, steps readable | pass | pass after f8 | pass |
+| 13 | Check before the run | card lists needs plainly; answers kept | pass | pass (s8) | pass |
+| 14 | Plan run, two steps, real agent | both done, honest end line, report | pass | pass | pass after p1 (broken step line reported skipped) |
+| 15 | Held step and the Inbox | question in plain words; answer from Inbox goes on | pass | pass | pass |
+| 16 | List to look at | half-orange step; typed answer becomes a step; All fine clears it | - | pass | - |
+| 17 | Stop, pause, resume a run | each says what happened; nothing lost | pause + resume pass; stop not caught (s19) | pass after f9-f11 (s9) | - |
+| 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) | - |
+| 19 | Close to tray and open again | runs go on; window comes back to the same place | pass | pass after f12 | pass after m1, m2 (tray/Dock; place kept) |
+| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) | - |
+| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) | - |
+| 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) | - |
+| 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | pass (s13) | - |
+| 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | pass (s15) | - |
+| 25 | Network drop and back | reconnecting line, then connected; no stale lines | - | pass after c1, c2 (s16) | - |
+| 26 | Sleep and wake | links, runs and terminals come back | - | pass; runs not checked (s17) | - |
+| 27 | Preview and live watch | preview address opens; live mirror on request | preview pass; live mirror not driven | preview pass; live mirror not driven | - |
+| 28 | Backups and data folder | daily backup made; restore of one table on scratch data | backup now pass; restore not driven | pass after ba1, ba2 (s14) | - |
+| 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | pass | - |
+| 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | pass | pass (s11) | - |
+| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | pass after n31a (s18) | - |
+| 32 | Go back one version | previous build installs over; data intact | - | pass (s12) | - |
 
 ST3, the 24 h run, has its own log. It covers memory and handle counts every 10 minutes, stuck processes, dead links, and the run's end line.
 
@@ -217,3 +218,20 @@ Seen, not fixed (for ST2 or later):
   quotes a long shell command (heavy for a normal user); the Git list refreshes every 15 s (s3). Not driven on
   Windows: 2 and 8 (no free model set up), 16, 18 (later Tasks), 20, 21-26, 31, 32 (installer, update channel,
   pairing and network flows: need the installed app or the owner).
+- s20 (Mac block, Mac mini M2, macOS 27.2.1, 2026-11-27, first owner-attended then owner asleep): test build from
+  source on dev.qanuvi.desktop.source, scratch git project ~/qc-scratch/mproj, OpenRouter key typed by the owner into
+  the test build (the Keychain asks once per new build: "Always Allow" binds to that build). Fixed and driven: m1
+  (Dock/tray did not open Qanuvi: the master ran from inside Qanuvi.app; now its own helper app, 8af783f), m4
+  (notifications asked "Where is use_default?": no sender for a test build, 53293bd), Mac icon (macOS 26 plates
+  non-square icons; dark rounded square, 82b73cf). Fixed, unit-tested: m2 (window place not kept, window-state
+  plugin; driven on the Mac: moved, closed, reopened in place), m3 (restored terminal tab named "Terminal"), r1
+  (Revert, rewind and Open on a step of Qanuvi's own agent said "outside the project": it names files relative to
+  the project, 497b6e4), p1 (a free model's edit left only "[x]" where step 1's line was; the run reported step 1
+  skipped although done; the line is now put back before the step is judged, 7c7da06). Flow 8 drove the hand-over
+  that Linux did not: gemma 429 -> nemotron-ultra took over, two tool calls, right answer. Flows 13-15: the check
+  before the run asked the plan's open question plainly; left empty, the step was held, the run waited at no cost,
+  the answer went on by itself. Seen: o1 OpenRouter's free daily limit (50 requests) ran out after these runs; the
+  check line shows the raw provider text three times (once per model) instead of saying it once plainly; m6 macOS
+  auto-capitalises typed text in the answer box ("teal" -> "Teal"), check code-like boxes; m5 a macOS notice "Qanuvi
+  is running in the background" after the helper build's first start. Ollama/OmniRoute not installed on the Mac
+  (owner: keep its disk low).
