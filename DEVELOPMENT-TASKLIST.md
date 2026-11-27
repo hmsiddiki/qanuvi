@@ -5203,6 +5203,20 @@ and ST1 has been driven again on the finished build.
   (by content type) and turn the biggest gap into the next tuning task. Check Headroom's changelog for new tricks
   now and then. Done when Qanuvi is within about 10% of Headroom's saving with no drop in steps passed, and the
   owner agrees to switch Headroom off; until then this stays open.
+  - Measurement 1 (2026-11-27, Qanuvi 0.1.49+ec04a74 compress.rs vs Headroom 0.42.0 library `compress()`, defaults,
+    each file as one tool result; corpus E:/qc-scratch/o3/corpus from this PC; rerun:
+    `QANUVI_O3_CORPUS=<dir> cargo test --lib measure_corpus -- --ignored --nocapture` and
+    E:/qc-scratch/o3/headroom_measure.py with Headroom's own Python). Characters before -> after, saved, time:
+    | sample | before | Headroom | Qanuvi |
+    |---|---|---|---|
+    | cargo build log + error | 19.1k | 18.9k (1%, 802 ms) | 4.5k (77%, 3 ms), error line + location kept |
+    | cargo build log | 9.5k | 9.4k (1%, 10 ms) | 3.3k (66%, 1 ms) |
+    | git diff (nearly all new lines) | 14.3k | 14.2k (1%, 18 s) | 14.3k (0%: under the 20% bar, sent as is) |
+    | npm ls --json --all | 39.6k | 25.6k (35%, 1.1 s) | 25.7k (35%, 6 ms) |
+    | web page (local site) | 67.4k | 67.4k (0%, 33 ms) | 12.1k (82%, 27 ms) |
+    | grep -rn "fn " (1500 matches, 56 files) | 110.2k | 87.2k (21%, 225 ms) | 9.8k (91%, 5 ms), all files named |
+    Not measured yet: steps passed on a real plan run with each (the end-to-end half of 24w), retrieve calls made,
+    cache reads. Note: Headroom's library mode leaves logs almost whole; its proxy may do more (its `inspect` view).
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:

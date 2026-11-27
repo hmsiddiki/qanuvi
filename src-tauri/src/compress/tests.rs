@@ -191,3 +191,39 @@ fn search_lines_are_told_from_log_lines_and_windows_paths_work() {
     assert!(!looks_like_match("2026-11-27T08:00:00 INFO started"));
     assert!(!looks_like_match("Note: 12: something"));
 }
+
+/// 24w: the measurement against Headroom. Runs only on request, on a folder of real tool outputs:
+/// QANUVI_O3_CORPUS=<folder> cargo test --lib measure_corpus -- --ignored --nocapture
+#[test]
+#[ignore]
+fn measure_corpus() {
+    let dir = std::env::var("QANUVI_O3_CORPUS").expect("QANUVI_O3_CORPUS");
+    let mut names: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .collect();
+    names.sort();
+    for p in names {
+        let text = std::fs::read_to_string(&p).unwrap_or_default();
+        let t = std::time::Instant::now();
+        let c = compress(
+            &text,
+            &Hint {
+                tool: "Bash",
+                ..Default::default()
+            },
+            None,
+        );
+        let ms = t.elapsed().as_secs_f64() * 1000.0;
+        println!(
+            "{:<18} {:?} {} -> {} ({:.0}% saved, {ms:.1} ms)",
+            p.file_name().unwrap().to_string_lossy(),
+            c.kind,
+            c.before,
+            c.after,
+            100.0 * (1.0 - c.after as f64 / c.before.max(1) as f64)
+        );
+        std::fs::write(p.with_extension("qanuvi.out"), &c.text).ok();
+    }
+}
