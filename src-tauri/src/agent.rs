@@ -1410,6 +1410,11 @@ impl Agents {
             }
             if let Some(url) = proxied.as_ref().or(base_url.as_ref()) {
                 cmd.env("ANTHROPIC_BASE_URL", url);
+                // o3a (Windows drive): an ANTHROPIC_BASE_URL in Claude Code's own ~/.claude/settings.json (a Headroom
+                // setup) wins over the environment, so the session went to Headroom anyway. Settings given on the
+                // command line rank above the user's file.
+                cmd.arg("--settings")
+                    .arg(json!({"env": {"ANTHROPIC_BASE_URL": url}}).to_string());
             }
         }
         no_window(&mut cmd);

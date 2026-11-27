@@ -242,7 +242,7 @@
         step uses fewer tokens. Error lines are always kept whole, files read for editing are never shortened, and the
         model can ask for anything left out. Built in: Qanuvi does it itself, nothing to install. Headroom: Claude Code
         goes through your own Headroom proxy (its address in Claude Code's settings above); Qanuvi's agent keeps the
-        built-in one.
+        built-in one. Automatic: Headroom where Claude Code already uses it, else built in.
       </p>
       <div class="grid">
         <label>
@@ -251,7 +251,7 @@
             value={settings.value.compression}
             onchange={(e) => settings.set("compression", e.currentTarget.value as "" | "builtin" | "headroom" | "off")}
           >
-            <option value="">Automatic (Headroom if Claude Code already uses it, else built in)</option>
+            <option value="">Automatic</option>
             <option value="builtin">Built in (Qanuvi)</option>
             <option value="headroom">Headroom (your own proxy)</option>
             <option value="off">Off</option>
