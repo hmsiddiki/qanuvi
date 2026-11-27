@@ -50,6 +50,8 @@ struct Options {
     mode: String,
     resume: Option<String>,
     data: PathBuf,
+    /// O3: tool output compressed before the model reads it (`--compress off` turns it off).
+    compress: bool,
 }
 
 fn options(args: &[String]) -> Options {
@@ -66,6 +68,7 @@ fn options(args: &[String]) -> Options {
         data: value("--data")
             .map(PathBuf::from)
             .unwrap_or_else(crate::paths::data_dir),
+        compress: value("--compress").as_deref() != Some("off"),
     }
 }
 
@@ -93,16 +96,18 @@ const TOOL_NAMES: [&str; 11] = [
 ];
 
 fn known(name: &str) -> bool {
-    TOOL_NAMES.contains(&name)
+    TOOL_NAMES.contains(&name) || name == crate::compress::RETRIEVE_TOOL
 }
 
 /// Tools that change nothing (no approval, allowed in plan mode).
 fn read_only(name: &str) -> bool {
-    agent_tools::READ_ONLY.contains(&name) || crate::mcp::INDEX_TOOLS.contains(&name)
+    agent_tools::READ_ONLY.contains(&name)
+        || crate::mcp::INDEX_TOOLS.contains(&name)
+        || name == crate::compress::RETRIEVE_TOOL
 }
 
-/// The tool definitions sent to the model.
-fn tool_definitions() -> Value {
+/// The tool definitions sent to the model (O3: with `qanuvi_retrieve` when tool output is compressed).
+fn tool_definitions(compress: bool) -> Value {
     let mut all = agent_tools::definitions()
         .as_array()
         .cloned()
@@ -113,6 +118,9 @@ fn tool_definitions() -> Value {
             .cloned()
             .unwrap_or_default(),
     );
+    if compress {
+        all.push(crate::compress::retrieve_tool_definition());
+    }
     Value::Array(all)
 }
 
@@ -246,6 +254,8 @@ struct Agent {
     asked: u64,
     /// The code index of the project (built on first use, kept up to date as files change).
     index: crate::mcp::Server,
+    /// O3: characters of tool output left out this turn (said once at the turn's end).
+    saved: usize,
 }
 
 enum Answer {
@@ -370,6 +380,7 @@ impl Agent {
 
     fn turn(&mut self, text: &str) {
         let start = Instant::now();
+        self.saved = 0;
         let job = if self.opts.mode == "plan" {
             Job::Light
         } else {
@@ -377,7 +388,7 @@ impl Agent {
         };
         let order = brain::order(&self.setup, &self.opts.model, job, &self.records, now());
         self.history.push(json!({"role": "user", "content": text}));
-        let tools = tool_definitions();
+        let tools = tool_definitions(self.opts.compress);
         let (mut input_tokens, mut output_tokens, mut cost) = (0i64, 0i64, 0.0f64);
         let mut at = 0usize;
         let mut rounds = 0usize;
@@ -571,6 +582,14 @@ impl Agent {
                                 Err(text) => agent_tools::Outcome { text, is_error: true },
                             }
                         }
+                        // O3: a shortened output asked back whole (or the lines holding a word).
+                        Some(i) if c.name == crate::compress::RETRIEVE_TOOL => {
+                            let store = crate::compress::Store::new(&self.opts.data);
+                            match store.get(i["id"].as_str().unwrap_or(""), i["search"].as_str()) {
+                                Ok(text) => agent_tools::Outcome { text, is_error: false },
+                                Err(text) => agent_tools::Outcome { text, is_error: true },
+                            }
+                        }
                         Some(i) => agent_tools::run(&self.root, &c.name, &i),
                         None => agent_tools::Outcome {
                             text: "The user refused this action. Do not try it again; ask or do something else.".into(),
@@ -581,7 +600,22 @@ impl Agent {
                 // The session view gets a short answer; the model the whole (already shortened) one.
                 let shown: String = outcome.text.chars().take(2_000).collect();
                 results.push(json!({"type": "tool_result", "tool_use_id": c.id, "content": shown, "is_error": outcome.is_error}));
-                self.history.push(json!({"role": "tool", "tool_call_id": c.id, "name": c.name, "content": outcome.text}));
+                // O3: compressed once, as it goes into the history, so later requests repeat the same bytes and the
+                // provider's prompt cache keeps hitting. A retrieval answer is what was asked for: never cut again.
+                let for_model = if self.opts.compress && c.name != crate::compress::RETRIEVE_TOOL {
+                    let hint = crate::compress::Hint {
+                        tool: &c.name,
+                        command: c.input["command"].as_str().unwrap_or(""),
+                        path: c.input["file_path"].as_str().unwrap_or(""),
+                    };
+                    let store = crate::compress::Store::new(&self.opts.data);
+                    let done = crate::compress::compress(&outcome.text, &hint, Some(&store));
+                    self.saved += done.before.saturating_sub(done.after);
+                    done.text
+                } else {
+                    outcome.text
+                };
+                self.history.push(json!({"role": "tool", "tool_call_id": c.id, "name": c.name, "content": for_model}));
             }
             self.out.send(&json!({
                 "type": "user",
@@ -612,6 +646,16 @@ impl Agent {
         self.records.save(&self.opts.data);
         self.cost_total += cost;
         self.save();
+        // O3: what compression left out this turn, said once (about 4 characters a token).
+        if self.saved >= 4_000 {
+            self.notice(
+                "",
+                &format!(
+                    "Tool output shortened by about {} tokens this turn (the model can ask for anything left out).",
+                    self.saved / 4
+                ),
+            );
+        }
         let (is_error, subtype, result) = match &outcome {
             Ok(()) => (false, "success", final_text),
             Err(e) => (true, "error_during_execution", e.clone()),
@@ -676,8 +720,11 @@ pub fn serve(args: &[String], setup: Setup, root: PathBuf, rx: Receiver<Value>, 
         "cwd": root.to_string_lossy(), "tools": TOOL_NAMES, "permissionMode": opts.mode
     }));
     let index = crate::mcp::Server::new(&root);
+    // O3: originals older than a day go before the first turn.
+    crate::compress::Store::new(&opts.data).tidy();
     let mut agent = Agent {
         index,
+        saved: 0,
         out,
         root,
         opts,
@@ -874,7 +921,7 @@ mod tests {
 
     #[test]
     fn has_the_code_index_tools_read_only() {
-        let defs = tool_definitions();
+        let defs = tool_definitions(false);
         let names: Vec<&str> = defs
             .as_array()
             .unwrap()
@@ -882,6 +929,11 @@ mod tests {
             .map(|d| d["function"]["name"].as_str().unwrap())
             .collect();
         assert_eq!(names, TOOL_NAMES);
+        // O3: with compression on, the retrieve tool comes last, read-only.
+        let with = tool_definitions(true);
+        let last = with.as_array().unwrap().last().unwrap();
+        assert_eq!(last["function"]["name"], crate::compress::RETRIEVE_TOOL);
+        assert!(known(crate::compress::RETRIEVE_TOOL) && read_only(crate::compress::RETRIEVE_TOOL));
         assert!(defs[7]["function"]["parameters"]["required"][0] == "name");
         for n in crate::mcp::INDEX_TOOLS {
             assert!(known(n) && read_only(n), "{n}");

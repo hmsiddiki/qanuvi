@@ -25,6 +25,27 @@ pub const RETRIEVE_TOOL: &str = "qanuvi_retrieve";
 /// How long originals are kept for retrieval.
 const KEEP_SECS: u64 = 24 * 3600;
 
+/// The machine setting that picks the compression (Settings → Agents): "builtin" (the default), "headroom" (the
+/// owner's Headroom proxy for Claude Code, as before), or "off".
+pub const SETTING: &str = "compression";
+
+/// Which compression this machine uses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Builtin,
+    Headroom,
+    Off,
+}
+
+/// The mode from the machine's settings (built-in when unset or unknown).
+pub fn mode_of(settings: &serde_json::Map<String, Value>) -> Mode {
+    match settings.get(SETTING).and_then(Value::as_str) {
+        Some("off") => Mode::Off,
+        Some("headroom") => Mode::Headroom,
+        _ => Mode::Builtin,
+    }
+}
+
 /// What kind of text a tool output is; the router picks the compressor by it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -244,9 +265,8 @@ fn log(text: &str, id: &str) -> Option<String> {
     let mut keep = vec![false; lines.len()];
     for (i, l) in lines.iter().enumerate() {
         if is_error_line(l) {
-            for k in i.saturating_sub(1)..=(i + 1).min(lines.len() - 1) {
-                keep[k] = true;
-            }
+            let end = (i + 1).min(lines.len() - 1);
+            keep[i.saturating_sub(1)..=end].fill(true);
         }
     }
     for k in keep.iter_mut().take(15) {
@@ -371,9 +391,8 @@ fn diff(text: &str, id: &str) -> Option<String> {
             keep[i] = true;
         }
         if changed(l) {
-            for k in i.saturating_sub(1)..=(i + 1).min(lines.len().saturating_sub(1)) {
-                keep[k] = true;
-            }
+            let end = (i + 1).min(lines.len().saturating_sub(1));
+            keep[i.saturating_sub(1)..=end].fill(true);
         }
     }
     let mut out = String::new();

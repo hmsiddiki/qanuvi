@@ -67,6 +67,9 @@ export interface Settings {
   ai: boolean;
   /** The agent new sessions use. */
   agent: string;
+  /** O3: context compression of tool output: Qanuvi's own ("builtin"), the owner's Headroom proxy for Claude Code
+   * ("headroom"), or none ("off"). Kept on the machine (compress.rs reads the same key). */
+  compression: "builtin" | "headroom" | "off";
   agents: Record<string, AgentSettings>;
   /** Monthly limit for all agent work, in US dollars; 0 means none. */
   monthlyBudgetUsd: number;
@@ -247,6 +250,7 @@ const DEFAULTS: Settings = {
   explorerVisible: true,
   ai: true,
   agent: PROVIDERS[0].id,
+  compression: "builtin",
   agents: {},
   monthlyBudgetUsd: 0,
   startOfferOff: false,
@@ -421,6 +425,8 @@ export function parseSettings(json: string | null): Settings {
     }
   if (typeof raw.tabsFollowProject === "boolean") s.tabsFollowProject = raw.tabsFollowProject;
   if (typeof raw.defaultShell === "string") s.defaultShell = raw.defaultShell;
+  if (raw.compression === "builtin" || raw.compression === "headroom" || raw.compression === "off")
+    s.compression = raw.compression;
   if (typeof raw.explorerWidth === "number" && Number.isFinite(raw.explorerWidth))
     s.explorerWidth = Math.min(520, Math.max(160, Math.round(raw.explorerWidth)));
   if (typeof raw.explorerVisible === "boolean") s.explorerVisible = raw.explorerVisible;

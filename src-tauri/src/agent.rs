@@ -1319,6 +1319,12 @@ impl Agents {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+            // O3: tool output compressed unless this machine turned compression off (Headroom only serves Claude Code,
+            // so Qanuvi's own agent uses the built-in one with it too).
+            let settings = crate::settings::get_all(db).unwrap_or_default();
+            if crate::compress::mode_of(&settings) == crate::compress::Mode::Off {
+                cmd.args(["--compress", "off"]);
+            }
             if let Some(agent_id) = &session.agent_session_id {
                 cmd.args(["--resume", agent_id]);
             }
