@@ -25,8 +25,8 @@ pub const RETRIEVE_TOOL: &str = "qanuvi_retrieve";
 /// How long originals are kept for retrieval.
 const KEEP_SECS: u64 = 24 * 3600;
 
-/// The machine setting that picks the compression (Settings → Agents): "builtin" (the default), "headroom" (the
-/// owner's Headroom proxy for Claude Code, as before), or "off".
+/// The machine setting that picks the compression (Settings → Agents): unset (automatic), "builtin", "headroom" (the
+/// user's own Headroom proxy for Claude Code, as before), or "off".
 pub const SETTING: &str = "compression";
 
 /// Which compression this machine uses.
@@ -37,13 +37,31 @@ pub enum Mode {
     Off,
 }
 
-/// The mode from the machine's settings (built-in when unset or unknown).
+/// The mode from the machine's settings. Unset is automatic: Headroom when Claude Code is already sent to one
+/// (`headroom_set_up`, so an update never moves a working Headroom setup aside without asking), else built in.
 pub fn mode_of(settings: &serde_json::Map<String, Value>) -> Mode {
+    mode_with(settings, headroom_set_up)
+}
+
+fn mode_with(settings: &serde_json::Map<String, Value>, headroom: impl Fn() -> bool) -> Mode {
     match settings.get(SETTING).and_then(Value::as_str) {
         Some("off") => Mode::Off,
         Some("headroom") => Mode::Headroom,
+        Some("builtin") => Mode::Builtin,
+        _ if headroom() => Mode::Headroom,
         _ => Mode::Builtin,
     }
+}
+
+/// Whether Claude Code's own settings on this computer send it to a Headroom proxy.
+pub fn headroom_set_up() -> bool {
+    crate::claude_update::settings_base_url().is_some_and(|u| looks_like_headroom(&u))
+}
+
+/// An address that is a Headroom proxy (its usual port or name).
+pub fn looks_like_headroom(url: &str) -> bool {
+    let u = url.to_ascii_lowercase();
+    u.contains(":8787") || u.contains("headroom")
 }
 
 /// What kind of text a tool output is; the router picks the compressor by it.

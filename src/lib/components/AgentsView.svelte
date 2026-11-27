@@ -249,8 +249,9 @@
           Compression
           <select
             value={settings.value.compression}
-            onchange={(e) => settings.set("compression", e.currentTarget.value as "builtin" | "headroom" | "off")}
+            onchange={(e) => settings.set("compression", e.currentTarget.value as "" | "builtin" | "headroom" | "off")}
           >
+            <option value="">Automatic (Headroom if Claude Code already uses it, else built in)</option>
             <option value="builtin">Built in (Qanuvi)</option>
             <option value="headroom">Headroom (your own proxy)</option>
             <option value="off">Off</option>

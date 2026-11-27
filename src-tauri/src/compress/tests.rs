@@ -227,3 +227,24 @@ fn measure_corpus() {
         std::fs::write(p.with_extension("qanuvi.out"), &c.text).ok();
     }
 }
+
+/// Unset is automatic: a computer already sending Claude Code to Headroom keeps it; an explicit choice always wins.
+#[test]
+fn the_mode_is_automatic_until_chosen() {
+    let set = |v: Option<&str>| {
+        let mut m = serde_json::Map::new();
+        if let Some(v) = v {
+            m.insert(SETTING.into(), Value::String(v.into()));
+        }
+        m
+    };
+    assert_eq!(mode_with(&set(None), || true), Mode::Headroom);
+    assert_eq!(mode_with(&set(None), || false), Mode::Builtin);
+    assert_eq!(mode_with(&set(Some("builtin")), || true), Mode::Builtin);
+    assert_eq!(mode_with(&set(Some("off")), || false), Mode::Off);
+    assert_eq!(mode_with(&set(Some("headroom")), || false), Mode::Headroom);
+    assert!(
+        looks_like_headroom("http://127.0.0.1:8787")
+            && !looks_like_headroom("https://api.anthropic.com")
+    );
+}
