@@ -7,6 +7,7 @@
   import "@xterm/xterm/css/xterm.css";
   import { api, errorText, type TermEvent } from "$lib/api";
   import { terminals, type TerminalTab } from "$lib/stores/terminals.svelte";
+  import { layout } from "$lib/layout/layout.svelte";
   import { linkEndedText, linkLostText, onLinkBack, onLinkEnd, own, shownMachine } from "$lib/remote";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { EarlyInput, opensLink, osc52Copy, pasteText, urlsIn } from "$lib/terminalText";
@@ -285,6 +286,12 @@
         term?.focus();
       });
     }
+  });
+
+  // s4: maximised (the button or the shortcut took the focus), typing goes on in the shown terminal. Not on restore:
+  // opening a file restores it, and the file keeps the focus.
+  $effect(() => {
+    if (visible && layout.state.terminalMaximized) requestAnimationFrame(() => term?.focus());
   });
 
   onDestroy(() => {

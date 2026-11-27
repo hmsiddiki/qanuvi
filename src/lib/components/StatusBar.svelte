@@ -28,6 +28,7 @@
   import { settings } from "$lib/stores/settings.svelte";
   import { ui, type Place } from "$lib/stores/ui.svelte";
   import { layout } from "$lib/layout/layout.svelte";
+  import { panel } from "$lib/stores/panel.svelte";
   import { formatCost } from "$lib/agent/events";
   import { monthStart } from "$lib/plan/routing";
   import { remoteAccess, usersText } from "$lib/stores/remoteAccess.svelte";
@@ -44,6 +45,13 @@
     menu = false;
     if (!layout.state.workVisible) layout.toggleWork();
     ui.show(view);
+  }
+
+  /** The branch opens Changes with the Git list beside it (s11), as the sidebar's Git mode does. */
+  function showChanges() {
+    if (layout.state.sidebarCollapsed) layout.toggleSidebarCollapsed();
+    panel.show("git");
+    show("diff");
   }
 
   // The branch: when the project or the repository changes, after agent turns, and every 15 seconds.
@@ -139,7 +147,7 @@
   </div>
 
   {#if git?.is_repo}
-    <button type="button" class="item" title="Git: {git.branch || 'detached'}" onclick={() => show("diff")}>
+    <button type="button" class="item" title="Git: {git.branch || 'detached'}" onclick={showChanges}>
       <GitBranch size={12} />
       <span>{git.branch || "detached"}</span>
       {#if git.upstream && (git.behind || git.ahead)}

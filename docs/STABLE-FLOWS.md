@@ -256,3 +256,32 @@ Seen, not fixed (for ST2 or later):
   found w2, the wizard said "Done ... with 0 models" when every test hit OpenRouter's free daily limit, and showed an
   OmniRoute error although OmniRoute was unticked (fixed a68b711). Flows 2 and 8 wait for the limit to reset
   (00:00 UTC). Not driven on Windows: 21, 31, 32 (the installer would replace the owner's installed copy).
+
+## ST2, fix round 1 (2026-11-27, This PC; unit-tested, type-checked, not driven in a window yet)
+
+Fixed from the "Seen, not fixed" notes above:
+- s4: maximising the terminal (button or Ctrl+Shift+J) puts the focus back in the shown terminal. Not on restore:
+  opening a file restores it and the file keeps the focus.
+- s6: a message that is neither plainly a question nor a change still goes to the best model, but its route line no
+  longer calls it "A change:" (only words that name a change do).
+- s7: the sidebar lights what is shown (Plans for the plan, Agents/Memory/Servers for their settings, the Inbox while
+  it is open, else Home), not the last entry clicked. Home now closes the settings page back to the work area.
+- s9: a plan step on Qanuvi's own agent shows the run's mode (it said "Manual" in an Auto run: the agent is started
+  on "default" so the run rules answer every ask, and that was saved as the session's mode). Found with it: picking
+  another mode during a run sent it to Qanuvi's own agent, which in Auto then approved on its own and the never-lists
+  were not asked; it now stays on "default" under run rules (the rules take the new mode at the next turn). The run
+  settings opened by the header's Resume say "Resume" on their button. On Linux the step's headless browser now ends
+  with the agent's browser tools (PR_SET_PDEATHSIG; Windows already had its job object; macOS not covered).
+- s10: a step held for its background command that ends another way (stop, quit) says so in its chat: "The step
+  stopped; it no longer waits for its background command."
+- s11: the status bar's branch opens Changes with the Git list beside it.
+- s12: the Agents card says "Installed" for Claude Code (it said "Connected" above "not signed in yet"); the Updates
+  card shows a test channel's address instead of a fixed "dev".
+- m6: no text box in Qanuvi lets macOS capitalise or correct what is typed (autocapitalize/autocorrect off unless a
+  box sets its own).
+Already fixed before: m7 (keysFor), o1.
+
+Left for the owner (decisions, not bugs): s2 files over 10 MB, s3 a file watcher, s5 PATH from ~/.bashrc, s8 a
+borrowed checker from another folder, s13 a headless command for remote access, s14 the backups list showing other
+data folders' backups, s12 written steps for going back on Linux, the held-step question quoting a long command, the
+sidebar's Reminders entry (step 22, not built: it does nothing), m5 the macOS background notice.

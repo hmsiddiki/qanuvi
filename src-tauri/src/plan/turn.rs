@@ -41,6 +41,10 @@ pub const BACKGROUND_WAIT_MS: i64 = 30 * 60_000;
 /// Shown in the step's chat when the turn is held for the agent's background commands.
 pub const BACKGROUND_WAIT_LINE: &str =
     "Waiting for the step's background command to finish; the agent goes on when it does.";
+/// Shown when a turn held for its background commands ends another way (stopped, quit): the waiting line above is
+/// no longer true (s10).
+pub const BACKGROUND_LEFT_LINE: &str =
+    "The step stopped; it no longer waits for its background command.";
 /// Sent when the background commands still run after BACKGROUND_WAIT_MS: the agent stops waiting for them.
 pub const BACKGROUND_GIVE_UP: &str = "(Qanuvi: your background command is still running after 30 minutes. Do not wait for it any longer: stop it if it is stuck, finish what you can of the step, and say in the step's log where it stands.)";
 
@@ -851,6 +855,12 @@ pub fn turn(
                 "the turn ended before an answer, so it was added as a new step after this one"
                     .into();
         }
+    }
+    // Still held for its background commands when the turn ended: the chat's waiting line is put right.
+    if background_since.is_some() && !matches!(&end, Ok(e) if e.status == "idle" && !e.cut_short) {
+        forward(&AgentEvent::Line {
+            line: ownermsg::chat_line(BACKGROUND_LEFT_LINE),
+        });
     }
     let end = match end {
         Ok(e) => e,

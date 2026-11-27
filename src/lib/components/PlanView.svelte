@@ -566,6 +566,7 @@
         {plan}
         setup={showRun}
         focusBudget={raising}
+        resume={canResume}
         onclose={() => {
           showRun = false;
           raising = false;

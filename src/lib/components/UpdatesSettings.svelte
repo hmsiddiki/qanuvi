@@ -68,7 +68,7 @@
 
 <div class="card">
   <div class="row"><span class="muted">This version</span><strong>{up.current || updates.current || "…"}</strong></div>
-  <div class="row"><span class="muted">Channel</span><span>dev</span></div>
+  <div class="row"><span class="muted">Channel</span><span>{up.channel}</span></div>
   {#if up.checkedAt}
     <div class="row">
       <span class="muted">Last checked</span><span>{ago(Math.floor(up.checkedAt / 1000))}</span>

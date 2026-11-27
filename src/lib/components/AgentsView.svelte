@@ -57,7 +57,8 @@
     p.id === "claude-code" ? !!agent.info?.available : settings.value.brain.models.length > 0;
   const statusText = (p: AgentProvider) =>
     p.id === "claude-code"
-      ? `Connected${agent.info?.version ? ` · ${agent.info.version}` : ""}`
+      ? // s12: found, not necessarily signed in (the card below says which): "Connected" read as both.
+        `Installed${agent.info?.version ? ` · ${agent.info.version}` : ""}`
       : `${settings.value.brain.models.length} model${settings.value.brain.models.length === 1 ? "" : "s"}`;
 </script>
 

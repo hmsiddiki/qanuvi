@@ -178,6 +178,14 @@ fn http_get(port: u16, path: &str) -> Result<String, String> {
         .unwrap_or_default())
 }
 
+/// The browsers this process starts end with it (set by the agent's browser tools, whose main thread launches them).
+static TIED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Browsers started from now on end when this process ends (Linux; Windows has its job object).
+pub fn tie_to_this_process() {
+    TIED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The profile folder prefix (`qanuvi-browser-<pid>-<uuid>` in the temp folder).
 const PROFILE_PREFIX: &str = "qanuvi-browser-";
 
@@ -298,6 +306,25 @@ fn own_group(cmd: &mut Command) {
     {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
+    }
+    // s9: an agent's browser tools ended at once (the run's or the master's Quit ends the agent's whole group) never
+    // ran their cleanup, and the browser, in its own group, lived on. On Linux it now ends with the tools' process.
+    // Only where the main thread launches it (the tools' process): the signal follows the launching thread.
+    #[cfg(target_os = "linux")]
+    if TIED.load(std::sync::atomic::Ordering::Relaxed) {
+        use std::os::unix::process::CommandExt;
+        let parent = std::process::id() as libc::pid_t;
+        // SAFETY: only async-signal-safe calls between fork and exec.
+        unsafe {
+            cmd.pre_exec(move || {
+                libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
+                // The parent may have gone before the line above.
+                if libc::getppid() != parent {
+                    libc::_exit(1);
+                }
+                Ok(())
+            });
+        }
     }
     #[cfg(not(unix))]
     let _ = cmd;

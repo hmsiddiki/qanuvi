@@ -1195,7 +1195,9 @@ impl Agents {
         }
         // A plan run's turn (24y): its rules answer from the start, before the agent's first tool call. Qanuvi's own
         // agent then asks for every change (in Auto it would approve most of them itself, never asking the rules);
-        // Claude Code's are held by the run-rules hook, whatever its mode.
+        // Claude Code's are held by the run-rules hook, whatever its mode. The session keeps the run's mode for the
+        // window (s9: the chip said "Manual" in an Auto run).
+        let shown_mode = mode;
         let mode = if own && policy.is_some() {
             "default"
         } else {
@@ -1239,7 +1241,7 @@ impl Agents {
                             .to_string(),
                         )?;
                     }
-                    if s.mode != mode {
+                    if s.mode != shown_mode {
                         send_line(
                             &mut running.stdin,
                             &json!({"type": "control_request", "request_id": format!("qanuvi-mode-{}", crate::llm::short_id()),
@@ -1249,7 +1251,7 @@ impl Agents {
                     }
                     let _ = db.conn().execute(
                         "UPDATE sessions SET model = ?2, mode = ?3 WHERE id = ?1",
-                        params![id, model, mode],
+                        params![id, model, shown_mode],
                     );
                 }
                 send_line(
@@ -1293,7 +1295,7 @@ impl Agents {
                 db.conn()
                     .execute(
                         "UPDATE sessions SET model = ?2, mode = ?3, status = 'running', updated_at = ?4 WHERE id = ?1",
-                        params![s.id, model, mode, now()],
+                        params![s.id, model, shown_mode, now()],
                     )
                     .map_err(|e| e.to_string())?;
                 get(db, &s.id)?
@@ -1304,7 +1306,7 @@ impl Agents {
                     .execute(
                         "INSERT INTO sessions (id, project_id, title, agent, model, mode, status, created_at, updated_at)
                          VALUES (?1, ?2, ?3, ?7, ?4, ?5, 'running', ?6, ?6)",
-                        params![id, project.id, title_from(prompt), model, mode, now(), kind],
+                        params![id, project.id, title_from(prompt), model, shown_mode, now(), kind],
                     )
                     .map_err(|e| e.to_string())?;
                 get(db, &id)?
@@ -1861,12 +1863,23 @@ impl Agents {
             );
         }
         if let Some(m) = mode {
-            send_line(
-                &mut running.stdin,
-                &json!({"type": "control_request", "request_id": format!("qanuvi-mode-{}", crate::llm::short_id()),
-                    "request": {"subtype": "set_permission_mode", "mode": m}})
-                .to_string(),
-            )?;
+            // Qanuvi's own agent under run rules stays on "default" so the rules answer every ask; told "auto" it
+            // would approve on its own and the never-lists would not be asked (the rules take the new mode at the
+            // next turn). The session still shows the chosen mode.
+            let ruled_own = self
+                .policies
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains_key(id)
+                && get(db, id).is_ok_and(|s| s.agent == OWN_AGENT);
+            if !ruled_own {
+                send_line(
+                    &mut running.stdin,
+                    &json!({"type": "control_request", "request_id": format!("qanuvi-mode-{}", crate::llm::short_id()),
+                        "request": {"subtype": "set_permission_mode", "mode": m}})
+                    .to_string(),
+                )?;
+            }
             let _ = db.conn().execute(
                 "UPDATE sessions SET mode = ?2 WHERE id = ?1",
                 params![id, m],

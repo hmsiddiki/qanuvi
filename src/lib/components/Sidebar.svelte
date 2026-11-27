@@ -82,8 +82,27 @@
   // The shown machine cannot be reached (24z3 Part E): its projects and chats are read-only, the Inbox stays.
   let held = $derived(switcher.held !== null);
 
+  /** The lit entry follows what is shown (s7, s11), not the last click: a chat or Changes shown means Home. */
+  let lit = $derived(
+    ui.inboxOpen
+      ? "inbox"
+      : ui.settings === "agents" || ui.settings === "memory" || ui.settings === "servers"
+        ? ui.settings
+        : ui.settings
+          ? null
+          : ui.view === "plan"
+            ? "plans"
+            : ui.section === "reminders"
+              ? "reminders"
+              : "home",
+  );
+
   function navigate(id: string) {
     ui.section = id;
+    if (id === "home") {
+      ui.closeSettings();
+      if (ui.view === "plan") ui.show("editor");
+    }
     if (id === "plans") ui.show("plan");
     if (id === "agents" || id === "memory" || id === "servers") ui.openSettings(id);
     if (id === "inbox") {
@@ -177,9 +196,9 @@
           <button
             type="button"
             class="item"
-            class:current={ui.section === item.id}
+            class:current={lit === item.id}
             data-nav={item.id}
-            aria-current={ui.section === item.id ? "page" : undefined}
+            aria-current={lit === item.id ? "page" : undefined}
             title={collapsed ? item.label : undefined}
             onclick={() => navigate(item.id)}
           >

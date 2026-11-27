@@ -118,5 +118,6 @@ pub fn run_mcp_browser(folder: &str, state: Option<&str>) {
     let root = std::path::Path::new(folder)
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(folder));
+    browser::tie_to_this_process();
     browser_mcp::serve(&root, state.map(PathBuf::from));
 }

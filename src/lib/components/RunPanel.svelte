@@ -103,9 +103,11 @@
     onchanged?: () => void;
     /** Opened by "Raise budget": the budget box gets the focus. */
     focusBudget?: boolean;
+    /** Opened by the header's Resume (an earlier run stopped with steps left): the button says Resume too (s9). */
+    resume?: boolean;
   }
 
-  let { project, file, plan, setup, onclose, onchanged, focusBudget = false }: Props = $props();
+  let { project, file, plan, setup, onclose, onchanged, focusBudget = false, resume = false }: Props = $props();
 
   /** The agent for this run: any that works on this computer (Claude Code needs its command; Qanuvi's own, models). */
   let usable = $derived(
@@ -1407,7 +1409,17 @@
             size={13}
             class="spin"
           /> Reading your answers…{:else}<Play size={13} />
-          {check ? "Start the run" : checkFirst ? "Check and start" : "Start"}{/if}</button
+          {check
+            ? resume
+              ? "Resume the run"
+              : "Start the run"
+            : checkFirst
+              ? resume
+                ? "Check and resume"
+                : "Check and start"
+              : resume
+                ? "Resume"
+                : "Start"}{/if}</button
       >
     </div>
   </form>

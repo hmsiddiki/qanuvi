@@ -19,6 +19,8 @@ export interface MasterUpdateState {
   checkedAt: number | null;
   available: { version: string; notes: string; url: string } | null;
   error: string;
+  /** s12: "dev", or a test channel's address (older masters do not say). */
+  channel?: string;
   install: {
     stage: "" | "downloading" | "checking" | "ready" | "waiting" | "restarting" | "failed";
     version: string;
@@ -130,6 +132,10 @@ class MasterUpdateStore {
   }
   get current(): string {
     return this.raw?.current ?? "";
+  }
+  /** Where updates come from: "dev", or a test channel's address. */
+  get channel(): string {
+    return this.raw?.channel || "dev";
   }
   get checkedAt(): number | null {
     return this.raw?.checkedAt ?? null;

@@ -92,15 +92,19 @@ pub enum Job {
     Code,
 }
 
+/// Whether a message's words plainly ask for a change. Only for routing and the route's label.
+pub fn says_change(text: &str) -> bool {
+    regex::Regex::new(
+        r"\b(fix|add|implement|create|write|change|update|refactor|rename|remove|delete|build|make|move|replace|convert|generate|install|upgrade|migrate|edit|modify|improve|optimi[sz]e|test)\w*\b",
+    )
+    .map(|r| r.is_match(&text.to_lowercase()))
+    .unwrap_or(true)
+}
+
 /// What kind of job a message is, from its words.
 pub fn job_of(text: &str) -> Job {
     let t = text.to_lowercase();
-    let change = regex::Regex::new(
-        r"\b(fix|add|implement|create|write|change|update|refactor|rename|remove|delete|build|make|move|replace|convert|generate|install|upgrade|migrate|edit|modify|improve|optimi[sz]e|test)\w*\b",
-    )
-    .map(|r| r.is_match(&t))
-    .unwrap_or(true);
-    if change {
+    if says_change(&t) {
         return Job::Code;
     }
     let question = t.trim_end().ends_with('?')
@@ -398,6 +402,13 @@ mod tests {
         assert_eq!(job_of("Fix the failing test in cart.rs"), Job::Code);
         assert_eq!(job_of("How do I add a coupon field?"), Job::Code);
         assert_eq!(job_of("the price is wrong"), Job::Code);
+        // s6: neither plainly a question nor a change: the best model, but not called "a change".
+        assert_eq!(
+            job_of("Read src/util.ts and tell me what it exports"),
+            Job::Code
+        );
+        assert!(!says_change("Read src/util.ts and tell me what it exports"));
+        assert!(says_change("Fix the failing test in cart.rs"));
     }
 
     #[test]

@@ -273,7 +273,9 @@ impl Agent {
     }
 
     /// Why the brain gave the turn to this model first, in words.
-    fn why(&self, model: &str, job: Job) -> String {
+    /// `change`: the message's words ask for a change. A message that is neither plainly a question nor a change
+    /// still goes to the best model, but is not called "a change" (s6).
+    fn why(&self, model: &str, job: Job, change: bool) -> String {
         let local = self.setup.candidate(model).is_some_and(|c| c.local);
         let place = if local {
             "on this computer"
@@ -290,9 +292,12 @@ impl Agent {
             (Job::Light, false) => format!(
                 "A question: {model} ({place}) answers it; no model on this computer is set up."
             ),
-            (Job::Code, _) => format!(
+            (Job::Code, _) if change => format!(
                 "A change: {model} ({place}) works on it, the best model in your list for changes."
             ),
+            (Job::Code, _) => {
+                format!("{model} ({place}) works on it, the best model in your list.")
+            }
         }
     }
 
@@ -414,7 +419,7 @@ impl Agent {
             };
             if model != used {
                 if used.is_empty() {
-                    self.notice(&model, &self.why(&model, job));
+                    self.notice(&model, &self.why(&model, job, brain::says_change(text)));
                 }
                 if !used.is_empty() {
                     self.records.turn(&used, false, calls, broken);

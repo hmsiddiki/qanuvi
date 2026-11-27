@@ -50,6 +50,14 @@ pub fn channel_url() -> String {
     }
 }
 
+/// The channel's name for the Updates card: "dev", or the test channel's address when `QANUVI_UPDATES_URL` is set.
+pub fn channel_name() -> String {
+    match std::env::var("QANUVI_UPDATES_URL") {
+        Ok(base) if !base.trim().is_empty() => format!("test: {}", base.trim()),
+        _ => "dev".into(),
+    }
+}
+
 /// The update key's public half (the same one the app checks its updates with).
 pub fn public_key() -> String {
     conf()["plugins"]["updater"]["pubkey"]
@@ -167,6 +175,8 @@ pub struct UpdateState {
     pub checked_at: Option<i64>,
     pub available: Option<Found>,
     pub error: String,
+    /// s12: where updates come from, as the Updates card says it: "dev", or a test channel's address.
+    pub channel: String,
     /// M8b: putting an update in, while it goes on (and how the last one ended when it failed).
     pub install: Install,
 }
@@ -221,6 +231,7 @@ impl Default for Updates {
     fn default() -> Self {
         Updates(Mutex::new(UpdateState {
             current: env!("CARGO_PKG_VERSION").to_string(),
+            channel: channel_name(),
             ..UpdateState::default()
         }))
     }
