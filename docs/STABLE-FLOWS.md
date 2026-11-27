@@ -34,7 +34,7 @@ A row is green only when every system passes.
 | 17 | Stop, pause, resume a run | each says what happened; nothing lost | pause + resume pass; stop not caught (s19) | pass after f9-f11 (s9) | - |
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) | - |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | pass | pass after f12 | pass after m1, m2 (tray/Dock; place kept) |
-| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) | - |
+| 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | pass (s22) | pass; "go on next time" built + driven 2026-11-25 (s10) | - |
 | 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) | pass after MU2 (0.1.49 -> 0.1.99 from a local test channel, s21) |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | pass (s13) | - |
@@ -248,3 +248,11 @@ Seen, not fixed (for ST2 or later):
   Qanuvi before). Seen: m7 the Reload button's shortcut says Ctrl+Shift+R on the Mac. A stray `.window-state.json` in
   the installed folder came from a build before the m2 path fix (current builds write window-state.json into the
   data folder only).
+- s22 (Windows, 2026-11-27 08:00-08:20, owner asleep, test build on E:\qc-scratch\win\st): m2 driven (window dragged
+  to 390,166, closed, started again: back at 390,166; place in the test data folder's window-state.json); m3 the
+  restored tab carries the shell's own title. Flow 20: a slow step (Haiku) running, tray Quit asked "Quitting Qanuvi
+  stops 1 agent session and 1 plan run ... Go on next time", chosen; the next start finished the run by itself
+  (1 of 1 done, $0.07). Flow 2 with the installed copy's OpenRouter key (the test build shares the credential entry):
+  found w2, the wizard said "Done ... with 0 models" when every test hit OpenRouter's free daily limit, and showed an
+  OmniRoute error although OmniRoute was unticked (fixed a68b711). Flows 2 and 8 wait for the limit to reset
+  (00:00 UTC). Not driven on Windows: 21, 31, 32 (the installer would replace the owner's installed copy).
