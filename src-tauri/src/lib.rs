@@ -14,6 +14,7 @@ pub mod browser_mcp;
 pub mod checks;
 pub mod claude_update;
 pub mod compress;
+pub mod compress_proxy;
 pub mod dap;
 pub mod data_location;
 pub mod direct;
@@ -93,6 +94,10 @@ pub fn run_mcp(folder: &str, memory: Option<(&str, &str)>) {
         && let Ok(db) = store::Db::open(std::path::Path::new(db))
     {
         server = server.with_memory(db, scope);
+    }
+    // O3: a Claude Code session through Qanuvi's compression gets `qanuvi_retrieve` (its MCP config sets this).
+    if let Some(dir) = std::env::var_os("QANUVI_RETRIEVE_DIR") {
+        server = server.with_retrieve(std::path::Path::new(&dir));
     }
     mcp::serve(&mut server);
 }

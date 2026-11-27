@@ -16,6 +16,8 @@ pub struct Server {
     index: ProjectIndex,
     /// The user's memory and the project it is searched for.
     memory: Option<(crate::store::Db, String)>,
+    /// O3: where shortened tool output is kept, for `qanuvi_retrieve` (a Claude Code session through the compression).
+    retrieve: Option<PathBuf>,
 }
 
 /// The code-index tools (all read-only).
@@ -115,7 +117,14 @@ impl Server {
             root: root.to_path_buf(),
             index: ProjectIndex::default(),
             memory: None,
+            retrieve: None,
         }
+    }
+
+    /// O3: serves `qanuvi_retrieve` from the data folder's kept originals.
+    pub fn with_retrieve(mut self, data_dir: &Path) -> Self {
+        self.retrieve = Some(data_dir.to_path_buf());
+        self
     }
 
     pub fn with_memory(mut self, db: crate::store::Db, scope: &str) -> Self {
@@ -140,6 +149,11 @@ impl Server {
 
     fn tool(&mut self, name: &str, args: &Value) -> Result<String, String> {
         let s = |k: &str| args[k].as_str().unwrap_or("").trim().to_string();
+        if name == crate::compress::RETRIEVE_TOOL
+            && let Some(dir) = &self.retrieve
+        {
+            return crate::compress::Store::new(dir).get(&s("id"), args["search"].as_str());
+        }
         match name {
             "find_symbol" => {
                 self.index.refresh(&self.root)?;
@@ -351,6 +365,13 @@ impl Tools for Server {
             && let Some(list) = all.as_array_mut()
         {
             list.extend(memory_tools());
+        }
+        if self.retrieve.is_some()
+            && let Some(list) = all.as_array_mut()
+        {
+            let def = crate::compress::retrieve_tool_definition();
+            let f = &def["function"];
+            list.push(json!({"name": f["name"], "description": f["description"], "inputSchema": f["parameters"]}));
         }
         all
     }

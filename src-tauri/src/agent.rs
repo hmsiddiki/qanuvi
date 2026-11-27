@@ -77,6 +77,24 @@ fn mcp_config(
     Ok(file)
 }
 
+/// O3: the session's MCP config file with Qanuvi's own server told where the kept originals are (`qanuvi_retrieve`).
+fn with_retrieve_env(file: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
+    let mut v: Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let dir = crate::paths::data_dir().to_string_lossy().to_string();
+    if let Some(server) = v["mcpServers"].get_mut("qanuvi") {
+        server["env"] = json!({ "QANUVI_RETRIEVE_DIR": dir });
+    }
+    std::fs::write(file, v.to_string()).map_err(|e| e.to_string())?;
+    Ok(file.to_path_buf())
+}
+
+/// O3: an address that is the user's Headroom proxy (its usual port or name): "Built in" compression replaces it.
+fn looks_like_headroom(url: &str) -> bool {
+    let u = url.to_ascii_lowercase();
+    u.contains(":8787") || u.contains("headroom")
+}
+
 /// The MCP config: the code-index tools and/or the test browser (with the file it notes the page in).
 pub fn mcp_config_json(
     exe: &str,
@@ -1363,10 +1381,29 @@ impl Agents {
                 cmd.arg("--append-system-prompt")
                     .arg(crate::brief::as_arg(brief, &program));
             }
+            // O3 part 2: with Settings, Agents, Context compression on "Built in", the session goes through Qanuvi's
+            // compression proxy to where it would have gone (the address set for it, else the one in Claude Code's own
+            // settings, else Anthropic). A Headroom address is passed over: "Built in" means instead of Headroom.
+            let settings = crate::settings::get_all(db).unwrap_or_default();
+            let proxied = (crate::compress::mode_of(&settings) == crate::compress::Mode::Builtin)
+                .then(|| {
+                    let upstream = base_url
+                        .clone()
+                        .or_else(crate::claude_update::settings_base_url)
+                        .filter(|u| !looks_like_headroom(u))
+                        .unwrap_or_else(|| crate::compress_proxy::ANTHROPIC.to_string());
+                    crate::compress_proxy::base_url(&crate::paths::data_dir(), &upstream)
+                })
+                .flatten();
+            // Its `qanuvi_retrieve` tool lives in Qanuvi's own MCP server, so that server comes along.
+            let index_tools = index_tools || proxied.is_some();
             // Qanuvi's own tools: the code index (read-only) and the test browser (its own empty profile, nothing of the
             // user's), so they need no approval.
             if index_tools || browser_tools {
-                let config = mcp_config(project, &session.id, index_tools, browser_tools)?;
+                let mut config = mcp_config(project, &session.id, index_tools, browser_tools)?;
+                if proxied.is_some() {
+                    config = with_retrieve_env(&config)?;
+                }
                 cmd.arg("--mcp-config").arg(config);
                 let mut allowed = Vec::new();
                 if index_tools {
@@ -1377,7 +1414,7 @@ impl Agents {
                 }
                 cmd.arg("--allowedTools").arg(allowed.join(","));
             }
-            if let Some(url) = &base_url {
+            if let Some(url) = proxied.as_ref().or(base_url.as_ref()) {
                 cmd.env("ANTHROPIC_BASE_URL", url);
             }
         }
