@@ -2072,7 +2072,17 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
-    PICKUP POINT (newest, 2026-11-27 05:00): Mac mini set up and driven (m1 helper app, m4 notifications, Mac icon all
+    OVERNIGHT 2026-11-27 (owner asleep, all three machines given; docs/STABLE-FLOWS.md s20, s21): Mac flows 1-4, 6,
+      8-10, 12-15, 19, 21, 31 PASS (Mac column added). Fixed + pushed: m2 window place (window-state plugin, kept in
+      Qanuvi's data folder) driven on Mac + Windows; m3 terminal tab name; r1 Revert/rewind/Open on a Qanuvi-agent step
+      ("outside the project"); p1 a step line broken by its free model was called skipped (put back before judging);
+      o1 OpenRouter's daily limit said plainly and once; MU1 .dmg; MU2 Mac updates (publish step off unless
+      QANUVI_MAC_APP_HOST; helper swaps Qanuvi.app; driven 0.1.49 -> 0.1.99 on a local channel); MU3 move to
+      Applications (driven from the mounted .dmg). Unpublished. Open: m5 macOS "running in the background" notice, m6
+      macOS auto-capitalisation in answer boxes, m7 Ctrl+Shift+R shown on Mac, dmg Finder layout (needs owner click:
+      Automation for sshd), the app's --stdio link from the helper, Windows flows 2/8/16/20-26/31/32, then O3
+      compressor (owner: if time).
+    PICKUP POINT (2026-11-27 05:00): Mac mini set up and driven (m1 helper app, m4 notifications, Mac icon all
       DRIVEN LIVE and pushed, unpublished). Next: MU1 -> MU2 -> MU3 above. Mac drive kit: memory note mac-mini
       (mdrive refuses keys unless Qanuvi is front; tray via `mdrive tray`). Site: owner runs the register/social
       sign-in plan, then we put qanuvi.com online and set the app's built-in client id to the live site's one.

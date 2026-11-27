@@ -35,7 +35,7 @@ A row is green only when every system passes.
 | 18 | Queue | add, reorder, next task starts after a run ends | - | later: owner moved it to the Tasks idea (docs/IDEAS-UPCOMING.md) | - |
 | 19 | Close to tray and open again | runs go on; window comes back to the same place | pass | pass after f12 | pass after m1, m2 (tray/Dock; place kept) |
 | 20 | Quit while a run goes on | asks; "go on next time" parks it; next start resumes | - | pass; "go on next time" built + driven 2026-11-25 (s10) | - |
-| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) | - |
+| 21 | Updates | Settings shows the right line; update from a test channel restarts on the new version | - | pass (s12) | pass after MU2 (0.1.49 -> 0.1.99 from a local test channel, s21) |
 | 22 | Pair a machine | code pairing over the relay; machine in the switcher | - | pass (s13) | - |
 | 23 | Switch machines | the other machine's projects, chat, terminal; back again | - | pass (s13) | - |
 | 24 | Direct link and fallback | "connected · direct" at home; relay on a hotspot; back by itself | - | pass (s15) | - |
@@ -45,7 +45,7 @@ A row is green only when every system passes.
 | 28 | Backups and data folder | daily backup made; restore of one table on scratch data | backup now pass; restore not driven | pass after ba1, ba2 (s14) | - |
 | 29 | Settings | every page opens, scrolls, saves; Save always reachable | pass | pass | - |
 | 30 | Status bar | account, branch, servers, memory sync, agents, cost: each opens its page | pass | pass (s11) | - |
-| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | pass after n31a (s18) | - |
+| 31 | Fresh install as a new user | installer / tarball on a clean user; first start works | - | pass after n31a (s18) | pass (dmg opened from the disk image; MU3 moved it to /Applications, s21) |
 | 32 | Go back one version | previous build installs over; data intact | - | pass (s12) | - |
 
 ST3, the 24 h run, has its own log. It covers memory and handle counts every 10 minutes, stuck processes, dead links, and the run's end line.
@@ -235,3 +235,16 @@ Seen, not fixed (for ST2 or later):
   auto-capitalises typed text in the answer box ("teal" -> "Teal"), check code-like boxes; m5 a macOS notice "Qanuvi
   is running in the background" after the helper build's first start. Ollama/OmniRoute not installed on the Mac
   (owner: keep its disk low).
+- s21 (Mac install and update, 2026-11-27, owner asleep): MU1 the .dmg (17 MB, Qanuvi.app + Applications link, the
+  dark volume icon; `hdiutil verify` valid; built with CI=true because the Finder layout step needs Automation
+  permission for sshd: owner's click, left for later). MU2 driven: a 0.1.49 test copy (with MU2) in
+  ~/qc-scratch/mup/target/release, a throwaway signing key, a 0.1.99 Qanuvi.app tarball on a channel at 127.0.0.1:
+  Check now found it, Download checked the signature, Restart to update swapped the bundle (0.1.49 kept as
+  Qanuvi.app.prev) and Qanuvi opened again on 0.1.99 with its chats and plan. Found on the way: the first try used a
+  copy built before MU2, which saved the file as _linux.tar.gz (not pressed); then the whole-install update was still
+  refused on macOS ("Windows and Linux only so far", fixed a40dd4c). MU3 driven: the .dmg mounted, Qanuvi opened from
+  /Volumes/Qanuvi (real data folder, no test badge): the Inbox offered "Move Qanuvi to Applications?" in plain words;
+  Move copied it to /Applications and it opened again from there; not asked again. Removed afterwards (the Mac had no
+  Qanuvi before). Seen: m7 the Reload button's shortcut says Ctrl+Shift+R on the Mac. A stray `.window-state.json` in
+  the installed folder came from a build before the m2 path fix (current builds write window-state.json into the
+  data folder only).
