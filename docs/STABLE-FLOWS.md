@@ -300,3 +300,23 @@ carry urgent knowledge). Built (unit-tested; Linux tests on the laptop; not driv
 - Held-step questions: a quoted command over 48 characters shows by its program ("npm install") with "Show command".
 - Reminders is hidden from the sidebar until step 22 is built.
 - m5 (macOS background notice): left as it is (macOS's own).
+
+## Flow 33: the owner's words in a running step (added 2026-11-28; check in every round from now on)
+
+Information, an instruction, new work and "keep this in memory" typed into a running step's chat. Expected: the
+step never stops and nothing asks the owner; the working agent uses information, does instructions in the step,
+small new work right after it, and big or risky new work becomes a "- [!]" step with what to confirm; "keep" goes
+into the project's memory.
+- Found 2026-11-28 in the owner's real run: plain information was sorted as a "change" by the free sorter, which
+  asked "when should your change be done?" in the Inbox and told the agent to stop the step. Fixed 7e5b035 +
+  1c27d83 (the agent decides; no "when?" question).
+- Laptop, test build 1c27d83, scratch ~/qc-scratch/st2c (2 steps, Qanuvi core free): the note was kept in memory and
+  the step went on; "also create notes/c.txt" was done. Found: the agent read that message only after step 1 went
+  idle, worked on with nobody listening (its MAP.md edit never answered), and step 2's first try failed in 0 s; both
+  rows kept spinning. Fixed b60aec7 (a turn waits 1.5 s at idle after a message sent mid-work and follows the work;
+  a run turn takes over a busy session's events).
+- Same test on b60aec7: PASS. One try per step, rows green, no session left waiting, no agent process left, the
+  address in FACTS.md and in the project's memory, c.txt made.
+Also driven on 4033e68/1c27d83 (laptop): s2, s3 (tree, open tab, edited tab's bar, Git count), s4, s5 (core's PATH),
+s7, s11, s12 (Agents badge), s13 (pair, turned off again), s14 (3 of 8 backups listed), Reminders gone, s9 chip says
+Auto, the right-click menu in front of the rename prompt.
