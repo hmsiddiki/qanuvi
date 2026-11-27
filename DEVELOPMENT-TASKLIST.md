@@ -2081,6 +2081,15 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    CHECKPOINT (newest, 2026-11-27 ~11:45, fresh session starts here): 0.1.51 published, all three machines on it (This
+      PC offers it itself), nothing unpublished. NEXT: (1) 24w repeats: built-in vs Headroom, 3 runs each side with
+      E:/qc-scratch/o3/make-bench2.mjs (round 2, Haiku) on a 0.1.51 test build on This PC (data E:/qc-scratch/win/st),
+      Headroom started with --log-messages on a scratch port so headroom inspect shows its work; find why Headroom
+      saved ~25% more on big test-runner output and tune compress.rs (search kept more per file too); totals with
+      E:/qc-scratch/o3/run_totals.py (headroom-ai Python, read-only). (2) Owner waits: qanuvi.com plan
+      (www/qanuvi/register-auth-helper.md), dmg Finder layout click, Windows flows 2/8 (OpenRouter limit), 21/31/32.
+      Kits: Mac mdrive (~/qc-scratch/mdrive), Windows wdrive/wlaunch/tray.mjs (E:/qc-scratch/win/kit), laptop drive.py.
+      Always pass --data to qanuvi-master CLI (without it, it reads the installed copy's data).
     0.1.51 PUBLISHED 5d8f66f tag v0.1.51 (2026-11-27, owner yes; backup channel-before-0.1.51; 6 files online). Owner's
       compression rule: Built-in compression Off by default until proven; Free models = Qanuvi agent only (Claude Code
       keeps Headroom); All models = every model through Qanuvi instead of Headroom (eb5467b). Laptop and Mac updated
