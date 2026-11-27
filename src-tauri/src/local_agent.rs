@@ -395,10 +395,10 @@ impl Agent {
                     format!(
                         "{} did not answer: {}. Switch to Auto to let Qanuvi core use your other models.",
                         self.opts.model,
-                        problems.join(" · ")
+                        crate::llm::grouped(&problems)
                     )
                 } else {
-                    format!("No model could answer. {}", problems.join(" · "))
+                    format!("No model could answer. {}", crate::llm::grouped(&problems))
                 });
             };
             if model != used {

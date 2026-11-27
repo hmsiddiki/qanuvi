@@ -797,7 +797,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         // m2: the window comes back where it was (place, size, maximised); seen on the Mac, the same everywhere. Not
-        // its visibility: a background start stays without a window.
+        // its visibility: a background start stays without a window. Kept in Qanuvi's own data folder (a full path
+        // replaces the plugin's config folder, which a test build shares with the installed copy), so a test window
+        // never moves the installed one, and the place moves with the data folder and its backups.
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(
@@ -805,6 +807,7 @@ pub fn run() {
                         | tauri_plugin_window_state::StateFlags::SIZE
                         | tauri_plugin_window_state::StateFlags::MAXIMIZED,
                 )
+                .with_filename(data.join("window-state.json").to_string_lossy())
                 .build(),
         )
         .setup(move |app| {

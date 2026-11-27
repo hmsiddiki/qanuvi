@@ -231,7 +231,43 @@ pub fn classify(status: u16, message: &str) -> Failure {
     } else {
         FailKind::Busy
     };
+    // o1 (Mac drive): OpenRouter's free daily limit, said plainly instead of its long text with a sales link.
+    if lower.contains("free-models-per-day") {
+        return fail(kind, DAILY_LIMIT.to_string());
+    }
     fail(kind, format!("{status}: {}", message.trim()))
+}
+
+/// o1: what an OpenRouter key without credits says once its free requests for the day are used.
+pub const DAILY_LIMIT: &str = "OpenRouter's free daily limit is used up (without credits it allows about 50 free requests a day); it starts \
+     again tomorrow";
+
+/// o1: "model: reason" lines with the same reason said once, with all their models ("a, b: reason").
+pub fn grouped(problems: &[String]) -> String {
+    let mut groups: Vec<(Vec<&str>, &str)> = Vec::new();
+    for p in problems {
+        let (model, reason) = p.split_once(": ").unwrap_or(("", p.as_str()));
+        match groups.iter_mut().find(|(_, r)| *r == reason) {
+            Some((models, _)) if !model.is_empty() => models.push(model),
+            Some(_) => {}
+            None => groups.push((
+                if model.is_empty() {
+                    vec![]
+                } else {
+                    vec![model]
+                },
+                reason,
+            )),
+        }
+    }
+    groups
+        .iter()
+        .map(|(models, reason)| match models.is_empty() {
+            true => reason.to_string(),
+            false => format!("{}: {reason}", models.join(", ")),
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
 fn to_ollama(messages: &[Value]) -> Vec<Value> {
@@ -910,6 +946,26 @@ mod tests {
         );
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].name, "Append");
+    }
+
+    /// o1 (Mac drive): the free daily limit said plainly, and a reason shared by several models said once.
+    #[test]
+    fn says_the_daily_limit_plainly_and_once() {
+        let f = classify(
+            429,
+            "Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day",
+        );
+        assert_eq!(f.kind, FailKind::Busy);
+        assert_eq!(f.reason, DAILY_LIMIT);
+        let problems = vec![
+            format!("openrouter/a:free: {DAILY_LIMIT}"),
+            format!("openrouter/b:free: {DAILY_LIMIT}"),
+            "ollama/c: 500: boom".to_string(),
+        ];
+        assert_eq!(
+            grouped(&problems),
+            format!("openrouter/a:free, openrouter/b:free: {DAILY_LIMIT} · ollama/c: 500: boom")
+        );
     }
 
     #[test]

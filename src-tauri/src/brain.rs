@@ -260,7 +260,7 @@ pub fn decide(setup: &Setup, system: &str, prompt: &str) -> Result<(String, Stri
     Err(if problems.is_empty() {
         "No model to decide with.".into()
     } else {
-        format!("No model could decide. {}", problems.join(" · "))
+        format!("No model could decide. {}", crate::llm::grouped(&problems))
     })
 }
 
