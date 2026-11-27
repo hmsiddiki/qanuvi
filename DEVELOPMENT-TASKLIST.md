@@ -2081,7 +2081,13 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
-    CHECKPOINT (newest, 2026-11-27 ~11:45, fresh session starts here): 0.1.51 published, all three machines on it (This
+    0.1.52 PUBLISHED tag v0.1.52 (2026-11-27, owner "publish anyway, dont default to all models now"; backup
+      E:/Backups/qanuvi/channel-before-0.1.52; 10 files online, sizes match). Holds 24w t1-t3 (tool schema metadata
+      trimmed, repeated outputs sent once, ENABLE_TOOL_SEARCH auto when Headroom had it off), q1-q3 (failing-test lines
+      kept, saved command output read back shortened with whole-file retrieval, outputs Claude Code already cut said
+      so) and c1 (plan follow takes the shown name). Built-in compression stays Off by default; owner keeps Headroom.
+      Stray test master on dev.qanuvi.desktop.source stopped. Machines update themselves from the channel.
+    CHECKPOINT (2026-11-27 ~11:45, fresh session starts here): 0.1.51 published, all three machines on it (This
       PC offers it itself), nothing unpublished. NEXT: (1) 24w repeats: built-in vs Headroom, 3 runs each side with
       E:/qc-scratch/o3/make-bench2.mjs (round 2, Haiku) on a 0.1.51 test build on This PC (data E:/qc-scratch/win/st),
       Headroom started with --log-messages on a scratch port so headroom inspect shows its work; find why Headroom
