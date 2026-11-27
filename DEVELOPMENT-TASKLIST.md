@@ -88,6 +88,15 @@ and ST1 has been driven again on the finished build.
   with the brain's updates (O1 d), and it reads the project memory to keep what that project needs (error lines,
   names the memory marks as important). Measured against Headroom (24w) until within about 10%; then the owner
   decides whether Headroom goes.
+  - BUILT 2026-11-27 overnight (owner: "if you have time"), unpublished: part 1 compress.rs (router + logs, JSON,
+    search, diffs, HTML; deterministic; error lines whole; code reads never cut; originals a day in
+    <data>/compress-store, `qanuvi_retrieve`) in Qanuvi's own agent (2426b24, ec04a74); part 2 compress_proxy.rs, a
+    proxy on 127.0.0.1 inside Qanuvi for Claude Code (eed7382), sent with --settings so a settings.json Headroom
+    address cannot win (o3a 19af4e6); Settings, Agents, Context compression: Automatic (Headroom where Claude Code
+    already uses it, else built in) / Built in / Headroom / Off (ae87417). DRIVEN on Windows: a real Claude Code
+    session through the built-in proxy quoted the FATAL line of a 401-line log exactly, original kept, cache read 103k.
+    24w measurement 1 in 24w below. Not done yet: brain-update rules and project-memory "keep" marks (O1 d), the
+    owner's decision on Headroom, an end-to-end plan run compared with Headroom (steps passed), the "be terse" note.
 - [ ] **O4. A live voice assistant (owner, 2026-11-24; widens 23)**: a talking assistant that lives in the tray:
   - V1 wake word: "Hey Qanuvi" heard while the tray icon is on, on this machine only (small local model, no audio
     leaves the machine until woken); a clear sign when it listens; mute in the tray.
@@ -2072,6 +2081,14 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    PICKUP POINT (newest, 2026-11-27 09:20, owner asleep since ~05:30): all pushed, NOTHING PUBLISHED since 0.1.49.
+      Done overnight (below and s20-s22): Mac flows + MU1-MU3, m2/m3/m7, r1, p1, o1, w2, Windows flow 20, O3 parts 1+2
+      (built-in compression, driven) with the Automatic/Built in/Headroom/Off setting. Waiting for the owner: the
+      qanuvi.com site (register-auth-helper.md plan), dmg Finder layout (Automation permission click on the Mac),
+      Windows flows 2/8 (OpenRouter's free daily limit resets 00:00 UTC), Windows 21/31/32 (the installer would replace
+      the installed copy), O3 decision (keep Headroom or switch), 0.1.50 (ask). My Mac leftovers to remove when Mac
+      testing ends: ~/Library/Caches|WebKit/dev.qanuvi.desktop, ~/Documents/Qanuvi backups (test build), the
+      .source data folder, ~/src/qanuvi build output (1.8-2.1 GB).
     OVERNIGHT 2026-11-27 (owner asleep, all three machines given; docs/STABLE-FLOWS.md s20, s21): Mac flows 1-4, 6,
       8-10, 12-15, 19, 21, 31 PASS (Mac column added). Fixed + pushed: m2 window place (window-state plugin, kept in
       Qanuvi's data folder) driven on Mac + Windows; m3 terminal tab name; r1 Revert/rewind/Open on a Qanuvi-agent step
