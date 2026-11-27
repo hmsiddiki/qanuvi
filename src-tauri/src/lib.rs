@@ -31,6 +31,7 @@ pub mod live;
 pub mod llm;
 pub mod local_agent;
 pub mod local_servers;
+pub mod login_path;
 pub mod lsp;
 pub mod machine;
 pub mod master;

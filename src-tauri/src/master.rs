@@ -410,6 +410,11 @@ impl Master {
                 Ok(json!({"files": list, "truncated": truncated}))
             }
             "files_read" => to(files::read_file(&self.root(args)?, &s(args, "path"))),
+            "files_read_part" => to(files::read_part(
+                &self.root(args)?,
+                &s(args, "path"),
+                args["offset"].as_u64().unwrap_or(0),
+            )),
             "snapshots_take" => to(crate::snapshots::take(
                 &self.root(args)?,
                 &list(args, "also"),
@@ -2463,6 +2468,7 @@ pub type Tray = fn(Arc<Watch>) -> !;
 /// `qanuvi-master serve` (M5b): the watcher of this data folder's core, until the core ends cleanly. `tray`: shown
 /// when this master is This PC's. One watcher per data folder; a second one leaves it to the first.
 pub fn serve(dir: &Path, tray: Option<Tray>) -> Result<(), String> {
+    crate::login_path::adopt();
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let Some(_lock) = watch::take_lock_at(&watch::watcher_lock(dir))? else {
         return Ok(());
@@ -2504,6 +2510,8 @@ fn note_state(m: &Master) {
 
 /// `qanuvi-master core`: the master that does the work, until it is stopped (started by its watcher, M5b).
 pub fn serve_core(dir: &Path) -> Result<(), String> {
+    // s5: the login shell's PATH (nvm, fnm...) before anything here looks for a program.
+    crate::login_path::adopt();
     // One master per data folder (s1): the app's launch and its first This PC call could each start one. The lock
     // is held until this process ends; a second master finds it taken and leaves the folder to the first.
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;

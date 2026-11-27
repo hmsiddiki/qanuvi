@@ -238,6 +238,59 @@ pub(crate) fn looks_binary(bytes: &[u8]) -> bool {
     bytes.iter().take(8000).any(|b| *b == 0)
 }
 
+/// s2: how much of a file over MAX_EDIT_BYTES one read gives (kept well under the relay's message limit).
+pub const PART_BYTES: u64 = 1024 * 1024;
+
+/// One part of a file too big for the editor, shown read-only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FilePart {
+    pub text: String,
+    /// Where this part starts and where the next one does (bytes).
+    pub offset: u64,
+    pub next: u64,
+    pub size: u64,
+}
+
+/// s2: up to PART_BYTES of a file from `offset`, ending at a line end when one is near (else at a whole character),
+/// so a big log or data file can be read in parts. A file's binary start is refused.
+pub fn read_part(root: &Path, rel: &str, offset: u64) -> Result<FilePart, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let path = resolve(root, rel)?;
+    let mut file = std::fs::File::open(&path).map_err(|_| format!("{rel} cannot be found."))?;
+    let size = file.metadata().map_err(|e| e.to_string())?.len();
+    let offset = offset.min(size);
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|e| e.to_string())?;
+    let mut bytes = Vec::with_capacity(PART_BYTES.min(size - offset) as usize);
+    file.take(PART_BYTES)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if offset == 0 && looks_binary(&bytes) {
+        return Err(format!("{rel} is a binary file."));
+    }
+    let at_end = offset + bytes.len() as u64 >= size;
+    if !at_end {
+        // A line end in the last quarter ends the part there; else a whole character does.
+        let quarter = bytes.len() - bytes.len() / 4;
+        if let Some(nl) = bytes[quarter..].iter().rposition(|b| *b == b'\n') {
+            bytes.truncate(quarter + nl + 1);
+        } else {
+            while !bytes.is_empty()
+                && std::str::from_utf8(&bytes).is_err_and(|e| e.error_len().is_none())
+            {
+                bytes.pop();
+            }
+        }
+    }
+    let next = offset + bytes.len() as u64;
+    Ok(FilePart {
+        text: String::from_utf8_lossy(&bytes).into_owned(),
+        offset,
+        next,
+        size,
+    })
+}
+
 pub fn read_file(root: &Path, rel: &str) -> Result<FileContent, String> {
     let path = resolve(root, rel)?;
     let meta = std::fs::metadata(&path).map_err(|_| format!("{rel} cannot be found."))?;
@@ -702,6 +755,33 @@ pub fn replace_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_big_file_reads_in_parts_that_end_at_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = "a log line with some words in it, number xxxxxx\n";
+        let text: String = (0..60_000)
+            .map(|i| line.replace("xxxxxx", &format!("{i:06}")))
+            .collect();
+        std::fs::write(dir.path().join("big.log"), &text).unwrap();
+        let mut got = String::new();
+        let mut at = 0;
+        loop {
+            let p = read_part(dir.path(), "big.log", at).unwrap();
+            assert!(p.text.len() as u64 <= PART_BYTES);
+            assert_eq!(p.offset, at);
+            got.push_str(&p.text);
+            if p.next >= p.size {
+                break;
+            }
+            assert!(p.text.ends_with('\n'), "a part ends at a line end");
+            at = p.next;
+        }
+        assert_eq!(got, text);
+        std::fs::write(dir.path().join("b.bin"), [0u8, 1, 2]).unwrap();
+        assert!(read_part(dir.path(), "b.bin", 0).is_err());
+        assert!(read_part(dir.path(), "../x", 0).is_err());
+    }
     use std::fs;
 
     fn project() -> tempfile::TempDir {

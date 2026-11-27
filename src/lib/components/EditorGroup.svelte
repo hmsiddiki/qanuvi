@@ -6,6 +6,7 @@
   import FileCode from "@lucide/svelte/icons/file-code";
   import X from "@lucide/svelte/icons/x";
   import CodeEditor from "./CodeEditor.svelte";
+  import BigFileView from "./BigFileView.svelte";
   import FileTabs from "./FileTabs.svelte";
   import IconButton from "./IconButton.svelte";
   import { editor } from "$lib/stores/editor.svelte";
@@ -70,14 +71,12 @@
         {/if}
         {#if own.error}
           <div class="placeholder"><p class="err">{own.error}</p></div>
-        {:else if own.binary || own.tooLarge}
+        {:else if own.binary}
           <div class="placeholder">
-            <p>
-              {own.binary
-                ? "This is a binary file and is not shown in the editor."
-                : "This file is larger than 10 MB and is not opened in the editor."}
-            </p>
+            <p>This is a binary file and is not shown in the editor.</p>
           </div>
+        {:else if own.tooLarge}
+          <BigFileView projectId={own.projectId} path={own.path} />
         {:else}
           <div class="editor-host">
             <CodeEditor

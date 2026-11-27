@@ -78,6 +78,14 @@ export interface FileContent {
   too_large: boolean;
 }
 
+/** s2: one part of a file too big for the editor (read-only). */
+export interface FilePart {
+  text: string;
+  offset: number;
+  next: number;
+  size: number;
+}
+
 export interface SearchMatch {
   path: string;
   line: number;
@@ -418,6 +426,8 @@ export const api = {
     logAppend: (projectId: string, path: string, text: string) =>
       invoke<void>("files_log_append", { projectId, path, text }),
     read: (projectId: string, path: string) => invoke<FileContent>("files_read", { projectId, path }),
+    readPart: (projectId: string, path: string, offset: number) =>
+      invoke<FilePart>("files_read_part", { projectId, path, offset }),
     write: (projectId: string, path: string, text: string, expectedHash: string | null) =>
       invoke<string>("files_write", { projectId, path, text, expectedHash }),
     /** A new empty file or folder (never replaces one that is there). */
