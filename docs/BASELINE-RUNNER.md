@@ -28,6 +28,9 @@ All are runner scenarios in `src-tauri/src/plan/runner/scenarios.rs` (`cargo tes
 | 3-4 no guessed holds | `baseline_a_plan_without_secrets_runs_start_to_end_without_asking_the_owner` |
 | 3-4 old guessed holds dropped | `a_kept_missing_program_hold_is_dropped_when_the_run_starts_again` |
 | 3 blocked step | `a_blocked_step_goes_to_the_inbox_the_run_waits_and_an_answer_lets_it_go_on` |
+| 3 a held step asks at once | `baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question` |
+| 1 end check kept whole | `a_long_end_check_command_is_kept_whole` (preflight.rs) |
+| 4 a step stops its own server | `a_step_may_stop_a_process_it_started_in_the_project_and_no_other` (run_rules.rs) |
 | 4 chat note | `a_note_typed_in_the_steps_chat_is_sorted_first_then_passed_on_and_the_step_goes_on` |
 | 4 chat "change" | `a_message_the_free_model_calls_a_change_goes_to_the_working_agent_and_nothing_waits_for_the_owner` |
 | 4 refused command | `y24_a_command_the_run_rules_refuse_sets_its_step_aside_with_the_command_named_and_the_run_goes_on` |
@@ -48,14 +51,30 @@ All are runner scenarios in `src-tauri/src/plan/runner/scenarios.rs` (`cargo tes
 
 ## Real-run record (laptop, same plan each release)
 
-| Version | Steps done | Inbox questions during the run | Stops before the end | Notes |
+The plan: `~/qc-scratch/st53/proj/PLAN.md` on the laptop (5 steps: two helpers with tests, a demo page with a server
+and a browser check, a release note that needs a secret the project does not have, a README). Run from the master's
+terminal with Claude Code in Auto mode, "Stop for me: Never". The right result is 4 steps done and only step 4 asking
+(for its secret), with no server left running.
+
+| Build | Steps done | Questions | Stops before the end | Notes |
 |---|---|---|---|---|
-| 0.1.53 | | | | first row, filled at ST3 |
+| 65411be | 3 of 5 | 1 (wrong) | step 5 blocked | The end check written into step 5 was cut at 300 characters with "…", so it could never run. The `kill` for the step's own demo server was refused, the server kept the port. Step 4's own question (the secret) was never asked. |
+| 055483b | 2 of 5 | 2 | step 3 blocked | The secret question for step 4 was asked at once (fixed). Step 3's `kill "$pid"` was still refused: the number sat in a variable. |
+| f645809 | | | | `kill $(cat x.pid)` is read, and a refused stop tells the agent to give the number itself. Drive on 0.1.53 next. |
+
+Scenarios added from these runs: `baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question`,
+`a_long_end_check_command_is_kept_whole`, `a_step_may_stop_a_process_it_started_in_the_project_and_no_other`.
+
+Still open (no stop, only slower): every step first fails twice on the free model ("qanuvi:auto: not finished",
+error after 5-20 s, no message kept) before a paid model does it. Each step loses about 30 seconds.
 
 ## Where it slipped before
 
 - **Y10 (0.1.45, 2026-11-23):** the check began holding steps for programs and addresses it guessed. The owner's
   sign-in plan stopped on "install qanuvi-browser", which is Qanuvi's own browser tool, not a program. Fixed in
   91d55e3: only missing secrets hold.
+- **Before 0.1.53:** a step could not stop a server it had started (the never-list refused every `kill`); the end
+  check was cut at 300 characters; a held step that also needed a later step never asked its own question. Fixed in
+  055483b and f645809.
 - **R2c (2026-11-15):** a chat message the free sorter called a "change" asked the owner "when?" and held the step.
   Fixed in 1c27d83 and b60aec7: the working agent decides.

@@ -42,7 +42,9 @@ export class TerminalsStore {
     const machine = switcher.shown;
     let found: Shell[];
     try {
-      found = await callOn<Shell[]>(machine, "term_shells", {});
+      // An answer with no list (null, as a master that is not ready gives) is no shells, never a crash.
+      const got = await callOn<Shell[] | null>(machine, "term_shells", {});
+      found = Array.isArray(got) ? got : [];
     } catch {
       found = [];
     }
