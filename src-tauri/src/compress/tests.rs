@@ -228,9 +228,9 @@ fn measure_corpus() {
     }
 }
 
-/// Unset is automatic: a computer already sending Claude Code to Headroom keeps it; an explicit choice always wins.
+/// Owner 2026-11-27: off until proven; Free models covers Qanuvi's own agent only, All models Claude Code too.
 #[test]
-fn the_mode_is_automatic_until_chosen() {
+fn the_built_in_compression_is_off_until_chosen() {
     let set = |v: Option<&str>| {
         let mut m = serde_json::Map::new();
         if let Some(v) = v {
@@ -238,11 +238,16 @@ fn the_mode_is_automatic_until_chosen() {
         }
         m
     };
-    assert_eq!(mode_with(&set(None), || true), Mode::Headroom);
-    assert_eq!(mode_with(&set(None), || false), Mode::Builtin);
-    assert_eq!(mode_with(&set(Some("builtin")), || true), Mode::Builtin);
-    assert_eq!(mode_with(&set(Some("off")), || false), Mode::Off);
-    assert_eq!(mode_with(&set(Some("headroom")), || false), Mode::Headroom);
+    assert_eq!(mode_of(&set(None)), Mode::Off);
+    assert!(!own_on(&set(None)));
+    assert_eq!(mode_of(&set(Some("free"))), Mode::Free);
+    assert!(own_on(&set(Some("free"))));
+    assert_eq!(mode_of(&set(Some("all"))), Mode::All);
+    // 0.1.50's values: "builtin" was every model; Automatic, Headroom and Off are off now.
+    assert_eq!(mode_of(&set(Some("builtin"))), Mode::All);
+    for old in ["", "headroom", "off"] {
+        assert_eq!(mode_of(&set(Some(old))), Mode::Off, "{old}");
+    }
     assert!(
         looks_like_headroom("http://127.0.0.1:8787")
             && !looks_like_headroom("https://api.anthropic.com")

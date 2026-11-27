@@ -67,9 +67,9 @@ export interface Settings {
   ai: boolean;
   /** The agent new sessions use. */
   agent: string;
-  /** O3: context compression of tool output: Qanuvi's own ("builtin"), the owner's Headroom proxy for Claude Code
-   * ("headroom"), none ("off"), or "" automatic: Headroom when Claude Code is already sent to one, else built in. Kept on the machine (compress.rs reads the same key). */
-  compression: "" | "builtin" | "headroom" | "off";
+  /** O3: Qanuvi's built-in compression (owner: off until proven). "off": none (Claude Code goes where its own
+   * settings send it, e.g. Headroom); "free": Qanuvi's own agent only; "all": every model, Claude Code too (no Headroom). */
+  compression: "off" | "free" | "all";
   agents: Record<string, AgentSettings>;
   /** Monthly limit for all agent work, in US dollars; 0 means none. */
   monthlyBudgetUsd: number;
@@ -250,7 +250,7 @@ const DEFAULTS: Settings = {
   explorerVisible: true,
   ai: true,
   agent: PROVIDERS[0].id,
-  compression: "",
+  compression: "off",
   agents: {},
   monthlyBudgetUsd: 0,
   startOfferOff: false,
@@ -425,13 +425,9 @@ export function parseSettings(json: string | null): Settings {
     }
   if (typeof raw.tabsFollowProject === "boolean") s.tabsFollowProject = raw.tabsFollowProject;
   if (typeof raw.defaultShell === "string") s.defaultShell = raw.defaultShell;
-  if (
-    raw.compression === "" ||
-    raw.compression === "builtin" ||
-    raw.compression === "headroom" ||
-    raw.compression === "off"
-  )
-    s.compression = raw.compression;
+  // 0.1.50 stored "builtin" for every model; its other values are off now.
+  if (raw.compression === "free" || raw.compression === "all") s.compression = raw.compression;
+  else if (raw.compression === "builtin") s.compression = "all";
   if (typeof raw.explorerWidth === "number" && Number.isFinite(raw.explorerWidth))
     s.explorerWidth = Math.min(520, Math.max(160, Math.round(raw.explorerWidth)));
   if (typeof raw.explorerVisible === "boolean") s.explorerVisible = raw.explorerVisible;

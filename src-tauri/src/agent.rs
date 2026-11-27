@@ -1331,10 +1331,9 @@ impl Agents {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-            // O3: tool output compressed unless this machine turned compression off (Headroom only serves Claude Code,
-            // so Qanuvi's own agent uses the built-in one with it too).
+            // O3: Qanuvi's own agent compresses when the built-in compression is on (Free models or All models).
             let settings = crate::settings::get_all(db).unwrap_or_default();
-            if crate::compress::mode_of(&settings) == crate::compress::Mode::Off {
+            if !crate::compress::own_on(&settings) {
                 cmd.args(["--compress", "off"]);
             }
             if let Some(agent_id) = &session.agent_session_id {
@@ -1375,11 +1374,11 @@ impl Agents {
                 cmd.arg("--append-system-prompt")
                     .arg(crate::brief::as_arg(brief, &program));
             }
-            // O3 part 2: with Settings, Agents, Context compression on "Built in", the session goes through Qanuvi's
+            // O3 part 2: with Settings, Agents, Built-in compression on "All models", the session goes through Qanuvi's
             // compression proxy to where it would have gone (the address set for it, else the one in Claude Code's own
-            // settings, else Anthropic). A Headroom address is passed over: "Built in" means instead of Headroom.
+            // settings, else Anthropic). A Headroom address is passed over: "All models" means instead of Headroom.
             let settings = crate::settings::get_all(db).unwrap_or_default();
-            let proxied = (crate::compress::mode_of(&settings) == crate::compress::Mode::Builtin)
+            let proxied = (crate::compress::mode_of(&settings) == crate::compress::Mode::All)
                 .then(|| {
                     let upstream = base_url
                         .clone()

@@ -25,37 +25,34 @@ pub const RETRIEVE_TOOL: &str = "qanuvi_retrieve";
 /// How long originals are kept for retrieval.
 const KEEP_SECS: u64 = 24 * 3600;
 
-/// The machine setting that picks the compression (Settings → Agents): unset (automatic), "builtin", "headroom" (the
-/// user's own Headroom proxy for Claude Code, as before), or "off".
+/// The machine setting for Qanuvi's built-in compression (Settings, Agents). Owner 2026-11-27: off until it is proven.
+/// "" or "off": off everywhere (Claude Code goes where its own settings send it, for example Headroom); "free":
+/// Qanuvi's own agent (its free and paid models) only, Claude Code untouched; "all": every model, Claude Code too,
+/// through the built-in proxy instead of Headroom. 0.1.50's "builtin" reads as "all", its other values as off.
 pub const SETTING: &str = "compression";
 
-/// Which compression this machine uses.
+/// What the built-in compression covers on this machine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
-    Builtin,
-    Headroom,
     Off,
+    /// Qanuvi's own agent only.
+    Free,
+    /// Every model: Qanuvi's own agent and Claude Code (Headroom skipped).
+    All,
 }
 
-/// The mode from the machine's settings. Unset is automatic: Headroom when Claude Code is already sent to one
-/// (`headroom_set_up`, so an update never moves a working Headroom setup aside without asking), else built in.
+/// The mode from the machine's settings.
 pub fn mode_of(settings: &serde_json::Map<String, Value>) -> Mode {
-    mode_with(settings, headroom_set_up)
-}
-
-fn mode_with(settings: &serde_json::Map<String, Value>, headroom: impl Fn() -> bool) -> Mode {
     match settings.get(SETTING).and_then(Value::as_str) {
-        Some("off") => Mode::Off,
-        Some("headroom") => Mode::Headroom,
-        Some("builtin") => Mode::Builtin,
-        _ if headroom() => Mode::Headroom,
-        _ => Mode::Builtin,
+        Some("free") => Mode::Free,
+        Some("all") | Some("builtin") => Mode::All,
+        _ => Mode::Off,
     }
 }
 
-/// Whether Claude Code's own settings on this computer send it to a Headroom proxy.
-pub fn headroom_set_up() -> bool {
-    crate::claude_update::settings_base_url().is_some_and(|u| looks_like_headroom(&u))
+/// Whether Qanuvi's own agent compresses tool output.
+pub fn own_on(settings: &serde_json::Map<String, Value>) -> bool {
+    mode_of(settings) != Mode::Off
 }
 
 /// An address that is a Headroom proxy (its usual port or name).

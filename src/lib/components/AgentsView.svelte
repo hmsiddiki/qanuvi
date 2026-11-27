@@ -229,32 +229,31 @@
   {/each}
 
   {#if settings.value.ai}
-    <!-- O3: context compression, Qanuvi's own or the owner's Headroom. -->
+    <!-- O3: Qanuvi's built-in compression (owner 2026-11-27: off until it is proven; Headroom stays for Claude Code). -->
     <section class="card">
       <header>
         <div class="title">
-          <strong>Context compression</strong>
-          <span>Every agent</span>
+          <strong>Built-in compression</strong>
+          <span>Off until you choose it</span>
         </div>
       </header>
       <p class="note">
-        Long tool output (logs, JSON, search results, diffs, web pages) is shortened before the model reads it, so a
-        step uses fewer tokens. Error lines are always kept whole, files read for editing are never shortened, and the
-        model can ask for anything left out. Built in: Qanuvi does it itself, nothing to install. Headroom: Claude Code
-        goes through your own Headroom proxy (its address in Claude Code's settings above); Qanuvi's agent keeps the
-        built-in one. Automatic: Headroom where Claude Code already uses it, else built in.
+        Qanuvi can shorten long tool output (logs, JSON, search results, diffs, web pages) before the model reads it, so
+        a step uses fewer tokens. Error lines are always kept whole, files read for editing are never shortened, and the
+        model can ask for anything left out. Off: nothing is shortened by Qanuvi; Claude Code goes where its own
+        settings send it (your Headroom, for example). Free models: Qanuvi's own agent only; Claude Code keeps Headroom.
+        All models: every model, free or paid, Claude Code too, through Qanuvi instead of Headroom.
       </p>
       <div class="grid">
         <label>
-          Compression
+          Built-in compression
           <select
             value={settings.value.compression}
-            onchange={(e) => settings.set("compression", e.currentTarget.value as "" | "builtin" | "headroom" | "off")}
+            onchange={(e) => settings.set("compression", e.currentTarget.value as "off" | "free" | "all")}
           >
-            <option value="">Automatic</option>
-            <option value="builtin">Built in (Qanuvi)</option>
-            <option value="headroom">Headroom (your own proxy)</option>
             <option value="off">Off</option>
+            <option value="free">Free models (Qanuvi agent)</option>
+            <option value="all">All models (instead of Headroom)</option>
           </select>
         </label>
       </div>
