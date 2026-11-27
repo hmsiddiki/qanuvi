@@ -207,7 +207,8 @@
 <style>
   .cmenu {
     position: fixed;
-    z-index: 1000;
+    /* Above the rename prompt (.veil): a right-click in its box opens the menu in front of it. */
+    z-index: 1002;
     min-width: 210px;
     max-width: 340px;
     padding: 4px;

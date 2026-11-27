@@ -281,7 +281,22 @@ Fixed from the "Seen, not fixed" notes above:
   box sets its own).
 Already fixed before: m7 (keysFor), o1.
 
-Left for the owner (decisions, not bugs): s2 files over 10 MB, s3 a file watcher, s5 PATH from ~/.bashrc, s8 a
-borrowed checker from another folder, s13 a headless command for remote access, s14 the backups list showing other
-data folders' backups, s12 written steps for going back on Linux, the held-step question quoting a long command, the
-sidebar's Reminders entry (step 22, not built: it does nothing), m5 the macOS background notice.
+Owner decisions (2026-11-27): all as recommended, except going back to an older version: never offered (updates
+carry urgent knowledge). Built (unit-tested; Linux tests on the laptop; not driven in a window yet):
+- s2: a file over 10 MB opens read-only, about 1 MB at a time ("Load more"), without colours or code help; each part
+  stays well under the relay's message limit.
+- s3: a file watcher per shown project (master side, notify): changes made outside Qanuvi reach the tree (only the
+  shown folders they touch), the Git list (at most every 2 s) and open tabs (a tab without edits shows the new text,
+  one with edits gets the "changed on disk" bar). node_modules, target, dist, build, vendor and the inside of .git
+  (except HEAD, the index and refs) are left out. Followed again when the link comes back; an older master keeps the
+  15-second Git refresh.
+- s5: Linux and Mac masters take the login shell's PATH at start (`$SHELL -ilc`, 6 s at most; QANUVI_NO_SHELL_PATH
+  turns it off).
+- s8: the check names a program found outside the project and the PATH (inside another project's folder) as a setup
+  item, and recommends adding it to the project.
+- s13: `qanuvi-master pair` with no --code turns remote access on when it is off, waits for the relay and prints a
+  pairing code for the other computer's window.
+- s14: Settings → Backups lists, keeps and counts only this data folder's backups.
+- Held-step questions: a quoted command over 48 characters shows by its program ("npm install") with "Show command".
+- Reminders is hidden from the sidebar until step 22 is built.
+- m5 (macOS background notice): left as it is (macOS's own).
