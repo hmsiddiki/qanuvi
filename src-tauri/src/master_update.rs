@@ -433,9 +433,12 @@ enum Job {
 }
 
 /// What a whole-install build's file name ends with: the Windows installer, or (L2) on Linux the app's programs in a
-/// tarball that the update puts into the user's home folder.
+/// tarball that the update puts into the user's home folder, or (MU2) on a Mac Qanuvi.app in a tarball that replaces
+/// the bundle Qanuvi runs from.
 pub const INSTALLER_END: &str = if cfg!(windows) {
     "_setup.exe"
+} else if cfg!(target_os = "macos") {
+    "_mac.tar.gz"
 } else {
     "_linux.tar.gz"
 };

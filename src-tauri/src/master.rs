@@ -1754,6 +1754,12 @@ impl Master {
         self.put_whole_app_in(|master, app, background| {
             if cfg!(windows) {
                 Ok(installer_script(&[master, app], installer, background))
+            } else if cfg!(target_os = "macos") {
+                // MU2: Qanuvi.app swapped where it is (the app's own bundle; the master is inside it).
+                let bundle = app_bundle(app).ok_or(
+                    "Qanuvi does not run from an app bundle (Qanuvi.app), so this update cannot go in here.",
+                )?;
+                Ok(mac_install_script(&[master, app], installer, &bundle, background))
             } else {
                 let (home, own) = linux_install_home()?;
                 Ok(linux_install_script(
@@ -2078,6 +2084,56 @@ pub fn unpacked_copy(app: &Path, home: &Path) -> Option<PathBuf> {
         dir == home.join(".local/lib/qanuvi") || dir.starts_with("/usr") || dir.starts_with("/opt");
     let whole = dir.join("qanuvi").is_file() && dir.join("qanuvi-master").is_file();
     (!installed && whole).then(|| dir.to_path_buf())
+}
+
+/// MU2: the Mac helper, as `sh -c` runs it; the @NAMES@ are filled in by [`mac_install_script`]. Waits for the app and
+/// its master to end (ps; macOS has no /proc), unpacks the new Qanuvi.app beside the bundle, swaps it in, keeps the
+/// one before beside it as "<name>.prev" (hidden from Launchpad by the name), and opens Qanuvi again. A tarball that
+/// does not unpack into a Qanuvi.app changes nothing and opens the old one again.
+const MAC_INSTALL: &str = r#"n=0
+while [ $n -lt 120 ]; do
+  busy=
+  if ps -axo comm= | grep -qxF -e @PROGRAMS@; then busy=1; fi
+  [ -z "$busy" ] && break
+  n=$((n + 1)); sleep 0.5
+done
+app=@BUNDLE@
+new="$app.new"
+rm -rf "$new"
+if ! { mkdir -p "$new" && tar -xzf @TARBALL@ -C "$new" && [ -x "$new/Qanuvi.app/Contents/MacOS/qanuvi" ]; }; then
+  rm -rf "$new"
+  open -a "$app" @ARGS@ >/dev/null 2>&1
+  exit 1
+fi
+xattr -dr com.apple.quarantine "$new/Qanuvi.app" >/dev/null 2>&1
+rm -rf "$app.prev"
+[ -d "$app" ] && mv "$app" "$app.prev"
+mv "$new/Qanuvi.app" "$app"
+rm -rf "$new"
+open -a "$app" @ARGS@ >/dev/null 2>&1
+"#;
+
+/// MU2: the shell lines that wait (a minute at most) for `programs` (the app and its master) to end, put the
+/// checked `tarball`'s Qanuvi.app in place of `bundle`, and open Qanuvi again (`background`: without a window).
+pub fn mac_install_script(
+    programs: &[&Path],
+    tarball: &Path,
+    bundle: &Path,
+    background: bool,
+) -> String {
+    let list: Vec<String> = programs.iter().map(|p| shell_quote(p)).collect();
+    MAC_INSTALL
+        .replace("@PROGRAMS@", &list.join(" -e "))
+        .replace("@BUNDLE@", &shell_quote(bundle))
+        .replace("@TARBALL@", &shell_quote(tarball))
+        .replace(
+            "@ARGS@",
+            if background {
+                "--args --background"
+            } else {
+                ""
+            },
+        )
 }
 
 /// The Linux helper (L2), as `sh -c` runs it; the @NAMES@ are filled in by [`linux_install_script`].
@@ -2846,6 +2902,89 @@ mod tests {
             None
         );
         assert_eq!(app_bundle(Path::new("qanuvi")), None);
+    }
+
+    /// MU2: the Mac helper's lines name the programs to wait for, the bundle and the tarball, quoted.
+    #[test]
+    fn mac_install_script_names_its_parts() {
+        let s = mac_install_script(
+            &[Path::new("/A p/Qanuvi.app/Contents/MacOS/qanuvi")],
+            Path::new("/u/up/Qanuvi_0.2.0_mac.tar.gz"),
+            Path::new("/A p/Qanuvi.app"),
+            true,
+        );
+        assert!(s.contains("grep -qxF -e '/A p/Qanuvi.app/Contents/MacOS/qanuvi'"));
+        assert!(s.contains("app='/A p/Qanuvi.app'"));
+        assert!(s.contains("tar -xzf '/u/up/Qanuvi_0.2.0_mac.tar.gz'"));
+        assert!(s.contains("--args --background"));
+        assert!(
+            !mac_install_script(&[], Path::new("/t"), Path::new("/b"), false)
+                .contains("--background")
+        );
+    }
+
+    /// MU2, run for real on a Mac: a good tarball replaces the bundle (old one kept as .prev); a bad one leaves it.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_install_script_swaps_the_bundle() {
+        let d = tempfile::tempdir().unwrap();
+        let bundle = d.path().join("Qanuvi.app");
+        let program = |root: &Path, says: &str| {
+            let macos = root.join("Contents/MacOS");
+            std::fs::create_dir_all(&macos).unwrap();
+            std::fs::write(macos.join("qanuvi"), format!("#!/bin/sh\necho {says}\n")).unwrap();
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(macos.join("qanuvi"), std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+        };
+        program(&bundle, "old");
+        let build = d.path().join("build");
+        program(&build.join("Qanuvi.app"), "new");
+        let tar = d.path().join("Qanuvi_9.9.9_mac.tar.gz");
+        assert!(
+            std::process::Command::new("tar")
+                .arg("-czf")
+                .arg(&tar)
+                .arg("-C")
+                .arg(&build)
+                .arg("Qanuvi.app")
+                .status()
+                .unwrap()
+                .success()
+        );
+        // `open` would start the fake app: the test runs the script with `open` stubbed out.
+        let run = |script: String| {
+            let script = format!("open() {{ :; }}\n{script}");
+            std::process::Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .status()
+                .unwrap()
+        };
+        let nobody = d.path().join("nobody-runs-this");
+        assert!(run(mac_install_script(&[&nobody], &tar, &bundle, false)).success());
+        let now = std::fs::read_to_string(bundle.join("Contents/MacOS/qanuvi")).unwrap();
+        assert!(now.contains("new"), "{now}");
+        let prev = d.path().join("Qanuvi.app.prev/Contents/MacOS/qanuvi");
+        assert!(std::fs::read_to_string(prev).unwrap().contains("old"));
+        // A tarball that is not a Qanuvi.app: nothing changes.
+        let bad = d.path().join("bad.tar.gz");
+        std::fs::write(d.path().join("x.txt"), "x").unwrap();
+        std::process::Command::new("tar")
+            .arg("-czf")
+            .arg(&bad)
+            .arg("-C")
+            .arg(d.path())
+            .arg("x.txt")
+            .status()
+            .unwrap();
+        assert!(!run(mac_install_script(&[&nobody], &bad, &bundle, false)).success());
+        assert!(
+            std::fs::read_to_string(bundle.join("Contents/MacOS/qanuvi"))
+                .unwrap()
+                .contains("new")
+        );
+        assert!(!d.path().join("Qanuvi.app.new").exists());
     }
 
     /// m1: the master's helper app inside Qanuvi.app, and the way back to the app's program.

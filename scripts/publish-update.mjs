@@ -11,6 +11,8 @@
 // 4. M8a: master builds, signed with the same key, listed beside the installer as master-<os>-<arch>: the Windows one
 //    the build above made, and the Linux server build (cargo zigbuild; QANUVI_SKIP_LINUX_MASTER=1 leaves it out). A
 //    macOS master build is made on a Mac; until then macOS masters say the version has no build for them yet.
+// 6. MU2: the Mac app (darwin-aarch64) the same way from a Mac (QANUVI_MAC_APP_HOST, QANUVI_MAC_APP_KEY,
+//    QANUVI_MAC_APP_DIR); its tarball holds Qanuvi.app and is signed here. Without QANUVI_MAC_APP_HOST it is left out.
 // 5. L2: the Linux app (linux-x86_64): the app and its master, built on a Linux machine over ssh from this very tree
 //    (QANUVI_LINUX_APP_HOST, user@host; QANUVI_LINUX_APP_KEY, its ssh key; QANUVI_LINUX_APP_DIR, the build folder there,
 //    else ~/qanuvi-release), packed as a tarball and signed here (the key never leaves this computer). The installed
@@ -114,6 +116,19 @@ if (!linuxHost) {
   console.log(`Linux app build: ${out}`);
 }
 
+// 6. MU2: the Mac app (darwin-aarch64), built on a Mac over ssh from this very tree like the Linux one: Qanuvi.app (its
+//    master in Contents/Helpers) packed as a tarball and signed here. Not signed by Apple (ad-hoc): a first install
+//    needs "Open Anyway" once; updates replace the bundle. Without QANUVI_MAC_APP_HOST it is left out.
+const macHost = process.env.QANUVI_MAC_APP_HOST;
+if (!macHost) {
+  console.warn("(No Mac app build this time: QANUVI_MAC_APP_HOST is not set.)");
+} else {
+  const out = `Qanuvi_${version}_mac.tar.gz`;
+  fs.copyFileSync(macApp(macHost, version, out), path.join(outDir, out));
+  platforms["darwin-aarch64"] = { signature: signFile(path.join(outDir, out)), url: `${baseUrl}/${out}` };
+  console.log(`Mac app build: ${out}`);
+}
+
 const latest = {
   version,
   notes: notes || `Qanuvi ${version}`,
@@ -169,6 +184,56 @@ function linuxApp(host, version, name) {
     "cp src-tauri/icons/128x128.png out/qanuvi.png",
     `tar -czf "$HOME/${name}" -C out qanuvi qanuvi-master qanuvi.png`,
     `out/qanuvi-master version | grep -q "${version}"`,
+  ].join("\n");
+  run("ssh", [...ssh, host, "bash -s"], script + "\n");
+  run("scp", [...ssh, `${host}:${name}`, name]);
+  return path.join(work, name);
+}
+
+/**
+ * MU2: builds the Mac app on `host` from this tree and answers the tarball brought back here (Qanuvi.app), not yet
+ * signed. QANUVI_MAC_APP_KEY: its ssh key; QANUVI_MAC_APP_DIR: the build folder there (else ~/qanuvi-release).
+ */
+function macApp(host, version, name) {
+  const key = process.env.QANUVI_MAC_APP_KEY;
+  const ssh = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", ...(key ? ["-i", key] : [])];
+  const dir = process.env.QANUVI_MAC_APP_DIR || "qanuvi-release";
+  const work = path.join(root, "src-tauri/target/mac-app");
+  fs.mkdirSync(work, { recursive: true });
+  const files = execSync("git ls-files -co --exclude-standard", { cwd: root, encoding: "utf8" })
+    .split(/\r?\n/)
+    .filter((p) => p && fs.existsSync(path.join(root, p)));
+  fs.writeFileSync(path.join(work, "files.txt"), files.join("\n") + "\n");
+  execSync("tar -czf src-tauri/target/mac-app/source.tar.gz -T src-tauri/target/mac-app/files.txt", {
+    cwd: root,
+    stdio: "inherit",
+  });
+  const run = (cmd, args, input) => {
+    const r = spawnSync(cmd, args, {
+      cwd: work,
+      stdio: [input === undefined ? "inherit" : "pipe", "inherit", "inherit"],
+      input,
+    });
+    if (r.status !== 0) {
+      console.error(`The Mac app build failed (${cmd} ${args.at(-1)}).`);
+      process.exit(1);
+    }
+  };
+  run("scp", [...ssh, "source.tar.gz", `${host}:qanuvi-release-source.tar.gz`]);
+  // On the Mac: the tree unpacked over the last one (node_modules and target kept), packages again only when
+  // package-lock.json changed, then Qanuvi.app (the master goes into its helper app by bundle.macOS.files).
+  const master = "Contents/Helpers/Qanuvi Master.app/Contents/MacOS/qanuvi-master";
+  const script = [
+    "set -e",
+    'export PATH="$HOME/.local/node/bin:$HOME/.cargo/bin:$PATH"',
+    `d="$HOME/${dir}"`,
+    'mkdir -p "$d" && tar -xzf "$HOME/qanuvi-release-source.tar.gz" -C "$d" && cd "$d"',
+    'lock="$(shasum -a 256 package-lock.json)"',
+    'if [ ! -d node_modules ] || [ "$(cat .lock-hash 2>/dev/null)" != "$lock" ]; then npm ci; echo "$lock" > .lock-hash; fi',
+    "CI=true CARGO_BUILD_JOBS=6 npx tauri build --bundles app",
+    "b=src-tauri/target/release/bundle/macos",
+    `tar -czf "$HOME/${name}" -C "$b" Qanuvi.app`,
+    `"$b/Qanuvi.app/${master}" version | grep -q "${version}"`,
   ].join("\n");
   run("ssh", [...ssh, host, "bash -s"], script + "\n");
   run("scp", [...ssh, `${host}:${name}`, name]);
