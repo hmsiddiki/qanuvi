@@ -1650,7 +1650,7 @@ and ST1 has been driven again on the finished build.
       (default) · Change" (Qanuvi relay / Your own relay, the only address box) in remote access and both pairing
       forms; A3 pairing assumes Qanuvi's relay, the code card names a custom relay. The window sends the default
       written out, so masters from before A1 (VPS) take it too.
-    CHECKPOINT (newest, 2026-11-21 18:50, owner restarting the PC, fresh conversation starts here): all pushed,
+    CHECKPOINT (2026-11-21 18:50, owner restarting the PC, fresh conversation starts here): all pushed,
       nothing unpublished except 24rl part 2a (7fc8126 + relay line above Turn on). Test build processes stopped.
       Still to drive: laptop turn on with nothing typed; pair with only the code; custom relay shown next to the code
       and paired; older records with an address keep it. Then 0.1.37 (ask). Then part 3, relay kit, sl1. The owner
@@ -2081,6 +2081,18 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    CHECKPOINT (newest, 2026-11-27 after 0.1.52, fresh session starts here): 0.1.52 published, ALL THREE MACHINES ON
+      IT (owner checked), nothing unpublished. Built-in compression stays Off by default; owner keeps Headroom on This PC.
+      NEXT (recommended order, owner picks): (1) ST2 one fix round over open items in docs/STABLE-FLOWS.md, then ST3
+      24 h unattended run on the laptop (feature freeze, blockers only); (2) alongside, if owner agrees: one real day
+      with "All models" on the laptop or Mac (not This PC), costs + quality against a Headroom day, into 24w;
+      (3) Windows flows 16, 20-26 alone with a test build (own data root E:/qc-scratch/win/st); 2/8 after the OpenRouter
+      limit resets (00:00 UTC); 21/31/32 need an owner decision (they replace the installed copy); (4) O1 qanuvi.com
+      plan with owner (www/qanuvi/register-auth-helper.md), O2-O7 planned in parts; (5) Mac: dmg Finder click (owner),
+      m5, --stdio link from the helper. Kits: 24w E:/qc-scratch/o3 (make-bench3.mjs, check3.sh, totals.mjs,
+      quality.sh, mcall.mjs); Windows E:/qc-scratch/win/kit; laptop drive.py; Mac ~/qc-scratch/mdrive. Publish command
+      = the 0.1.51/0.1.52 one (QANUVI_RELEASE_ANYWAY, LINUX/MAC_APP_HOST + keys, CARGO_BUILD_JOBS=4), back up the whole
+      channel folder first. Always pass --data to the qanuvi-master CLI.
     0.1.52 PUBLISHED tag v0.1.52 (2026-11-27, owner "publish anyway, dont default to all models now"; backup
       E:/Backups/qanuvi/channel-before-0.1.52; 10 files online, sizes match). Holds 24w t1-t3 (tool schema metadata
       trimmed, repeated outputs sent once, ENABLE_TOOL_SEARCH auto when Headroom had it off), q1-q3 (failing-test lines
