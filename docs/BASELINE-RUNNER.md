@@ -60,7 +60,8 @@ terminal with Claude Code in Auto mode, "Stop for me: Never". The right result i
 |---|---|---|---|---|
 | 65411be | 3 of 5 | 1 (wrong) | step 5 blocked | The end check written into step 5 was cut at 300 characters with "…", so it could never run. The `kill` for the step's own demo server was refused, the server kept the port. Step 4's own question (the secret) was never asked. |
 | 055483b | 2 of 5 | 2 | step 3 blocked | The secret question for step 4 was asked at once (fixed). Step 3's `kill "$pid"` was still refused: the number sat in a variable. |
-| f645809 | | | | `kill $(cat x.pid)` is read, and a refused stop tells the agent to give the number itself. Drive on 0.1.53 next. |
+| 0.1.53 (b8128fa) | 3 of 5 | 2 | none | Step 4 asked at once (right). Step 5 also asked: the end check `... & pid=$!; ...; kill $pid` was refused, so it waited for the owner. No server left. |
+| 6403d56 | 4 of 5 | 1 (right) | none | **Target met.** Only step 4 asks: a real post to an outside chat that needs a secret. The end check ran whole and passed; the agent stopped its server by number after the hint; no server left running. Publish as 0.1.54 waits for the owner's yes. |
 
 Scenarios added from these runs: `baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question`,
 `a_long_end_check_command_is_kept_whole`, `a_step_may_stop_a_process_it_started_in_the_project_and_no_other`.
