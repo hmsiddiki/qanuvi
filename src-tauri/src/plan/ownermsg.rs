@@ -102,6 +102,8 @@ pub struct Sorted {
     pub title: String,
     /// The message answers the waiting change question (now, after this step, a new step), read by the model.
     pub when: Option<When>,
+    /// The owner asked to keep it (or it is a lasting fact about the project): it goes into the project's memory.
+    pub keep: bool,
 }
 
 /// One message as the step's log and the run's decisions keep it.
@@ -217,14 +219,18 @@ pub fn sort_prompt(step: &str, text: &str, waiting: Option<&str>) -> String {
     format!(
         "The owner typed a message into the chat of a running plan step. Sort it.\n\nStep: {step}\nMessage: \
          \"{text}\"{when}\n\nKinds:\n- note: a correction or a fact for this step; the agent takes it into account and \
-         goes on.\n- rule: a standing rule for the whole plan, not only this step (how all the work should be done, e.g. \
+         goes on. Information the owner gives (addresses, where and how to test, how something is set up, what should \
+         work, keys or logins already in place) is a note, even when it names what should work.\n- rule: a standing rule for the whole plan, not only this step (how all the work should be done, e.g. \
          \"always follow the core code style\", \"check the other plugins before adding helpers\"); every later step \
-         gets it.\n- question: the owner asks something; the agent answers briefly and goes on.\n- change: the owner wants \
-         something this step does not cover, or a change of the plan or its scope.\n- stop: the owner wants the run \
+         gets it.\n- question: the owner asks something; the agent answers briefly and goes on.\n- change: the owner asks for \
+         work this step does not cover, or a change of the plan or its scope.\n- stop: the owner wants the run \
          stopped.\n- pause: the owner wants the run paused.\n\nRead the message by what it means, in any language. \
-         When unsure between note and change, answer change. When unsure between note and rule, answer note. Answer \
-         with JSON only: {{\"kind\": \"note|rule|question|change|stop|pause\", \"title\": \"for a change: a short \
-         title for it as a plan step\", \"when\": \"now|after|new\" or null}}"
+         When unsure between note and change, answer note: the agent reads a note and can still act on it. When unsure \
+         between note and rule, answer note. \"keep\": true when the owner asks to keep it (in memory, for later, \
+         remember) or it is a lasting fact about the project (a test address, how the project is set up); it then \
+         goes into the project's memory too. Answer with JSON only: {{\"kind\": \"note|rule|question|change|stop|pause\", \
+         \"title\": \"for a change: a short title for it as a plan step; with keep: a short title for the fact\", \
+         \"when\": \"now|after|new\" or null, \"keep\": true or false}}"
     )
 }
 
@@ -256,6 +262,18 @@ pub fn parse_sort(answer: &str) -> Option<(Kind, String, Option<When>)> {
     Some((kind, title, when))
 }
 
+/// Whether the decider's answer says to keep the message in the project's memory.
+pub fn parse_keep(answer: &str) -> bool {
+    let (Some(start), Some(end)) = (answer.find('{'), answer.rfind('}')) else {
+        return false;
+    };
+    answer
+        .get(start..=end)
+        .and_then(|j| serde_json::from_str::<Value>(j).ok())
+        .and_then(|v| v.get("keep").and_then(Value::as_bool))
+        .unwrap_or(false)
+}
+
 // ---------- What the agent is told ----------
 
 pub fn note_message(text: &str) -> String {
@@ -285,8 +303,9 @@ pub fn question_message(text: &str) -> String {
 
 pub fn change_hold_message(text: &str) -> String {
     format!(
-        "(Qanuvi: the owner asks for a change: \"{text}\". Do not start it yet. Finish only the edit in hand, then \
-         answer \"Waiting for the owner\" and stop; Qanuvi asks the owner when it should be done.)"
+        "(Qanuvi: the owner asks for a change: \"{text}\". Do not start it yet: go on with this step's own work as \
+         before; Qanuvi asks the owner when the change should be done and tells you the answer. If the step is done \
+         before that, answer \"Waiting for the owner\" and stop.)"
     )
 }
 
@@ -469,6 +488,11 @@ mod tests {
         );
         assert_eq!(parse_sort("{\"kind\": \"maybe\"}"), None);
         assert_eq!(parse_sort("no idea"), None);
+        // The owner asked to keep it: it goes into the project memory too.
+        assert!(parse_keep("{\"kind\": \"note\", \"keep\": true}"));
+        assert!(!parse_keep("{\"kind\": \"note\"}"));
+        // A change waiting for the owner never stops the step's own work.
+        assert!(change_hold_message("x").contains("go on with this step's own work"));
         let p = sort_prompt("1. Export", "plus tard", Some("also add a CSV export"));
         assert!(
             p.contains("when should their change \"also add a CSV export\" be done"),

@@ -436,6 +436,7 @@ fn sort_message(
             by: who,
             title,
             when: when.filter(|_| waiting.is_some()),
+            keep: ownermsg::parse_keep(&answer),
         };
     }
     ownermsg::Sorted {
@@ -443,6 +444,7 @@ fn sort_message(
         by: ownermsg::WORD_RULES.into(),
         title: String::new(),
         when: None,
+        keep: false,
     }
 }
 
@@ -653,7 +655,19 @@ pub fn turn(
             };
             match sorted.kind {
                 Kind::Note | Kind::Rule | Kind::Question => {
-                    let handled = ownermsg::handled_text(sorted.kind);
+                    // The owner asked to keep it, or it is a lasting fact: the project's memory has it from now on.
+                    let kept = sorted.keep
+                        && sorted.kind != Kind::Question
+                        && env.memory_keep(&step_title, &text).is_ok();
+                    let handled = if kept {
+                        format!(
+                            "{}, and kept in the project's memory",
+                            ownermsg::handled_text(sorted.kind)
+                        )
+                    } else {
+                        ownermsg::handled_text(sorted.kind).to_string()
+                    };
+                    let handled = handled.as_str();
                     watch.messages.push(record(handled));
                     forward(&AgentEvent::Line {
                         line: told(handled),
