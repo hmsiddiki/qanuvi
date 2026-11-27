@@ -88,25 +88,25 @@ fn label_key(steps: &[Step], label: &str) -> String {
         .unwrap_or_else(|| label.trim().to_string())
 }
 
-/// An address as the probe takes it: a URL as it is, "host:port" as a TCP address.
-fn probe_url(name: &str) -> String {
-    if name.contains("://") {
-        name.to_string()
-    } else {
-        format!("tcp://{name}")
-    }
-}
-
 static ENV_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_]{0,99}$").unwrap());
 
-/// d5: tries what the steps need on this machine (read-only) and answers a hold for each step that cannot run here,
-/// with the reason in plain words. `first` is the step a need with no steps named holds.
+/// d5: answers a hold for each step that needs a secret the project does not have (only the owner can give one).
+/// `first` is the step a need with no steps named holds.
+///
+/// Programs and addresses the check guessed hold nothing (owner, 2026-11-28): the guess was often wrong (Qanuvi's own
+/// browser tool read as a program to install), and the working agent finds out itself, uses another way, starts the
+/// server, or marks the step blocked so the rest of the run goes on.
 pub fn probe(env: &dyn RunEnv, found: &Preflight, steps: &[Step], first: &str) -> Vec<Hold> {
     let mut holds: Vec<Hold> = Vec::new();
     let secrets = env.secret_names();
-    let mut hold = |labels: &[String], why: String| {
-        let mut keys: Vec<String> = labels
+    for n in &found.needs {
+        let name = n.name.trim().trim_matches('`');
+        if n.kind != "secret" || !ENV_NAME.is_match(name) || secrets.iter().any(|s| s == name) {
+            continue;
+        }
+        let mut keys: Vec<String> = n
+            .steps
             .iter()
             .map(|l| label_key(steps, l))
             .filter(|k| !k.is_empty())
@@ -118,60 +118,26 @@ pub fn probe(env: &dyn RunEnv, found: &Preflight, steps: &[Step], first: &str) -
             if !holds.iter().any(|h| h.step == step) {
                 holds.push(Hold {
                     step,
-                    why: why.clone(),
+                    why: format!(
+                        "it needs {name}; add it in the project's settings under Secrets, then Try again"
+                    ),
                     by: HoldBy::Default,
                 });
             }
-        }
-    };
-    for n in &found.needs {
-        let name = n.name.trim().trim_matches('`');
-        match n.kind.as_str() {
-            "program" => {
-                let program = name.split_whitespace().next().unwrap_or("");
-                if !program.is_empty() && !env.has_program(program) {
-                    hold(
-                        &n.steps,
-                        format!(
-                            "it needs the program {program}, which is not on this machine; install it, then Try again"
-                        ),
-                    );
-                }
-            }
-            "address" => {
-                if !env.reachable(&probe_url(name)) {
-                    hold(
-                        &n.steps,
-                        format!(
-                            "it needs {name}, which does not answer from this machine; start it or check the address, \
-                             then Try again"
-                        ),
-                    );
-                }
-            }
-            "secret" if ENV_NAME.is_match(name) && !secrets.iter().any(|s| s == name) => {
-                hold(
-                    &n.steps,
-                    format!(
-                        "it needs {name}; add it in the project's settings under Secrets, then Try again"
-                    ),
-                );
-            }
-            _ => {}
         }
     }
     holds
 }
 
-/// lr2: a kept hold of the probe ("it needs the program cargo, which is not on this machine ...") is tried again when a
-/// run starts: false once the program, address or secret is there now, so a run started again after the owner
-/// installed it does not stop on the old finding. Holds of any other kind stay (true).
+/// lr2: a kept hold of the probe is tried again when a run starts: a secret hold stays while the secret is still
+/// missing. A kept program or address hold from an older version is dropped (false): those no longer hold.
+/// Holds of any other kind stay (true).
 pub fn still_missing(env: &dyn RunEnv, why: &str) -> bool {
     static PROGRAM: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"^it needs the program (\S+), which is not on this machine").unwrap()
+        Regex::new(r"^it needs the program \S+, which is not on this machine").unwrap()
     });
     static ADDRESS: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"^it needs (.+?), which does not answer from this machine").unwrap()
+        Regex::new(r"^it needs .+?, which does not answer from this machine").unwrap()
     });
     static SECRET: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
@@ -180,11 +146,8 @@ pub fn still_missing(env: &dyn RunEnv, why: &str) -> bool {
         .unwrap()
     });
     let why = why.trim();
-    if let Some(c) = PROGRAM.captures(why) {
-        return !env.has_program(&c[1]);
-    }
-    if let Some(c) = ADDRESS.captures(why) {
-        return !env.reachable(&probe_url(&c[1]));
+    if PROGRAM.is_match(why) || ADDRESS.is_match(why) {
+        return false;
     }
     if let Some(c) = SECRET.captures(why) {
         return !env.secret_names().iter().any(|s| s == &c[1]);

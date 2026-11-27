@@ -320,3 +320,23 @@ into the project's memory.
 Also driven on 4033e68/1c27d83 (laptop): s2, s3 (tree, open tab, edited tab's bar, Git count), s4, s5 (core's PATH),
 s7, s11, s12 (Agents badge), s13 (pair, turned off again), s14 (3 of 8 backups listed), Reminders gone, s9 chip says
 Auto, the right-click menu in front of the rename prompt.
+
+## The baseline (owner, 2026-11-28)
+
+The standard every fix, check and upgrade is held to, so what works never falls back:
+
+1. **A bug found live becomes a test first.** It is written as a runner scenario that fails on the bug, then fixed.
+   It stays in the suite for good (`baseline_` scenarios and the flows above).
+2. **Nothing is published unless every test passes.** `scripts/publish-update.mjs` runs the Rust and window suites
+   and refuses to publish when one fails. `QANUVI_RELEASE_ANYWAY` does not skip this.
+3. **A test is never loosened to let a fix pass.** If a fix makes an old test fail, the fix is wrong, unless the
+   owner changed the behaviour that test describes.
+4. **A run asks the owner only what only the owner can give** (a secret, a real yes on big or risky work). Anything
+   the agent can find out or judge itself (a program, an address, a message in the chat) never reaches the Inbox and
+   never stops a step.
+
+First baseline scenario: `baseline_a_plan_without_secrets_runs_start_to_end_without_asking_the_owner`. It is the
+owner's case from 2026-11-28: steps 7 and 8 of a sign-in plan were held with "install qanuvi-browser", a program that
+does not exist. The check had read Qanuvi's own browser tool as a program to install. Since this fix, the check holds
+steps only for missing secrets. A missing program or an address that doesn't answer is the agent's to find out, and an
+old hold of that kind is dropped when the run starts again.

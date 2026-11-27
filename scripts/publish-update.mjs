@@ -46,6 +46,21 @@ if (!process.env.QANUVI_RELEASE_ANYWAY) {
   }
 }
 
+// 0b. The baseline (owner, 2026-11-28): every test passes or nothing is published. Not skipped by
+// QANUVI_RELEASE_ANYWAY (that one is only for the model check above). The runner's baseline scenarios
+// (src-tauri/src/plan/runner/scenarios.rs, "baseline_" and the flows in docs/STABLE-FLOWS.md) are in these suites.
+for (const [what, cmd, args, env] of [
+  ["Rust tests", "cargo", ["test", "--lib", "--manifest-path", "src-tauri/Cargo.toml"], { CARGO_BUILD_JOBS: "4" }],
+  ["window tests", "npx", ["vitest", "run"], {}],
+]) {
+  console.log(`Baseline: ${what} ...`);
+  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: true, env: { ...process.env, ...env } });
+  if (r.status !== 0) {
+    console.error(`Not released: the baseline fell (${what} failed). Fix it first; nothing was changed.`);
+    process.exit(3);
+  }
+}
+
 // 1. The version, everywhere it is written.
 const conf = path.join(root, "src-tauri/tauri.conf.json");
 const c = JSON.parse(fs.readFileSync(conf, "utf8"));

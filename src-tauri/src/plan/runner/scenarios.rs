@@ -3142,10 +3142,8 @@ fn y10_the_check_settles_grants_eyes_the_end_check_promises_and_tries_what_steps
     );
     let setup = crate::plan::run::test_setup(FILE, options());
     let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
-    // d5: chromium is not on this machine: only step 4 holds; cargo is.
-    let held: Vec<&str> = got.wait_before.iter().map(|x| x.step.as_str()).collect();
-    assert_eq!(held, ["4"], "{:?}", got.wait_before);
-    assert!(got.wait_before[0].why.contains("chromium"));
+    // d5: a program the check guessed (chromium, not on this machine) holds nothing: the agent finds out itself.
+    assert!(got.wait_before.is_empty(), "{:?}", got.wait_before);
     // d1 + d2: kept for the runner.
     let rules = crate::plan::check_more::CheckRules::load(&*env, FILE);
     assert_eq!(rules.grants_of("2"), ["delete"]);
@@ -3402,44 +3400,68 @@ fn y10_a_question_nobody_answers_is_decided_after_the_wait_but_a_risky_step_stil
     );
 }
 
-/// lr2: a run started again tries a kept "it needs the program X" hold again: the program there now, the step runs;
-/// still missing, it still waits.
+/// A kept "it needs the program X" hold from an older version (owner's real case: "qanuvi-browser", Qanuvi's own
+/// browser tool) no longer stops anything: a run started again drops it, closes its question, and both steps run.
 #[test]
-fn a_kept_missing_program_hold_is_tried_again_when_the_run_starts_again() {
-    let env = world("# Plan\n\n- [ ] **1. Build**\n- [ ] **2. Ship**\n");
-    let hold = |step: &str, program: &str| preflight::Hold {
+fn a_kept_missing_program_hold_is_dropped_when_the_run_starts_again() {
+    let env = world("# Plan\n\n- [ ] **7. Google**\n- [ ] **8. Microsoft**\n");
+    let hold = |step: &str| preflight::Hold {
         step: step.into(),
-        why: format!(
-            "it needs the program {program}, which is not on this machine; install it, then Try again"
-        ),
+        why: "it needs the program qanuvi-browser, which is not on this machine; install it, then Try again"
+            .into(),
         by: preflight::HoldBy::Default,
     };
     let state = crate::plan::planstate::keep_holds(
         &crate::plan::planstate::PlanState::default(),
-        &[hold("1", "cargo"), hold("2", "rustup")],
+        &[hold("7"), hold("8")],
         0.0,
     );
     env.plan_data_set(FILE, Kind::State, &serde_json::to_value(&state).unwrap())
         .unwrap();
     env.set_agent(|c| {
-        let n = step_of(c.prompt, &["1", "2"]);
+        let n = step_of(c.prompt, &["7", "8"]);
         c.env.mark(FILE, n, 'x');
         AgentReply::default()
     });
-    let running = Run::start(env.clone(), FILE, options(), stop_button());
-    // Step 1 runs (cargo is there now); step 2 still waits (rustup is not): its question comes.
-    wait_until("step 2's question never came", &|| {
-        open_question(&env).is_some()
-    });
-    let q = open_question(&env).unwrap();
-    assert!(q.title.contains("2. Ship"), "{}", q.title);
-    env.answer(q.key.as_deref().unwrap(), json!({"choice": "skip"}));
-    let r = running.wait();
-    assert_eq!(step(&r, "1").status, RunStepStatus::Done, "{}", r.message);
-    assert_eq!(
-        step(&r, "2").status,
-        RunStepStatus::Skipped,
-        "{}",
-        r.message
+    let r = Run::start(env.clone(), FILE, options(), stop_button()).wait();
+    assert_eq!(step(&r, "7").status, RunStepStatus::Done, "{}", r.message);
+    assert_eq!(step(&r, "8").status, RunStepStatus::Done, "{}", r.message);
+    assert!(open_question(&env).is_none());
+}
+
+/// Baseline (owner, 2026-11-28): a plan that needs no secret runs start to end with no question in the Inbox, whatever
+/// the check before the run guessed about programs and addresses. The working agent finds those out itself.
+#[test]
+fn baseline_a_plan_without_secrets_runs_start_to_end_without_asking_the_owner() {
+    let env = world(
+        "# Plan\n\n- [ ] **7. Google**\n  - Open https://aloelo.dev/qanuvi/login/oauth/google/start in the browser.\n- [ ] **8. Microsoft**\n  - Live check like step 7.\n",
     );
+    let answer = json!({
+        "secrets": [], "questions": [], "risky": [], "setup": [], "order": [], "eyes": [], "promises": [],
+        "needs": [
+            {"kind": "program", "name": "qanuvi-browser", "steps": ["7", "8"]},
+            {"kind": "program", "name": "chromium", "steps": ["7"]},
+            {"kind": "address", "name": "http://127.0.0.1:9", "steps": ["8"]}
+        ]
+    })
+    .to_string();
+    env.set_agent(move |c| {
+        if planner(c) {
+            return AgentReply {
+                result: Some(answer.clone()),
+                ..Default::default()
+            };
+        }
+        let n = step_of(c.prompt, &["7", "8"]);
+        c.env.mark(FILE, n, 'x');
+        AgentReply::default()
+    });
+    let setup = crate::plan::run::test_setup(FILE, options());
+    let got = crate::plan::headless_check::check_before_run(&*env, &setup).unwrap();
+    assert!(got.wait_before.is_empty(), "{:?}", got.wait_before);
+    let r = Run::start(env.clone(), FILE, options(), stop_button()).wait();
+    assert_eq!(r.status, RunStatus::Done, "{:?} {}", statuses(&r), r.message);
+    assert_eq!(step(&r, "7").status, RunStepStatus::Done, "{}", r.message);
+    assert_eq!(step(&r, "8").status, RunStepStatus::Done, "{}", r.message);
+    assert!(open_question(&env).is_none(), "{:?}", env.inbox());
 }
