@@ -5264,6 +5264,30 @@ and ST1 has been driven again on the finished build.
     library-mode numbers. One run each (agent behaviour varies a lot per step); Headroom's proxy has no message log
     here, so its per-request work could not be inspected. Next for 24w: repeat each side 3 times, compare per step,
     run Headroom with --log-messages on a scratch port to see what it does to test-runner output. Owner keeps Headroom.
+  - Measurement 3, repeats (2026-11-27 12:08-12:25, 0.1.51 test build on This PC, headless, data E:/qc-scratch/win/st;
+    round-2 plan x6 in E:/qc-scratch/o3/bench3, 3 copies per side run side by side; built in = compression "all", no
+    address; Headroom = compression "off", run start baseUrl http://127.0.0.1:8797 (a scratch Headroom 0.42.0,
+    --log-messages --log-file bench3/hr.jsonl, HEADROOM_BEACON=off); totals by E:/qc-scratch/o3/totals.mjs):
+    | run | input | cache read | output | cost | time |
+    |---|---|---|---|---|---|
+    | Headroom 1 / 2 / 3 | 828k / 539k / 641k | 9.93M / 8.05M / 8.31M | 81k / 73k / 69k | $1.12 / $0.63 / $0.82 | 507 / 473 / 427 s |
+    | built in 1 / 2 / 3 | 805k / 761k / 672k | 10.24M / 7.84M / 6.24M | 71k / 71k / 59k | $1.11 / $0.83 / $0.74 | 439 / 462 / 337 s |
+    | mean Headroom / built in | 669k / 746k (+11%) | 8.76M / 8.11M | 74k / 67k | $0.86 / $0.89 (+3%) | 469 / 413 s |
+    All six 10/10 and equally correct (2,906 tests pass, no computeTotal left, refund added, 7 NOTES sections).
+    The spread inside one side (Headroom $0.63-$1.12) is larger than the gap between the sides: round 2's "Headroom
+    cheaper by a quarter" was one-run noise; today it is close to a draw, built in slightly behind on input and faster.
+    Headroom's own log (399 requests, 22.2M tokens sent, 1.41M saved = 6.4%): 67% of its saving (948k) is tool
+    definitions only (tool_schema_compaction: drops JSON Schema annotation keys, tidies description spaces; plus
+    tool-search deferral, 19 tools x 2,234 tokens a request, which it counts as an estimate, not realized: it defers
+    the tools Claude Code sends because ENABLE_TOOL_SEARCH is "false" in ~/.claude/settings.json); 19% (274k)
+    cross-turn dedup (a tool result repeated in later turns); only 13% (186k) tool output itself (tool_result 124k,
+    log 35k, protected error output 10k, bash 7k). Saved command output read back with Read (Claude Code's
+    tool-results/*.txt files) happened as often on both sides (5-6 vs 3-6 reads a run); compress.rs treats every Read as
+    code (compress.rs kind_of), so those reads pass through whole.
+    Next tuning candidates, biggest first (owner picks): (1) tool definitions on "All models": let Claude Code defer
+    its own tools (ENABLE_TOOL_SEARCH on in the session's --settings env) and/or drop schema annotation keys in
+    compress_proxy; mostly cached tokens, so the money gain is small; (2) cross-turn dedup of a repeated tool result;
+    (3) a Read of a tool-results/*.txt file judged by its content (it is command output, not code). Then repeat x3.
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:
