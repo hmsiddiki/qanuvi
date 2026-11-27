@@ -378,12 +378,12 @@ impl Policy {
             Vec::new()
         };
         // A step may stop a process the project or the run started (a demo server it opened): `kill <pid>`,
-        // `taskkill /PID`, `Stop-Process -Id` by number only. Any other kill stays on the never-list.
-        granted.extend(
-            parts(command)
-                .into_iter()
-                .filter(|p| crate::own_process::stops_own(p, &self.root)),
-        );
+        // `taskkill /PID`, `Stop-Process -Id` by number, or `kill $!` / `kill $pid` after `pid=$!` in the same command
+        // (the job it just started). Any other kill stays on the never-list.
+        granted.extend(parts(command).into_iter().filter(|p| {
+            crate::own_process::stops_own(p, &self.root)
+                || crate::own_process::stops_own_job(p, command)
+        }));
         let mut command_left = command.to_string();
         for g in &granted {
             command_left = command_left.replacen(g.as_str(), " true ", 1);
@@ -980,6 +980,20 @@ mod tests {
         assert!(!matches!(own_quiet, Verdict::Never(_)), "{own_quiet:?}");
         assert!(!matches!(by_file, Verdict::Never(_)), "{by_file:?}");
         assert!(matches!(mixed, Verdict::Never(_)), "{mixed:?}");
+        // The job the same command started (the real end check of a run, 2026-11-28).
+        for own_job in [
+            "npm test && (node server.js & pid=$!; sleep 1; curl -fsS http://127.0.0.1:4173/ | grep -q 'Text tools'; rc=$?; kill $pid; exit $rc)",
+            "node server.js & sleep 1; curl -s http://127.0.0.1:4173/; kill $!",
+            "node server.js & SERVER=$! ; sleep 1; kill \"${SERVER}\" 2>/dev/null",
+        ] {
+            let v = p.command(own_job);
+            assert!(!matches!(v, Verdict::Never(_)), "{own_job}: {v:?}");
+        }
+        // A variable set from anything else is not the job.
+        assert!(matches!(
+            p.command("pid=$(pgrep sshd); kill $pid"),
+            Verdict::Never(_)
+        ));
         // Not this process, not init, not a number Qanuvi cannot see; the refusal says how to stop one's own.
         for bad in [
             format!("kill {}", std::process::id()),

@@ -104,6 +104,26 @@ pub fn stops_own(part: &str, root: &Path) -> bool {
         .is_some_and(|pids| pids.iter().all(|&p| belongs(p, root)))
 }
 
+/// `kill $!`, or `kill $pid` where the same command set `pid=$!`: it stops the background job this very command
+/// started, never anything else (an end check that starts the demo server, fetches it, and stops it again).
+pub fn stops_own_job(part: &str, whole: &str) -> bool {
+    static KILL_VAR: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"^kill(?:\s+-(?:[0-9]+|[A-Z]+))*\s+"?\$(?:(!)|\{?([A-Za-z_][A-Za-z0-9_]*)\}?)"?(?:\s*(?:2>\s*/dev/null|>\s*/dev/null\s+2>&1|\|\|\s*true))?$"#,
+        )
+        .unwrap()
+    });
+    let Some(c) = KILL_VAR.captures(part.trim()) else {
+        return false;
+    };
+    if c.get(1).is_some() {
+        return true;
+    }
+    let name = regex::escape(&c[2]);
+    Regex::new(&format!(r"(?:^|[\s;&|(]){name}=\$!(?:$|[\s;&|)])"))
+        .is_ok_and(|set| set.is_match(whole))
+}
+
 #[cfg(target_os = "linux")]
 fn cwd_of(pid: u32) -> Option<std::path::PathBuf> {
     std::fs::read_link(format!("/proc/{pid}/cwd")).ok()
