@@ -2245,6 +2245,8 @@ impl<'a> Loop<'a> {
             };
             let reviewed = is_free(&model) || extra.is_some();
             let before = if reviewed { step_snap } else { None };
+            // p1: the list as the step's agent got it, to put back a step line it breaks.
+            let plan_before = self.plan().map(|p| p.text);
             if self.s.options.packets {
                 let ctx = self.context(&fresh);
                 prompt = packet_prompt(&prompt, &ctx, &test_command);
@@ -2544,6 +2546,21 @@ impl<'a> Loop<'a> {
                 // Back: the next outage is a new one, said again.
                 self.outage = None;
                 self.outage_said = false;
+            }
+            // p1: its own line broken by its agent: put back before it is judged (it was called skipped).
+            if let Some(was) = plan_before.as_deref()
+                && let Some(now) = self.plan()
+                && let Some(fixed) =
+                    restore_step_line(was, &now.text, st.number.as_deref(), &st.title)
+                && self.env.write(&file, &fixed, Some(&now.hash)).is_ok()
+            {
+                self.decide(
+                    "repaired",
+                    "Qanuvi",
+                    &format!("Step {}", key(&st)),
+                    "its line in the plan put back",
+                    "the step's agent broke the step's own line in the plan file",
+                );
             }
             if attempt.outcome == Outcome::Open
                 && let Some(after) = self.plan()

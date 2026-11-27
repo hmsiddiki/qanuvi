@@ -901,6 +901,70 @@ pub fn step_outcome(text: &str, number: Option<&str>, title: &str) -> StepOutcom
     }
 }
 
+/// p1 (Mac drive): the step's own line, broken by the step's agent (a free model's edit left only "[x]" where
+/// "- [ ] **1. Create math.js ...**" was), put back as it was before the step. Ticked when the broken line has a
+/// tick or a "- Done:" line now stands under it. The line is placed by the step's first detail line, which must be
+/// in the file once; None when the step is still found, or its place is not certain (then it stays missing).
+pub fn restore_step_line(
+    before: &str,
+    after: &str,
+    number: Option<&str>,
+    title: &str,
+) -> Option<String> {
+    let same = |s: &Step| s.number.as_deref() == number && s.title == title;
+    let now = parse_plan(after);
+    if now.steps.iter().any(same) {
+        return None;
+    }
+    let was = parse_plan(before).steps.into_iter().find(same)?;
+    let old: Vec<&str> = before.lines().collect();
+    let original = *old.get(was.line)?;
+    let anchor = *old.get(was.line + 1)?;
+    if anchor.trim().is_empty() || !anchor.starts_with(char::is_whitespace) {
+        return None;
+    }
+    let mut lines: Vec<String> = after.lines().map(String::from).collect();
+    let mut at = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| l.as_str() == anchor);
+    let (k, _) = at.next()?;
+    if at.next().is_some() {
+        return None;
+    }
+    // Its detail lines now: from the anchor to the next line that is not indented.
+    let details = lines[k..]
+        .iter()
+        .take_while(|l| l.starts_with(char::is_whitespace) && !l.trim().is_empty());
+    let done_note = details
+        .into_iter()
+        .any(|l| l.trim_start().starts_with("- Done:"));
+    let broken = (k > 0).then(|| lines[k - 1].clone());
+    let broken_is_step = k > 0 && now.steps.iter().any(|s| s.line == k - 1);
+    if broken_is_step {
+        return None;
+    }
+    let ticked = done_note
+        || broken
+            .as_deref()
+            .is_some_and(|b| b.contains("[x]") || b.contains("[X]"));
+    let line = if ticked {
+        original.replacen("[ ]", "[x]", 1)
+    } else {
+        original.to_string()
+    };
+    match broken {
+        Some(b) if !b.trim().is_empty() => lines[k - 1] = line,
+        _ => lines.insert(k, line),
+    }
+    let newline = if after.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut text = lines.join(newline);
+    if after.ends_with('\n') {
+        text.push_str(newline);
+    }
+    Some(text)
+}
+
 /// A step's number and title.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StepName {

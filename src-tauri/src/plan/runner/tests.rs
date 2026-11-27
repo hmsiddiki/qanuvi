@@ -336,3 +336,61 @@ fn run_settings_one_model_and_team() {
         true
     ));
 }
+
+/// p1 (Mac drive): a free model's edit left "[x]" where step 1's line was; the run then called the step skipped.
+#[test]
+fn a_step_line_its_agent_broke_is_put_back() {
+    let before = "## Project Tasks\n\n- [ ] **1. Create math.js with add function**\n  - Create a new file math.js.\n  - Validate: math.js exists.\n\n- [ ] **2. Update hello.js**\n  - Use math.js.\n";
+    let broken = "## Project Tasks\n\n[x]\n  - Create a new file math.js.\n  - Validate: math.js exists.\n  - Done: Created math.js.\n\n- [ ] **2. Update hello.js**\n  - Use math.js.\n";
+    let fixed = restore_step_line(
+        before,
+        broken,
+        Some("1"),
+        "Create math.js with add function",
+    )
+    .unwrap();
+    assert!(
+        fixed.contains(
+            "- [x] **1. Create math.js with add function**\n  - Create a new file math.js."
+        )
+    );
+    assert!(!fixed.contains("\n[x]\n"));
+    assert_eq!(
+        step_outcome(&fixed, Some("1"), "Create math.js with add function"),
+        StepOutcome::Done
+    );
+    assert!(
+        fixed.contains("- [ ] **2. Update hello.js**"),
+        "other steps untouched"
+    );
+
+    // The line deleted outright (a blank line left): put back, still open without a tick or Done line.
+    let deleted = "## Project Tasks\n\n\n  - Create a new file math.js.\n  - Validate: math.js exists.\n\n- [ ] **2. Update hello.js**\n  - Use math.js.\n";
+    let back = restore_step_line(
+        before,
+        deleted,
+        Some("1"),
+        "Create math.js with add function",
+    )
+    .unwrap();
+    assert_eq!(
+        step_outcome(&back, Some("1"), "Create math.js with add function"),
+        StepOutcome::Open
+    );
+
+    // Still found, or no certain place (its first detail line gone): left alone.
+    assert_eq!(
+        restore_step_line(
+            before,
+            before,
+            Some("1"),
+            "Create math.js with add function"
+        ),
+        None
+    );
+    let lost = "## Project Tasks\n\n[x]\n\n- [ ] **2. Update hello.js**\n  - Use math.js.\n";
+    assert_eq!(
+        restore_step_line(before, lost, Some("1"), "Create math.js with add function"),
+        None
+    );
+}
