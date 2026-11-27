@@ -409,7 +409,13 @@ impl Policy {
                     let p = p.trim();
                     let short: String = p.chars().take(100).collect();
                     let dots = if short.len() < p.len() { "…" } else { "" };
-                    format!("{why}: the part `{short}{dots}`")
+                    // A real run: the agent wrote `kill "$pid"`, was refused, and left its own demo server running.
+                    let hint = if crate::own_process::is_stop(p) {
+                        format!(". {}", crate::own_process::STOP_HINT)
+                    } else {
+                        String::new()
+                    };
+                    format!("{why}: the part `{short}{dots}`{hint}")
                 }
                 None => why.into(),
             });
@@ -965,18 +971,26 @@ mod tests {
         let own = p.command(&format!("kill {id}"));
         let own_quiet = p.command(&format!("kill -9 {id} 2>/dev/null; echo stopped"));
         let mixed = p.command(&format!("kill {id} && git push"));
+        // A pid file in the project names the number.
+        std::fs::write(dir.path().join("server.pid"), format!("{id}\n")).unwrap();
+        let by_file = p.command("kill \"$(cat server.pid)\"");
         let _ = mine.kill();
         let _ = mine.wait();
         assert!(!matches!(own, Verdict::Never(_)), "{own:?}");
         assert!(!matches!(own_quiet, Verdict::Never(_)), "{own_quiet:?}");
+        assert!(!matches!(by_file, Verdict::Never(_)), "{by_file:?}");
         assert!(matches!(mixed, Verdict::Never(_)), "{mixed:?}");
-        // Not this process, not init, not by a pid file.
+        // Not this process, not init, not a number Qanuvi cannot see; the refusal says how to stop one's own.
         for bad in [
             format!("kill {}", std::process::id()),
             "kill 1".to_string(),
-            "kill $(cat server.pid)".to_string(),
+            "kill \"$pid\"".to_string(),
+            "kill $(cat missing.pid)".to_string(),
         ] {
-            assert!(matches!(p.command(&bad), Verdict::Never(_)), "{bad}");
+            match p.command(&bad) {
+                Verdict::Never(why) => assert!(why.contains("give its number itself"), "{why}"),
+                v => panic!("{bad}: {v:?}"),
+            }
         }
         // On Linux and macOS a process working in another folder is not the project's.
         if cfg!(unix) {

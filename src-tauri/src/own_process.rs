@@ -6,6 +6,41 @@ use regex::Regex;
 use std::path::Path;
 use std::sync::LazyLock;
 
+/// Told to the agent with a refused stop command, so it stops its own process the way the rules let it.
+pub const STOP_HINT: &str = "To stop a process this project started (a server or watcher a step opened), give its \
+     number itself: `kill 12345` (Linux, macOS) or `taskkill /PID 12345 /F` (Windows), alone in the command, not in \
+     a variable; Qanuvi allows it when the process belongs to the project. Find the number with `ps`, `pgrep -f` or \
+     `lsof -i :PORT`.";
+
+/// Whether a command part is a stop command at all (kill, taskkill, Stop-Process), whatever it names.
+pub fn is_stop(part: &str) -> bool {
+    static STOPS: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^\s*(kill|taskkill|stop-process)\b").unwrap());
+    STOPS.is_match(part)
+}
+
+/// `$(cat FILE)` and `` `cat FILE` `` with a process number written in FILE (a pid file, absolute or in the project)
+/// put in, so `kill $(cat server.pid)` is judged by the number it names.
+fn with_pid_files(part: &str, root: &Path) -> String {
+    static CAT: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#""?(?:\$\(\s*cat\s+([^\s)`"]+)\s*\)|`\s*cat\s+([^\s)`"]+)\s*`)"?"#).unwrap()
+    });
+    CAT.replace_all(part, |c: &regex::Captures| {
+        let file = c.get(1).or_else(|| c.get(2)).map_or("", |m| m.as_str());
+        let path = if Path::new(file).is_absolute() {
+            Path::new(file).to_path_buf()
+        } else {
+            root.join(file)
+        };
+        std::fs::read_to_string(&path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty() && s.chars().all(|ch| ch.is_ascii_digit()))
+            .unwrap_or_else(|| c[0].to_string())
+    })
+    .into_owned()
+}
+
 /// The process ids a stop command names, when the whole command is only that: `kill [-SIG] <pid>...`,
 /// `taskkill [/F] [/T] /PID <pid>...`, `Stop-Process [-Id] <pid>[,<pid>] [-Force]`, with an optional
 /// `2>/dev/null` or `>/dev/null 2>&1` at the end. None for anything else (a name, a pattern, a variable).
@@ -65,7 +100,8 @@ pub fn belongs(pid: u32, root: &Path) -> bool {
 
 /// A stop command part whose every process belongs to the project or the run.
 pub fn stops_own(part: &str, root: &Path) -> bool {
-    stop_pids(part).is_some_and(|pids| pids.iter().all(|&p| belongs(p, root)))
+    stop_pids(&with_pid_files(part, root))
+        .is_some_and(|pids| pids.iter().all(|&p| belongs(p, root)))
 }
 
 #[cfg(target_os = "linux")]
