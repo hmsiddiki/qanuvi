@@ -5322,6 +5322,26 @@ and ST1 has been driven again on the finished build.
     of a kept original to confirm the failing tests (cheap, correct answers), plus the q2/q3 cases now fixed. Tool
     calls stay in Headroom's range except built in 4 (196). Next for 24w: one more set of 3 after q3 with a bigger
     mixed plan (owner's choice), then the owner decides whether "All models" may replace Headroom.
+  - Measurement 5, bigger mixed plan (2026-11-27 ~13:40-14:20, owner: "do as you recommend"; build tb3 = c8d237c with
+    q3; generator E:/qc-scratch/o3/make-bench3.mjs: round 2's project plus a lint run with 1,480 warnings and 2
+    errors (run 5 times across the plan, so repeats happen), a 376 KB JSON printout, a 39 KB HTML report, and a
+    move of formatMoney into its own file; 14 steps on Haiku; copies in E:/qc-scratch/o3/bench4; end state checked
+    by check3.sh: tests, lint 0 errors and 1,480 warnings, no computeTotal, src/format.js, refund, and every fact in
+    NOTES.md (both lint error lines, the warning count, the log ERROR line, gold/silver/bronze 388/786/826, 25 at
+    score 100, id 1338, Q3 97,310 in Section 41)):
+    | run | steps | input | cache read | cost | time | tool calls | retrieve |
+    |---|---|---|---|---|---|---|---|
+    | Headroom 1 / 2 / 3 | 14 / 14 / 14 | 524k / 897k / 913k | 9.33M / 14.16M / 15.89M | $0.67 / $1.35 / $1.46 | 506 / 574 / 627 s | 170 / 209 / 241 | 0 |
+    | built in 1 / 2 / 3 | 14 / 14 / 14 | 558k / 392k / 431k | 10.61M / 9.85M / 11.45M | $0.73 / $0.69 / $0.70 | 499 / 412 / 466 s | 193 / 145 / 177 | 1 / 1 / 0 |
+    | mean Headroom / built in | | 778k / 460k (-41%) | 13.1M / 10.6M | $1.16 / $0.71 (-39%) | 569 / 459 s | 207 / 172 | |
+    All six correct on every check; no failed, held or retried step. Headroom's log: 545 requests, 33.4M tokens sent,
+    3.8M saved (11.4%); it left the lint, JSON and HTML outputs mostly whole, and its runs needed more turns. Built in
+    was also steadier (cost $0.69-$0.73 against $0.67-$1.46). With measurement 4 this is the first clear result:
+    on long, mixed output the built-in compression saves more than Headroom with no loss of correctness or
+    continuity; on round 2 (test output and logs only) it is level. For the owner: whether "All models" may now
+    replace Headroom on This PC (Settings, Agents, Built-in compression), or a longer real plan first.
+    Found on the way: c1 `qanuvi-master plan follow` refused the name the terminal itself shows for two same-named
+    projects ("bi1 (bench4)"); find_project now takes the shown name too (test added).
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:

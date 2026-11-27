@@ -354,8 +354,16 @@ pub fn find_project<'a>(list: &'a [Value], which: &str) -> Result<&'a Value, Str
                 .is_some_and(|n| n.trim().eq_ignore_ascii_case(which))
         })
         .collect();
+    // The name as this terminal shows it when two projects share one ("bi1 (bench4)", pn1): typed back, it is that one.
+    let shown = || {
+        list.iter().find(|p| {
+            super::cli_plan::shown_name(list, p["id"].as_str().unwrap_or(""))
+                .eq_ignore_ascii_case(which)
+        })
+    };
     match named.as_slice() {
         [p] => Ok(p),
+        _ if let Some(p) = shown() => Ok(p),
         [] => Err(format!(
             "No project named \"{which}\". See: qanuvi-master projects list"
         )),
@@ -513,6 +521,19 @@ mod tests {
             find_project(&list, "nope")
                 .unwrap_err()
                 .contains("No project")
+        );
+        // The name as the terminal shows two same-named projects, typed back, finds that one.
+        let twins = vec![
+            json!({"id": "a", "name": "bi1", "path": "E:\\o3\\bench3\\bi1"}),
+            json!({"id": "b", "name": "bi1", "path": "E:\\o3\\bench4\\bi1"}),
+        ];
+        let shown = super::super::cli_plan::shown_name(&twins, "b");
+        assert_eq!(shown, "bi1 (bench4)");
+        assert_eq!(find_project(&twins, &shown).unwrap()["id"], "b");
+        assert!(
+            find_project(&twins, "bi1")
+                .unwrap_err()
+                .contains("2 projects")
         );
     }
 }
