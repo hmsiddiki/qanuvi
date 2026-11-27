@@ -1774,6 +1774,15 @@ impl Master {
     fn install_unpacked(&self) -> Result<(), String> {
         let (home, own) = linux_install_home()?;
         let app = crate::sign_in_start::app_exe()?;
+        // MU3: on a Mac, Qanuvi.app moves into an Applications folder.
+        if cfg!(target_os = "macos") {
+            let from = mac_outside_applications(&app, &home)
+                .ok_or("Qanuvi is in the Applications folder already.")?;
+            let to = mac_applications_dir(&home);
+            return self.put_whole_app_in(|master, app, background| {
+                Ok(mac_move_script(&[master, app], &from, &to, background))
+            });
+        }
         let from = unpacked_copy(&app, &home)
             .ok_or("This Qanuvi is not an unpacked copy, so there is nothing to install.")?;
         self.put_whole_app_in(|master, app, background| {
@@ -1786,7 +1795,8 @@ impl Master {
     /// s18: Qanuvi started on Linux from an unpacked tarball has no menu entry and no `qanuvi://` link handler until
     /// its first update. This PC's master asks once, in the Inbox, whether to install it for this user.
     fn offer_home_install(&self) {
-        if !cfg!(target_os = "linux") || !self.app_data {
+        let mac = cfg!(target_os = "macos");
+        if !(cfg!(target_os = "linux") || mac) || !self.app_data {
             return;
         }
         let asked = self.dir.join(HOME_INSTALL_ASKED);
@@ -1799,26 +1809,51 @@ impl Master {
         let Ok(app) = crate::sign_in_start::app_exe() else {
             return;
         };
-        let Some(from) = unpacked_copy(&app, &home) else {
+        // MU3: on a Mac, a Qanuvi.app outside the Applications folders (the disk image, Downloads, macOS's
+        // read-only copy of a downloaded app) cannot update in place.
+        let from = if mac {
+            mac_outside_applications(&app, &home)
+        } else {
+            unpacked_copy(&app, &home)
+        };
+        let Some(from) = from else {
             return;
         };
         if std::fs::write(&asked, b"").is_err() {
             return;
         }
+        let (title, text, label) = if mac {
+            (
+                "Move Qanuvi to Applications?",
+                format!(
+                    "Qanuvi runs from {}, outside the Applications folder, so updates cannot go in there and it \
+                     may not be found in Launchpad. Moved, it updates in place. No password is needed. Qanuvi closes \
+                     and opens again from Applications; the copy here (or the disk image) can be removed afterwards.",
+                    from.display()
+                ),
+                "Move to Applications",
+            )
+        } else {
+            (
+                "Install Qanuvi for this user?",
+                format!(
+                    "Qanuvi runs from the unpacked folder {}. Installed, it gets an entry in the app menu, opens Qanuvi \
+                     links, and updates in place. No password is needed. Qanuvi closes and starts again from its new \
+                     place; the unpacked folder can be deleted afterwards.",
+                    from.display()
+                ),
+                "Install for this user",
+            )
+        };
         let item = crate::inbox::NewItem {
             kind_of: "answer".into(),
             kind: "update".into(),
-            title: "Install Qanuvi for this user?".into(),
-            text: format!(
-                "Qanuvi runs from the unpacked folder {}. Installed, it gets an entry in the app menu, opens Qanuvi links, \
-                 and updates in place. No password is needed. Qanuvi closes and starts again from its new place; the \
-                 unpacked folder can be deleted afterwards.",
-                from.display()
-            ),
+            title: title.into(),
+            text,
             key: Some(HOME_INSTALL_KEY.into()),
             open: None,
             form: Some(json!({"choices": [
-                {"id": "install", "label": "Install for this user"},
+                {"id": "install", "label": label},
                 {"id": "later", "label": "Not now"}
             ]})),
             source: Some(json!({"kind": HOME_INSTALL_KEY})),
@@ -1852,7 +1887,12 @@ impl Master {
                     let note = crate::inbox::NewItem {
                         kind_of: "problem".into(),
                         kind: "update".into(),
-                        title: "Qanuvi was not installed for this user".into(),
+                        title: if cfg!(target_os = "macos") {
+                            "Qanuvi was not moved to Applications"
+                        } else {
+                            "Qanuvi was not installed for this user"
+                        }
+                        .into(),
                         text: e,
                         key: Some(format!("{HOME_INSTALL_KEY}-failed")),
                         open: None,
@@ -1987,12 +2027,12 @@ pub(crate) fn mac_app_of_helper(master: &Path) -> Option<PathBuf> {
 /// front; a program started straight by a background process opens behind the app in use. Arguments added after
 /// this go to the app (`open --args`). Needs the master in its own helper app (`mac_helper_master`).
 fn app_command(exe: &Path) -> std::process::Command {
-    if cfg!(target_os = "macos") {
-        if let Some(bundle) = app_bundle(exe) {
-            let mut c = std::process::Command::new("/usr/bin/open");
-            c.arg("-a").arg(bundle).arg("--args");
-            return c;
-        }
+    if cfg!(target_os = "macos")
+        && let Some(bundle) = app_bundle(exe)
+    {
+        let mut c = std::process::Command::new("/usr/bin/open");
+        c.arg("-a").arg(bundle).arg("--args");
+        return c;
     }
     std::process::Command::new(exe)
 }
@@ -2101,9 +2141,9 @@ done
 app=@BUNDLE@
 new="$app.new"
 rm -rf "$new"
-if ! { mkdir -p "$new" && tar -xzf @TARBALL@ -C "$new" && [ -x "$new/Qanuvi.app/Contents/MacOS/qanuvi" ]; }; then
+if ! { mkdir -p "$new" && @UNPACK@ && [ -x "$new/Qanuvi.app/Contents/MacOS/qanuvi" ]; }; then
   rm -rf "$new"
-  open -a "$app" @ARGS@ >/dev/null 2>&1
+  open -a @OLD_APP@ @ARGS@ >/dev/null 2>&1
   exit 1
 fi
 xattr -dr com.apple.quarantine "$new/Qanuvi.app" >/dev/null 2>&1
@@ -2122,11 +2162,32 @@ pub fn mac_install_script(
     bundle: &Path,
     background: bool,
 ) -> String {
+    let unpack = format!("tar -xzf {} -C \"$new\"", shell_quote(tarball));
+    mac_put_in_script(programs, &unpack, bundle, bundle, background)
+}
+
+/// MU3: the same helper moving Qanuvi into an Applications folder: the running `from` bundle (the disk image,
+/// Downloads, macOS's read-only translocated copy) is copied to `<to_dir>/Qanuvi.app` (one there before kept as
+/// .prev), and Qanuvi opens again from there. A copy that fails opens the old one again.
+pub fn mac_move_script(programs: &[&Path], from: &Path, to_dir: &Path, background: bool) -> String {
+    let unpack = format!("ditto {} \"$new/Qanuvi.app\"", shell_quote(from));
+    let bundle = to_dir.join("Qanuvi.app");
+    mac_put_in_script(programs, &unpack, &bundle, from, background)
+}
+
+fn mac_put_in_script(
+    programs: &[&Path],
+    unpack: &str,
+    bundle: &Path,
+    old_app: &Path,
+    background: bool,
+) -> String {
     let list: Vec<String> = programs.iter().map(|p| shell_quote(p)).collect();
     MAC_INSTALL
         .replace("@PROGRAMS@", &list.join(" -e "))
         .replace("@BUNDLE@", &shell_quote(bundle))
-        .replace("@TARBALL@", &shell_quote(tarball))
+        .replace("@UNPACK@", unpack)
+        .replace("@OLD_APP@", &shell_quote(old_app))
         .replace(
             "@ARGS@",
             if background {
@@ -2135,6 +2196,36 @@ pub fn mac_install_script(
                 ""
             },
         )
+}
+
+/// MU3: the Qanuvi.app this `app` runs from when it is not in an Applications folder (/Applications or the user's
+/// ~/Applications), or None (there already, a test build in the source tree, or no app bundle).
+pub fn mac_outside_applications(app: &Path, home: &Path) -> Option<PathBuf> {
+    if crate::data_location::from_source_path(app) {
+        return None;
+    }
+    let bundle = app_bundle(app)?;
+    let parent = bundle.parent()?;
+    let in_apps = parent == Path::new("/Applications") || parent == home.join("Applications");
+    (!in_apps).then_some(bundle)
+}
+
+/// MU3: where Qanuvi.app goes: /Applications when this user may write there (administrators can, without a
+/// password), else the user's own ~/Applications.
+fn mac_applications_dir(home: &Path) -> PathBuf {
+    let system = Path::new("/Applications");
+    let probe = system.join(format!(".qanuvi-write-check-{}", std::process::id()));
+    let writable = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+        .is_ok();
+    let _ = std::fs::remove_file(&probe);
+    if writable {
+        system.to_path_buf()
+    } else {
+        home.join("Applications")
+    }
 }
 
 /// The Linux helper (L2), as `sh -c` runs it; the @NAMES@ are filled in by [`linux_install_script`].
@@ -2535,12 +2626,11 @@ fn start_service(dir: &Path, after: Option<u32>) -> Result<(), String> {
 pub fn master_exe_beside_me() -> Result<PathBuf, String> {
     let exe = crate::data_location::current_exe().map_err(|e| e.to_string())?;
     // m1 (Mac): the master is its own helper app inside Qanuvi.app.
-    if cfg!(target_os = "macos") {
-        if let Some(helper) = app_bundle(&exe).map(|b| mac_helper_master(&b)) {
-            if helper.is_file() {
-                return Ok(helper);
-            }
-        }
+    if cfg!(target_os = "macos")
+        && let Some(helper) = app_bundle(&exe).map(|b| mac_helper_master(&b))
+        && helper.is_file()
+    {
+        return Ok(helper);
     }
     let master = exe.with_file_name(if cfg!(windows) {
         "qanuvi-master.exe"
@@ -2986,6 +3076,91 @@ mod tests {
                 .contains("new")
         );
         assert!(!d.path().join("Qanuvi.app.new").exists());
+    }
+
+    /// MU3: only a Qanuvi.app outside both Applications folders is offered the move; test builds never.
+    #[test]
+    fn mac_outside_applications_finds_only_stray_copies() {
+        let home = Path::new("/Users/u");
+        let exe = |b: &str| PathBuf::from(format!("{b}/Contents/MacOS/qanuvi"));
+        assert_eq!(
+            mac_outside_applications(&exe("/Volumes/Qanuvi/Qanuvi.app"), home),
+            Some(PathBuf::from("/Volumes/Qanuvi/Qanuvi.app"))
+        );
+        assert!(mac_outside_applications(&exe("/Users/u/Downloads/Qanuvi.app"), home).is_some());
+        assert!(
+            mac_outside_applications(
+                &exe("/private/var/folders/x/AppTranslocation/A/d/Qanuvi.app"),
+                home
+            )
+            .is_some()
+        );
+        assert_eq!(
+            mac_outside_applications(&exe("/Applications/Qanuvi.app"), home),
+            None
+        );
+        assert_eq!(
+            mac_outside_applications(&exe("/Users/u/Applications/Qanuvi.app"), home),
+            None
+        );
+        assert_eq!(
+            mac_outside_applications(
+                &exe("/Users/u/src/q/target/release/bundle/macos/Qanuvi.app"),
+                home
+            ),
+            None
+        );
+        assert_eq!(
+            mac_outside_applications(Path::new("/usr/local/bin/qanuvi"), home),
+            None
+        );
+        let s = mac_move_script(
+            &[],
+            Path::new("/Volumes/Q/Qanuvi.app"),
+            Path::new("/Applications"),
+            false,
+        );
+        assert!(s.contains("ditto '/Volumes/Q/Qanuvi.app' \"$new/Qanuvi.app\""));
+        let to = shell_quote(&Path::new("/Applications").join("Qanuvi.app"));
+        assert!(s.contains(&format!("app={to}")));
+        assert!(
+            s.contains("open -a '/Volumes/Q/Qanuvi.app'"),
+            "a failed copy opens the old one"
+        );
+    }
+
+    /// MU3, run for real on a Mac: the running copy is copied into the Applications folder given.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_move_script_copies_the_bundle() {
+        let d = tempfile::tempdir().unwrap();
+        let from = d.path().join("Downloads/Qanuvi.app");
+        let macos = from.join("Contents/MacOS");
+        std::fs::create_dir_all(&macos).unwrap();
+        std::fs::write(macos.join("qanuvi"), "#!/bin/sh\necho moved\n").unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(macos.join("qanuvi"), std::fs::Permissions::from_mode(0o755))
+            .unwrap();
+        let apps = d.path().join("Applications");
+        let nobody = d.path().join("nobody-runs-this");
+        let script = format!(
+            "open() {{ :; }}\n{}",
+            mac_move_script(&[&nobody], &from, &apps, false)
+        );
+        assert!(
+            std::process::Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let now = std::fs::read_to_string(apps.join("Qanuvi.app/Contents/MacOS/qanuvi")).unwrap();
+        assert!(now.contains("moved"));
+        assert!(
+            from.exists(),
+            "the copy it came from stays (a disk image cannot be changed)"
+        );
     }
 
     /// m1: the master's helper app inside Qanuvi.app, and the way back to the app's program.

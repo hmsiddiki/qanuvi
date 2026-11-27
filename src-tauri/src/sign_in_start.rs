@@ -34,10 +34,10 @@ pub fn app_exe() -> Result<PathBuf, String> {
         return Ok(me);
     }
     // m1 (Mac): a master in its helper app inside Qanuvi.app.
-    if cfg!(target_os = "macos") {
-        if let Some(app) = crate::master::mac_app_of_helper(&me).filter(|a| a.is_file()) {
-            return Ok(app);
-        }
+    if cfg!(target_os = "macos")
+        && let Some(app) = crate::master::mac_app_of_helper(&me).filter(|a| a.is_file())
+    {
+        return Ok(app);
     }
     let app = me.with_file_name(if cfg!(windows) {
         "qanuvi.exe"
