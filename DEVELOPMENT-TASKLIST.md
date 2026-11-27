@@ -2081,6 +2081,11 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    0.1.51 PUBLISHED 5d8f66f tag v0.1.51 (2026-11-27, owner yes; backup channel-before-0.1.51; 6 files online). Owner's
+      compression rule: Built-in compression Off by default until proven; Free models = Qanuvi agent only (Claude Code
+      keeps Headroom); All models = every model through Qanuvi instead of Headroom (eb5467b). Laptop and Mac updated
+      themselves 0.1.50 -> 0.1.51 (first real Mac update through the channel; .prev kept). Next: 24w repeats (3 runs
+      each, Headroom with --log-messages on a scratch port) in a fresh session.
     0.1.50 PUBLISHED c9f152c tag v0.1.50 (2026-11-27 ~10:10, owner "publish anyway"; first darwin-aarch64 build; backup
       E:/Backups/qanuvi/channel-before-0.1.50; 6 files online, sizes match). Mac: the published tarball installed into
       /Applications (real copy, real data folder, owner keeps it). Laptop: updated itself 0.1.48 -> 0.1.50 (.prev kept).
