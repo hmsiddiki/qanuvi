@@ -16,7 +16,7 @@
   import ClaudeCodeSetup from "./ClaudeCodeSetup.svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { errorText } from "$lib/api";
-  import { localVerdict, recommend } from "$lib/agents/guides";
+  import { localVerdict, noneAnswered, recommend } from "$lib/agents/guides";
   import { brain } from "$lib/stores/brain.svelte";
   import { guides } from "$lib/stores/guides.svelte";
   import { omni } from "$lib/stores/omniroute.svelte";
@@ -183,9 +183,15 @@
       await brain.find(p);
       if (brain.errors[p.id]) throw new Error(brain.errors[p.id]);
       const picks = recommend(brain.found[p.id] ?? [], {}, 5);
+      let used = 0;
       for (const c of picks)
-        if (await brain.probe(p, c.model as Parameters<typeof brain.probe>[1]))
+        if (await brain.probe(p, c.model as Parameters<typeof brain.probe>[1])) {
           brain.use(c.model as Parameters<typeof brain.use>[0]);
+          used++;
+        }
+      // w2 (Windows drive): every test failed (OpenRouter's free daily limit was used up) and the wizard went on to
+      // "Done ... with 0 models". Said instead, with the reason, once.
+      if (picks.length && !used) throw new Error(noneAnswered(picks.map((c) => brain.probes[c.model.id]?.text ?? "")));
     });
     if (!error) next();
   }
@@ -391,7 +397,8 @@
     </p>
   {/if}
   {#if shownError(error)}<p class="error small">{shownError(error)}</p>{/if}
-  {#if shownError(omni.error)}<p class="error small">{shownError(omni.error)}</p>{/if}
+  <!-- w2: OmniRoute's own error only when it was chosen (it showed after OmniRoute was unticked). -->
+  {#if want.omniroute && shownError(omni.error)}<p class="error small">{shownError(omni.error)}</p>{/if}
 </div>
 
 <style>

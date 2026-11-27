@@ -554,3 +554,13 @@ export function localVerdict(
     text: `Models that fit here (like ${coder.model.name}) answer questions and make small edits for free and offline, but they are not good enough for real coding work. For that, Qanuvi uses the free online models (Claude through OmniRoute, OpenRouter).`,
   };
 }
+
+/**
+ * w2 (Windows drive): what the setup says when none of the free models it tested answered. Their failures ("did not
+ * answer: ...") are said once each, not once per model; the daily limit text from the core is kept as it is.
+ */
+export function noneAnswered(failures: string[]): string {
+  const reasons = [...new Set(failures.map((f) => f.replace(/^did not answer:\s*/, "").trim()).filter(Boolean))];
+  const why = reasons.length ? ` ${reasons.join(" · ")}` : "";
+  return `None of the free models answered the test, so none was added.${why} Try again later, or add another provider.`;
+}

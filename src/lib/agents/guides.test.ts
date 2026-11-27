@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILT_IN_GUIDES,
   changes,
+  noneAnswered,
   jsonIn,
   parseGuides,
   recommend,
@@ -158,5 +159,18 @@ describe("telling the truth about local models", () => {
         .level,
     ).toBe("coding");
     expect(localVerdict({ ramGb: 1, gpu: null, os: "linux", arch: "x86_64" }).level).toBe("none");
+  });
+});
+
+// w2 (Windows drive): the free AI setup went on to "Done ... with 0 models" when every test failed.
+describe("noneAnswered", () => {
+  it("says why once, not once per model", () => {
+    const limit = "OpenRouter's free daily limit is used up; it starts again tomorrow";
+    const text = noneAnswered([`did not answer: ${limit}`, `did not answer: ${limit}`, ""]);
+    expect(text).toContain("None of the free models answered the test");
+    expect(text.split(limit).length - 1).toBe(1);
+    expect(noneAnswered([])).toBe(
+      "None of the free models answered the test, so none was added. Try again later, or add another provider.",
+    );
   });
 });
