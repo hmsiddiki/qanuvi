@@ -5239,6 +5239,17 @@ and ST1 has been driven again on the finished build.
     | grep -rn "fn " (1500 matches, 56 files) | 110.2k | 87.2k (21%, 225 ms) | 9.8k (91%, 5 ms), all files named |
     Not measured yet: steps passed on a real plan run with each (the end-to-end half of 24w), retrieve calls made,
     cache reads. Note: Headroom's library mode leaves logs almost whole; its proxy may do more (its `inspect` view).
+  - Measurement 2, end to end (2026-11-27, 0.1.50 test build on This PC, Claude Code, plan runs headless with
+    --no-check, generators E:/qc-scratch/o3/make-bench.mjs and make-bench2.mjs, totals by run_totals.py):
+    Round 1 (7 steps, Sonnet, small outputs: the agent trimmed with grep/tail itself): Headroom 7/7, in 42.9k,
+    cache 520k, out 11.8k, $0.36, 102 s; built in 7/7, in 41.2k, cache 556k, out 9.8k, $0.33, 86 s. A draw: the
+    built-in compressor shortened nothing (store unchanged).
+    Round 2 (10 steps, Haiku, whole test suite 2,914 lines, whole log, whole JSON): Headroom 10/10, in 534k, cache
+    8.70M, out 63k, $0.74, 413 s; built in 10/10, in 703k (+32%), cache 9.27M, out 60k, $1.00, 394 s; 7 originals
+    kept. Both copies ended equally correct. HEADROOM WON ROUND 2 by about a quarter on cost, the opposite of the
+    library-mode numbers. One run each (agent behaviour varies a lot per step); Headroom's proxy has no message log
+    here, so its per-request work could not be inspected. Next for 24w: repeat each side 3 times, compare per step,
+    run Headroom with --log-messages on a scratch port to see what it does to test-runner output. Owner keeps Headroom.
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:
