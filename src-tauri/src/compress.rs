@@ -9,7 +9,8 @@
 //! - error lines (error, fail, fatal, panic, exception, traceback, denied ...) are kept as they are, with a line on
 //!   each side;
 //! - small output (under [`MIN_CHARS`]) and code read from files are never touched: an agent edits code by its exact
-//!   text;
+//!   text (a Read of a command's saved output, [`is_saved_output`], is output, not code);
+//! - a failing test (TAP "not ok", expected/got, assertions) counts as an error line;
 //! - the result says what was left out and how to get it back, in one line a model understands.
 
 use std::path::{Path, PathBuf};
@@ -125,17 +126,63 @@ pub fn is_error_line(line: &str) -> bool {
         "abort",
         "critical",
         "warning",
+        // Test runners: TAP's "not ok", the expected/got pair under it, assertions, and the marks jest and
+        // others print for a failed test. A failing test must never be cut from a run's output.
+        "not ok",
+        "expected",
+        "assert",
+        "\u{2715}",
+        "\u{2717}",
+        "\u{2718}",
     ]
     .iter()
     .any(|w| l.contains(w))
+}
+
+/// A file read that is really an earlier command's output: Claude Code saves a big output to
+/// `~/.claude/projects/<project>/<session>/tool-results/<id>.txt` and the agent reads it back with Read. It is
+/// command output (a test run, a log), not code the agent edits, so it is judged by its content.
+pub fn is_saved_output(hint: &Hint) -> bool {
+    let tool = hint.tool.to_ascii_lowercase();
+    let path = hint.path.replace('\\', "/").to_ascii_lowercase();
+    tool == "read" && path.contains("/.claude/projects/") && path.contains("/tool-results/")
+}
+
+/// A Read's text without its line numbers ("     12\tok 12 - ..."), with the first and last number, when nearly every
+/// line has one (at least 9 in 10); None otherwise, and the text is left as it is.
+fn without_line_numbers(text: &str) -> Option<(String, u64, u64)> {
+    let mut out = String::with_capacity(text.len());
+    let (mut numbered, mut total) = (0usize, 0usize);
+    let (mut first, mut last) = (None, 0u64);
+    for line in text.lines() {
+        total += 1;
+        let t = line.trim_start();
+        let digits = t.bytes().take_while(u8::is_ascii_digit).count();
+        let rest = &t[digits..];
+        let body = rest
+            .strip_prefix('\t')
+            .or_else(|| rest.strip_prefix('\u{2192}'));
+        match (digits > 0, body, t[..digits].parse::<u64>()) {
+            (true, Some(body), Ok(n)) => {
+                numbered += 1;
+                first.get_or_insert(n);
+                last = n;
+                out.push_str(body);
+            }
+            _ => out.push_str(line),
+        }
+        out.push('\n');
+    }
+    (total > 0 && numbered * 10 >= total * 9).then(|| (out, first.unwrap_or(1), last))
 }
 
 /// The router: what kind of text this is.
 pub fn kind_of(text: &str, hint: &Hint) -> Kind {
     let tool = hint.tool.to_ascii_lowercase();
     let path = hint.path.to_ascii_lowercase();
-    // Files read for work: code and data an agent may edit stay whole (a .json file read is code here too).
-    if tool == "read" || tool.ends_with("read_file") || tool == "view" {
+    // Files read for work: code and data an agent may edit stay whole (a .json file read is code here too). A read of
+    // an earlier command's saved output is not code: it goes on to be judged by its content.
+    if (tool == "read" || tool.ends_with("read_file") || tool == "view") && !is_saved_output(hint) {
         return Kind::Code;
     }
     if tool == "grep" || tool == "search" || tool.contains("search") || tool.contains("find") {
@@ -208,6 +255,60 @@ fn looks_like_match(line: &str) -> bool {
 
 /// Compresses one tool output. Originals of anything left out go to `store` (when given) for retrieval.
 pub fn compress(text: &str, hint: &Hint, store: Option<&Store>) -> Compressed {
+    // A saved command output read back: compressed without the Read's line numbers, and said where it came from, so
+    // the agent knows which lines of the saved file it has seen. Not worth it: the read is sent as it came.
+    if is_saved_output(hint) {
+        let Some((plain, first, last)) = without_line_numbers(text) else {
+            return Compressed::unchanged(text, Kind::Code);
+        };
+        let as_output = Hint {
+            tool: "saved-output",
+            ..hint.clone()
+        };
+        let mut c = compress_plain(&plain, &as_output, store);
+        if c.after >= c.before {
+            return Compressed::unchanged(text, c.kind);
+        }
+        // 24w drive: an agent reads a big saved output in parts (lines 1-2000, then the next part). A retrieval of
+        // one part searched only that part ("No line holds \"not ok\"" while a failure sat in the next one), so the
+        // whole saved file is what retrieval gives back; when it cannot be read, the note says it is this part only.
+        if let Some(chunk_id) = c.id.clone() {
+            let whole = std::fs::read_to_string(hint.path).ok();
+            let whole_id = whole.as_ref().and_then(|w| {
+                let id = id_of(w);
+                store.and_then(|s| s.put(&id, w).is_ok().then_some(id))
+            });
+            let note = match (&whole_id, &whole) {
+                (Some(id), Some(w)) => format!(
+                    "({RETRIEVE_TOOL} id \"{id}\" gives the whole saved output, all {} lines, not only this part; \
+                     or only its lines matching a search)",
+                    w.lines().count()
+                ),
+                _ => format!(
+                    "({RETRIEVE_TOOL} id \"{chunk_id}\" gives lines {first}-{last} only, or those of them matching a \
+                     search; Read the file at other offsets for the rest)"
+                ),
+            };
+            c.text = c.text.replace(&retrieve_note(&chunk_id), &note);
+            if whole_id.is_some() {
+                c.id = whole_id;
+            }
+        }
+        let out = format!(
+            "[Lines {first}-{last} of {}, a command's saved output, shortened for reading:]\n{}",
+            hint.path, c.text
+        );
+        return Compressed {
+            after: out.len(),
+            text: out,
+            before: text.len(),
+            ..c
+        };
+    }
+    compress_plain(text, hint, store)
+}
+
+fn compress_plain(text: &str, hint: &Hint, store: Option<&Store>) -> Compressed {
     let kind = kind_of(text, hint);
     if text.len() < MIN_CHARS || kind == Kind::Code || kind == Kind::Text {
         return Compressed::unchanged(text, kind);
@@ -225,11 +326,22 @@ pub fn compress(text: &str, hint: &Hint, store: Option<&Store>) -> Compressed {
         // Worth it only when it saves at least a fifth.
         Some(out) if out.len() * 5 < text.len() * 4 => {
             let kept = store.map(|s| s.put(&id, text).is_ok()).unwrap_or(false);
-            let out = if kept {
-                out
-            } else {
+            let out = if !kept {
                 // Nothing to retrieve from: the note must not promise it.
                 out.replace(&retrieve_note(&id), "(the rest was left out)")
+            } else if let Some(gone) = cut_by_agent(text) {
+                // 24w drive: the agent's own tool had already cut the middle ("... [20012 characters truncated] ..."),
+                // so retrieval cannot give "the whole output": said plainly, with the way to see all of it.
+                out.replace(
+                    &retrieve_note(&id),
+                    &format!(
+                        "({RETRIEVE_TOOL} id \"{id}\" gives back what arrived here, or its lines matching a search; \
+                         the tool that ran the command had already left out {gone} characters in the middle, so to \
+                         see all of it, run the command again with its output sent to a file and read that file)"
+                    ),
+                )
+            } else {
+                out
             };
             Compressed {
                 after: out.len(),
@@ -241,6 +353,17 @@ pub fn compress(text: &str, hint: &Hint, store: Option<&Store>) -> Compressed {
         }
         _ => Compressed::unchanged(text, kind),
     }
+}
+
+/// How many characters the agent's own tool cut from the middle of an output before it reached Qanuvi, when it says
+/// so: Claude Code's Bash writes a line "... [20012 characters truncated] ...".
+fn cut_by_agent(text: &str) -> Option<u64> {
+    text.lines().find_map(|l| {
+        let l = l.trim();
+        let rest = l.strip_prefix("... [")?;
+        let (n, tail) = rest.split_once(' ')?;
+        (tail == "characters truncated] ...").then(|| n.parse().ok())?
+    })
 }
 
 /// The id of an original: its content hash (the same text always gets the same id).

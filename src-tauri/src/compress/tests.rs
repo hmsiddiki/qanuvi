@@ -253,3 +253,161 @@ fn the_built_in_compression_is_off_until_chosen() {
             && !looks_like_headroom("https://api.anthropic.com")
     );
 }
+
+/// A test run like the 24w benchmark's: 2,900 passing lines with three failures in the middle.
+fn build_test_run() -> String {
+    let mut s = String::from("> bench@1.0.0 test\n> node test/run.js\n\n");
+    for n in 1..=2900 {
+        if [700, 1500, 2300].contains(&n) {
+            s.push_str(&format!(
+                "not ok {n} - total of {n} items\n  expected: {}\n  got: {}\n",
+                n * 2,
+                n * 3
+            ));
+        } else {
+            s.push_str(&format!("ok {n} - check {n} ({} ms)\n", (n * 7) % 13));
+        }
+    }
+    s.push_str("# 2900 tests, 3 failed\n");
+    s
+}
+
+#[test]
+fn a_test_run_keeps_every_failing_test_and_its_expected_and_got_lines() {
+    let run = build_test_run();
+    let c = compress(
+        &run,
+        &Hint {
+            tool: "Bash",
+            command: "npm test",
+            ..Default::default()
+        },
+        None,
+    );
+    assert!(c.after * 5 < c.before, "{} -> {}", c.before, c.after);
+    for n in [700, 1500, 2300] {
+        assert!(
+            c.text.contains(&format!("not ok {n} - total of {n} items")),
+            "{n}"
+        );
+        assert!(c.text.contains(&format!("  expected: {}", n * 2)), "{n}");
+        assert!(c.text.contains(&format!("  got: {}", n * 3)), "{n}");
+    }
+    assert!(c.text.contains("# 2900 tests, 3 failed"));
+}
+
+#[test]
+fn a_saved_command_output_read_back_is_shortened_but_a_code_read_is_not() {
+    let (_d, s) = store();
+    let run = build_test_run();
+    // Claude Code's Read: "     12\t" before each line.
+    let numbered: String = run
+        .lines()
+        .enumerate()
+        .map(|(i, l)| format!("{:>6}\t{l}\n", i + 1))
+        .collect();
+    let saved = Hint {
+        tool: "Read",
+        path: r"C:\Users\u\.claude\projects\E--p\0a1b\tool-results\b0inhke.txt",
+        ..Default::default()
+    };
+    assert!(is_saved_output(&saved));
+    let c = compress(&numbered, &saved, Some(&s));
+    assert!(c.after * 5 < c.before, "{} -> {}", c.before, c.after);
+    let last = run.lines().count();
+    assert!(
+        c.text.starts_with(&format!("[Lines 1-{last} of ")),
+        "{}",
+        &c.text[..120]
+    );
+    for n in [700, 1500, 2300] {
+        assert!(
+            c.text.contains(&format!("not ok {n} - total of {n} items")),
+            "{n}"
+        );
+    }
+    // The original (without the numbers) comes back whole.
+    assert_eq!(s.get(c.id.as_ref().unwrap(), None).unwrap(), run);
+    // Deterministic, like every compressor.
+    assert_eq!(compress(&numbered, &saved, Some(&s)).text, c.text);
+    // Not readable here: the note says retrieval gives this part only.
+    assert!(
+        c.text.contains(&format!("gives lines 1-{last} only")),
+        "{}",
+        c.text
+    );
+    // A part of a saved file that is on disk: retrieval gives the whole file, and says so.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir
+        .path()
+        .join(".claude/projects/E--p/0a1b/tool-results/b1.txt");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    std::fs::write(&file, &run).unwrap();
+    let part: String = numbered
+        .lines()
+        .take(2000)
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let file_s = file.to_string_lossy().to_string();
+    let on_disk = Hint {
+        tool: "Read",
+        path: &file_s,
+        ..Default::default()
+    };
+    let p = compress(&part, &on_disk, Some(&s));
+    assert!(
+        p.text.starts_with("[Lines 1-2000 of "),
+        "{}",
+        &p.text[..100]
+    );
+    assert!(
+        p.text.contains(&format!(
+            "all {} lines, not only this part",
+            run.lines().count()
+        )),
+        "{}",
+        p.text
+    );
+    let whole = s.get(p.id.as_ref().unwrap(), Some("not ok")).unwrap();
+    assert!(
+        whole.contains("not ok 2300"),
+        "the failure after line 2000 is found: {whole}"
+    );
+    // The same text read from a project file is code: whole.
+    let code = Hint {
+        tool: "Read",
+        path: "E:/p/logs/app.log",
+        ..Default::default()
+    };
+    assert!(!is_saved_output(&code));
+    assert_eq!(compress(&numbered, &code, None).text, numbered);
+    // A saved output without line numbers (not a Read's format) is left as it came.
+    assert_eq!(compress(&run, &saved, None).text, run);
+}
+
+#[test]
+fn an_output_already_cut_by_the_agents_tool_is_not_called_whole() {
+    let (_d, s) = store();
+    let mut run = String::from("Exit code 1\n\n> bench@1.0.0 test\n> node test/run.js\n\n");
+    for n in 1..150 {
+        run.push_str(&format!("ok {n} - total of {n} items ({} ms)\n", n % 13));
+    }
+    run.push_str("\n... [20012 characters truncated] ...\n\n");
+    for n in 2750..2906 {
+        run.push_str(&format!("ok {n} - format {n} ({} ms)\n", n % 13));
+    }
+    let hint = Hint {
+        tool: "Bash",
+        command: "npm test",
+        ..Default::default()
+    };
+    let c = compress(&run, &hint, Some(&s));
+    assert!(c.id.is_some());
+    assert!(
+        c.text.contains("had already left out 20012 characters"),
+        "{}",
+        c.text
+    );
+    assert!(!c.text.contains("gives the whole output"), "{}", c.text);
+    assert_eq!(cut_by_agent("plain output\n"), None);
+}

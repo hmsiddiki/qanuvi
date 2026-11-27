@@ -257,13 +257,122 @@ pub fn rewrite(body: &[u8], data_dir: &Path) -> Vec<u8> {
         return body.to_vec();
     };
     let store = crate::compress::Store::new(data_dir);
-    if !compress_messages(&mut v, Some(&store)) {
+    let tools = compact_tools(&mut v);
+    if !(compress_messages(&mut v, Some(&store)) | tools) {
         return body.to_vec();
     }
     serde_json::to_vec(&v).unwrap_or_else(|_| body.to_vec())
 }
 
+/// JSON Schema keys that are machine metadata only (which draft, an id, a comment for people). Dropping them changes
+/// neither which inputs are valid nor what the model learns about a tool; titles, examples and descriptions stay.
+const SCHEMA_META: [&str; 3] = ["$schema", "$id", "$comment"];
+
+/// Drops [`SCHEMA_META`] from the request's tool definitions (each tool's `input_schema`, nested schemas too); says
+/// whether anything changed. Deterministic, so the tools part of the prompt cache keeps hitting.
+pub fn compact_tools(v: &mut Value) -> bool {
+    let mut changed = false;
+    for tool in v
+        .get_mut("tools")
+        .and_then(Value::as_array_mut)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(schema) = tool.get_mut("input_schema") {
+            changed |= compact_schema(schema);
+        }
+    }
+    changed
+}
+
+/// One schema: its own metadata keys dropped, then only the keywords that hold schemas are walked (property names,
+/// enum and default values are data and never touched).
+fn compact_schema(s: &mut Value) -> bool {
+    let Some(obj) = s.as_object_mut() else {
+        return false;
+    };
+    let mut changed = false;
+    for k in SCHEMA_META {
+        changed |= obj.remove(k).is_some();
+    }
+    for (k, child) in obj.iter_mut() {
+        match k.as_str() {
+            "properties" | "patternProperties" | "$defs" | "definitions" | "dependentSchemas" => {
+                for sub in child
+                    .as_object_mut()
+                    .into_iter()
+                    .flat_map(|m| m.values_mut())
+                {
+                    changed |= compact_schema(sub);
+                }
+            }
+            "anyOf" | "oneOf" | "allOf" | "prefixItems" => {
+                for sub in child.as_array_mut().into_iter().flatten() {
+                    changed |= compact_schema(sub);
+                }
+            }
+            "items"
+            | "additionalProperties"
+            | "not"
+            | "if"
+            | "then"
+            | "else"
+            | "contains"
+            | "propertyNames"
+            | "additionalItems"
+            | "unevaluatedItems"
+            | "unevaluatedProperties" => {
+                if let Some(list) = child.as_array_mut() {
+                    for sub in list {
+                        changed |= compact_schema(sub);
+                    }
+                } else {
+                    changed |= compact_schema(child);
+                }
+            }
+            _ => {}
+        }
+    }
+    changed
+}
+
+/// A tool result's text when it is plain text (a string, or one text part); None for images and mixed parts.
+fn plain_text(content: &Value) -> Option<&str> {
+    if let Some(t) = content.as_str() {
+        return Some(t);
+    }
+    match content.as_array().map(Vec::as_slice) {
+        Some([p]) if p["type"] == "text" => p["text"].as_str(),
+        _ => None,
+    }
+}
+
+/// Where an earlier result came from, for the line that stands in for its repeat.
+fn source_of(tool: &str, command: &str, path: &str) -> String {
+    let clip = |s: &str| {
+        let s = s.trim();
+        if s.chars().count() > 100 {
+            format!("{}...", s.chars().take(100).collect::<String>())
+        } else {
+            s.to_string()
+        }
+    };
+    let tool = if tool.is_empty() { "tool" } else { tool };
+    if !command.trim().is_empty() {
+        format!("{tool} `{}`", clip(command))
+    } else if !path.is_empty() {
+        format!("{tool} of {path}")
+    } else {
+        tool.to_string()
+    }
+}
+
 /// Compresses the `tool_result` blocks of a Messages request in place; says whether anything changed.
+///
+/// Cross-turn repeats: a command or search output identical, character for character, to an earlier result in the
+/// same request is sent once; the later copy becomes one line pointing at the earlier one, which is still in the
+/// conversation above it. Decided on this request's messages alone, so a repeat is only ever shortened while its
+/// first copy is there. Code read from files is never shortened this way (the agent edits by its exact text).
 pub fn compress_messages(v: &mut Value, store: Option<&crate::compress::Store>) -> bool {
     let Some(messages) = v.get_mut("messages").and_then(Value::as_array_mut) else {
         return false;
@@ -288,6 +397,8 @@ pub fn compress_messages(v: &mut Value, store: Option<&crate::compress::Store>) 
         }
     }
     let mut changed = false;
+    // First copies of long outputs: (content id, length) -> where it came from.
+    let mut seen: HashMap<(String, usize), String> = HashMap::new();
     for m in messages.iter_mut() {
         let Some(blocks) = m.get_mut("content").and_then(Value::as_array_mut) else {
             continue;
@@ -310,6 +421,22 @@ pub fn compress_messages(v: &mut Value, store: Option<&crate::compress::Store>) 
                 command: &command,
                 path: &path,
             };
+            if let Some(text) = plain_text(&block["content"])
+                && text.len() >= crate::compress::MIN_CHARS
+                && crate::compress::kind_of(text, &hint) != crate::compress::Kind::Code
+            {
+                let key = (crate::compress::id_of(text), text.len());
+                if let Some(first) = seen.get(&key) {
+                    block["content"] = Value::String(format!(
+                        "[This output is the same, character for character, as the earlier {first} result above \
+                         ({} characters); not repeated here.]",
+                        text.len()
+                    ));
+                    changed = true;
+                    continue;
+                }
+                seen.insert(key, source_of(&tool, &command, &path));
+            }
             let content = &mut block["content"];
             if let Some(text) = content.as_str() {
                 let c = crate::compress::compress(text, &hint, store);
@@ -383,6 +510,113 @@ mod tests {
         assert_eq!(again, v);
         // Not a Messages request: sent as it came.
         assert_eq!(rewrite(b"not json", Path::new(".")), b"not json".to_vec());
+    }
+
+    #[test]
+    fn a_repeated_output_is_sent_once_and_code_reads_are_never_deduplicated() {
+        let out: String = (0..300)
+            .map(|i| format!("src/m{i}.js:3:export function f{i}() {{\n"))
+            .collect();
+        let code = "fn main() {}\n".repeat(400);
+        let mut v = serde_json::json!({"model": "m", "messages": [
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "a", "name": "Bash", "input": {"command": "grep -rn export src"}},
+                {"type": "tool_use", "id": "r1", "name": "Read", "input": {"file_path": "/p/main.rs"}}
+            ]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "a", "content": out.clone()},
+                {"type": "tool_result", "tool_use_id": "r1", "content": code.clone()}
+            ]},
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "b", "name": "Bash", "input": {"command": "grep -rn export src"}},
+                {"type": "tool_use", "id": "r2", "name": "Read", "input": {"file_path": "/p/main.rs"}}
+            ]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "b", "content": [{"type": "text", "text": out.clone()}]},
+                {"type": "tool_result", "tool_use_id": "r2", "content": code.clone()}
+            ]}
+        ]});
+        assert!(compress_messages(&mut v, None));
+        let first = v["messages"][1]["content"][0]["content"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let again = v["messages"][3]["content"][0]["content"].as_str().unwrap();
+        // The first copy is there (compressed as usual); the repeat points at it.
+        assert!(first.contains("src/m0.js"), "{first}");
+        assert!(
+            again.contains("same, character for character")
+                && again.contains("grep -rn export src"),
+            "{again}"
+        );
+        assert!(again.len() < 200);
+        // Code stays whole both times.
+        assert_eq!(v["messages"][1]["content"][1]["content"], code);
+        assert_eq!(v["messages"][3]["content"][1]["content"], code);
+        // Deterministic: the same request gives the same bytes again.
+        let mut twice: Value = serde_json::from_str(&v.to_string()).unwrap();
+        let before = twice.clone();
+        compress_messages(&mut twice, None);
+        assert_eq!(twice, before);
+        // A different output is not taken for a repeat.
+        let mut w = serde_json::json!({"model": "m", "messages": [
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "a", "name": "Bash", "input": {"command": "npm test"}},
+                {"type": "tool_use", "id": "b", "name": "Bash", "input": {"command": "npm test"}}]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "a", "content": format!("{out}# 1 failed\n")},
+                {"type": "tool_result", "tool_use_id": "b", "content": format!("{out}# 0 failed\n")}]}
+        ]});
+        compress_messages(&mut w, None);
+        let second = w["messages"][1]["content"][1]["content"].as_str().unwrap();
+        assert!(
+            !second.contains("character for character") && second.contains("# 0 failed"),
+            "{second}"
+        );
+    }
+
+    #[test]
+    fn tool_definitions_lose_only_schema_metadata() {
+        let mut v = serde_json::json!({"model": "m", "messages": [], "tools": [
+            {"name": "Bash", "description": "Runs a command.", "input_schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "title": "BashInput",
+                "properties": {
+                    "$id": {"type": "string", "description": "a property really named $id"},
+                    "command": {"type": "string", "description": "The command", "examples": ["ls"]},
+                    "mode": {"enum": [{"$comment": "data, not a schema"}], "default": {"$schema": "kept"}},
+                    "list": {"type": "array", "items": {"$comment": "x", "type": "string"}},
+                    "either": {"anyOf": [{"$id": "#a", "type": "string"}, {"type": "number"}]}
+                },
+                "required": ["command"],
+                "additionalProperties": false
+            }}
+        ]});
+        assert!(compact_tools(&mut v));
+        let s = &v["tools"][0]["input_schema"];
+        assert!(s.get("$schema").is_none());
+        // Kept: titles, examples, descriptions, property names, enum and default values, constraints.
+        assert_eq!(s["title"], "BashInput");
+        assert_eq!(s["properties"]["command"]["examples"][0], "ls");
+        assert_eq!(
+            s["properties"]["$id"]["description"],
+            "a property really named $id"
+        );
+        assert_eq!(
+            s["properties"]["mode"]["enum"][0]["$comment"],
+            "data, not a schema"
+        );
+        assert_eq!(s["properties"]["mode"]["default"]["$schema"], "kept");
+        assert_eq!(s["required"][0], "command");
+        assert_eq!(s["additionalProperties"], false);
+        // Nested schemas lose theirs too.
+        assert!(s["properties"]["list"]["items"].get("$comment").is_none());
+        assert!(s["properties"]["either"]["anyOf"][0].get("$id").is_none());
+        // Nothing left to drop: unchanged, and the bytes stay the same request after request.
+        let once = v.clone();
+        assert!(!compact_tools(&mut v));
+        assert_eq!(v, once);
     }
 
     /// The proxy end to end on this machine: a fake upstream answers a streamed reply; the tool result reached it

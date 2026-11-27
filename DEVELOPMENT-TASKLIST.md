@@ -5288,6 +5288,40 @@ and ST1 has been driven again on the finished build.
     its own tools (ENABLE_TOOL_SEARCH on in the session's --settings env) and/or drop schema annotation keys in
     compress_proxy; mostly cached tokens, so the money gain is small; (2) cross-turn dedup of a repeated tool result;
     (3) a Read of a tool-results/*.txt file judged by its content (it is command output, not code). Then repeat x3.
+  - Tuning t1-t3 BUILT (owner 2026-11-27: build all three, without hurting the quality or continuity of a session),
+    unpublished: t1 tool definitions: the proxy drops only `$schema`, `$id`, `$comment` from tool schemas (machine
+    metadata; titles, examples, descriptions, enum/default values and property names kept; a real Claude Code request
+    had only `$schema`, about 1% of 150 KB of tools), and on "All models" a session gets Claude Code's own
+    ENABLE_TOOL_SEARCH "auto" back when the user's "false" came with a Headroom setup (claude_update
+    tool_search_off_for_headroom; a "false" set without Headroom is kept). t2 cross-turn dedup in compress_messages: a
+    command or search output of 2,000+ characters identical to an earlier result in the same request becomes one line
+    pointing at it (decided per request, so only while the first copy is there; code reads never). t3 a Read of
+    Claude Code's saved output (`.claude/projects/.../tool-results/`) is judged by content: line numbers taken off, said
+    as "[Lines a-b of <file>, a command's saved output, shortened for reading:]". Quality fixes found on the way: q1 a
+    failing test was not an error line (TAP "not ok", expected/got, assert, jest marks now are; before, a long npm test
+    could lose its failures from the middle); q2 (found in the drive) the retrieval id of one part of a saved output
+    searched only that part ("No line holds not ok" while the failure was in the next part): retrieval now gives the
+    whole saved file and says so; q3 (found in the drive) when Claude Code itself already cut the middle
+    ("... [20012 characters truncated] ..."), the note no longer promises "the whole output" and says how to see all
+    of it. Tests: 708 lib tests pass (new: failing tests kept, saved-output read, whole-file retrieval, dedup, schema
+    metadata, agent-side truncation, tool-search rule); clippy clean. Not driven in a window: only headless plan runs.
+  - Measurement 4 (2026-11-27 12:46-13:20, same plan and setup as measurement 3; built-in test build from
+    E:/qc-scratch/o3/tb (t1-t3 + q1) and tb2 (+ q2), run from copies because target/release/qanuvi-master.exe was
+    held by a stray test master; Headroom again through the scratch 8797 proxy):
+    | run | input | cache read | cost | tool calls | retrieve calls |
+    |---|---|---|---|---|---|
+    | Headroom 4 / 5 / 6 | 618k / 755k / 622k | 8.08M / 8.84M / 10.94M | $0.80 / $1.05 / $0.90 | 146 / 134 / 162 | 0 |
+    | built in 4 / 5 / 6 (t1-t3, q1) | 601k / 415k / 588k | 6.44M / 7.66M / 8.84M | $0.71 / $0.61 / $0.83 | 196 / 119 / 120 | 2 / 9 / 0 |
+    | built in 7 / 8 / 9 (+ q2) | 741k / 455k / 656k | 8.91M / 10.45M / 9.63M | $1.01 / $0.75 / $0.88 | 159 / 157 / 164 | 3 / 6 / 4 |
+    All nine 10/10 and correct (2,906 tests pass, rename done, refund added, 7 NOTES sections); no failed, held or
+    retried step in any run. Means: Headroom 6 runs (m3 + m4) input 667k, $0.89; built in before tuning (m3) 746k,
+    $0.89; built in after tuning (6 runs) 576k (-14% against Headroom), $0.80 (-10%); same-hour sets only (Headroom
+    4-6 against built in 7-9): 665k vs 617k (-7%), $0.92 vs $0.88 (-4%). Built in is now level with Headroom or a
+    little ahead on this plan; the spread inside each side ($0.61-$1.05) is still larger than the gap, so this is
+    "within about 10%", not a clear win. Continuity: retrieval calls went from 0-1 to 0-9 a run; they were searches
+    of a kept original to confirm the failing tests (cheap, correct answers), plus the q2/q3 cases now fixed. Tool
+    calls stay in Headroom's range except built in 4 (196). Next for 24w: one more set of 3 after q3 with a bigger
+    mixed plan (owner's choice), then the owner decides whether "All models" may replace Headroom.
 - [ ] **24t. Chat clean-up (owner, 2026-11-13; agreed 2026-11-13)**: chats were never cleaned up by themselves:
   every session and all its lines (tool output too) stayed in the database until the owner deleted it, and 24j
   housekeeping covers plan files only. 24s part 2 assumed a "usual clean-up" that did not exist. One short session:

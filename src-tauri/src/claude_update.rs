@@ -110,6 +110,32 @@ pub fn settings_base_url() -> Option<String> {
     base_url_in(&std::fs::read_to_string(path).ok()?)
 }
 
+/// Whether Claude Code's user settings turned its own tool search off as part of a Headroom setup (Headroom defers
+/// the tools itself, so it asks for `ENABLE_TOOL_SEARCH` "false"). A session sent past Headroom (built-in compression on
+/// "All models") then gets Claude Code's own "auto" back; a "false" set without Headroom is the user's and is kept.
+pub fn tool_search_off_for_headroom() -> bool {
+    let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) else {
+        return false;
+    };
+    let path = std::path::Path::new(&home)
+        .join(".claude")
+        .join("settings.json");
+    std::fs::read_to_string(path)
+        .map(|t| tool_search_off_for_headroom_in(&t))
+        .unwrap_or(false)
+}
+
+fn tool_search_off_for_headroom_in(text: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else {
+        return false;
+    };
+    let env = &v["env"];
+    env["ENABLE_TOOL_SEARCH"].as_str() == Some("false")
+        && env["ANTHROPIC_BASE_URL"]
+            .as_str()
+            .is_some_and(crate::compress::looks_like_headroom)
+}
+
 fn base_url_in(text: &str) -> Option<String> {
     let v: serde_json::Value = serde_json::from_str(text).ok()?;
     v["env"]["ANTHROPIC_BASE_URL"].as_str().map(str::to_string)
@@ -225,6 +251,17 @@ mod tests {
         );
         assert_eq!(base_url_in("{}"), None);
         assert_eq!(base_url_in("not json"), None);
+        // Tool search turned off by a Headroom setup is given back past Headroom; the user's own "false" is kept.
+        assert!(tool_search_off_for_headroom_in(
+            r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:8787/p/x","ENABLE_TOOL_SEARCH":"false"}}"#
+        ));
+        assert!(!tool_search_off_for_headroom_in(
+            r#"{"env":{"ENABLE_TOOL_SEARCH":"false"}}"#
+        ));
+        assert!(!tool_search_off_for_headroom_in(
+            r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:8787","ENABLE_TOOL_SEARCH":"true"}}"#
+        ));
+        assert!(!tool_search_off_for_headroom_in("not json"));
         let on = serde_json::json!({"updates": {"claudeAuto": true}});
         assert!(auto_wanted(on.as_object().unwrap()));
         assert!(!auto_wanted(&serde_json::Map::new()));

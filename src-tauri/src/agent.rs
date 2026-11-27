@@ -1412,8 +1412,14 @@ impl Agents {
                 // o3a (Windows drive): an ANTHROPIC_BASE_URL in Claude Code's own ~/.claude/settings.json (a Headroom
                 // setup) wins over the environment, so the session went to Headroom anyway. Settings given on the
                 // command line rank above the user's file.
-                cmd.arg("--settings")
-                    .arg(json!({"env": {"ANTHROPIC_BASE_URL": url}}).to_string());
+                let mut env = json!({"ANTHROPIC_BASE_URL": url});
+                // 24w tuning: a Headroom setup turns Claude Code's tool search off (Headroom defers tools itself). Past
+                // Headroom nothing would defer them, so the session gets Claude Code's own "auto" back: tools are
+                // deferred only when they fill much of the context, exactly as Claude Code decides on its own.
+                if proxied.is_some() && crate::claude_update::tool_search_off_for_headroom() {
+                    env["ENABLE_TOOL_SEARCH"] = json!("auto");
+                }
+                cmd.arg("--settings").arg(json!({ "env": env }).to_string());
             }
         }
         no_window(&mut cmd);
