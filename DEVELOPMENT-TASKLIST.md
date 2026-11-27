@@ -2081,6 +2081,11 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
+    0.1.50 PUBLISHED c9f152c tag v0.1.50 (2026-11-27 ~10:10, owner "publish anyway"; first darwin-aarch64 build; backup
+      E:/Backups/qanuvi/channel-before-0.1.50; 6 files online, sizes match). Mac: the published tarball installed into
+      /Applications (real copy, real data folder, owner keeps it). Laptop: updated itself 0.1.48 -> 0.1.50 (.prev kept).
+      Owner keeps Headroom on This PC until the built-in compression is proven. NEXT: the long run, Headroom vs built in
+      (same scratch plan, Claude Code, test build on This PC, compression=headroom then builtin), results into 24w.
     PICKUP POINT (newest, 2026-11-27 09:20, owner asleep since ~05:30): all pushed, NOTHING PUBLISHED since 0.1.49.
       Done overnight (below and s20-s22): Mac flows + MU1-MU3, m2/m3/m7, r1, p1, o1, w2, Windows flow 20, O3 parts 1+2
       (built-in compression, driven) with the Automatic/Built in/Headroom/Off setting. Waiting for the owner: the
