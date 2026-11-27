@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchShortcut, shortcutLabel } from "./shortcuts";
+import { keysFor, matchShortcut, shortcutLabel } from "./shortcuts";
 
 const press = (key: string, mods: Partial<{ ctrl: boolean; meta: boolean; shift: boolean; alt: boolean }> = {}) => ({
   key,
@@ -32,5 +32,16 @@ describe("shortcutLabel", () => {
   it("writes shortcuts for each system", () => {
     expect(shortcutLabel("toggleTerminalMaximized", false)).toBe("Ctrl+Shift+J");
     expect(shortcutLabel("toggleAgent", true)).toBe("Cmd+Option+A");
+  });
+});
+
+// m7 (Mac drive): the Reload button said Ctrl+Shift+R on a Mac.
+describe("keysFor", () => {
+  it("says Cmd on a Mac and leaves other systems and other words alone", () => {
+    expect(keysFor("Ctrl+Shift+R", true)).toBe("Cmd+Shift+R");
+    expect(keysFor("Ctrl+K Ctrl+F", true)).toBe("Cmd+K Cmd+F");
+    expect(keysFor("Ctrl+Shift+R", false)).toBe("Ctrl+Shift+R");
+    expect(keysFor("Find in the conversation (Ctrl+F)", true)).toBe("Find in the conversation (Cmd+F)");
+    expect(keysFor("Control panel", true)).toBe("Control panel");
   });
 });

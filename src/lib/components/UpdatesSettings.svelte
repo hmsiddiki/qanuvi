@@ -11,6 +11,8 @@
   import { shownPlace } from "$lib/remote";
   import { ago } from "$lib/stores/git.svelte";
   import { settings } from "$lib/stores/settings.svelte";
+  import { platform } from "$lib/platform.svelte";
+  import { keysFor } from "$lib/shortcuts";
 
   const up = masterUpdate;
   const pc = $derived(!switcher.shown);
@@ -124,7 +126,9 @@
         >The interface starts again; agents keep working in the background and terminals open again.</span
       >
     </span>
-    <button type="button" class="btn" onclick={() => updates.reloadWindow()}>Reload <kbd>Ctrl+Shift+R</kbd></button>
+    <button type="button" class="btn" onclick={() => updates.reloadWindow()}
+      >Reload <kbd>{keysFor("Ctrl+Shift+R", platform.isMac)}</kbd></button
+    >
   </div>
   <div class="row">
     <span>

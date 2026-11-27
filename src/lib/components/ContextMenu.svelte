@@ -6,6 +6,8 @@
    */
   import { tick } from "svelte";
   import { clipboardText, contextMenu, copyText, type MenuItem } from "$lib/stores/contextMenu.svelte";
+  import { platform } from "$lib/platform.svelte";
+  import { keysFor } from "$lib/shortcuts";
 
   let menu: HTMLDivElement | undefined = $state();
   let pos = $state({ x: 0, y: 0 });
@@ -172,7 +174,7 @@
           onclick={() => run(item)}
         >
           <span>{item.label}</span>
-          {#if item.hint}<span class="hint">{item.hint}</span>{/if}
+          {#if item.hint}<span class="hint">{keysFor(item.hint, platform.isMac)}</span>{/if}
         </button>
       {/each}
     {/each}

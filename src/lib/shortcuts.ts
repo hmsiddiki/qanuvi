@@ -46,3 +46,11 @@ export function shortcutLabel(action: LayoutAction, isMac: boolean): string {
   parts.push(s.key.toUpperCase());
   return parts.join("+");
 }
+
+/**
+ * m7 (Mac drive): a shortcut written the Windows/Linux way ("Ctrl+Shift+R", "Ctrl+K Ctrl+F"), as the Mac says it:
+ * Ctrl is Cmd there (the keyboard handlers use Cmd on a Mac already). Other text is left as it is.
+ */
+export function keysFor(text: string, isMac: boolean): string {
+  return isMac ? text.replace(/\bCtrl\+/g, "Cmd+") : text;
+}

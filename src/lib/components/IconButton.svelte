@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { platform } from "$lib/platform.svelte";
+  import { keysFor } from "$lib/shortcuts";
 
   interface Props {
     label: string;
@@ -20,7 +22,7 @@
   class:active
   aria-label={label}
   aria-pressed={active}
-  title={shortcut ? `${label} (${shortcut})` : label}
+  title={keysFor(shortcut ? `${label} (${shortcut})` : label, platform.isMac)}
   {disabled}
   {onclick}
 >
