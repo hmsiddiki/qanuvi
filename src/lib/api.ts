@@ -78,6 +78,14 @@ export interface FileContent {
   too_large: boolean;
 }
 
+/** s3: what changed in a project folder (`more`: more than were listed; `ping`: only a check the window is there). */
+export interface FileChanges {
+  paths?: string[];
+  git?: boolean;
+  more?: boolean;
+  ping?: boolean;
+}
+
 /** s2: one part of a file too big for the editor (read-only). */
 export interface FilePart {
   text: string;
@@ -426,6 +434,8 @@ export const api = {
     logAppend: (projectId: string, path: string, text: string) =>
       invoke<void>("files_log_append", { projectId, path, text }),
     read: (projectId: string, path: string) => invoke<FileContent>("files_read", { projectId, path }),
+    /** s3: changes in the project folder made outside Qanuvi, as they happen (older masters refuse it). */
+    watch: (projectId: string, onEvent: Channel<FileChanges>) => invoke<void>("files_watch", { projectId, onEvent }),
     readPart: (projectId: string, path: string, offset: number) =>
       invoke<FilePart>("files_read_part", { projectId, path, offset }),
     write: (projectId: string, path: string, text: string, expectedHash: string | null) =>

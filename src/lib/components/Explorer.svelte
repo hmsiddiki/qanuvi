@@ -15,6 +15,8 @@
   import { agent } from "$lib/stores/agent.svelte";
   import { decorations, type Decorations } from "$lib/git/decorations";
   import { gitState } from "$lib/stores/git.svelte";
+  import { fileWatch } from "$lib/stores/fileWatch.svelte";
+  import { untrack } from "svelte";
   import IconButton from "./IconButton.svelte";
 
   interface Props {
@@ -136,6 +138,26 @@
     await Promise.all([load(files.parentOf(rel)), load(""), loadGit()]);
     if (expanded.has(rel)) await load(rel);
   }
+
+  // s3: the folder is followed; a change made outside Qanuvi reloads the shown folders it touched.
+  $effect(() => {
+    fileWatch.follow(project.id);
+  });
+  $effect(() => {
+    void fileWatch.changed;
+    untrack(() => {
+      const l = fileWatch.last;
+      if (l.projectId !== project.id || (!l.all && !l.paths.length)) return;
+      if (l.all) {
+        void refresh();
+        return;
+      }
+      const dirs = new Set(l.paths.map((p) => files.parentOf(p)));
+      // A changed folder itself (made, renamed) and the folders holding changed paths, when shown.
+      for (const p of l.paths) if (children.has(p)) dirs.add(p);
+      for (const d of dirs) if (d === "" || children.has(d)) void load(d);
+    });
+  });
 
   export function collapseAll() {
     expanded.clear();

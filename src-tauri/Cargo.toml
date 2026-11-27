@@ -49,6 +49,7 @@ jiff = "0.2"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 globset = "0.4"
 ignore = "0.4.34"
+notify = "9.0.0"
 regex = "1.13.1"
 portable-pty = "0.9.0"
 tauri-plugin-dialog = { version = "2.8.4", optional = true }

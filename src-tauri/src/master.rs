@@ -81,6 +81,8 @@ pub struct Master {
     /// Windows following this master's project list: told when a project is added, removed or changed by anyone
     /// (its own terminal, another window), so an open window's list follows.
     projects_watchers: inbox_cmds::InboxWatchers,
+    /// s3: the project folders windows follow for changes made outside Qanuvi.
+    file_watches: crate::file_watch::FileWatches,
     /// The desktop app's links to This PC's master (migration M4c): the tray's Open and Quit reach the app on them.
     app_links: inbox_cmds::InboxWatchers,
     /// The tray's Quit question while it is up (t1): asked in Qanuvi's own dialog, answered on `app_quit_answer`.
@@ -245,6 +247,7 @@ impl Master {
             remotes,
             remote_watchers: inbox_cmds::InboxWatchers::default(),
             projects_watchers: inbox_cmds::InboxWatchers::default(),
+            file_watches: crate::file_watch::FileWatches::default(),
             app_links: inbox_cmds::InboxWatchers::default(),
             quit_question: Default::default(),
             remote_errors: Mutex::default(),
@@ -410,6 +413,13 @@ impl Master {
                 Ok(json!({"files": list, "truncated": truncated}))
             }
             "files_read" => to(files::read_file(&self.root(args)?, &s(args, "path"))),
+            // s3: changes in the project folder made outside Qanuvi, on the stream as they happen.
+            "files_watch" => {
+                let root = self.root(args)?;
+                self.file_watches
+                    .follow(&root, stream(&s(args, "onEvent")))?;
+                Ok(Value::Null)
+            }
             "files_read_part" => to(files::read_part(
                 &self.root(args)?,
                 &s(args, "path"),
@@ -1266,7 +1276,7 @@ impl Master {
     }
 }
 
-fn hostname() -> String {
+pub(crate) fn hostname() -> String {
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .ok()

@@ -207,7 +207,8 @@ fn add_and_connect(dir: &Path, mut server: Value) -> Result<(), String> {
 const USAGE: &str = "Usage: qanuvi-master servers list
        qanuvi-master servers add <ssh address> [--name <name>] [--program <path>] [--key <ssh key file>] [--no-auto]
        qanuvi-master servers remove <name or id>
-       qanuvi-master pair --code <pairing code> [--relay <your own relay>] [--name <this machine's name there>]";
+       qanuvi-master pair --code <pairing code> [--relay <your own relay>] [--name <this machine's name there>]
+       qanuvi-master pair [--name <this machine's name>] [--relay <your own relay>]   (shows a code to pair with)";
 
 /// `qanuvi-master servers …`; `args` are the words after `servers`.
 pub fn servers_cli(dir: &Path, args: &[String]) -> Result<(), String> {
@@ -290,7 +291,9 @@ pub fn servers_cli(dir: &Path, args: &[String]) -> Result<(), String> {
 pub fn pair_cli(dir: &Path, args: &[String]) -> Result<(), String> {
     // 24rl A1: no --relay means Qanuvi's relay.
     let relay = flag(args, "--relay").unwrap_or("");
-    let code = flag(args, "--code").ok_or(USAGE)?;
+    let Some(code) = flag(args, "--code") else {
+        return offer_code(dir, args);
+    };
     let name = flag(args, "--name").unwrap_or("");
     let p = call(
         dir,
@@ -310,6 +313,60 @@ pub fn pair_cli(dir: &Path, args: &[String]) -> Result<(), String> {
             "relay": {"url": p["relay"], "masterId": p["masterId"], "pairing": p["pairing"]},
         }),
     )
+}
+
+/// s13 (ST2): `qanuvi-master pair` on a machine without a window (a server): turns remote access on when it is off
+/// (Qanuvi's relay, or --relay), waits for the relay, and shows a pairing code for the other computer's window.
+fn offer_code(dir: &Path, args: &[String]) -> Result<(), String> {
+    if !words(args).is_empty() {
+        return Err(USAGE.into());
+    }
+    let st = call(dir, "relay_status", json!({}))?;
+    let wanted_relay = flag(args, "--relay");
+    if !st["enabled"].as_bool().unwrap_or(false)
+        || wanted_relay.is_some()
+        || flag(args, "--name").is_some()
+    {
+        let name = flag(args, "--name")
+            .map(str::to_string)
+            .or_else(|| {
+                st["name"]
+                    .as_str()
+                    .filter(|n| !n.trim().is_empty())
+                    .map(String::from)
+            })
+            .unwrap_or_else(crate::master::hostname);
+        let relay = wanted_relay.or(st["relay"].as_str()).unwrap_or("");
+        call(
+            dir,
+            "relay_configure",
+            json!({"relay": relay, "name": name, "enabled": true}),
+        )?;
+        println!("Remote access is on for \"{name}\".");
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        let st = call(dir, "relay_status", json!({}))?;
+        if st["connected"].as_bool().unwrap_or(false) {
+            break;
+        }
+        if std::time::Instant::now() > deadline {
+            let error = st["error"].as_str().unwrap_or("");
+            return Err(if error.is_empty() {
+                "This machine did not reach the relay within 30 seconds. Check its internet connection and try again."
+                    .into()
+            } else {
+                format!("This machine did not reach the relay: {error}")
+            });
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    let code = call(dir, "relay_pair_start", json!({}))?;
+    println!("Pairing code: {}", code.as_str().unwrap_or(""));
+    println!(
+        "In Qanuvi on the other computer: Settings, Servers, \"Pair with a computer through the relay\": type it there. It works for 10 minutes."
+    );
+    Ok(())
 }
 
 #[cfg(test)]

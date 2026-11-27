@@ -320,6 +320,27 @@ class EditorStore {
     }
   }
 
+  /**
+   * s3: files of a project changed on disk (outside Qanuvi). An open tab without edits shows the new text; one with
+   * edits gets the "changed on disk" bar. `all`: too many changes were listed, every open tab of the project is read.
+   */
+  async diskChanged(projectId: string, paths: string[], all: boolean): Promise<void> {
+    const hit = new Set(paths);
+    const tabs = this.tabs.filter(
+      (t) => t.projectId === projectId && !t.config && !t.binary && !t.tooLarge && (all || hit.has(t.path)),
+    );
+    for (const tab of tabs) {
+      try {
+        const file = await readTab(tab);
+        if (file.hash === tab.hash) continue;
+        if (tab.dirty) tab.conflict = true;
+        else await this.reload(tab.key);
+      } catch {
+        // Gone or unreadable now: the tab says so when it is saved or read again.
+      }
+    }
+  }
+
   /** Reads the file again from disk, dropping unsaved changes. */
   async reload(key: string): Promise<void> {
     const tab = this.tabs.find((t) => t.key === key);

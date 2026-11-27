@@ -19,6 +19,7 @@ pub mod dap;
 pub mod data_location;
 pub mod direct;
 pub mod drafts;
+pub mod file_watch;
 pub mod files;
 pub mod free_relays;
 pub mod git;

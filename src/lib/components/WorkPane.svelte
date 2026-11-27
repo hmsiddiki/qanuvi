@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { fileWatch } from "$lib/stores/fileWatch.svelte";
   import Globe from "@lucide/svelte/icons/globe";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import ListChecks from "@lucide/svelte/icons/list-checks";
@@ -40,6 +41,10 @@
   import { ui, type WorkView } from "$lib/stores/ui.svelte";
 
   let project = $derived(projects.current);
+  // s3: the shown project's folder is followed (open tabs and the Git list hear outside changes).
+  $effect(() => {
+    if (project) fileWatch.follow(project.id);
+  });
   /** The editor groups with tabs for this project (15i part 4): one, or two when the editor is split. */
   let shown = $derived(editor.shownGroups(project?.id ?? null));
   let split = $derived(shown.length > 1);
