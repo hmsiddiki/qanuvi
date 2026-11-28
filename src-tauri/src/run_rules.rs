@@ -985,6 +985,8 @@ mod tests {
             "npm test && (node server.js & pid=$!; sleep 1; curl -fsS http://127.0.0.1:4173/ | grep -q 'Text tools'; rc=$?; kill $pid; exit $rc)",
             "node server.js & sleep 1; curl -s http://127.0.0.1:4173/; kill $!",
             "node server.js & SERVER=$! ; sleep 1; kill \"${SERVER}\" 2>/dev/null",
+            // The 24 h run's end check (2026-11-28): CLI and server together, a local POST with its output dropped.
+            r#"d=$(mktemp -d) && node bin/notes.js add --store "$d/notes.json" --title "End check" --body "hello" && node bin/notes.js list --store "$d/notes.json" | grep -q "End check" && { node server.js --store "$d/notes.json" & p=$!; sleep 1; curl -fsS http://127.0.0.1:4180/ | grep -qi '<form' && curl -fsS -X POST -H 'Content-Type: application/json' -d '{"title":"From web","body":"x","tags":[]}' http://127.0.0.1:4180/api/notes >/dev/null && curl -fsS http://127.0.0.1:4180/api/notes | grep -q 'From web'; r=$?; kill $p; [ $r -eq 0 ]; } && npm test"#,
         ] {
             let v = p.command(own_job);
             assert!(!matches!(v, Verdict::Never(_)), "{own_job}: {v:?}");

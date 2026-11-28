@@ -340,3 +340,20 @@ owner's case from 2026-11-28: steps 7 and 8 of a sign-in plan were held with "in
 does not exist. The check had read Qanuvi's own browser tool as a program to install. Since this fix, the check holds
 steps only for missing secrets. A missing program or an address that doesn't answer is the agent's to find out, and an
 old hold of that kind is dropped when the run starts again.
+
+## ST3, the 24 h run (laptop, started 2026-11-28 06:35)
+
+Setup: the 0.1.55 build (`~/qc-scratch/st3/bin`) serving the test data root `~/qc-scratch/st1/xdg`. The window is
+the test build of the same code (2873e4f = 0.1.55 without the version bump): the release build has Qanuvi's real app
+name, so it handed over to the installed copy and quit. The plan is `~/qc-scratch/st3/proj/PLAN.md`: 25 steps, a
+notes library with CLI, web page and file store; step 24 needs a secret the project does not have. Short runs of the
+5-step st53 plan start at hours 4, 8, 12, 16 and 20. `monitor.sh` logs Qanuvi's processes (memory, threads, open
+files), leftover agents, servers and browsers, and the run state every 10 minutes to `monitor.log`.
+
+Not covered unattended: the network drop and sleep/wake. Both need the laptop's password (nmcli network control and
+suspend ask for it). They are left for the owner (2 minutes at the laptop).
+
+First hour: 23 of 25 steps done in about 30 minutes, all on the first try. Step 24 waits for its secret (right).
+Step 25 also waits: its end check was refused as "a download". Cause: a local `curl ... >/dev/null` counted as
+fetching from outside, because the redirection was read as an address. Fixed after the run started (redirections are
+skipped; a test holds the exact command). Not in 0.1.55.
