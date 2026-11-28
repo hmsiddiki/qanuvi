@@ -2081,7 +2081,24 @@ and ST1 has been driven again on the finished build.
       Also: m2 (window position not kept), m3 (restored terminal tab named "Terminal"), m5 (macOS "running in the
       background" notice), the app's --stdio link from the helper, then Mac sign-in + pairing once the site plan
       (www/qanuvi/register-auth-helper.md, owner runs it) is done, then the 32 flows as a Mac column.
-    CHECKPOINT (newest, 2026-11-27 after 0.1.52, fresh session starts here): 0.1.52 published, ALL THREE MACHINES ON
+    CHECKPOINT (newest, 2026-11-28 08:05, app work resumes here; owner moves to qanuvi.com in a separate session):
+      0.1.55 PUBLISHED 66106ae tag v0.1.55. UNPUBLISHED: 8813cd0 (a local curl with >/dev/null or 2>&1 is a local
+      fetch, not a download; blocker fix found by ST3), 0.1.56 waits for the owner's yes. RUNNER BASELINE in force:
+      docs/BASELINE-RUNNER.md (owner's 5-point flow, guarding scenarios, real-run record on the laptop st53 plan; a
+      live bug becomes a failing scenario first; publish-update.mjs refuses on any failing test, even with
+      QANUVI_RELEASE_ANYWAY). ST3 24 h RUN ON THE LAPTOP (feature freeze, blockers only): started 2026-11-28 06:35,
+      ends ~2026-11-29 06:35, 0.1.55 master in ~/qc-scratch/st3 (bin/, proj/ = 25-step notes plan), test window
+      ~/src/qanuvi build pid 143486; monitor.sh -> ~/qc-scratch/st3/monitor.log every 10 min (rss/threads/fds per
+      process, leftover agents/servers/browsers, run state); runs.sh short st53 runs at h4/8/16/20 -> runs.log,
+      later.sh at h12 -> later.log. Main plan 23/25 in ~30 min: step 24 waits for its secret (right), step 25 waits
+      because of the curl bug fixed in 8813cd0 (not in the running build). Owner did the network drop and sleep/wake
+      (slept 07:48, woke fine, all processes alive). Watch: "headless browsers 6" in the monitor (likely one browser's
+      processes; must not grow). AT THE END: read the three logs, judge memory/thread/fd trends, leftovers, every
+      scheduled run against the baseline record, write results into docs/STABLE-FLOWS.md "ST3" and the
+      BASELINE-RUNNER.md table, stop the st3 processes (anchored pkill ^/home/neel/..., never pkill -f matching ssh),
+      then ask 0.1.56. AFTER ST3: ST4 (flaky tests), ST5, Windows ST3, then the earlier list below (items 2, 3, 5).
+      Owner action still open on This PC: old qanuvi-browser Inbox cards (Go ahead, or they drop on the next run).
+    CHECKPOINT (before, 2026-11-27 after 0.1.52): 0.1.52 published, ALL THREE MACHINES ON
       IT (owner checked), nothing unpublished. Built-in compression stays Off by default; owner keeps Headroom on This PC.
       NEXT (recommended order, owner picks): (1) ST2 one fix round over open items in docs/STABLE-FLOWS.md, then ST3
       24 h unattended run on the laptop (feature freeze, blockers only); (2) alongside, if owner agrees: one real day
