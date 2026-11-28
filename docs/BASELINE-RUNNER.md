@@ -30,6 +30,7 @@ All are runner scenarios in `src-tauri/src/plan/runner/scenarios.rs` (`cargo tes
 | 3 blocked step | `a_blocked_step_goes_to_the_inbox_the_run_waits_and_an_answer_lets_it_go_on` |
 | 3 a held step asks at once | `baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question` |
 | 1 end check kept whole | `a_long_end_check_command_is_kept_whole` (preflight.rs) |
+| 4 free models out for today | `baseline_free_models_out_for_today_are_tried_once_then_paid_models_do_every_step` |
 | 4 a step stops its own server | `a_step_may_stop_a_process_it_started_in_the_project_and_no_other` (run_rules.rs) |
 | 4 chat note | `a_note_typed_in_the_steps_chat_is_sorted_first_then_passed_on_and_the_step_goes_on` |
 | 4 chat "change" | `a_message_the_free_model_calls_a_change_goes_to_the_working_agent_and_nothing_waits_for_the_owner` |
@@ -66,8 +67,13 @@ terminal with Claude Code in Auto mode, "Stop for me: Never". The right result i
 Scenarios added from these runs: `baseline_a_held_step_that_needs_a_later_step_still_asks_its_own_question`,
 `a_long_end_check_command_is_kept_whole`, `a_step_may_stop_a_process_it_started_in_the_project_and_no_other`.
 
-Still open (no stop, only slower): every step first fails twice on the free model ("qanuvi:auto: not finished",
-error after 5-20 s, no message kept) before a paid model does it. Each step loses about 30 seconds.
+| a119548 | 3 of 5 | 2 | step 5 blocked | Free models out for today (OpenRouter's daily limit): one free try, the notice said once, every later try straight to the paid model. Before this, every step lost two free tries, and a step could end "did not finish" with no paid try at all. Step 5 blocked on Qanuvi's own end check: it read the page from `$_` and could never pass. |
+| 2873e4f | 4 of 5 | 1 (right) | none | **Target met, $0.00:** the free limit had reset, and free models did all four steps on the first try. Checked by hand: 27 tests pass, the page serves "Text tools", README written, no server left running. |
+
+Fixed from these runs: the free models' daily limit is found once and the run goes on with the paid models
+(`baseline_free_models_out_for_today_are_tried_once_then_paid_models_do_every_step`). An end check Qanuvi wrote before
+the run is its own guess, not the owner's yardstick: the step may correct a command that could never pass, never
+weaker, and the next try runs the corrected line (`CheckRules.written`).
 
 ## Where it slipped before
 
